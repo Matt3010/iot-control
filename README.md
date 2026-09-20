@@ -1,22 +1,30 @@
-# 🍕 Restaurant Index
+# 🚀 Restaurant Index
 
-Il mio indice personale dei ristoranti, reso come un **mondo isometrico voxel/low-poly**
-con [Three.js](https://threejs.org/). Ogni ristorante è un edificio su un'isola: ci clicchi
-sopra e si apre la scheda con categoria, voto, prezzo e note.
+Il mio indice personale dei ristoranti, reso come un **diorama spaziale isometrico**
+con [Three.js](https://threejs.org/) — nello stile del
+[Kenney Space Kit](https://kenney.nl/assets/space-kit). Una colonia rocciosa che
+galleggia nel buio: ogni ristorante è una struttura, ci clicchi sopra e si apre la
+scheda con categoria, voto, prezzo e note. Astronauti (e qualche alieno) girano tra
+gli avamposti.
 
 ![anteprima](docs/preview.png)
 
 ## ✨ Cosa fa
 
-- **Isola isometrica 3D** generata proceduralmente, con acqua animata, alberi, fiori e funghi.
-- **Ogni ristorante = un edificio** low-poly, con un "totem" di cibo che gira accanto
-  (pizza, sushi, vino…) e una pedana colorata per categoria.
-- **Cartelli di legno** fluttuanti con il nome del ristorante e un pallino colore-categoria.
-- **Clic su un edificio / cartello** → scheda dettaglio + la camera ci zooma sopra.
-- **Ricerca** per nome, cucina, città o note (evidenzia i risultati e vola sull'unico match).
-- **Sidebar** Index / Map / Saved e vista "salvati".
-- **➕ Aggiungi** un ristorante dal browser: compare subito sull'isola. I preferiti
-  restano salvati in `localStorage`.
+- **Isola-colonia galleggiante** generata proceduralmente: terreno roccioso a
+  **livelli/terrazze**, base rastremata che galleggia nel vuoto, sfondo scuro,
+  luci da studio con ombre morbide e vignettatura — la resa del sample Kenney.
+- **Ogni ristorante = una struttura spaziale** (hangar, cupole, gantry) con una
+  **piazzola colorata** per categoria e un piccolo prop a tema che ruota accanto
+  (parabola, rover, navetta…).
+- **Razzo** centrale assemblato dai pezzi del kit, parabole, rover, navette in
+  hovering, barili, rocce, crateri e meteore sparsi come nel diorama.
+- **Astronauti e alieni** che camminano a saltelli tra le strutture.
+- **Etichette olografiche** fluttuanti con nome + pallino colore-categoria.
+- **Clic su una struttura / etichetta** → scheda dettaglio + zoom della camera.
+- **Ricerca** per nome, cucina, città o note; **sidebar** Index / Map / Saved.
+- **➕ Aggiungi** un ristorante dal browser: compare subito sulla colonia. I
+  preferiti restano salvati in `localStorage`.
 
 ## 🎮 Controlli
 
@@ -25,7 +33,7 @@ sopra e si apre la scheda con categoria, voto, prezzo e note.
 | Ruotare | trascina con il tasto sinistro |
 | Zoom | rotellina / pizzica su mobile |
 | Pan | tasto destro (o due dita) |
-| Aprire un ristorante | clic sull'edificio o sul cartello |
+| Aprire un ristorante | clic sulla struttura o sull'etichetta |
 
 ## 🚀 Avvio
 
@@ -39,33 +47,32 @@ npm run preview  # anteprima della build
 ## 🧱 Struttura
 
 ```
-public/assets/models/   # modelli GLB (edifici, natura, cibo) + texture colormap
+public/assets/models/space/   # modelli GLB del Kenney Space Kit
 src/
-  main.js               # renderer, camera isometrica ortografica, luci, raycast, loop
-  world.js              # generazione isola, terreno instanced, acqua, posizionamento
-  assets.js             # GLTFLoader con cache + normalizzazione dei modelli
-  data.js               # categorie + ristoranti demo
-  ui.js                 # ricerca, sidebar, scheda, modale "Aggiungi", preferiti
-  style.css             # interfaccia (stile "cartello di legno")
+  main.js                     # renderer, camera iso ortografica, luci studio, raycast, loop
+  world.js                    # terreno a livelli, base galleggiante, strutture, props, astronauti
+  assets.js                   # GLTFLoader con cache + normalizzazione dei modelli
+  data.js                     # categorie (→ strutture) + ristoranti demo
+  ui.js                       # ricerca, sidebar, scheda, modale "Aggiungi", preferiti
+  style.css                   # interfaccia "mission control"
 ```
 
-I dati dei ristoranti al momento partono da un set demo (`src/data.js`). I preferiti sono
-salvati nel browser; l'aggiunta di ristoranti è in memoria/`localStorage`.
-Prossimo passo naturale: persistere l'elenco (JSON versionato o piccolo backend).
+I dati partono da un set demo (`src/data.js`); i preferiti e i ristoranti aggiunti
+vivono in `localStorage`. Prossimo passo naturale: persistenza versionata o backend.
 
-## 🎨 Crediti asset — tutti CC0
+## 🎨 Crediti asset — CC0
 
-I modelli 3D sono di **[Kenney](https://kenney.nl)**, rilasciati in
+Modelli 3D di **[Kenney](https://kenney.nl)**, in
 **[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)** (dominio pubblico,
-uso libero anche commerciale, senza attribuzione obbligatoria — ma un grazie è doveroso):
+uso libero anche commerciale):
 
-- [Nature Kit](https://kenney.nl/assets/nature-kit) — alberi, fiori, funghi, erba
-- [City Kit (Commercial)](https://kenney.nl/assets/city-kit-commercial) — edifici
-- [Food Kit](https://kenney.nl/assets/food-kit) — i "totem" di cibo
+- **[Space Kit](https://kenney.nl/assets/space-kit)** — strutture, razzo, veicoli,
+  parabole, astronauti/alieni, rocce e crateri. La palette del terreno
+  (`#e88463` / `#b25f43`) è quella originale del kit.
 
-Per aggiungere altri pacchetti: scarica lo zip da kenney.nl, copia i `.glb` (formato GLTF/GLB)
-in `public/assets/models/…`, includendo la cartella `Textures/colormap.png` accanto ai
-modelli City/Food (usano una texture-atlante esterna), e referenziali da `data.js`.
+Per aggiungere altri pezzi: scarica lo zip da kenney.nl, copia i `.glb`
+(formato GLTF/GLB, autonomi) in `public/assets/models/space/` e referenziali da
+`data.js` / `world.js`.
 
 Librerie: [Three.js](https://threejs.org/) (MIT), [Vite](https://vitejs.dev/) (MIT).
 Font: [Baloo 2](https://fonts.google.com/specimen/Baloo+2) e

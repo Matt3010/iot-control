@@ -29,8 +29,8 @@ labelsEl.appendChild(labelRenderer.domElement);
 
 // ---- scene --------------------------------------------------------------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x46b6e8);
-scene.fog = new THREE.FogExp2(0x7ec9ee, 0.011);
+scene.background = new THREE.Color(0x252e39);
+scene.fog = new THREE.FogExp2(0x252e39, 0.018);
 
 // ---- isometric camera ---------------------------------------------------
 const VIEW = 22;
@@ -54,23 +54,30 @@ controls.target.set(0, 0, 0);
 controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
 
-// ---- lights -------------------------------------------------------------
-scene.add(new THREE.HemisphereLight(0xcdeeff, 0x5c7f36, 0.85));
-scene.add(new THREE.AmbientLight(0xffffff, 0.25));
-const sun = new THREE.DirectionalLight(0xfff2d6, 1.55);
-sun.position.set(16, 30, 10);
+// ---- studio lighting (diorama look) ------------------------------------
+scene.add(new THREE.HemisphereLight(0xaec4e0, 0x5a3a2c, 0.55));
+scene.add(new THREE.AmbientLight(0xffffff, 0.32));
+
+const sun = new THREE.DirectionalLight(0xfff1dd, 2.1);
+sun.position.set(-16, 28, 14);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 1;
 sun.shadow.camera.far = 90;
-sun.shadow.camera.left = -22;
-sun.shadow.camera.right = 22;
-sun.shadow.camera.top = 22;
-sun.shadow.camera.bottom = -22;
+sun.shadow.camera.left = -24;
+sun.shadow.camera.right = 24;
+sun.shadow.camera.top = 24;
+sun.shadow.camera.bottom = -24;
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.03;
+sun.shadow.radius = 4;
 scene.add(sun);
 scene.add(sun.target);
+
+// cool rim light from behind for edge separation against the dark backdrop
+const rim = new THREE.DirectionalLight(0x8fb4ff, 0.5);
+rim.position.set(18, 12, -18);
+scene.add(rim);
 
 // ---- build the world ----------------------------------------------------
 const world = new World(scene);
@@ -78,10 +85,15 @@ const restaurants = DEMO_RESTAURANTS.map((r) => ({ ...r, id: makeId() }));
 
 async function boot() {
   world.generateIsland();
+  world.computeHeights();
+  const cells = world.pickSpreadCells(restaurants.length);
+  world.flattenAround(cells);
   world.buildTerrain();
-  world.buildWater();
-  await world.placeRestaurants(restaurants);
-  await world.scatterNature();
+  await world.placeRestaurants(restaurants, cells);
+  await world.addRocket();
+  await world.scatterDecor();
+  await world.addHeroProps();
+  await world.addPeople(14);
 
   ui = createUI({ world, focusOn });
 
@@ -156,10 +168,13 @@ window.addEventListener('resize', onResize);
 
 // ---- animation loop -----------------------------------------------------
 const clock = new THREE.Clock();
+let elapsed = 0;
 function animate() {
   requestAnimationFrame(animate);
-  const t = clock.getElapsedTime();
-  world.update(t);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
+  const t = elapsed;
+  world.update(t, dt);
 
   // hover pop
   for (const b of world.buildings) {

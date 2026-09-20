@@ -35,9 +35,10 @@ export function loadModel(path) {
   return p;
 }
 
-// Return a fresh clone, normalised so its footprint fits `targetSize` (XZ)
-// and its base sits on y = 0. Returns a Group ready to position.
-export async function instantiate(path, { targetSize = 1, keepHeight = true } = {}) {
+// Return a fresh clone, normalised so its base sits on y = 0. Scale is set
+// either by footprint (`targetSize`, XZ) or by total height (`targetHeight`).
+// Returns a Group ready to position.
+export async function instantiate(path, { targetSize = 1, targetHeight = null } = {}) {
   const src = await loadModel(path);
   const model = src.clone(true);
   // Clone materials so per-instance tweaks (hover highlight) don't leak.
@@ -56,7 +57,7 @@ export async function instantiate(path, { targetSize = 1, keepHeight = true } = 
   box.getCenter(center);
 
   const footprint = Math.max(size.x, size.z) || 1;
-  const scale = targetSize / footprint;
+  const scale = targetHeight ? targetHeight / (size.y || 1) : targetSize / footprint;
 
   const group = new THREE.Group();
   model.position.x -= center.x;
@@ -65,6 +66,6 @@ export async function instantiate(path, { targetSize = 1, keepHeight = true } = 
   group.add(model);
   group.scale.setScalar(scale);
 
-  group.userData.baseHeight = keepHeight ? size.y * scale : 0;
+  group.userData.baseHeight = size.y * scale;
   return group;
 }
