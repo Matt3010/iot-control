@@ -114,13 +114,46 @@ export class World {
           field[c][r] = sum / cnt;
         }
     }
-    // 3. quantise to a few clean terraces
+    // 3. continuous heights
+    const H = [];
+    for (let c = 0; c < COLS; c++) {
+      H[c] = [];
+      for (let r = 0; r < ROWS; r++) H[c][r] = field[c][r] * 2.6;
+    }
+    // 4. carve concave craters — flat bowl floor + sloped walls (clearly visible)
+    this.craters = [];
+    for (let i = 0; i < 6; i++) {
+      this.craters.push({
+        cc: 5 + Math.floor(this.rng() * (COLS - 10)),
+        cr: 5 + Math.floor(this.rng() * (ROWS - 10)),
+        rad: 2.6 + this.rng() * 2.0,
+        depth: 1.8 + this.rng() * 1.2,
+      });
+    }
+    for (let c = 0; c < COLS; c++)
+      for (let r = 0; r < ROWS; r++)
+        for (const k of this.craters) {
+          const t = Math.hypot(c - k.cc, r - k.cr) / k.rad;
+          if (t >= 1) continue;
+          // flat floor for the inner 45%, then a smooth sloped wall out to the rim
+          const f = t < 0.45 ? 1 : Math.max(0, 1 - ((t - 0.45) / 0.55) ** 2);
+          H[c][r] -= k.depth * f;
+        }
+    // 5. quantise into clean terraces (craters may dip below 0)
     for (let c = 0; c < COLS; c++) {
       this.heights[c] = [];
       for (let r = 0; r < ROWS; r++) {
-        let h = Math.round((field[c][r] * 2.6) / STEP) * STEP;
-        this.heights[c][r] = Math.max(0, Math.min(h, 2.5));
+        let h = Math.round(H[c][r] / STEP) * STEP;
+        this.heights[c][r] = Math.max(-1.2, Math.min(h, 2.5));
       }
+    }
+    // remember crater interiors so buildings don't get placed inside them
+    this.craterCells = new Set();
+    for (const k of this.craters) {
+      const R = Math.ceil(k.rad);
+      for (let dc = -R; dc <= R; dc++)
+        for (let dr = -R; dr <= R; dr++)
+          if (Math.hypot(dc, dr) < k.rad * 0.8) this.craterCells.add(this.key(k.cc + dc, k.cr + dr));
     }
   }
 
@@ -249,6 +282,7 @@ export class World {
       for (let dr = -radius; dr <= radius; dr++) {
         const nc = c + dc, nr = r + dr;
         if (!this.isLand(nc, nr) || this.usedCells.has(this.key(nc, nr)) || !this.hasMargin(nc, nr)) continue;
+        if (this.craterCells && this.craterCells.has(this.key(nc, nr))) continue; // keep craters clear of buildings
         const d = dc * dc + dr * dr;
         if (d < bestD) { bestD = d; best = [nc, nr]; }
       }
@@ -432,9 +466,8 @@ export class World {
       this.usedCells.add(this.key(c, r));
       const roll = this.rng();
       let name, size;
-      if (roll < 0.44) { name = ROCKS[Math.floor(this.rng() * ROCKS.length)]; size = 0.4 + this.rng() * 0.5; }
-      else if (roll < 0.66) { name = CRATERS[Math.floor(this.rng() * CRATERS.length)]; size = 0.6 + this.rng() * 0.5; }
-      else if (roll < 0.82) { name = METEORS[Math.floor(this.rng() * METEORS.length)]; size = 0.5 + this.rng() * 0.4; }
+      if (roll < 0.58) { name = ROCKS[Math.floor(this.rng() * ROCKS.length)]; size = 0.4 + this.rng() * 0.5; }
+      else if (roll < 0.8) { name = METEORS[Math.floor(this.rng() * METEORS.length)]; size = 0.5 + this.rng() * 0.4; }
       else { name = PROPS[Math.floor(this.rng() * PROPS.length)]; size = 0.5 + this.rng() * 0.25; }
       jobs.push(this.plop(`space/${name}`, c, r, size));
     }
