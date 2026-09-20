@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { instantiate, instantiateRaw } from './assets.js';
+import { instantiate } from './assets.js';
 import { CATEGORIES } from './data.js';
 
 const COLS = 24;
@@ -39,7 +39,9 @@ export class World {
     this.usedCells = new Set();   // static occupancy (structures, rails, pipes, decor)
     this.peopleCells = new Set(); // dynamic occupancy for wandering astronauts
     this.monorail = null;
-    this.edgeOffset = 0;  // rotation offset so terrain_side skirts face outward
+    this.edgeOffset = Math.PI;  // rotation offset so terrain_side bevels face outward
+    this.vehicles = [];
+    this.roadCells = new Set();
     this.heights = [];
   }
 
@@ -116,14 +118,30 @@ export class World {
     for (let c = 0; c < COLS; c++) {
       this.heights[c] = [];
       for (let r = 0; r < ROWS; r++) {
-        let h = Math.round((field[c][r] * 1.9) / STEP) * STEP;
-        this.heights[c][r] = Math.max(0, Math.min(h, 1.5));
+        let h = Math.round((field[c][r] * 2.6) / STEP) * STEP;
+        this.heights[c][r] = Math.max(0, Math.min(h, 2.5));
       }
     }
   }
 
   heightAt(c, r) {
     return (this.heights[c] && this.heights[c][r] != null) ? this.heights[c][r] : 0;
+  }
+
+  // height of a grid CORNER = average of the land cells touching it. This is
+  // what turns the plateau levels into sloped connections between them.
+  cornerHeight(ci, ri) {
+    let sum = 0, n = 0;
+    for (const [cc, rr] of [[ci - 1, ri - 1], [ci, ri - 1], [ci - 1, ri], [ci, ri]]) {
+      if (this.isLand(cc, rr)) { sum += this.heightAt(cc, rr); n++; }
+    }
+    return n ? sum / n : 0;
+  }
+
+  // the actual (sloped) surface height at a cell centre — used to sit objects
+  surfaceY(c, r) {
+    return (this.cornerHeight(c, r) + this.cornerHeight(c + 1, r) +
+            this.cornerHeight(c, r + 1) + this.cornerHeight(c + 1, r + 1)) / 4;
   }
 
   // flatten a plaza around building cells so structures sit level
@@ -136,40 +154,56 @@ export class World {
     }
   }
 
-  // ---- terrain mesh -----------------------------------------------------
+  // ---- terrain as a low-poly height-map mesh ----------------------------
+  // Plateaus stay flat; the transitions between levels become SLOPES, and
+  // the island's outer edge drops as a vertical wall to the floating keel.
   buildTerrain() {
-    const geo = new THREE.BoxGeometry(TILE, 1, TILE);
-    const top = new THREE.MeshStandardMaterial({ color: C_ROCK_TOP, roughness: 1, flatShading: true });
-    const side = new THREE.MeshStandardMaterial({ color: C_ROCK_SIDE, roughness: 1, flatShading: true });
-    const deep = new THREE.MeshStandardMaterial({ color: C_ROCK_DEEP, roughness: 1, flatShading: true });
-    const mats = [side, side, top, deep, side, side]; // +x,-x,+y,-y,+z,-z
+    const positions = [];
+    const colors = [];
+    const cTop = new THREE.Color(C_ROCK_TOP);
+    const cSide = new THREE.Color(C_ROCK_SIDE);
+    const cSlope = new THREE.Color(C_ROCK_TOP).lerp(new THREE.Color(C_ROCK_SIDE), 0.35);
+    const base = -BODY;
+    const vx = (ci) => (ci - COLS / 2) * TILE;
+    const vz = (ri) => (ri - ROWS / 2) * TILE;
 
-    const count = this.landCells.length;
-    const mesh = new THREE.InstancedMesh(geo, mats, count);
+    const tri = (ax, ay, az, bx, by, bz, cx, cy, cz, col) => {
+      positions.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+      for (let i = 0; i < 3; i++) colors.push(col.r, col.g, col.b);
+    };
+    const wall = (ax, az, ah, bx, bz, bh) => {
+      tri(ax, ah, az, ax, base, az, bx, bh, bz, cSide);
+      tri(bx, bh, bz, ax, base, az, bx, base, bz, cSide);
+    };
+
+    for (const [c, r] of this.landCells) {
+      const h00 = this.cornerHeight(c, r);
+      const h10 = this.cornerHeight(c + 1, r);
+      const h01 = this.cornerHeight(c, r + 1);
+      const h11 = this.cornerHeight(c + 1, r + 1);
+      const x0 = vx(c), x1 = vx(c + 1), z0 = vz(r), z1 = vz(r + 1);
+      // is this cell part of a slope (corners differ) or a flat plateau?
+      const flat = (h00 === h10 && h10 === h01 && h01 === h11);
+      const col = flat ? cTop : cSlope;
+      tri(x0, h00, z0, x1, h10, z0, x1, h11, z1, col);
+      tri(x0, h00, z0, x1, h11, z1, x0, h01, z1, col);
+      // outer boundary walls down to the base
+      if (!this.isLand(c, r - 1)) wall(x0, z0, h00, x1, z0, h10);
+      if (!this.isLand(c, r + 1)) wall(x1, z1, h11, x0, z1, h01);
+      if (!this.isLand(c - 1, r)) wall(x0, z1, h01, x0, z0, h00);
+      if (!this.isLand(c + 1, r)) wall(x1, z0, h10, x1, z1, h11);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = true; mesh.receiveShadow = true;
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const s = new THREE.Vector3();
-    const p = new THREE.Vector3();
-    const col = new THREE.Color();
-    this.landCells.forEach(([c, r], i) => {
-      const h = this.heightAt(c, r);
-      const yTop = h, yBot = -BODY;
-      const height = yTop - yBot;
-      const w = this.cellToWorld(c, r);
-      p.set(w.x, (yTop + yBot) / 2, w.z);
-      s.set(TILE, height, TILE);
-      m.compose(p, q, s);
-      mesh.setMatrixAt(i, m);
-      const v = 0.92 + this.rng() * 0.12;
-      col.setRGB(v, v, v);
-      mesh.setColorAt(i, col);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     this.scene.add(mesh);
 
-    this.buildKeel(geo);
+    this.buildKeel(new THREE.BoxGeometry(TILE, 1, TILE));
   }
 
   // tapered dark underside so the island reads as a floating chunk
@@ -202,29 +236,6 @@ export class World {
       mesh.instanceMatrix.needsUpdate = true;
       this.scene.add(mesh);
     }
-  }
-
-  // authentic Kenney beveled rock edges on straight boundary/terrace steps
-  async buildTerrainEdges() {
-    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    const jobs = [];
-    for (const [c, r] of this.landCells) {
-      const h = this.heightAt(c, r);
-      const exposed = [];
-      for (const [dx, dz] of dirs) {
-        const nc = c + dx, nr = r + dz;
-        if (!this.isLand(nc, nr) || this.heightAt(nc, nr) < h - 0.01) exposed.push([dx, dz]);
-      }
-      if (exposed.length !== 1) continue; // straight runs only (clean, no overlap)
-      const [dx, dz] = exposed[0];
-      const w = this.cellToWorld(c, r);
-      jobs.push(instantiateRaw('space/terrain_side').then((g) => {
-        g.position.set(w.x, h + 0.005, w.z);
-        g.rotation.y = Math.atan2(dx, dz) + this.edgeOffset;
-        this.scene.add(g);
-      }));
-    }
-    await Promise.all(jobs);
   }
 
   // ---- placement helpers ------------------------------------------------
@@ -277,7 +288,7 @@ export class World {
   async addRestaurant(restaurant, cell) {
     const cat = CATEGORIES[restaurant.category] || CATEGORIES.trattoria;
     const w = this.cellToWorld(cell[0], cell[1]);
-    const y = this.heightAt(cell[0], cell[1]);
+    const y = this.surfaceY(cell[0], cell[1]);
 
     const group = new THREE.Group();
     group.position.set(w.x, y, w.z);
@@ -349,7 +360,7 @@ export class World {
     this.flattenAround([[c, r]], 2);
     const w = this.cellToWorld(c, r);
     const grp = new THREE.Group();
-    grp.position.set(w.x, this.heightAt(c, r), w.z);
+    grp.position.set(w.x, this.surfaceY(c, r), w.z);
 
     const size = 1.7;
     const stack = ['rocket_baseA', 'rocket_fuelA', 'rocket_topA'];
@@ -384,7 +395,7 @@ export class World {
       const nc = c + it.dc, nr = r + it.dr;
       if (!this.isLand(nc, nr)) continue;
       const w = this.cellToWorld(nc, nr);
-      const y = this.heightAt(nc, nr);
+      const y = this.surfaceY(nc, nr);
       const g = it.native
         ? await instantiate(`space/${it.name}`, { native: true })
         : await instantiate(`space/${it.name}`, { targetSize: it.size });
@@ -404,7 +415,7 @@ export class World {
     for (let i = 0; i < cells.length; i++) {
       const [c, r] = cells[i];
       const w = this.cellToWorld(c, r);
-      const th = this.heightAt(c, r);
+      const th = this.surfaceY(c, r);
       const name = (i === 0 || i === cells.length - 1) ? 'pipe_entrance' : 'pipe_ringHigh';
       const er = i === 0 ? rot + Math.PI : rot;
       const g = await this.placePiece(name, w.x, th + 0.1, w.z, er);
@@ -433,7 +444,7 @@ export class World {
   async plop(path, c, r, size, { spin = false } = {}) {
     const g = await instantiate(path, { targetSize: size });
     const w = this.cellToWorld(c, r);
-    g.position.set(w.x + (this.rng() - 0.5) * 0.4, this.heightAt(c, r), w.z + (this.rng() - 0.5) * 0.4);
+    g.position.set(w.x + (this.rng() - 0.5) * 0.4, this.surfaceY(c, r), w.z + (this.rng() - 0.5) * 0.4);
     g.rotation.y = this.rng() * Math.PI * 2;
     this.scene.add(g);
     return g;
@@ -460,7 +471,7 @@ export class World {
       this.usedCells.add(this.key(c, r));
       const g = await instantiate(`space/${h.name}`, { targetSize: h.size });
       const w = this.cellToWorld(c, r);
-      const baseY = this.heightAt(c, r) + (h.hover ? 0.9 : 0);
+      const baseY = this.surfaceY(c, r) + (h.hover ? 0.9 : 0);
       g.position.set(w.x, baseY, w.z);
       g.rotation.y = this.rng() * Math.PI * 2;
       this.scene.add(g);
@@ -510,7 +521,7 @@ export class World {
     const railY = maxH + 1.7;
     cells.forEach(([c, r], i) => {
       const w = this.cellToWorld(c, r);
-      const th = this.heightAt(c, r);
+      const th = this.surfaceY(c, r);
       // supports only every 3rd cell (and at the ends) — the reference is sparse
       if (i % 3 === 0 || i === cells.length - 1) {
         instantiate('space/monorail_trackSupport', { native: true }).then((sup) => {
@@ -542,7 +553,7 @@ export class World {
     for (let i = 0; i < cells.length; i++) {
       const [c, r] = cells[i];
       const w = this.cellToWorld(c, r);
-      const th = this.heightAt(c, r);
+      const th = this.surfaceY(c, r);
       const sup = await instantiate('space/pipe_supportLow', { native: true });
       sup.position.set(w.x, th, w.z); this.scene.add(sup);
       const y = th + 0.5;
@@ -561,7 +572,7 @@ export class World {
     for (let i = 0; i < cells.length; i++) {
       const [c, r] = cells[i];
       const w = this.cellToWorld(c, r);
-      const th = this.heightAt(c, r);
+      const th = this.surfaceY(c, r);
       const path = (i === 0 || i === cells.length - 1) ? 'corridor_end' : 'corridor';
       const g = await this.placePiece(path, w.x, th, w.z, i === 0 ? rot + Math.PI : rot);
       g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
@@ -597,38 +608,10 @@ export class World {
       if (!nz && !nx) continue;
       const rot = nx && !nz ? Math.PI / 2 : 0;
       const w = this.cellToWorld(c, r);
-      const road = await this.placePiece('terrain_roadStraight', w.x, h + 0.02, w.z, rot);
+      const road = await this.placePiece('terrain_roadStraight', w.x, this.surfaceY(c, r) + 0.02, w.z, rot);
       road.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
       this.usedCells.add(this.key(c, r));
       placed++;
-    }
-  }
-
-  // smooth low-poly hills that connect the terrace levels
-  async addMounds(n = 6) {
-    const geo = new THREE.SphereGeometry(1, 10, 7);
-    for (let i = 0; i < n; i++) {
-      const cell = this.findFreeCell();
-      if (!cell) break;
-      const [c, r] = cell;
-      const rad = 1.2 + this.rng() * 1.7;
-      const rc = Math.ceil(rad * 0.8);
-      for (let dc = -rc; dc <= rc; dc++)
-        for (let dr = -rc; dr <= rc; dr++)
-          this.usedCells.add(this.key(c + dc, r + dr));
-      const w = this.cellToWorld(c, r);
-      const h = this.heightAt(c, r);
-      const shade = 0.94 + this.rng() * 0.12;
-      const mat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(C_ROCK_TOP).multiplyScalar(shade),
-        roughness: 1, flatShading: true,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      const sy = rad * (0.5 + this.rng() * 0.28);
-      mesh.scale.set(rad, sy, rad);
-      mesh.position.set(w.x, h - sy * 0.45, w.z);
-      mesh.castShadow = true; mesh.receiveShadow = true;
-      this.scene.add(mesh);
     }
   }
 
@@ -644,8 +627,7 @@ export class World {
       const isRail = rail.some(([rc, rr]) => rc === c && rr === r);
       if (this.usedCells.has(k) && !isRail) continue;
       const w = this.cellToWorld(c, r);
-      const h = this.heightAt(c, r);
-      const road = await this.placePiece('terrain_roadStraight', w.x, h + 0.02, w.z, 0);
+      const road = await this.placePiece('terrain_roadStraight', w.x, this.surfaceY(c, r) + 0.02, w.z, 0);
       road.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
       if (!isRail) this.usedCells.add(k);
     }
@@ -668,6 +650,62 @@ export class World {
     await this.scatterRoads(26);
   }
 
+  // ---- vehicles that drive around and lay down the road path ------------
+  async addVehicles(n = 4) {
+    const models = ['rover', 'craft_miner', 'craft_cargoA', 'rover'];
+    const spots = this.landCells.filter(([c, r]) => this.hasMargin(c, r) && !this.usedCells.has(this.key(c, r)));
+    for (let i = 0; i < n; i++) {
+      const cell = spots[Math.floor(this.rng() * spots.length)];
+      if (!cell) break;
+      const g = await instantiate(`space/${models[i % models.length]}`, { targetSize: 0.72 });
+      const [c, r] = cell;
+      const w = this.cellToWorld(c, r);
+      g.position.set(w.x, this.surfaceY(c, r), w.z);
+      g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      this.scene.add(g);
+      this.vehicles.push({ obj: g, c, r, t: 1, from: g.position.clone(), to: g.position.clone(), facing: 0, dur: 0.34, lastDir: [0, 1] });
+    }
+  }
+
+  dropRoad(c, r, dx) {
+    const k = this.key(c, r);
+    if (this.roadCells.has(k)) return;
+    this.roadCells.add(k);
+    const w = this.cellToWorld(c, r);
+    const rot = dx !== 0 ? Math.PI / 2 : 0;
+    this.placePiece('terrain_roadStraight', w.x, this.surfaceY(c, r) + 0.02, w.z, rot).then((g) => {
+      g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    });
+  }
+
+  stepVehicle(v, dt) {
+    v.t += dt / v.dur;
+    if (v.t >= 1) {
+      v.t = 0;
+      const others = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => this.rng() - 0.5);
+      const dirs = this.rng() < 0.78 ? [v.lastDir, ...others] : others;
+      let picked = null;
+      for (const [dx, dz] of dirs) {
+        const nc = v.c + dx, nr = v.r + dz;
+        if (this.isLand(nc, nr) && this.hasMargin(nc, nr) && !this.usedCells.has(this.key(nc, nr)) &&
+            Math.abs(this.heightAt(nc, nr) - this.heightAt(v.c, v.r)) <= STEP) { picked = [nc, nr, dx, dz]; break; }
+      }
+      if (!picked) { v.t = 1; return; }
+      const [nc, nr, dx, dz] = picked;
+      this.dropRoad(v.c, v.r, dx);      // lay road on the cell we leave
+      v.from.copy(v.obj.position);
+      const w = this.cellToWorld(nc, nr);
+      v.to.set(w.x, this.surfaceY(nc, nr), w.z);
+      v.facing = Math.atan2(dx, dz); v.lastDir = [dx, dz]; v.c = nc; v.r = nr;
+    }
+    v.obj.position.lerpVectors(v.from, v.to, v.t);
+    v.obj.position.y += Math.sin(Math.PI * v.t) * 0.03;
+    let a = v.obj.rotation.y, d = v.facing - a;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    v.obj.rotation.y = a + d * Math.min(1, dt * 9);
+  }
+
   // ---- astronauts wandering the colony ----------------------------------
   async addPeople(n) {
     const spots = this.landCells.filter(([c, r]) => this.hasMargin(c, r) && !this.usedCells.has(this.key(c, r)));
@@ -682,7 +720,7 @@ export class World {
       const g = await instantiate(`space/${name}`, { targetHeight: 0.85 });
       const [c, r] = cell;
       const w = this.cellToWorld(c, r);
-      g.position.set(w.x, this.heightAt(c, r), w.z);
+      g.position.set(w.x, this.surfaceY(c, r), w.z);
       this.scene.add(g);
       this.peopleCells.add(this.key(c, r));
       this.people.push({ obj: g, c, r, t: 1, from: g.position.clone(), to: g.position.clone(), facing: 0, dur: 0.55 });
@@ -715,7 +753,7 @@ export class World {
       this.peopleCells.add(this.key(nc, nr));
       pr.from.copy(pr.obj.position);
       const w = this.cellToWorld(nc, nr);
-      pr.to.set(w.x, this.heightAt(nc, nr), w.z);
+      pr.to.set(w.x, this.surfaceY(nc, nr), w.z);
       pr.facing = Math.atan2(dc, dr);
       pr.c = nc; pr.r = nr;
     }
@@ -736,6 +774,7 @@ export class World {
       if (s.bob) s.obj.position.y = s.base + Math.sin(t * 1.4 + s.phase) * s.bob;
     }
     for (const pr of this.people) this.stepPerson(pr, dt);
+    for (const v of this.vehicles) this.stepVehicle(v, dt);
   }
 }
 

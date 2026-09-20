@@ -93,11 +93,11 @@ async function boot() {
   await world.placeRestaurants(restaurants, cells);
   await world.addRocket();
   await world.addLaunchComplex();
-  await world.addMounds(7);
   await world.buildNetwork();
   await world.scatterDecor(0.22);
   await world.addHeroProps();
   await world.addPeople(16);
+  await world.addVehicles(4);
 
   ui = createUI({ world, focusOn });
 
