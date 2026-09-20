@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { instantiate } from './assets.js';
+import { instantiate, instantiateRaw } from './assets.js';
 import { CATEGORIES } from './data.js';
 
 const COLS = 24;
@@ -14,9 +14,10 @@ const C_ROCK_TOP = 0xe88463;
 const C_ROCK_SIDE = 0xb25f43;
 const C_ROCK_DEEP = 0x8a4832;
 
-const ROCKS = ['rock', 'rock_largeA', 'rock_largeB', 'rocks_smallA', 'rocks_smallB', 'rock_crystals'];
+const ROCKS = ['rock', 'rock_largeA', 'rock_largeB', 'rocks_smallA', 'rocks_smallB', 'rock_crystals', 'rock_crystalsLargeA', 'rock_crystalsLargeB'];
 const CRATERS = ['crater', 'craterLarge'];
 const METEORS = ['meteor', 'meteor_detailed', 'meteor_half'];
+const PROPS = ['barrel', 'barrels', 'machine_barrel', 'barrels_rail', 'turret_single'];
 const PEOPLE = ['astronautA', 'astronautB', 'alien'];
 
 function mulberry32(seed) {
@@ -38,6 +39,7 @@ export class World {
     this.usedCells = new Set();   // static occupancy (structures, rails, pipes, decor)
     this.peopleCells = new Set(); // dynamic occupancy for wandering astronauts
     this.monorail = null;
+    this.edgeOffset = 0;  // rotation offset so terrain_side skirts face outward
     this.heights = [];
   }
 
@@ -202,6 +204,29 @@ export class World {
     }
   }
 
+  // authentic Kenney beveled rock edges on straight boundary/terrace steps
+  async buildTerrainEdges() {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const jobs = [];
+    for (const [c, r] of this.landCells) {
+      const h = this.heightAt(c, r);
+      const exposed = [];
+      for (const [dx, dz] of dirs) {
+        const nc = c + dx, nr = r + dz;
+        if (!this.isLand(nc, nr) || this.heightAt(nc, nr) < h - 0.01) exposed.push([dx, dz]);
+      }
+      if (exposed.length !== 1) continue; // straight runs only (clean, no overlap)
+      const [dx, dz] = exposed[0];
+      const w = this.cellToWorld(c, r);
+      jobs.push(instantiateRaw('space/terrain_side').then((g) => {
+        g.position.set(w.x, h + 0.005, w.z);
+        g.rotation.y = Math.atan2(dx, dz) + this.edgeOffset;
+        this.scene.add(g);
+      }));
+    }
+    await Promise.all(jobs);
+  }
+
   // ---- placement helpers ------------------------------------------------
   hasMargin(c, r) {
     return this.isLand(c + 1, r) && this.isLand(c - 1, r) && this.isLand(c, r + 1) && this.isLand(c, r - 1);
@@ -339,6 +364,52 @@ export class World {
     grp.add(fins);
     this.scene.add(grp);
     this.rocketTop = grp.position.y + yy;
+    this.rocketCell = [c, r];
+  }
+
+  // launch complex around the rocket: gantry, supports, barrels, turret
+  async addLaunchComplex() {
+    if (!this.rocketCell) return;
+    const [c, r] = this.rocketCell;
+    const items = [
+      { dc: -2, dr: -1, name: 'structure_detailed', size: 1.3 },
+      { dc: 2, dr: 1, name: 'pipe_supportHigh', native: true },
+      { dc: 2, dr: -1, name: 'pipe_supportHigh', native: true },
+      { dc: 2, dr: 2, name: 'machine_barrel', size: 0.8 },
+      { dc: -2, dr: 2, name: 'turret_double', size: 0.7 },
+      { dc: 0, dr: 2, name: 'barrels', size: 0.7 },
+      { dc: -2, dr: 1, name: 'barrels_rail', size: 0.6 },
+    ];
+    for (const it of items) {
+      const nc = c + it.dc, nr = r + it.dr;
+      if (!this.isLand(nc, nr)) continue;
+      const w = this.cellToWorld(nc, nr);
+      const y = this.heightAt(nc, nr);
+      const g = it.native
+        ? await instantiate(`space/${it.name}`, { native: true })
+        : await instantiate(`space/${it.name}`, { targetSize: it.size });
+      g.position.set(w.x, y, w.z);
+      g.rotation.y = Math.floor(this.rng() * 4) * (Math.PI / 2);
+      g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      this.scene.add(g);
+    }
+  }
+
+  // a raised pipe made of arch rings (an iconic Space Kit silhouette)
+  async buildPipeArch(c0, r0, dir, len) {
+    const rot = dir === 'x' ? Math.PI / 2 : 0;
+    const cells = this.lineCells(c0, r0, dir, len).filter(([c, r]) => this.isLand(c, r));
+    if (cells.length < 3) return;
+    this.reserve(cells);
+    for (let i = 0; i < cells.length; i++) {
+      const [c, r] = cells[i];
+      const w = this.cellToWorld(c, r);
+      const th = this.heightAt(c, r);
+      const name = (i === 0 || i === cells.length - 1) ? 'pipe_entrance' : 'pipe_ringHigh';
+      const er = i === 0 ? rot + Math.PI : rot;
+      const g = await this.placePiece(name, w.x, th + 0.1, w.z, er);
+      g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    }
   }
 
   // ---- decoration (rocks, craters, meteors, hero props) -----------------
@@ -350,9 +421,10 @@ export class World {
       this.usedCells.add(this.key(c, r));
       const roll = this.rng();
       let name, size;
-      if (roll < 0.55) { name = ROCKS[Math.floor(this.rng() * ROCKS.length)]; size = 0.4 + this.rng() * 0.5; }
-      else if (roll < 0.8) { name = CRATERS[Math.floor(this.rng() * CRATERS.length)]; size = 0.6 + this.rng() * 0.5; }
-      else { name = METEORS[Math.floor(this.rng() * METEORS.length)]; size = 0.5 + this.rng() * 0.4; }
+      if (roll < 0.44) { name = ROCKS[Math.floor(this.rng() * ROCKS.length)]; size = 0.4 + this.rng() * 0.5; }
+      else if (roll < 0.66) { name = CRATERS[Math.floor(this.rng() * CRATERS.length)]; size = 0.6 + this.rng() * 0.5; }
+      else if (roll < 0.82) { name = METEORS[Math.floor(this.rng() * METEORS.length)]; size = 0.5 + this.rng() * 0.4; }
+      else { name = PROPS[Math.floor(this.rng() * PROPS.length)]; size = 0.5 + this.rng() * 0.25; }
       jobs.push(this.plop(`space/${name}`, c, r, size));
     }
     await Promise.all(jobs);
@@ -436,16 +508,20 @@ export class World {
     let maxH = 0;
     for (const [c, r] of cells) maxH = Math.max(maxH, this.heightAt(c, r));
     const railY = maxH + 1.7;
-    for (const [c, r] of cells) {
+    cells.forEach(([c, r], i) => {
       const w = this.cellToWorld(c, r);
       const th = this.heightAt(c, r);
-      const sup = await instantiate('space/monorail_trackSupport', { native: true });
-      sup.position.set(w.x, th, w.z);
-      sup.scale.y = Math.max(0.3, (railY - th) / 0.5);
-      sup.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-      this.scene.add(sup);
-      await this.placePiece('monorail_trackStraight', w.x, railY, w.z, rot);
-    }
+      // supports only every 3rd cell (and at the ends) — the reference is sparse
+      if (i % 3 === 0 || i === cells.length - 1) {
+        instantiate('space/monorail_trackSupport', { native: true }).then((sup) => {
+          sup.position.set(w.x, th, w.z);
+          sup.scale.y = Math.max(0.3, (railY - th) / 0.5);
+          sup.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+          this.scene.add(sup);
+        });
+      }
+      this.placePiece('monorail_trackStraight', w.x, railY, w.z, rot);
+    });
     const cars = ['monorail_trainFront', 'monorail_trainPassenger', 'monorail_trainCargo', 'monorail_trainEnd'];
     const start = Math.max(0, Math.floor(cells.length * 0.12));
     for (let i = 0; i < cars.length; i++) {
@@ -528,6 +604,53 @@ export class World {
     }
   }
 
+  // smooth low-poly hills that connect the terrace levels
+  async addMounds(n = 6) {
+    const geo = new THREE.SphereGeometry(1, 10, 7);
+    for (let i = 0; i < n; i++) {
+      const cell = this.findFreeCell();
+      if (!cell) break;
+      const [c, r] = cell;
+      const rad = 1.2 + this.rng() * 1.7;
+      const rc = Math.ceil(rad * 0.8);
+      for (let dc = -rc; dc <= rc; dc++)
+        for (let dr = -rc; dr <= rc; dr++)
+          this.usedCells.add(this.key(c + dc, r + dr));
+      const w = this.cellToWorld(c, r);
+      const h = this.heightAt(c, r);
+      const shade = 0.94 + this.rng() * 0.12;
+      const mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(C_ROCK_TOP).multiplyScalar(shade),
+        roughness: 1, flatShading: true,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      const sy = rad * (0.5 + this.rng() * 0.28);
+      mesh.scale.set(rad, sy, rad);
+      mesh.position.set(w.x, h - sy * 0.45, w.z);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      this.scene.add(mesh);
+    }
+  }
+
+  // a road that runs beneath the elevated monorail (elements crossing over)
+  async buildCrossing() {
+    if (!this.monorail) return;
+    const rail = this.monorail.cells;
+    const mid = rail[Math.floor(rail.length / 2)];
+    const c = mid[0];
+    for (let r = mid[1] - 5; r <= mid[1] + 5; r++) {
+      if (!this.isLand(c, r)) continue;
+      const k = this.key(c, r);
+      const isRail = rail.some(([rc, rr]) => rc === c && rr === r);
+      if (this.usedCells.has(k) && !isRail) continue;
+      const w = this.cellToWorld(c, r);
+      const h = this.heightAt(c, r);
+      const road = await this.placePiece('terrain_roadStraight', w.x, h + 0.02, w.z, 0);
+      road.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+      if (!isRail) this.usedCells.add(k);
+    }
+  }
+
   async buildNetwork() {
     // the monorail corridor was reserved before the buildings were placed
     await this.placeMonorail();
@@ -536,8 +659,13 @@ export class World {
     run = this.findFlatRun('x', 5); if (run) await this.buildPipe(run[0], run[1], 'x', 5);
     // a short corridor link
     run = this.findFlatRun('x', 3); if (run) await this.buildCorridor(run[0], run[1], 'x', 3);
+    // an iconic raised pipe-ring arch
+    run = this.findFlatRun('z', 5); if (run) await this.buildPipeArch(run[0], run[1], 'z', 5);
+    run = this.findFlatRun('x', 5); if (run) await this.buildPipeArch(run[0], run[1], 'x', 5);
+    // a road passing beneath the elevated monorail
+    await this.buildCrossing();
     // surface tracks (reserve their cells so decor won't sit on them)
-    await this.scatterRoads(22);
+    await this.scatterRoads(26);
   }
 
   // ---- astronauts wandering the colony ----------------------------------

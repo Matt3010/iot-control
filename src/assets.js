@@ -69,3 +69,20 @@ export async function instantiate(path, { targetSize = 1, targetHeight = null, n
   group.userData.baseHeight = size.y * scale;
   return group;
 }
+
+// Clone a model at native scale WITHOUT recentring — keeps the model's own
+// origin (needed for modular terrain edge pieces whose skirt hangs below y=0).
+export async function instantiateRaw(path) {
+  const src = await loadModel(path);
+  const model = src.clone(true);
+  model.traverse((o) => {
+    if (o.isMesh && o.material) {
+      o.material = Array.isArray(o.material) ? o.material.map((m) => m.clone()) : o.material.clone();
+      o.castShadow = true;
+      o.receiveShadow = true;
+    }
+  });
+  const group = new THREE.Group();
+  group.add(model);
+  return group;
+}

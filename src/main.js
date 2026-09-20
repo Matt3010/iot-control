@@ -16,7 +16,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.2;
 sceneEl.appendChild(renderer.domElement);
 
 const labelRenderer = new CSS2DRenderer();
@@ -29,8 +29,8 @@ labelsEl.appendChild(labelRenderer.domElement);
 
 // ---- scene --------------------------------------------------------------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x252e39);
-scene.fog = new THREE.FogExp2(0x252e39, 0.018);
+scene.background = new THREE.Color(0x2a333f);
+// no fog — the reference diorama is brightly and evenly lit
 
 // ---- isometric camera ---------------------------------------------------
 const VIEW = 22;
@@ -54,11 +54,11 @@ controls.target.set(0, 0, 0);
 controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
 
-// ---- studio lighting (diorama look) ------------------------------------
-scene.add(new THREE.HemisphereLight(0xaec4e0, 0x5a3a2c, 0.55));
-scene.add(new THREE.AmbientLight(0xffffff, 0.32));
+// ---- bright studio lighting (matches the Kenney sample render) ---------
+scene.add(new THREE.HemisphereLight(0xe6eefc, 0x8a6446, 0.95));
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-const sun = new THREE.DirectionalLight(0xfff1dd, 2.1);
+const sun = new THREE.DirectionalLight(0xfff6ea, 2.2);
 sun.position.set(-16, 28, 14);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -70,14 +70,14 @@ sun.shadow.camera.top = 24;
 sun.shadow.camera.bottom = -24;
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.03;
-sun.shadow.radius = 4;
+sun.shadow.radius = 3;
 scene.add(sun);
 scene.add(sun.target);
 
-// cool rim light from behind for edge separation against the dark backdrop
-const rim = new THREE.DirectionalLight(0x8fb4ff, 0.5);
-rim.position.set(18, 12, -18);
-scene.add(rim);
+// soft fill from the opposite side to keep shadows light (not murky)
+const fill = new THREE.DirectionalLight(0xcfe0ff, 0.55);
+fill.position.set(18, 14, -16);
+scene.add(fill);
 
 // ---- build the world ----------------------------------------------------
 const world = new World(scene);
@@ -92,10 +92,12 @@ async function boot() {
   world.buildTerrain();
   await world.placeRestaurants(restaurants, cells);
   await world.addRocket();
+  await world.addLaunchComplex();
+  await world.addMounds(7);
   await world.buildNetwork();
-  await world.scatterDecor();
+  await world.scatterDecor(0.22);
   await world.addHeroProps();
-  await world.addPeople(14);
+  await world.addPeople(16);
 
   ui = createUI({ world, focusOn });
 
