@@ -1,0 +1,18 @@
+{
+  "name": "restaurant-index",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A personal restaurant index rendered as an isometric voxel world with Three.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  }
+}
