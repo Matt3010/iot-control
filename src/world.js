@@ -261,19 +261,6 @@ export class World {
     group.add(building);
     const bh = building.userData.baseHeight || 1.4;
 
-    // category pad (colour pop, like a landing pad marking)
-    const pad = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.05, 1.05, 0.08, 28),
-      new THREE.MeshStandardMaterial({
-        color: new THREE.Color(cat.color), roughness: 0.6, metalness: 0.1,
-        emissive: new THREE.Color(cat.color), emissiveIntensity: 0.25,
-      }),
-    );
-    pad.position.y = 0.04;
-    pad.receiveShadow = true;
-    pad.userData.restaurantRoot = group;
-    group.add(pad);
-
     // small themed prop that slowly spins beside the structure
     const prop = await instantiate(`space/${cat.prop}`, { targetSize: 0.55 });
     prop.position.set(0.95, 0.05, 0.75);
@@ -406,6 +393,135 @@ export class World {
       if (h.spin) this.spinners.push({ obj: g, spin: h.spin, bob: 0, base: baseY, phase: 0 });
       if (h.hover) this.spinners.push({ obj: g, spin: 0.15, bob: 0.18, base: baseY, phase: this.rng() * 6 });
     }
+  }
+
+  // ---- modular network: monorail, pipes, corridors, roads ---------------
+  async placePiece(path, x, y, z, rotY = 0, scaleY = 1) {
+    const g = await instantiate(`space/${path}`, { native: true });
+    g.position.set(x, y, z);
+    g.rotation.y = rotY;
+    if (scaleY !== 1) g.scale.y = scaleY;
+    this.scene.add(g);
+    return g;
+  }
+
+  lineCells(c0, r0, dir, len) {
+    const out = [];
+    for (let i = 0; i < len; i++) out.push(dir === 'x' ? [c0 + i, r0] : [c0, r0 + i]);
+    return out;
+  }
+
+  reserve(cells) { for (const [c, r] of cells) this.usedCells.add(this.key(c, r)); }
+
+  // an elevated monorail line on support pillars, with a train
+  async buildMonorail(c0, r0, dir, len) {
+    const rot = dir === 'x' ? Math.PI / 2 : 0;
+    const cells = this.lineCells(c0, r0, dir, len).filter(([c, r]) => this.isLand(c, r));
+    if (cells.length < 3) return;
+    let maxH = 0;
+    for (const [c, r] of cells) maxH = Math.max(maxH, this.heightAt(c, r));
+    const railY = maxH + 1.7;
+    for (const [c, r] of cells) {
+      const w = this.cellToWorld(c, r);
+      const th = this.heightAt(c, r);
+      const sup = await instantiate('space/monorail_trackSupport', { native: true });
+      sup.position.set(w.x, th, w.z);
+      sup.scale.y = Math.max(0.3, (railY - th) / 0.5);
+      sup.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      this.scene.add(sup);
+      await this.placePiece('monorail_trackStraight', w.x, railY, w.z, rot);
+    }
+    const cars = ['monorail_trainFront', 'monorail_trainPassenger', 'monorail_trainCargo', 'monorail_trainEnd'];
+    const start = Math.max(0, Math.floor(cells.length * 0.12));
+    for (let i = 0; i < cars.length; i++) {
+      const cell = cells[start + i];
+      if (!cell) break;
+      const w = this.cellToWorld(cell[0], cell[1]);
+      const car = await this.placePiece(cars[i], w.x, railY + 0.13, w.z, rot);
+      car.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    }
+  }
+
+  // a straight run of pipe on low supports, capped at both ends
+  async buildPipe(c0, r0, dir, len) {
+    const rot = dir === 'x' ? Math.PI / 2 : 0;
+    const cells = this.lineCells(c0, r0, dir, len).filter(([c, r]) => this.isLand(c, r));
+    if (cells.length < 2) return;
+    this.reserve(cells);
+    for (let i = 0; i < cells.length; i++) {
+      const [c, r] = cells[i];
+      const w = this.cellToWorld(c, r);
+      const th = this.heightAt(c, r);
+      const sup = await instantiate('space/pipe_supportLow', { native: true });
+      sup.position.set(w.x, th, w.z); this.scene.add(sup);
+      const y = th + 0.5;
+      if (i === 0) await this.placePiece('pipe_end', w.x, y, w.z, rot + Math.PI);
+      else if (i === cells.length - 1) await this.placePiece('pipe_end', w.x, y, w.z, rot);
+      else await this.placePiece('pipe_straight', w.x, y, w.z, rot);
+    }
+  }
+
+  // an enclosed corridor connecting two spots
+  async buildCorridor(c0, r0, dir, len) {
+    const rot = dir === 'x' ? Math.PI / 2 : 0;
+    const cells = this.lineCells(c0, r0, dir, len).filter(([c, r]) => this.isLand(c, r));
+    if (cells.length < 2) return;
+    this.reserve(cells);
+    for (let i = 0; i < cells.length; i++) {
+      const [c, r] = cells[i];
+      const w = this.cellToWorld(c, r);
+      const th = this.heightAt(c, r);
+      const path = (i === 0 || i === cells.length - 1) ? 'corridor_end' : 'corridor';
+      const g = await this.placePiece(path, w.x, th, w.z, i === 0 ? rot + Math.PI : rot);
+      g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    }
+  }
+
+  // find a straight flat run of free land cells (same height)
+  findFlatRun(dir, len) {
+    const order = this.landCells.slice().sort(() => this.rng() - 0.5);
+    for (const [c0, r0] of order) {
+      const cells = this.lineCells(c0, r0, dir, len);
+      const h0 = this.heightAt(c0, r0);
+      let ok = true;
+      for (const [c, r] of cells) {
+        if (!this.isLand(c, r) || this.usedCells.has(this.key(c, r)) || this.heightAt(c, r) !== h0 || !this.hasMargin(c, r)) { ok = false; break; }
+      }
+      if (ok) return [c0, r0];
+    }
+    return null;
+  }
+
+  // flat road/track tiles laid on the surface for detail
+  async scatterRoads(count = 26) {
+    let placed = 0;
+    const order = this.landCells.slice().sort(() => this.rng() - 0.5);
+    for (const [c, r] of order) {
+      if (placed >= count) break;
+      if (this.usedCells.has(this.key(c, r)) || !this.hasMargin(c, r)) continue;
+      // orient toward a same-height neighbour
+      const h = this.heightAt(c, r);
+      const nz = this.isLand(c, r + 1) && this.heightAt(c, r + 1) === h;
+      const nx = this.isLand(c + 1, r) && this.heightAt(c + 1, r) === h;
+      if (!nz && !nx) continue;
+      const rot = nx && !nz ? Math.PI / 2 : 0;
+      const w = this.cellToWorld(c, r);
+      const road = await this.placePiece('terrain_roadStraight', w.x, h + 0.02, w.z, rot);
+      road.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+      placed++;
+    }
+  }
+
+  async buildNetwork() {
+    // a long monorail crossing the colony
+    await this.buildMonorail(3, Math.round(ROWS * 0.32), 'x', COLS - 6);
+    // a couple of pipe runs on flat ground
+    let run = this.findFlatRun('z', 5); if (run) await this.buildPipe(run[0], run[1], 'z', 5);
+    run = this.findFlatRun('x', 5); if (run) await this.buildPipe(run[0], run[1], 'x', 5);
+    // a short corridor link
+    run = this.findFlatRun('x', 3); if (run) await this.buildCorridor(run[0], run[1], 'x', 3);
+    // surface tracks
+    await this.scatterRoads(26);
   }
 
   // ---- astronauts wandering the colony ----------------------------------

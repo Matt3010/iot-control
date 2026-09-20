@@ -91,6 +91,7 @@ async function boot() {
   world.buildTerrain();
   await world.placeRestaurants(restaurants, cells);
   await world.addRocket();
+  await world.buildNetwork();
   await world.scatterDecor();
   await world.addHeroProps();
   await world.addPeople(14);
