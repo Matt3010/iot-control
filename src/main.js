@@ -86,6 +86,7 @@ const restaurants = DEMO_RESTAURANTS.map((r) => ({ ...r, id: makeId() }));
 async function boot() {
   world.generateIsland();
   world.computeHeights();
+  world.reserveMonorailDefault();     // claim the rail corridor before anything else
   const cells = world.pickSpreadCells(restaurants.length);
   world.flattenAround(cells);
   world.buildTerrain();

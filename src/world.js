@@ -35,7 +35,9 @@ export class World {
     this.buildings = [];
     this.people = [];
     this.spinners = [];   // props that rotate/bob each frame
-    this.usedCells = new Set();
+    this.usedCells = new Set();   // static occupancy (structures, rails, pipes, decor)
+    this.peopleCells = new Set(); // dynamic occupancy for wandering astronauts
+    this.monorail = null;
     this.heights = [];
   }
 
@@ -413,11 +415,24 @@ export class World {
 
   reserve(cells) { for (const [c, r] of cells) this.usedCells.add(this.key(c, r)); }
 
-  // an elevated monorail line on support pillars, with a train
-  async buildMonorail(c0, r0, dir, len) {
-    const rot = dir === 'x' ? Math.PI / 2 : 0;
+  // reserve the monorail corridor up-front so structures/decor never sit
+  // in it (prevents the rail clipping into anything)
+  reserveMonorail(c0, r0, dir, len) {
     const cells = this.lineCells(c0, r0, dir, len).filter(([c, r]) => this.isLand(c, r));
     if (cells.length < 3) return;
+    this.reserve(cells);
+    this.monorail = { cells, dir };
+  }
+
+  reserveMonorailDefault() {
+    this.reserveMonorail(3, Math.round(ROWS * 0.32), 'x', COLS - 6);
+  }
+
+  // an elevated monorail line on support pillars, with a train
+  async placeMonorail() {
+    if (!this.monorail) return;
+    const { cells, dir } = this.monorail;
+    const rot = dir === 'x' ? Math.PI / 2 : 0;
     let maxH = 0;
     for (const [c, r] of cells) maxH = Math.max(maxH, this.heightAt(c, r));
     const railY = maxH + 1.7;
@@ -508,27 +523,32 @@ export class World {
       const w = this.cellToWorld(c, r);
       const road = await this.placePiece('terrain_roadStraight', w.x, h + 0.02, w.z, rot);
       road.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+      this.usedCells.add(this.key(c, r));
       placed++;
     }
   }
 
   async buildNetwork() {
-    // a long monorail crossing the colony
-    await this.buildMonorail(3, Math.round(ROWS * 0.32), 'x', COLS - 6);
-    // a couple of pipe runs on flat ground
+    // the monorail corridor was reserved before the buildings were placed
+    await this.placeMonorail();
+    // a couple of pipe runs on flat ground (findFlatRun avoids occupied cells)
     let run = this.findFlatRun('z', 5); if (run) await this.buildPipe(run[0], run[1], 'z', 5);
     run = this.findFlatRun('x', 5); if (run) await this.buildPipe(run[0], run[1], 'x', 5);
     // a short corridor link
     run = this.findFlatRun('x', 3); if (run) await this.buildCorridor(run[0], run[1], 'x', 3);
-    // surface tracks
-    await this.scatterRoads(26);
+    // surface tracks (reserve their cells so decor won't sit on them)
+    await this.scatterRoads(22);
   }
 
   // ---- astronauts wandering the colony ----------------------------------
   async addPeople(n) {
     const spots = this.landCells.filter(([c, r]) => this.hasMargin(c, r) && !this.usedCells.has(this.key(c, r)));
     for (let i = 0; i < n; i++) {
-      const cell = spots[Math.floor(this.rng() * spots.length)];
+      let cell = null;
+      for (let tries = 0; tries < 20 && !cell; tries++) {
+        const cand = spots[Math.floor(this.rng() * spots.length)];
+        if (cand && !this.peopleCells.has(this.key(cand[0], cand[1]))) cell = cand;
+      }
       if (!cell) break;
       const name = PEOPLE[Math.floor(this.rng() * PEOPLE.length)];
       const g = await instantiate(`space/${name}`, { targetHeight: 0.85 });
@@ -536,23 +556,35 @@ export class World {
       const w = this.cellToWorld(c, r);
       g.position.set(w.x, this.heightAt(c, r), w.z);
       this.scene.add(g);
-      this.people.push({ obj: g, c, r, t: 1, from: g.position.clone(), to: g.position.clone(), facing: 0, dur: 0.5 });
+      this.peopleCells.add(this.key(c, r));
+      this.people.push({ obj: g, c, r, t: 1, from: g.position.clone(), to: g.position.clone(), facing: 0, dur: 0.55 });
     }
+  }
+
+  // a cell an astronaut may step onto: land, not a cliff edge, not occupied
+  walkable(c, r) {
+    return this.isLand(c, r) && this.hasMargin(c, r) &&
+      !this.usedCells.has(this.key(c, r)) && !this.peopleCells.has(this.key(c, r));
   }
 
   stepPerson(pr, dt) {
     pr.t += dt / pr.dur;
     if (pr.t >= 1) {
       pr.t = 0;
-      // choose a walkable neighbour
       const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => this.rng() - 0.5);
       let picked = null;
       for (const [dc, dr] of dirs) {
         const nc = pr.c + dc, nr = pr.r + dr;
-        if (this.isLand(nc, nr) && this.hasMargin(nc, nr)) { picked = [nc, nr, dc, dr]; break; }
+        // don't step up/down more than one terrace, and never onto an occupied cell
+        if (this.walkable(nc, nr) && Math.abs(this.heightAt(nc, nr) - this.heightAt(pr.c, pr.r)) <= STEP) {
+          picked = [nc, nr, dc, dr]; break;
+        }
       }
-      if (!picked) { pr.t = 1; return; }
+      if (!picked) { pr.t = 1; return; } // wait a beat, then retry
       const [nc, nr, dc, dr] = picked;
+      // release the old cell, claim the new one for the whole hop
+      this.peopleCells.delete(this.key(pr.c, pr.r));
+      this.peopleCells.add(this.key(nc, nr));
       pr.from.copy(pr.obj.position);
       const w = this.cellToWorld(nc, nr);
       pr.to.set(w.x, this.heightAt(nc, nr), w.z);
