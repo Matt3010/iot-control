@@ -9,7 +9,7 @@ function migrate(place: Place & { groupId?: string }): Place {
   return { ...rest, groupIds: groupId ? [groupId] : [] };
 }
 
-const empty = (): Database => ({ categories: [], groups: [], places: [] });
+const empty = (): Database => ({ users: [], categories: [], groups: [], places: [] });
 
 /**
  * The working copy a unit of work mutates. Nothing reaches the disk until the
@@ -49,6 +49,7 @@ export class JsonStore {
     try {
       const parsed = JSON.parse(await fs.readFile(dataFile, 'utf8')) as Partial<Database>;
       return {
+        users: Array.isArray(parsed.users) ? parsed.users : [],
         categories: Array.isArray(parsed.categories) ? parsed.categories : [],
         groups: Array.isArray(parsed.groups) ? parsed.groups : [],
         places: Array.isArray(parsed.places) ? parsed.places.map(migrate) : [],

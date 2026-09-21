@@ -1,5 +1,8 @@
 import {
   ArrowRight,
+  LogOut,
+  Lock,
+  Mail,
   ChevronDown,
   ChevronUp,
   MapPin,
@@ -26,6 +29,9 @@ export const ICONS = {
   undo: Undo2,
   collapse: ChevronUp,
   expand: ChevronDown,
+  mail: Mail,
+  lock: Lock,
+  logout: LogOut,
 } as const;
 
 export type IconName = keyof typeof ICONS;

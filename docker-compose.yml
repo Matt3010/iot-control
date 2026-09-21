@@ -6,6 +6,13 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+    environment:
+      # Senza, ne viene generato uno accanto ai dati: mettilo tu se vuoi
+      # poter ricreare il container senza buttare fuori nessuno.
+      # JWT_SECRET: cambiami
+      # Dopo il primo accesso le iscrizioni si chiudono; riaprile con:
+      # ALLOW_SIGNUP: "true"
+      JWT_TTL_DAYS: "30"
     volumes:
       - place-index-data:/data
 

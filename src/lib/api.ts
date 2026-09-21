@@ -1,3 +1,10 @@
+/** Chi vuole sapere che il server ci ha chiuso la porta in faccia. */
+let unauthorized: (() => void) | null = null;
+
+export const onUnauthorized = (handler: () => void): void => {
+  unauthorized = handler;
+};
+
 /** Every call the client makes, in one place, with the server's error text kept. */
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`/api${path}`, {
@@ -7,6 +14,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const detail = (await response.json().catch(() => ({}))) as { error?: string };
+    if (response.status === 401) unauthorized?.();
     throw new Error(detail.error ?? `errore ${response.status}`);
   }
   return (response.status === 204 ? null : await response.json()) as T;

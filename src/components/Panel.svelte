@@ -1,5 +1,6 @@
 <script lang="ts">
   import { mapBridge } from '../lib/mapBridge.svelte';
+  import { auth } from '../lib/auth.svelte';
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
@@ -67,6 +68,14 @@
           {store.places.length === 1 ? 'posto' : 'posti'}
         </span>
       {/if}
+      <button
+        class="ghost-icon"
+        type="button"
+        title={'Esci da ' + (auth.account?.email ?? '')}
+        onclick={() => auth.leave()}
+      >
+        <Icon name="logout" />
+      </button>
       {#if viewport.narrow}
         <button
           class="ghost-icon panel-toggle"

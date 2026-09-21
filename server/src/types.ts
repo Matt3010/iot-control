@@ -1,3 +1,13 @@
+export interface User {
+  id: string;
+  /** Minuscola e ripulita: è la chiave con cui si entra. */
+  email: string;
+  /** scrypt: sale e derivata, mai la password. */
+  salt: string;
+  hash: string;
+  createdAt: string;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -24,6 +34,7 @@ export interface Place {
 
 /** Everything the store holds, and the unit a transaction works on. */
 export interface Database {
+  users: User[];
   categories: Category[];
   groups: Group[];
   places: Place[];

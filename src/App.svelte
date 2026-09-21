@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { auth } from './lib/auth.svelte';
   import { store } from './lib/store.svelte';
   import { toast } from './lib/toast.svelte';
   import { ui } from './lib/ui.svelte';
@@ -6,6 +7,7 @@
   import ColorPopover from './components/ColorPopover.svelte';
   import EmojiPopover from './components/EmojiPopover.svelte';
   import Hint from './components/Hint.svelte';
+  import LoginScreen from './components/LoginScreen.svelte';
   import ManageSheet from './components/ManageSheet.svelte';
   import MapCanvas from './components/MapCanvas.svelte';
   import Palette from './components/Palette.svelte';
@@ -13,9 +15,14 @@
   import PlaceSheet from './components/PlaceSheet.svelte';
   import Toast from './components/Toast.svelte';
 
-  // Niente sheet spalancata all'avvio: il pannello dice da solo da dove
-  // si comincia, e la sheet si apre quando la chiedi.
-  store.load().catch((error: Error) => toast.show(`Caricamento fallito: ${error.message}`));
+  // Prima si vede chi c'è: l'indice si carica solo per chi è entrato, e si
+  // ricarica se rientra con un altro account.
+  auth.load();
+
+  $effect(() => {
+    if (!auth.account) return;
+    store.load().catch((error: Error) => toast.show(`Caricamento fallito: ${error.message}`));
+  });
 
   // The map cursor and the bottom-of-screen rules read these off the body.
   $effect(() => {
@@ -78,19 +85,25 @@
 
 <svelte:window onkeydown={onKeydown} onpointerdown={onPointerdown} />
 
-<MapCanvas />
-<Panel />
+{#if auth.checking}
+  <!-- un istante di niente: meglio del lampo della porta a chi è già dentro -->
+{:else if !auth.account}
+  <LoginScreen />
+{:else}
+  <MapCanvas />
+  <Panel />
 <AddButton />
 <Hint />
 
-{#if ui.sheet === 'place' && ui.draft}
-  <PlaceSheet />
-{:else if ui.sheet === 'manage'}
-  <ManageSheet />
-{/if}
+  {#if ui.sheet === 'place' && ui.draft}
+    <PlaceSheet />
+  {:else if ui.sheet === 'manage'}
+    <ManageSheet />
+  {/if}
 
-{#if ui.paletteOpen}<Palette />{/if}
-{#if emojiEverOpened}<EmojiPopover />{/if}
-{#if ui.color}<ColorPopover />{/if}
+  {#if ui.paletteOpen}<Palette />{/if}
+  {#if emojiEverOpened}<EmojiPopover />{/if}
+  {#if ui.color}<ColorPopover />{/if}
+{/if}
 
 <Toast />

@@ -28,8 +28,8 @@ città, un viaggio, una lista. Niente account, niente categorie preimpostate, ni
   quell'etichetta.
 - **Niente finestre di conferma**: quel che elimini sparisce subito, con sei secondi di
   "Annulla" nel toast. Solo allo scadere la cancellazione parte davvero.
-- I dati stanno sul server in un unico `places.json`: chiunque apra la pagina vede lo stesso
-  indice.
+- **Si entra con email e password**, e un accesso se lo crea chiunque. I dati stanno sul server
+  in un unico `places.json`: chi entra vede lo stesso indice — l'accesso protegge, non divide.
 
 ## Il front-end
 
@@ -51,6 +51,25 @@ leggono tutti la stessa cosa.
 Il foglio di stile è rimasto globale invece di finire dentro i componenti: è un
 sistema di design unico per tutta l'app, e tenerlo in un posto solo rende
 evidente quando due cose dovrebbero somigliarsi.
+
+## Chi entra
+
+Passport con strategia JWT, e il token in un cookie `httpOnly`: nessuno script della pagina
+può leggerlo, e il browser lo riporta da solo. La password non si conserva — si conserva una
+derivata `scrypt` col suo sale, e il confronto è a tempo costante.
+
+- **Le iscrizioni sono aperte**: chiunque si crea un accesso. L'indice però è uno solo, quindi
+  chi entra vede e modifica le stesse cose: se lo pubblichi su internet e vuoi restare in pochi,
+  chiudile con `ALLOW_SIGNUP=false` dopo esserti registrato.
+- **Email sconosciuta e password sbagliata danno lo stesso errore**: chi prova non deve capire
+  quale dei due ha indovinato.
+- **Tutto `/api` è protetto** tranne le quattro rotte d'ingresso, e un rifiuto arriva come
+  `401 { error }`, non come pagina.
+- **Il segreto**: `JWT_SECRET` dall'ambiente. Se manca, ne viene generato uno e tenuto accanto
+  ai dati (`jwt.secret`, permessi 600), altrimenti ogni riavvio butterebbe fuori tutti.
+
+La schermata d'ingresso è la mappa con due tappe: un pin per l'email, uno per la password,
+uniti da un tratteggio.
 
 ## Il backend
 
@@ -95,10 +114,18 @@ docker run -d --name place-index -p 8080:8080 -v place-index-data:/data place-in
 Per tenere i dati in una cartella del host invece che in un volume:
 `-v /percorso/sul/host:/data`.
 
-Variabili d'ambiente: `PORT` (default `8080`), `DATA_DIR` (default `/data` nell'immagine).
+Variabili d'ambiente:
 
-> Non c'è autenticazione: se lo esponi su internet, mettilo dietro un reverse proxy con basic
-> auth o su una rete privata.
+| variabile | default | a cosa serve |
+| --- | --- | --- |
+| `PORT` | `8080` | la porta su cui ascolta |
+| `DATA_DIR` | `/data` nell'immagine | dove vivono `places.json` e il segreto |
+| `JWT_SECRET` | generato e salvato | con che cosa si firmano i token |
+| `JWT_TTL_DAYS` | `30` | quanto dura una sessione |
+| `ALLOW_SIGNUP` | `true` | se altri possono crearsi un accesso |
+
+> Dietro un reverse proxy con HTTPS il cookie diventa `secure` da solo: l'app si fida
+> dell'intestazione `X-Forwarded-Proto`.
 
 ## Sviluppo
 
@@ -145,6 +172,9 @@ Ogni file si porta dietro le proprie regole per lo schermo stretto: non c'è un 
 
 | Metodo | Rotta | Note |
 | --- | --- | --- |
+| `GET` | `/api/auth/state` | pubblica: dice se c'è già qualcuno e se ci si può iscrivere |
+| `POST` | `/api/auth/register` `/api/auth/login` | `{ email, password }`, rispondono col cookie |
+| `POST` `GET` | `/api/auth/logout` `/api/auth/me` | uscire, e sapere chi si è |
 | `GET` | `/api/state` | `{ categories, groups, places }`: da qui parte il client |
 | `GET` `POST` | `/api/categories` | `{ name, emoji?, color? }` |
 | `PUT` `DELETE` | `/api/categories/:id` | la cancellazione porta via anche i posti della categoria |
@@ -154,4 +184,4 @@ Ogni file si porta dietro le proprie regole per lo schermo stretto: non c'è un 
 | `PUT` `DELETE` | `/api/places/:id` | il `PUT` è parziale: manda solo i campi che cambiano |
 
 Gli errori arrivano come `{ error, details? }`: `400` per un DTO non valido o un riferimento
-inesistente, `404` per un id che non c'è.
+inesistente, `401` se non sei entrato, `404` per un id che non c'è.

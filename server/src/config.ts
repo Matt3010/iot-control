@@ -11,6 +11,20 @@ export const config = {
   /** The built front-end, served by this same process. */
   clientDir: path.join(projectRoot, 'dist'),
   bodyLimit: '128kb',
+  auth: {
+    /** Set it in production; otherwise one is generated and kept next to the data. */
+    secret: process.env.JWT_SECRET,
+    /** Quanti giorni dura una sessione prima di dover rientrare. */
+    ttlDays: Number(process.env.JWT_TTL_DAYS ?? 30),
+    cookie: 'pi_token',
+    /**
+     * Aperte: chiunque può crearsi un accesso. L'indice però resta uno solo,
+     * quindi chi entra vede e modifica le stesse cose. Si chiude con
+     * ALLOW_SIGNUP=false.
+     */
+    allowSignup: process.env.ALLOW_SIGNUP !== 'false',
+  },
 } as const;
 
 export const dataFile = path.join(config.dataDir, 'places.json');
+export const secretFile = path.join(config.dataDir, 'jwt.secret');
