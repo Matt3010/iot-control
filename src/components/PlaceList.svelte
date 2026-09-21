@@ -158,7 +158,9 @@
   line-height: 1;
 }
 
-.row-body { display: grid; min-width: 0; }
+/* il corpo si prende quello che avanza, così le distanze finiscono tutte
+   incolonnate a destra invece di seguire la lunghezza del nome */
+.row-body { display: grid; flex: 1; min-width: 0; }
 
 .row-name {
   font-size: 13px;
@@ -179,8 +181,10 @@
 
 .row-dist {
   flex: none;
+  margin-left: auto;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
+  text-align: right;
   color: var(--ink-3);
 }
 

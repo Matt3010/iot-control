@@ -516,14 +516,17 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 20%, transparent);
 }
 
-.map-top { display: flex; align-items: center; gap: 4px; }
+.map-top { display: flex; align-items: center; gap: 0; }
 
 .map-open {
   display: grid;
   place-items: center;
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
+  /* il tasto è più largo del suo segno: si tira indietro di quel tanto, così
+     il pin cade sulla stessa riga verticale del resto della card */
+  margin-left: -4px;
   border: 0;
   border-radius: 50%;
   background: none;
@@ -539,7 +542,7 @@
 .map-name {
   flex: 1;
   min-width: 0;
-  padding: 5px 7px;
+  padding: 5px 6px 5px 5px;
   background: none;
   border-color: transparent;
   box-shadow: none;
@@ -551,12 +554,16 @@
 .map-name:hover { background: var(--glass-strong); }
 .map-name:focus { background: var(--glass-strong); box-shadow: 0 0 0 1px var(--hairline); }
 
+/* la riga sotto vive nella stessa colonna del resto: niente rientro. Allineata
+   al centro e non alla riga di base, perché la riga di base di un interruttore
+   è quella della sua pista, non del suo testo: con "baseline" il meta cadeva
+   sette pixel più in basso dell'etichetta. */
 .map-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 0 4px 0 8px;
+  padding: 0;
 }
 
 .map-meta {
@@ -585,7 +592,7 @@
 /* il conto sta sotto al link, smorzato: è una nota, non un titolo */
 .visits {
   margin: 0;
-  padding: 0 2px;
+  padding: 0;
   font-size: 11.5px;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
@@ -664,7 +671,7 @@
 #category-list li, #group-list li {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
   padding: 5px 6px;
   border-radius: var(--r-md);
   background: var(--sunken);
@@ -677,7 +684,7 @@
 #category-list input[type="text"], #group-list input {
   flex: 1;
   min-width: 0;
-  padding: 5px 7px;
+  padding: 5px 6px 5px 5px;
   background: none;
   border-color: transparent;
   box-shadow: none;
@@ -703,9 +710,12 @@
 
 /* l'emoji della categoria è il suo ritratto: sta in un bollo come il pin
    della mappa, non in un tasto qualsiasi */
+/* come nelle card delle mappe: il tasto si tira indietro del suo bordo,
+   così l'emoji cade sulla colonna della card */
 #category-list .emoji-btn {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
+  margin-left: -4px;
   font-size: 16px;
   border-radius: 50%;
   background: none;
@@ -720,8 +730,9 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
+  margin-left: -4px;
   color: var(--ink-3);
 }
 
