@@ -55,6 +55,8 @@ export interface Snapshot {
 export interface Draft {
   key?: string;
   id?: string;
+  /** Di quale mappa è: un posto che modifichi non cambia casa. */
+  mapId?: string;
   private?: boolean;
   name?: string;
   note?: string;

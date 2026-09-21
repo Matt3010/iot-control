@@ -64,7 +64,13 @@
     <MapSwitcher />
     <span class="panel-head-end">
       {#if !store.loading}
-        <span id="place-count" class="tally">
+        <span
+          id="place-count"
+          class="tally"
+          title={store.shownMaps.length > 1
+            ? 'Di ' + store.shownMaps.map((map) => map.name).join(' e ')
+            : undefined}
+        >
           {store.currentPlaces.length}
           {store.currentPlaces.length === 1 ? 'posto' : 'posti'}
         </span>

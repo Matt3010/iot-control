@@ -38,8 +38,10 @@
   const visibleCategories = $derived(
     categoryFilter.trim() ? store.categories.filter((c) => match(c.name, categoryFilter)) : store.categories,
   );
+  /** Qui si gestiscono i gruppi della mappa selezionata: è dove nascono i nuovi. */
+  const mapGroups = $derived(store.groups.filter((group) => group.mapId === store.activeMap?.id));
   const visibleGroups = $derived(
-    groupFilter.trim() ? store.currentGroups.filter((g) => match(g.name, groupFilter)) : store.currentGroups,
+    groupFilter.trim() ? mapGroups.filter((g) => match(g.name, groupFilter)) : mapGroups,
   );
 
   async function addCategory(name: string) {
@@ -60,7 +62,7 @@
     try {
       const created = await store.createMap(name);
       newMapName = '';
-      toast.show(`"${created.name}" è la mappa aperta`);
+      toast.show(`"${created.name}" è la mappa selezionata`);
     } catch (error) {
       toast.show((error as Error).message);
     }
@@ -68,7 +70,8 @@
 
   async function addGroup(name: string) {
     try {
-      const created = await store.createGroup(name);
+      // se stai scrivendo un posto, il gruppo nasce nella mappa di quel posto
+      const created = await store.createGroup(name, ui.draft?.mapId);
       newGroupName = '';
       if (ui.draft) ui.draft.groupIds = [...(ui.draft.groupIds ?? []), created.id];
       toast.show(`Gruppo "${created.name}" creato`);
@@ -210,7 +213,7 @@
               <button
                 type="button"
                 class="map-open"
-                title={open ? 'È la mappa aperta' : 'Apri questa mappa'}
+                title={open ? 'È la mappa selezionata' : 'Seleziona questa mappa'}
                 aria-pressed={open}
                 onclick={() => store.openMap(map.id)}
               >
@@ -225,6 +228,20 @@
               />
               <button
                 type="button"
+                class="ghost-icon map-eye"
+                class:is-shown={store.shows(map.id)}
+                disabled={open}
+                title={open
+                  ? 'La mappa selezionata si vede sempre'
+                  : store.shows(map.id)
+                    ? 'Smetti di mostrarla accanto'
+                    : 'Mostra anche questa, insieme alla selezionata'}
+                onclick={() => store.toggleShown(map.id)}
+              >
+                <Icon name={store.shows(map.id) ? 'eye' : 'eyeOff'} />
+              </button>
+              <button
+                type="button"
                 class="ghost-icon"
                 title="Elimina mappa"
                 disabled={store.maps.length <= 1}
@@ -237,7 +254,11 @@
             <div class="map-foot">
               <span class="map-meta">
                 {places}
-                {places === 1 ? 'posto' : 'posti'}{open ? ' · aperta' : ''}
+                {places === 1 ? 'posto' : 'posti'}{open
+                  ? ' · selezionata'
+                  : store.shows(map.id)
+                    ? ' · in vista'
+                    : ''}
               </span>
               <Switch
                 checked={map.published}
@@ -288,7 +309,7 @@
     </div>
   {:else}
     <div class="tab-panel">
-      {#if store.currentGroups.length > MANY}
+      {#if mapGroups.length > MANY}
         <input class="list-filter" type="search" placeholder="Filtra i gruppi" bind:value={groupFilter} />
       {/if}
       <ul id="group-list" data-fade="none" use:fadeEdges>
@@ -311,7 +332,7 @@
             </button>
           </li>
         {/each}
-        {#if store.currentGroups.length && !visibleGroups.length}
+        {#if mapGroups.length && !visibleGroups.length}
           <li class="list-empty">Nessun gruppo con questo nome.</li>
         {/if}
       </ul>
@@ -445,7 +466,7 @@
 
 .map-card:hover { background: var(--sunken-hover); }
 
-/* quella aperta porta il segno, non una parola in più */
+/* quella selezionata porta il segno, non una parola in più */
 .map-card.is-open {
   background: var(--sunken-hover);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 20%, transparent);
@@ -504,6 +525,10 @@
 }
 
 #map-list .ghost-icon:disabled { opacity: 0.3; cursor: default; }
+
+/* l'occhio resta smorto finché la mappa non è accesa accanto */
+.map-eye { color: var(--ink-3); }
+.map-eye.is-shown { color: var(--ink); }
 
 .profile-link {
   display: grid;

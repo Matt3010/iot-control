@@ -24,8 +24,10 @@ interface PendingDelete {
 
 class Store {
   maps = $state<PlaceMap[]>([]);
-  /** Quale mappa stai guardando: è una scelta di questo browser. */
+  /** Quella selezionata: dove finisce quello che aggiungi. Scelta di questo browser. */
   activeMapId = $state<string | null>(readJSON('pi.map', null));
+  /** Le altre accese accanto: si vedono, ma non è lì che stai scrivendo. */
+  extraMapIds = $state<string[]>(readJSON('pi.maps', []));
   categories = $state<Category[]>([]);
   groups = $state<Group[]>([]);
   places = $state<LocalPlace[]>([]);
@@ -56,19 +58,44 @@ class Store {
     return this.maps.find((map) => map.id === this.activeMapId) ?? this.maps[0];
   }
 
-  /** Gruppi e posti della mappa aperta: il resto esiste, ma non adesso. */
+  /** Tutte quelle accese, nell'ordine in cui stanno nell'elenco. */
+  get shownMaps(): PlaceMap[] {
+    return this.maps.filter((map) => this.shows(map.id));
+  }
+
+  shows(id: string): boolean {
+    return id === this.activeMap?.id || this.extraMapIds.includes(id);
+  }
+
+  /** Gruppi e posti delle mappe accese: il resto esiste, ma non adesso. */
   get currentGroups(): Group[] {
-    return this.groups.filter((group) => group.mapId === this.activeMap?.id);
+    return this.groups.filter((group) => this.shows(group.mapId));
   }
 
   get currentPlaces(): LocalPlace[] {
-    return this.places.filter((place) => place.mapId === this.activeMap?.id);
+    return this.places.filter((place) => this.shows(place.mapId));
   }
 
+  /** Sceglierne una vuol dire guardare solo quella, e scrivere lì dentro. */
   openMap(id: string): void {
     this.activeMapId = id;
+    this.extraMapIds = [];
     writeJSON('pi.map', id);
+    writeJSON('pi.maps', []);
     this.setGroup(null);
+  }
+
+  /** Accendere una mappa accanto: quella selezionata resta, e non si spegne. */
+  toggleShown(id: string): void {
+    if (id === this.activeMap?.id) return;
+    this.extraMapIds = this.extraMapIds.includes(id)
+      ? this.extraMapIds.filter((other) => other !== id)
+      : [...this.extraMapIds, id];
+    writeJSON('pi.maps', this.extraMapIds);
+    // un gruppo è di una mappa sola: cambiando cosa si vede può non esserci più
+    if (this.activeGroup && !this.currentGroups.some((group) => group.id === this.activeGroup)) {
+      this.setGroup(null);
+    }
   }
 
   async createMap(name: string): Promise<PlaceMap> {
@@ -103,7 +130,11 @@ class Store {
     this.maps.splice(index, 1);
     this.groups = this.groups.filter((group) => group.mapId !== map.id);
     this.places = this.places.filter((place) => place.mapId !== map.id);
-    if (this.activeMap) this.openMap(this.activeMap.id);
+    this.#forget(map.id);
+    if (this.activeMap && this.activeMapId !== this.activeMap.id) {
+      this.activeMapId = this.activeMap.id;
+      writeJSON('pi.map', this.activeMapId);
+    }
 
     const cancel = this.#defer((options) => api.delete(`/maps/${map.id}`, options).catch(() => undefined));
 
@@ -117,6 +148,12 @@ class Store {
         this.openMap(map.id);
       },
     });
+  }
+
+  #forget(id: string): void {
+    if (!this.extraMapIds.includes(id)) return;
+    this.extraMapIds = this.extraMapIds.filter((other) => other !== id);
+    writeJSON('pi.maps', this.extraMapIds);
   }
 
   /* ----------------------------------------------------------------- reads */
@@ -133,10 +170,10 @@ class Store {
     return !this.activeGroup || place.groupIds.includes(this.activeGroup);
   }
 
-  /** Tre domande in una: è di questa mappa, la sua categoria è accesa, è nel gruppo scelto? */
+  /** Tre domande in una: la sua mappa è accesa, la categoria pure, è nel gruppo scelto? */
   visible(place: Place): boolean {
     return (
-      place.mapId === this.activeMap?.id &&
+      this.shows(place.mapId) &&
       !this.hiddenCategories.includes(place.categoryId) &&
       this.inScope(place)
     );
@@ -158,10 +195,16 @@ class Store {
       this.groups = snapshot.groups ?? [];
       this.places = snapshot.places.map(withKey);
 
-      // la mappa scelta l'altra volta potrebbe non esserci più
-      if (!this.maps.some((map) => map.id === this.activeMapId)) {
+      // le mappe scelte l'altra volta potrebbero non esserci più
+      const alive = new Set(this.maps.map((map) => map.id));
+      if (!alive.has(this.activeMapId ?? '')) {
         this.activeMapId = this.maps[0]?.id ?? null;
         writeJSON('pi.map', this.activeMapId);
+      }
+      const extras = this.extraMapIds.filter((id) => alive.has(id) && id !== this.activeMapId);
+      if (extras.length !== this.extraMapIds.length) {
+        this.extraMapIds = extras;
+        writeJSON('pi.maps', extras);
       }
     } finally {
       this.loading = false;
@@ -267,8 +310,8 @@ class Store {
 
   /* ----------------------------------------------------------------- groups */
 
-  async createGroup(name: string): Promise<Group> {
-    const created = await api.post<Group>('/groups', { name, mapId: this.activeMap?.id });
+  async createGroup(name: string, mapId = this.activeMap?.id): Promise<Group> {
+    const created = await api.post<Group>('/groups', { name, mapId });
     this.groups.push(created);
     return created;
   }
@@ -313,7 +356,8 @@ class Store {
 
   /** Shown immediately; the server's answer replaces it in place. */
   async savePlace(draft: Draft): Promise<void> {
-    const mapId = this.activeMap?.id ?? '';
+    // se il posto c'era già resta dov'era: solo i nuovi nascono in quella selezionata
+    const mapId = draft.mapId ?? this.activeMap?.id ?? '';
     const payload = placePayload(mapId, draft);
     const existing = draft.key ? this.places.find((place) => place.key === draft.key) : undefined;
 

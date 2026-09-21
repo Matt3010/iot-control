@@ -46,12 +46,22 @@
     ui.closePlace();
     if (place) store.deletePlace(place);
   }
+
+  /** I gruppi sono di una mappa sola: al posto si possono dare solo i suoi. */
+  const groupsHere = $derived(
+    store.groups.filter((group) => group.mapId === (draft?.mapId ?? store.activeMap?.id)),
+  );
 </script>
 
 {#if draft}
   <aside id="place-sheet" class="surface" use:swipeToClose={() => ui.closePlace()}>
     <header>
-      <h2 id="place-title">{editing ? 'Modifica posto' : 'Nuovo posto'}</h2>
+      <span class="head-text">
+        <h2 id="place-title">{editing ? 'Modifica posto' : 'Nuovo posto'}</h2>
+        {#if store.shownMaps.length > 1}
+          <span class="head-where">in {store.maps.find((m) => m.id === (draft.mapId ?? store.activeMap?.id))?.name}</span>
+        {/if}
+      </span>
       <button class="ghost-icon" type="button" title="Chiudi" onclick={() => ui.closePlace()}>
         <Icon name="close" />
       </button>
@@ -94,7 +104,7 @@
       </div>
     </div>
 
-    {#if store.currentGroups.length}
+    {#if groupsHere.length}
       <div class="field" id="group-field">
         <span class="eyebrow">Gruppo</span>
         <div id="group-choice" class="chips">
@@ -103,7 +113,7 @@
             look={draft.groupIds?.length ? 'off' : 'sel'}
             onclick={() => (draft.groupIds = [])}
           />
-          {#each store.currentGroups as group (group.id)}
+          {#each groupsHere as group (group.id)}
             <Chip
               label={group.name}
               look={draft.groupIds?.includes(group.id) ? 'sel' : 'off'}
@@ -148,6 +158,17 @@
 {/if}
 
 <style>
+/* il titolo si porta dietro in quale mappa stai scrivendo, quando non è ovvio */
+.head-text { display: grid; gap: 1px; min-width: 0; }
+
+.head-where {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 #place-form { display: grid; gap: 14px; }
 
 /* un interruttore, non una casella: la differenza si vede da lontano */

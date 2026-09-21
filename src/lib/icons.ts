@@ -3,6 +3,9 @@ import {
   ArrowRight,
   AtSign,
   Check,
+  Eye,
+  Layers,
+  EyeOff,
   LogOut,
   Link2,
   Lock,
@@ -39,6 +42,9 @@ export const ICONS = {
   link: Link2,
   handle: AtSign,
   alert: AlertCircle,
+  eye: Eye,
+  layers: Layers,
+  eyeOff: EyeOff,
   check: Check,
 } as const;
 

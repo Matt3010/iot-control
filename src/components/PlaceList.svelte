@@ -26,6 +26,7 @@
   {:else}
     {#each rows as { place, distance } (place.key)}
       {@const category = store.categoryOf(place.categoryId)}
+      {@const from = store.shownMaps.length > 1 ? store.maps.find((m) => m.id === place.mapId) : undefined}
       <li data-key={place.key} use:followActive>
         <button
           type="button"
@@ -45,7 +46,10 @@
           <span class="row-dot">{category?.emoji ?? '📍'}</span>
           <span class="row-body">
             <span class="row-name">{place.name}</span>
-            <span class="row-note">{place.note || category?.name || ''}</span>
+            <span class="row-note">
+              {#if from}<span class="row-map">{from.name}</span>{/if}
+              {place.note || category?.name || ''}
+            </span>
           </span>
           {#if place.private}
             <span class="row-lock" title="Privato: resta fuori dalla mappa pubblica">
@@ -75,6 +79,17 @@
 :global(#place-list[data-fade='both']) {
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
   mask-image: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+}
+
+/* con più mappe accese, ogni posto dice da quale viene */
+.row-map {
+  padding: 1px 6px;
+  margin-right: 5px;
+  border-radius: 99px;
+  background: var(--sunken-hover);
+  font-size: 10.5px;
+  font-weight: 560;
+  color: var(--ink-2);
 }
 
 .row-lock {

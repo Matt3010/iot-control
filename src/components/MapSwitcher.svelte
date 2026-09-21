@@ -20,7 +20,7 @@
       newName = '';
       creating = false;
       open = false;
-      toast.show(`"${created.name}" è la mappa aperta`);
+      toast.show(`"${created.name}" è la mappa selezionata`);
     } catch (error) {
       toast.show((error as Error).message);
     }
@@ -38,10 +38,10 @@
     class="current"
     type="button"
     aria-expanded={open}
-    title="Cambia mappa"
+    title={store.shownMaps.length > 1 ? `Stai guardando ${store.shownMaps.length} mappe` : "Cambia mappa"}
     onclick={() => (open = !open)}
   >
-    <Icon name="pin" />
+    <Icon name={store.extraMapIds.length ? 'layers' : 'pin'} />
     <span class="current-name">{store.activeMap?.name ?? 'Place Index'}</span>
     <Icon name={open ? 'collapse' : 'expand'} />
   </button>
@@ -53,11 +53,13 @@
       <span class="eyebrow">Le tue mappe</span>
       <ul>
         {#each store.maps as map (map.id)}
-          <li>
+          {@const here = map.id === store.activeMap?.id}
+          {@const shown = store.shows(map.id)}
+          <li class:is-on={here} class:is-shown={shown}>
             <button
               type="button"
               class="entry"
-              class:is-on={map.id === store.activeMap?.id}
+              title={here ? 'È la mappa selezionata' : 'Guarda solo questa'}
               onclick={() => choose(map.id)}
             >
               <span class="entry-name">{map.name}</span>
@@ -67,6 +69,19 @@
               <span class="entry-count">
                 {store.places.filter((place) => place.mapId === map.id).length}
               </span>
+            </button>
+            <button
+              type="button"
+              class="eye"
+              disabled={here}
+              title={here
+                ? 'La mappa selezionata si vede sempre'
+                : shown
+                  ? 'Smetti di mostrarla accanto'
+                  : 'Mostra anche questa'}
+              onclick={() => store.toggleShown(map.id)}
+            >
+              <Icon name={shown ? 'eye' : 'eyeOff'} />
             </button>
           </li>
         {/each}
@@ -123,6 +138,7 @@
   .current:hover { background: var(--sunken-hover); }
 
   .current-name {
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -161,22 +177,55 @@
     overflow-y: auto;
   }
 
+  /* la riga è due comandi: aprirla, o solo mostrarla accanto */
+  .menu li {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    border-radius: var(--r-md);
+    transition: background 0.14s;
+  }
+
+  .menu li:hover { background: var(--sunken); }
+  .menu li.is-on { background: var(--sunken-hover); }
+
   .entry {
     display: flex;
     align-items: center;
     gap: 8px;
-    width: 100%;
-    padding: 7px 9px;
+    flex: 1;
+    min-width: 0;
+    padding: 7px 2px 7px 9px;
     border: 0;
     border-radius: var(--r-md);
     background: none;
     font-size: 13px;
     text-align: left;
-    transition: background 0.14s;
   }
 
-  .entry:hover { background: var(--sunken); }
-  .entry.is-on { background: var(--sunken-hover); font-weight: 560; }
+  .menu li.is-on .entry { font-weight: 560; }
+
+  .eye {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    margin-right: 4px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--ink-3);
+    opacity: 0.55;
+    transition: opacity 0.14s, background 0.14s, color 0.14s;
+  }
+
+  .eye:hover { opacity: 1; background: var(--glass-strong); color: var(--ink); }
+  .eye :global(.ico) { width: 15px; height: 15px; }
+
+  /* accesa accanto: l'occhio resta aperto anche senza il puntatore sopra */
+  .menu li.is-shown .eye { opacity: 1; color: var(--ink-2); }
+  .menu li.is-on .eye { opacity: 0.4; cursor: default; }
 
   .entry-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
