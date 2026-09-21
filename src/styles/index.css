@@ -1,16 +1,11 @@
 /* ==========================================================================
-   Place Index — overlay design system
-   A single elevated layer of glass sitting on top of the map: one type scale,
-   one shadow scale, one radius scale, tinted per category where it matters.
-   Load order is the cascade order; each file owns its own narrow-screen rules.
+   Place Index — le fondamenta
+   Qui restano solo le cose che appartengono a tutta l'app: i token, il reset
+   con la superficie in vetro, i controlli di form e i keyframe. Ogni pezzo di
+   interfaccia si porta il proprio stile dentro il suo componente.
    ========================================================================== */
 
 @import './tokens.css';
 @import './base.css';
 @import './controls.css';
-@import './panel.css';
-@import './sheets.css';
-@import './map.css';
-@import './palette.css';
-@import './hud.css';
 @import './animations.css';

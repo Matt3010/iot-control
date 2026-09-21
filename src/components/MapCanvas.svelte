@@ -229,3 +229,216 @@
 </script>
 
 <div id="map" bind:this={container}></div>
+
+<style>
+:global(.picking #map) { cursor: crosshair; }
+
+:global(.pin) {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50% 50% 50% 6px;
+  transform: rotate(-45deg);
+  background: var(--c, #6b7280);
+  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.32), rgb(255 255 255 / 0) 55%);
+  border: 2px solid rgb(255 255 255 / 0.92);
+  box-shadow: 0 5px 14px -4px rgb(10 13 18 / 0.55), inset 0 -2px 6px rgb(0 0 0 / 0.14);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s;
+  will-change: transform;
+}
+
+:global(.pin span) {
+  font-family: var(--emoji);
+  transform: rotate(45deg);
+  font-size: 18px;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+}
+
+:global(.leaflet-marker-icon:hover .pin), :global(.pin.is-hover) {
+  transform: rotate(-45deg) scale(1.12);
+  box-shadow: 0 10px 22px -5px rgb(10 13 18 / 0.6), inset 0 -2px 6px rgb(0 0 0 / 0.14);
+}
+
+:global(.pin.is-hover) { box-shadow: 0 10px 22px -5px rgb(10 13 18 / 0.6), 0 0 0 5px color-mix(in srgb, var(--c) 24%, transparent); }
+
+:global(.pin.draft) {
+  animation: pin-drop 0.42s var(--ease);
+  box-shadow: 0 10px 22px -6px rgb(10 13 18 / 0.6), 0 0 0 6px color-mix(in srgb, var(--c, #6b7280) 22%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(.pin) { border-color: rgb(255 255 255 / 0.8); }
+}
+
+:global(.cluster) {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  box-shadow: 0 6px 16px -5px rgb(10 13 18 / 0.5);
+  transition: transform 0.18s var(--ease);
+}
+
+:global(.cluster span) {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+:global(.leaflet-marker-icon:hover .cluster) { transform: scale(1.07); }
+
+:global(.leaflet-container) {
+  font-family: var(--font);
+  background: #e8ebef;
+}
+
+:global(.leaflet-tile-pane) { filter: saturate(0.4) brightness(1.05) contrast(0.94); }
+
+@media (prefers-color-scheme: dark) {
+  :global(.leaflet-container) { background: #0b0d10; }
+
+  :global(.leaflet-tile-pane) {
+      filter: invert(1) hue-rotate(180deg) saturate(0.4) brightness(0.92) contrast(0.9);
+    }
+}
+
+:global(.leaflet-bottom.leaflet-left) { margin-bottom: env(safe-area-inset-bottom); }
+
+:global(.leaflet-control-zoom) {
+  border: 1px solid var(--hairline) !important;
+  border-radius: var(--r-md) !important;
+  overflow: hidden;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--shadow-1), inset 0 1px 0 var(--highlight) !important;
+}
+
+:global(.leaflet-control-zoom a) {
+  width: 32px;
+  height: 32px;
+  line-height: 30px;
+  background: none;
+  color: var(--ink-2);
+  font-size: 17px;
+  font-weight: 400;
+  border-bottom: 1px solid var(--hairline-soft);
+  transition: background 0.14s, color 0.14s;
+}
+
+:global(.leaflet-control-zoom a:last-child) { border-bottom: 0; }
+
+:global(.leaflet-control-zoom a:hover) { background: var(--sunken-hover); color: var(--ink); }
+
+:global(.leaflet-control-attribution) {
+  /* Leaflet glues it to the corner; as a floating pill it needs its own room */
+  margin: 0 10px 8px !important;
+  padding: 2px 8px !important;
+  border-radius: 99px;
+  background: var(--glass) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: var(--ink-3) !important;
+  font-size: 10px !important;
+  box-shadow: var(--shadow-1);
+}
+
+:global(.leaflet-control-attribution a) { color: var(--ink-2) !important; }
+
+:global(.leaflet-popup-content-wrapper) {
+  padding: 0;
+  border-radius: var(--r-lg) !important;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  box-shadow: var(--shadow-3), inset 0 1px 0 var(--highlight) !important;
+}
+
+:global(.leaflet-popup-content) { margin: 0; padding: 14px 16px 12px; width: 232px !important; }
+
+:global(.leaflet-popup-tip) {
+  background: var(--glass-strong);
+  border: 1px solid var(--hairline);
+  box-shadow: none;
+}
+
+:global(.leaflet-popup-close-button) { display: none; }
+
+:global(.pop-cat .emo) { font-family: var(--emoji); }
+
+:global(.pop-cat) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--c, var(--ink-3)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c, var(--ink-3)) 34%, transparent);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+:global(.pop-name) { margin: 0; font-size: 15.5px; font-weight: 620; letter-spacing: -0.018em; }
+
+:global(.pop-note) {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+}
+
+:global(.pop-actions) {
+  display: flex;
+  gap: 4px;
+  margin: 12px -6px -4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline-soft);
+}
+
+:global(.pop-actions button), :global(.pop-actions a) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: none;
+  transition: background 0.14s, color 0.14s;
+}
+
+:global(.pop-actions button:hover), :global(.pop-actions a:hover) { background: var(--sunken); color: var(--ink); }
+
+:global(.pop-actions .ico) { width: 15px; height: 15px; }
+
+@media (max-width: 600px) {
+  :global(.leaflet-bottom.leaflet-left) { margin-bottom: calc(62px + env(safe-area-inset-bottom)); }
+
+  :global(.sheet-open .leaflet-control-zoom) { display: none; }
+
+  :global(.sheet-open .leaflet-bottom.leaflet-left) {
+      margin-bottom: calc(var(--sheet-h, 0px) + 20px + env(safe-area-inset-bottom));
+    }
+}
+</style>

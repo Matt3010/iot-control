@@ -45,3 +45,85 @@
     {/each}
   {/if}
 </ul>
+
+<style>
+/* index ------------------------------------------------------------------- */
+
+#place-list {
+  list-style: none;
+  margin: -4px -4px 0;
+  padding: 0 4px 4px;
+  display: grid;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.row:hover { background: var(--sunken); }
+
+.row.is-active {
+  background: color-mix(in srgb, var(--c) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 32%, transparent);
+}
+
+.row-dot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 34%, transparent);
+  font-family: var(--emoji);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.row-body { display: grid; min-width: 0; }
+
+.row-name {
+  font-size: 13px;
+  font-weight: 540;
+  letter-spacing: -0.008em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-note {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-dist {
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.row-empty {
+  padding: 6px 8px 8px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+</style>

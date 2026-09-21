@@ -55,3 +55,38 @@
 <div id="emoji-popover" class="surface" style:left="{at.left}px" style:top="{at.top}px">
   <emoji-picker class={dark.matches ? 'dark' : 'light'} use:picker></emoji-picker>
 </div>
+
+<style>
+/* -------------------------------------------------------------- emoji picker */
+
+#emoji-popover {
+  position: absolute;
+  z-index: var(--z-popover);
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-3), inset 0 1px 0 var(--highlight);
+  animation: rise 0.22s var(--ease);
+}
+
+emoji-picker {
+  width: 304px;
+  height: 322px;
+  --background: transparent;
+  --border-color: var(--hairline);
+  --border-size: 0;
+  --indicator-color: var(--ink);
+  --input-border-color: var(--hairline);
+  --input-font-color: var(--ink);
+  --input-placeholder-color: var(--ink-3);
+  --input-border-radius: 10px;
+  --button-active-background: var(--sunken-hover);
+  --button-hover-background: var(--sunken);
+  --category-font-color: var(--ink-3);
+  --category-font-size: 11px;
+  --emoji-padding: 0.4rem;
+  --num-columns: 8;
+  font-family: var(--font);
+}
+</style>

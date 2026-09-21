@@ -83,3 +83,44 @@ h2 {
   text-transform: uppercase;
   color: var(--ink-3);
 }
+
+/* ---------------------------------------------------------------- le sheet */
+/* Il contenitore è condiviso dai due pannelli di destra: vive qui, mentre il
+   loro contenuto sta nei rispettivi componenti. */
+
+/* Sheets
+   The two panels that slide in from the right — new/edit place and the
+   category manager — and the emoji popover that serves them. */
+
+/* ------------------------------------------------------------------ sheets */
+
+aside {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: var(--z-sheet);
+  width: min(356px, calc(100vw - 28px));
+  max-height: calc(100vh - 28px);
+  padding: var(--card-pad);
+  overflow: auto;
+  animation: sheet-in 0.32s var(--ease);
+}
+
+aside header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 600px) {
+aside {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: auto;
+    max-height: 74vh;
+    animation-name: sheet-in-mobile;
+  }
+}

@@ -90,3 +90,83 @@
     <PlaceList {rows} />
   {/if}
 </div>
+
+<style>
+/* Panel
+   The left rail: wordmark, search, category filters and the index itself —
+   the places currently on screen, nearest first. */
+
+/* ------------------------------------------------------------------- panel */
+
+#panel {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: var(--z-panel);
+  width: min(326px, calc(100vw - 28px));
+  max-height: calc(100vh - 116px);
+  padding: var(--card-pad);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  animation: rise 0.5s var(--ease);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 0 6px;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+}
+
+.wordmark :global(.ico) { width: 16px; height: 16px; color: var(--ink-2); }
+
+.tally {
+  font-size: 11.5px;
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  background: var(--sunken);
+  border-radius: 99px;
+  padding: 2px 9px;
+}
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 6px;
+  margin-bottom: -4px;
+}
+
+/* filters ----------------------------------------------------------------- */
+
+#filters, #group-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+
+#filters:empty::before {
+  content: "Nessuna categoria. Creane una per iniziare.";
+  font-size: 12.5px;
+  color: var(--ink-3);
+  padding: 2px 6px 4px;
+}
+
+@media (max-width: 600px) {
+  #panel {
+      left: 12px;
+      right: 12px;
+      top: 12px;
+      width: auto;
+      max-height: 48vh;
+    }
+}
+</style>

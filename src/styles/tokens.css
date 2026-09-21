@@ -41,6 +41,7 @@
   --z-toast: 1500;
 
   /* geometry */
+  --card-pad: 14px;
   --r-lg: 20px;
   --r-md: 13px;
   --r-sm: 10px;

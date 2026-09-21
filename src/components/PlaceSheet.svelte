@@ -5,16 +5,19 @@
   import Chip from './Chip.svelte';
   import Icon from './Icon.svelte';
 
-  const draft = $derived(ui.draft!);
-  const editing = $derived(Boolean(draft.id));
+  // Closing the sheet clears the draft a beat before this component goes away,
+  // so every read of it has to survive the gap.
+  const draft = $derived(ui.draft);
+  const editing = $derived(Boolean(draft?.id));
 
   // A new place starts in the first category and in the group you are looking at.
   $effect(() => {
-    if (!draft.categoryId && store.categories.length) draft.categoryId = store.categories[0]!.id;
+    if (draft && !draft.categoryId && store.categories.length) draft.categoryId = store.categories[0]!.id;
   });
 
   function save(event: SubmitEvent) {
     event.preventDefault();
+    if (!draft) return;
     if (!draft.categoryId) {
       toast.show('Scegli o crea una categoria');
       return;
@@ -30,45 +33,46 @@
   }
 
   function remove() {
-    const place = store.places.find((candidate) => candidate.key === draft.key);
+    const place = store.places.find((candidate) => candidate.key === draft?.key);
     ui.closePlace();
     if (place) store.deletePlace(place);
   }
 </script>
 
-<aside id="place-sheet" class="surface">
-  <header>
-    <h2 id="place-title">{editing ? 'Modifica posto' : 'Nuovo posto'}</h2>
-    <button class="ghost-icon" type="button" title="Chiudi" onclick={() => ui.closePlace()}>
-      <Icon name="close" />
-    </button>
-  </header>
+{#if draft}
+  <aside id="place-sheet" class="surface">
+    <header>
+      <h2 id="place-title">{editing ? 'Modifica posto' : 'Nuovo posto'}</h2>
+      <button class="ghost-icon" type="button" title="Chiudi" onclick={() => ui.closePlace()}>
+        <Icon name="close" />
+      </button>
+    </header>
 
-  <form id="place-form" onsubmit={save}>
-    <label class="field">
-      <span class="eyebrow">Nome</span>
-      <!-- svelte-ignore a11y_autofocus -->
-      <input name="name" required maxlength="80" placeholder="Trattoria da Nonna" autofocus bind:value={draft.name} />
-    </label>
+    <form id="place-form" onsubmit={save}>
+      <label class="field">
+        <span class="eyebrow">Nome</span>
+        <!-- svelte-ignore a11y_autofocus -->
+        <input name="name" required maxlength="80" placeholder="Trattoria da Nonna" autofocus bind:value={draft.name} />
+      </label>
 
-    <div class="field">
-      <span class="eyebrow">Categoria</span>
-      <div id="category-choice" class="chips">
-        {#if store.categories.length === 0}
-          <button type="button" class="ghost" onclick={() => ui.openManage('categories')}>
-            Crea la prima categoria
-          </button>
-        {:else}
-          {#each store.categories as category (category.id)}
-            <Chip
-              color={category.color}
-              emoji={category.emoji}
-              label={category.name}
-              look={draft.categoryId === category.id ? 'on' : 'off'}
-              onclick={() => (draft.categoryId = category.id)}
-            />
-          {/each}
-        {/if}
+      <div class="field">
+        <span class="eyebrow">Categoria</span>
+        <div id="category-choice" class="chips">
+          {#if store.categories.length === 0}
+            <button type="button" class="ghost" onclick={() => ui.openManage('categories')}>
+              Crea la prima categoria
+            </button>
+          {:else}
+            {#each store.categories as category (category.id)}
+              <Chip
+                color={category.color}
+                emoji={category.emoji}
+                label={category.name}
+                look={draft.categoryId === category.id ? 'on' : 'off'}
+                onclick={() => (draft.categoryId = category.id)}
+              />
+            {/each}
+{/if}
       </div>
     </div>
 
@@ -115,4 +119,32 @@
       <button type="submit" class="primary">Salva</button>
     </div>
   </form>
-</aside>
+  </aside>
+{/if}
+
+<style>
+#place-form { display: grid; gap: 14px; }
+
+/* the container is drawn here; the chips inside it come from <Chip> */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chips :global(.chip) { cursor: pointer; }
+
+.coords {
+  margin: -4px 0 0;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--ink-3);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+  border-top: 1px solid var(--hairline-soft);
+  margin-top: 2px;
+}
+</style>
