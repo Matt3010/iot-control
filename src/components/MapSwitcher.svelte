@@ -63,6 +63,9 @@
               onclick={() => choose(map.id)}
             >
               <span class="entry-name">{map.name}</span>
+              {#if map.published}
+                <span class="entry-public" title="Pubblica"><Icon name="link" /></span>
+              {/if}
               <span class="entry-count">
                 {store.places.filter((place) => place.mapId === map.id).length}
               </span>
@@ -70,6 +73,17 @@
           </li>
         {/each}
       </ul>
+
+      <button
+        type="button"
+        class="new"
+        onclick={() => {
+          open = false;
+          ui.openManage('maps');
+        }}
+      >
+        <Icon name="link" /> Condividi e gestisci
+      </button>
 
       {#if creating}
         <form class="add-row" onsubmit={create}>
@@ -175,6 +189,9 @@
     font-variant-numeric: tabular-nums;
     color: var(--ink-3);
   }
+
+  .entry-public { display: inline-flex; }
+  .entry-public :global(.ico) { width: 13px; height: 13px; color: var(--ink-3); }
 
   .new {
     display: inline-flex;

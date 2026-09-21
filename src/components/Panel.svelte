@@ -70,6 +70,17 @@
         </span>
       {/if}
       <button
+        class="ghost-icon share-btn"
+        class:is-public={store.activeMap?.published}
+        type="button"
+        title={store.activeMap?.published
+          ? 'Questa mappa è pubblica: copia o cambia il link'
+          : 'Pubblica questa mappa e prendi il link'}
+        onclick={() => ui.toggleManage('maps')}
+      >
+        <Icon name="link" />
+      </button>
+      <button
         class="ghost-icon"
         type="button"
         title={'Esci da ' + (auth.account?.email ?? '')}
@@ -235,6 +246,9 @@
 }
 
 .panel-toggle { margin-right: -4px; }
+
+/* quando la mappa è pubblica il link si accende: lo stato si vede da lì */
+.share-btn.is-public { color: var(--ink); background: var(--sunken-hover); }
 
 .tally {
   font-size: 11.5px;

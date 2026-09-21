@@ -97,7 +97,9 @@
 
 <aside id="manage-sheet" class="surface" use:swipeToClose={() => ui.closeManage()}>
   <header>
-    <h2>Categorie e gruppi</h2>
+    <h2>
+      {ui.manageTab === 'maps' ? 'Mappe e link' : ui.manageTab === 'groups' ? 'Gruppi' : 'Categorie'}
+    </h2>
     <button class="ghost-icon" type="button" title="Chiudi" onclick={() => ui.closeManage()}>
       <Icon name="close" />
     </button>
