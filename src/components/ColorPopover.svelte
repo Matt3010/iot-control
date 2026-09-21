@@ -1,10 +1,10 @@
 <script lang="ts">
   import { COLORS } from '../lib/format';
-  import { placeBeside } from '../lib/popover';
+  import { placeAnchored } from '../lib/popover';
   import { ui } from '../lib/ui.svelte';
 
   const request = $derived(ui.color!);
-  const at = $derived(placeBeside(request.anchor, 208, 208));
+  const at = $derived(placeAnchored(request.anchor, 186, 186));
 </script>
 
 <div id="color-popover" class="surface" style:left="{at.left}px" style:top="{at.top}px">

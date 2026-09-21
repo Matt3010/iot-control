@@ -22,3 +22,20 @@ export function placeBeside(anchor: HTMLElement, width: number, height: number):
   );
   return { left, top };
 }
+
+/**
+ * A small popover belongs to the button that opened it: centred under it, or
+ * above when there is no room below. Anything else reads as "wrong place".
+ */
+export function placeAnchored(anchor: HTMLElement, width: number, height: number): Position {
+  const rect = anchor.getBoundingClientRect();
+  const left = Math.min(
+    Math.max(8, rect.left + rect.width / 2 - width / 2),
+    Math.max(8, window.innerWidth - width - 8),
+  );
+  const below = rect.bottom + height + GAP < window.innerHeight;
+  const top = below
+    ? rect.bottom + GAP
+    : Math.max(8, Math.min(rect.top - height - GAP, window.innerHeight - height - 8));
+  return { left, top };
+}

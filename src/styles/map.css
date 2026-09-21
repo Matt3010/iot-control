@@ -121,6 +121,8 @@
 .leaflet-control-zoom a:hover { background: var(--sunken-hover); color: var(--ink); }
 
 .leaflet-control-attribution {
+  /* Leaflet glues it to the corner; as a floating pill it needs its own room */
+  margin: 0 10px 8px !important;
   padding: 2px 8px !important;
   border-radius: 99px;
   background: var(--glass) !important;
