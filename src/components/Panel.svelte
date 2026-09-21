@@ -44,91 +44,93 @@
 <div id="panel" class="surface" class:is-collapsed={collapsed}>
   <div class="panel-head">
     <span class="wordmark"><Icon name="pin" /> Place Index</span>
-    {#if !store.loading}
-      <span id="place-count" class="tally">
-        {store.places.length}
-        {store.places.length === 1 ? 'posto' : 'posti'}
-      </span>
-    {/if}
-    {#if viewport.narrow}
-      <button
-        class="ghost-icon panel-toggle"
-        type="button"
-        aria-expanded={!collapsed}
-        title={collapsed ? 'Mostra filtri ed elenco' : 'Riduci il pannello'}
-        onclick={() => (ui.panelWish = collapsed ? 'open' : 'closed')}
-      >
-        <Icon name={collapsed ? 'expand' : 'collapse'} />
-      </button>
-    {/if}
+    <span class="panel-head-end">
+      {#if !store.loading}
+        <span id="place-count" class="tally">
+          {store.places.length}
+          {store.places.length === 1 ? 'posto' : 'posti'}
+        </span>
+      {/if}
+      {#if viewport.narrow}
+        <button
+          class="ghost-icon panel-toggle"
+          type="button"
+          aria-expanded={!collapsed}
+          title={collapsed ? 'Mostra filtri ed elenco' : 'Riduci il pannello'}
+          onclick={() => (ui.panelWish = collapsed ? 'open' : 'closed')}
+        >
+          <Icon name={collapsed ? 'expand' : 'collapse'} />
+        </button>
+      {/if}
+    </span>
   </div>
 
   <SearchTrigger />
 
   {#if !collapsed}
-  {#if store.groups.length && !store.loading}
-    <div class="panel-row" id="group-head">
-      <span class="eyebrow">Gruppi</span>
-    </div>
-    <div id="group-filters">
-      <Chip
-        label="Tutti"
-        count={store.places.length}
-        look={store.activeGroup === null ? 'sel' : 'off'}
-        onclick={() => pickGroup(null)}
-      />
-      {#each store.groups as group (group.id)}
-        <Chip
-          label={group.name}
-          count={store.countGroup(group.id)}
-          look={store.activeGroup === group.id ? 'sel' : 'off'}
-          onclick={() => pickGroup(group.id)}
-        />
-      {/each}
-    </div>
-  {/if}
-
-  {#if store.loading}
-    <PanelSkeleton />
-  {:else}
-    {#if store.categories.length}
-      <div class="panel-row">
-        <span class="eyebrow">Categorie</span>
-        <button
-          id="manage-btn"
-          class="ghost-icon"
-          type="button"
-          title="Gestisci categorie e gruppi"
-          onclick={() => ui.toggleManage()}
-        >
-          <Icon name="filters" />
-        </button>
+    {#if store.groups.length && !store.loading}
+      <div class="panel-row" id="group-head">
+        <span class="eyebrow">Gruppi</span>
       </div>
-
-      <div id="filters">
-        {#each store.categories as category (category.id)}
+      <div id="group-filters">
+        <Chip
+          label="Tutti"
+          count={store.places.length}
+          look={store.activeGroup === null ? 'sel' : 'off'}
+          onclick={() => pickGroup(null)}
+        />
+        {#each store.groups as group (group.id)}
           <Chip
-            color={category.color}
-            emoji={category.emoji}
-            label={category.name}
-            count={store.countIn(category.id)}
-            look={store.hiddenCategories.includes(category.id) ? 'off' : 'on'}
-            onclick={() => store.toggleCategory(category.id)}
+            label={group.name}
+            count={store.countGroup(group.id)}
+            look={store.activeGroup === group.id ? 'sel' : 'off'}
+            onclick={() => pickGroup(group.id)}
           />
         {/each}
       </div>
     {/if}
 
-    {#if store.places.length}
-      <div class="panel-row" id="list-head">
-        <span class="eyebrow">In vista</span>
-        <span id="list-count" class="tally">{rows.length}</span>
-      </div>
-      <PlaceList {rows} />
+    {#if store.loading}
+      <PanelSkeleton />
     {:else}
-      <EmptyState />
+      {#if store.categories.length}
+        <div class="panel-row">
+          <span class="eyebrow">Categorie</span>
+          <button
+            id="manage-btn"
+            class="ghost-icon"
+            type="button"
+            title="Gestisci categorie e gruppi"
+            onclick={() => ui.toggleManage()}
+          >
+            <Icon name="filters" />
+          </button>
+        </div>
+
+        <div id="filters">
+          {#each store.categories as category (category.id)}
+            <Chip
+              color={category.color}
+              emoji={category.emoji}
+              label={category.name}
+              count={store.countIn(category.id)}
+              look={store.hiddenCategories.includes(category.id) ? 'off' : 'on'}
+              onclick={() => store.toggleCategory(category.id)}
+            />
+          {/each}
+        </div>
+      {/if}
+
+      {#if store.places.length}
+        <div class="panel-row" id="list-head">
+          <span class="eyebrow">In vista</span>
+          <span id="list-count" class="tally">{rows.length}</span>
+        </div>
+        <PlaceList {rows} />
+      {:else}
+        <EmptyState />
+      {/if}
     {/if}
-  {/if}
   {/if}
 </div>
 
@@ -160,6 +162,15 @@
   justify-content: space-between;
   padding: 2px 4px 0 6px;
 }
+
+/* il conteggio appartiene al titolo, non al mezzo: viaggia col chevron */
+.panel-head-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-toggle { margin-right: -4px; }
 
 .wordmark {
   display: inline-flex;
@@ -196,11 +207,11 @@
 
 @media (max-width: 600px) {
   #panel {
-      left: 12px;
-      right: 12px;
-      top: 12px;
-      width: auto;
-      max-height: 48vh;
-    }
+    left: 12px;
+    right: 12px;
+    top: 12px;
+    width: auto;
+    max-height: 48vh;
+  }
 }
 </style>
