@@ -1,7 +1,6 @@
 import type { MapDto } from '../dto/map.dto.js';
 import { badRequest, notFound } from '../errors/HttpError.js';
 import { store } from '../persistence/JsonStore.js';
-import { GroupRepository } from '../repositories/GroupRepository.js';
 import { MapRepository } from '../repositories/MapRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import type { PlaceMap } from '../types.js';
@@ -44,8 +43,9 @@ export class MapManager {
       if (!maps.owns(ownerId, id)) throw notFound('mappa inesistente');
       if (maps.findAllOf(ownerId).length <= 1) throw badRequest('una mappa deve restare');
 
+      // solo la mappa e i suoi posti: i gruppi sono tuoi, come le categorie,
+      // e restano anche quando la mappa dove li usavi non c'è più
       const removedPlaces = new PlaceRepository(tx).deleteByMap(id);
-      new GroupRepository(tx).deleteByMap(id);
       maps.delete(id);
       return { removedPlaces };
     });

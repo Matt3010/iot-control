@@ -28,7 +28,6 @@ export type PublicMapView = Omit<MapView, 'views' | 'viewers' | 'viewsFromProfil
 
 export interface GroupView {
   id: string;
-  mapId: string;
   name: string;
 }
 
@@ -70,7 +69,7 @@ export const toPublicMapView = (map: PlaceMap): PublicMapView => {
   return outside;
 };
 
-export const toGroupView = ({ id, mapId, name }: Group): GroupView => ({ id, mapId, name });
+export const toGroupView = ({ id, name }: Group): GroupView => ({ id, name });
 
 /** The defaults here also carry records written before groups existed. */
 export const toPlaceView = (place: Place): PlaceView => ({

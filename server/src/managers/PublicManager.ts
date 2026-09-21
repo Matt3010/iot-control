@@ -85,7 +85,7 @@ export class PublicManager {
         categories: new CategoryRepository(tx)
           .findAllOf(map.ownerId)
           .filter((category) => usedCategories.has(category.id)),
-        groups: new GroupRepository(tx).findAllOfMaps([map.id]).filter((group) => usedGroups.has(group.id)),
+        groups: new GroupRepository(tx).findAllOf(map.ownerId).filter((group) => usedGroups.has(group.id)),
         places,
       };
     });

@@ -8,6 +8,18 @@ export interface EmojiRequest {
   onPick: (emoji: string) => void;
 }
 
+/** Una domanda prima di una cosa che non torna indietro. */
+export interface SureRequest {
+  anchor: HTMLElement;
+  /** Cosa sparisce, detto con il suo nome. */
+  title: string;
+  /** Cosa si porta dietro: si scrive solo se si porta dietro qualcosa. */
+  detail?: string;
+  /** Il verbo sul tasto rosso: "Elimina", "Sciogli". */
+  verb: string;
+  onYes: () => void;
+}
+
 export interface ColorRequest {
   anchor: HTMLElement;
   current: string;
@@ -23,6 +35,7 @@ class Ui {
   paletteOpen = $state(false);
   emoji = $state<EmojiRequest | null>(null);
   color = $state<ColorRequest | null>(null);
+  sure = $state<SureRequest | null>(null);
   /**
    * Su schermo stretto il pannello e una scheda non ci stanno insieme:
    * 'auto' lo fa ridurre quando serve, le altre due sono scelte tue.
@@ -86,8 +99,16 @@ class Ui {
     this.color = { anchor, current, onPick };
   }
 
+  /** Chiede conferma accanto al tasto che l'ha chiesta. */
+  askSure(anchor: HTMLElement, question: Omit<SureRequest, 'anchor'>): void {
+    this.emoji = null;
+    this.color = null;
+    this.sure = { anchor, ...question };
+  }
+
   /** Esc unwinds the overlay one layer at a time, topmost first. */
   escape(): boolean {
+    if (this.sure) return (this.sure = null), true;
     if (this.paletteOpen) return (this.paletteOpen = false), true;
     if (this.color) return (this.color = null), true;
     if (this.emoji) return (this.emoji = null), true;

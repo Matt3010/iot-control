@@ -64,7 +64,7 @@
             >
               <span class="entry-name">{map.name}</span>
               {#if map.published}
-                <span class="entry-public" title="Pubblica"><Icon name="link" /></span>
+                <span class="entry-public" title="Mappa pubblica"><Icon name="link" /></span>
               {/if}
               <span class="entry-count">
                 {store.places.filter((place) => place.mapId === map.id).length}
@@ -100,8 +100,8 @@
 
       {#if creating}
         <AddRow
-          placeholder="Nome della mappa"
-          title="Crea"
+          placeholder="Nome della nuova mappa"
+          title="Crea mappa"
           bind:value={newName}
           bind:field={field}
           onadd={create}

@@ -18,9 +18,9 @@ export interface Category {
   color: string;
 }
 
+/** I gruppi sono tuoi, come le categorie: valgono su tutte le tue mappe. */
 export interface Group {
   id: string;
-  mapId: string;
   name: string;
 }
 

@@ -22,7 +22,7 @@
     event.preventDefault();
     if (!draft) return;
     if (!draft.categoryId) {
-      toast.show('Scegli o crea una categoria');
+      toast.show('Scegli una categoria prima di salvare');
       return;
     }
 
@@ -48,10 +48,8 @@
     if (place) store.deletePlace(place);
   }
 
-  /** I gruppi sono di una mappa sola: al posto si possono dare solo i suoi. */
-  const groupsHere = $derived(
-    store.groups.filter((group) => group.mapId === (draft?.mapId ?? store.activeMap?.id)),
-  );
+  /** I gruppi sono tuoi e valgono su tutte le mappe: ci sono tutti. */
+  const groupsHere = $derived(store.groups);
 </script>
 
 {#if draft}
@@ -70,7 +68,7 @@
 
     <form id="place-form" onsubmit={save}>
       <label class="field">
-        <span class="eyebrow">Nome</span>
+        <span class="eyebrow">Nome del posto</span>
         <!-- svelte-ignore a11y_autofocus -->
         <!-- binding a funzione: chiudendo la scheda la bozza sparisce un attimo
              prima del componente, e una lettura secca solleverebbe -->
@@ -78,7 +76,7 @@
           name="name"
           required
           maxlength="80"
-          placeholder="Trattoria da Nonna"
+          placeholder="Es. Trattoria da Nonna"
           autofocus
           bind:value={() => draft?.name ?? '', (value) => draft && (draft.name = value)}
         />
@@ -107,10 +105,10 @@
 
     {#if groupsHere.length}
       <div class="field" id="group-field">
-        <span class="eyebrow">Gruppo</span>
+        <span class="eyebrow">Gruppi</span>
         <div id="group-choice" class="chips">
           <Chip
-            label="Nessuno"
+            label="Nessun gruppo"
             look={draft.groupIds?.length ? 'off' : 'sel'}
             onclick={() => (draft.groupIds = [])}
           />
@@ -128,8 +126,8 @@
     <Switch
       checked={draft.private ?? false}
       onchange={(value) => draft && (draft.private = value)}
-      label="Privato"
-      note="Resta fuori dalla mappa che pubblichi."
+      label="Posto privato"
+      note="Non compare nella mappa pubblica."
     />
 
     <label class="field">
@@ -138,7 +136,7 @@
         name="note"
         maxlength="500"
         rows="3"
-        placeholder="Indirizzo, il piatto da non perdere, con chi ci sei stato…"
+        placeholder="Es. indirizzo, cosa ordinare, con chi ci sei stato"
         bind:value={() => draft?.note ?? '', (value) => draft && (draft.note = value)}
       ></textarea>
     </label>
@@ -147,8 +145,17 @@
 
     <div class="actions">
       {#if editing}
-        <Button look="danger" onclick={remove}>
-          <Icon name="trash" /> Elimina
+        <Button
+          look="danger"
+          extra="kill"
+          onclick={(event: MouseEvent) =>
+            ui.askSure(event.currentTarget as HTMLElement, {
+              title: `Eliminare “${draft.name || 'questo posto'}”?`,
+              verb: 'Elimina',
+              onYes: remove,
+            })}
+        >
+          <Icon name="trash" /> Elimina posto
         </Button>
       {/if}
       <Button look="ghost" onclick={() => ui.closePlace()}>Annulla</Button>

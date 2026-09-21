@@ -63,7 +63,7 @@ export class PlaceManager {
     if (!new CategoryRepository(tx).owns(ownerId, categoryId)) throw badRequest('categoria inesistente');
 
     const groups = new GroupRepository(tx);
-    if (groupIds.some((id) => !groups.existsInMap(mapId, id))) throw badRequest('gruppo inesistente');
+    if (groupIds.some((id) => !groups.owns(ownerId, id))) throw badRequest('gruppo inesistente');
   }
 }
 

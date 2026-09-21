@@ -17,8 +17,9 @@ export interface User {
 }
 
 /**
- * Una mappa è un indice a sé: i suoi posti, i suoi gruppi. Le categorie no,
- * quelle sono di chi le ha fatte e valgono su tutte le sue mappe.
+ * Una mappa è un indice a sé: i suoi posti. Categorie e gruppi no, quelli sono
+ * di chi li ha fatti e valgono su tutte le sue mappe — eliminare una mappa non
+ * porta via nient'altro che la mappa e i posti che ci stavano dentro.
  */
 export interface PlaceMap {
   id: string;
@@ -47,7 +48,7 @@ export interface Category {
 
 export interface Group {
   id: string;
-  mapId: string;
+  ownerId: string;
   name: string;
 }
 

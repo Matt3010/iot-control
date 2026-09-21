@@ -16,6 +16,7 @@
   import Palette from './components/Palette.svelte';
   import Panel from './components/Panel.svelte';
   import PlaceSheet from './components/PlaceSheet.svelte';
+  import SurePopover from './components/SurePopover.svelte';
   import Toast from './components/Toast.svelte';
 
   /** /m/<slug> e /u/<handle> sono pubblici: non chiedono nulla a nessuno. */
@@ -86,6 +87,7 @@
     const target = event.target as HTMLElement;
     if (ui.emoji && !target.closest('#emoji-popover') && !target.closest('.emoji-btn')) ui.emoji = null;
     if (ui.color && !target.closest('#color-popover') && !target.closest('.swatch')) ui.color = null;
+    if (ui.sure && !target.closest('#sure-popover') && !target.closest('.kill')) ui.sure = null;
   }
 </script>
 
@@ -114,6 +116,7 @@
   {#if ui.paletteOpen}<Palette />{/if}
   {#if emojiEverOpened}<EmojiPopover />{/if}
   {#if ui.color}<ColorPopover />{/if}
+  {#if ui.sure}<SurePopover />{/if}
 {/if}
 
 <Toast />

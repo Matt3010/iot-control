@@ -16,6 +16,20 @@
   import Switch from './Switch.svelte';
   import Button from './Button.svelte';
 
+  /** Una volta sola, perché le domande parlino tutte la stessa lingua. */
+  const conta = (n: number): string => (n === 1 ? 'un posto' : `${n} posti`);
+
+  /**
+   * Eliminare una mappa porta via i suoi posti, e nient'altro: categorie e
+   * gruppi sono tuoi e valgono su tutte. La domanda lo dice per nome, che è
+   * l'unico modo perché una conferma serva a qualcosa.
+   */
+  function portaVia(mapId: string): string | undefined {
+    const posti = store.places.filter((place) => place.mapId === mapId).length;
+    if (!posti) return undefined;
+    return `Se ne ${posti === 1 ? 'va' : 'vanno'} con lei ${conta(posti)}. Categorie e gruppi restano.`;
+  }
+
   let newEmoji = $state(DEFAULT_EMOJI);
   let newColor = $state<string>(SUGGESTED[0]!);
   let newCategoryName = $state('');
@@ -66,8 +80,8 @@
 
   /** Come si conta, detto una volta sola e appeso a ogni numero. */
   const COUNT_NOTE =
-    'Aperture: quante volte il link è stato usato, senza contare le ricariche ' +
-    'dei primi minuti. Persone: quante impronte diverse in una giornata — chi ' +
+    'Le aperture sono quante volte il link è stato usato, senza contare le ricariche ' +
+    'dei primi minuti. Le persone sono le impronte diverse in una giornata, e chi ' +
     'torna domani conta di nuovo. Chi sei lo indoviniamo da indirizzo e browser ' +
     'mescolati a un numero che cambia ogni giorno, non lo conserviamo, e dalla ' +
     'stessa rete con lo stesso browser sei sempre la stessa persona, anche in ' +
@@ -92,8 +106,8 @@
   const visibleCategories = $derived(
     categoryFilter.trim() ? store.categories.filter((c) => match(c.name, categoryFilter)) : store.categories,
   );
-  /** Qui si gestiscono i gruppi della mappa selezionata: è dove nascono i nuovi. */
-  const mapGroups = $derived(store.groups.filter((group) => group.mapId === store.activeMap?.id));
+  /** I gruppi sono tuoi: qui ci sono tutti, non solo quelli della mappa aperta. */
+  const mapGroups = $derived(store.groups);
   const visibleGroups = $derived(
     groupFilter.trim() ? mapGroups.filter((g) => match(g.name, groupFilter)) : mapGroups,
   );
@@ -124,8 +138,7 @@
 
   async function addGroup(name: string) {
     try {
-      // se stai scrivendo un posto, il gruppo nasce nella mappa di quel posto
-      const created = await store.createGroup(name, ui.draft?.mapId);
+      const created = await store.createGroup(name);
       newGroupName = '';
       if (ui.draft) ui.draft.groupIds = [...(ui.draft.groupIds ?? []), created.id];
       toast.show(`Gruppo "${created.name}" creato`);
@@ -138,7 +151,11 @@
 <aside id="manage-sheet" class="surface" use:swipeToClose={() => ui.closeManage()}>
   <header>
     <h2>
-      {ui.manageTab === 'maps' ? 'Mappe e link' : ui.manageTab === 'groups' ? 'Gruppi' : 'Categorie'}
+      {ui.manageTab === 'maps'
+        ? 'Mappe e condivisione'
+        : ui.manageTab === 'groups'
+          ? 'Gruppi'
+          : 'Categorie'}
     </h2>
     <Button look="icon" title="Chiudi" onclick={() => ui.closeManage()}>
       <Icon name="close" />
@@ -178,7 +195,7 @@
   {#if ui.manageTab === 'categories'}
     <div class="tab-panel">
       {#if store.categories.length > MANY}
-        <input class="list-filter" type="search" placeholder="Filtra le categorie" bind:value={categoryFilter} />
+        <input class="list-filter" type="search" placeholder="Cerca categoria" bind:value={categoryFilter} />
       {/if}
       <ul id="category-list" data-fade="none" use:fadeEdges>
         {#each visibleCategories as category (category.id)}
@@ -207,7 +224,7 @@
                 <button
                   type="button"
                   class="swatch"
-                  title="Colore"
+                  title="Cambia colore"
                   style:--c={category.color}
                   aria-label="Colore"
                   onclick={(event) =>
@@ -216,7 +233,21 @@
                     )}
                 ></button>
                 <span class="count">{store.countIn(category.id) || ''}</span>
-                <Button look="icon" title="Elimina categoria" onclick={() => store.deleteCategory(category)}>
+                <Button
+                  look="icon"
+                  tone="danger"
+                  extra="kill"
+                  title="Elimina categoria"
+                  onclick={(event: MouseEvent) =>
+                    ui.askSure(event.currentTarget as HTMLElement, {
+                      title: `Eliminare “${category.name}”?`,
+                      detail: store.countIn(category.id)
+                        ? `Se ne vanno con lei anche ${conta(store.countIn(category.id))}.`
+                        : undefined,
+                      verb: 'Elimina',
+                      onYes: () => store.deleteCategory(category),
+                    })}
+                >
                   <Icon name="trash" />
                 </Button>
               {/snippet}
@@ -230,8 +261,8 @@
 
       <AddRow
         id="category-form"
-        placeholder="Nuova categoria"
-        title="Aggiungi categoria"
+        placeholder="Nome categoria"
+        title="Crea categoria"
         bind:value={newCategoryName}
         bind:field={categoryInput}
         onadd={addCategory}
@@ -250,7 +281,7 @@
           <button
             type="button"
             class="swatch"
-            title="Colore"
+            title="Scegli colore"
             style:--c={newColor}
             aria-label="Colore"
             onclick={(event) => ui.askColor(event.currentTarget, newColor, (color) => (newColor = color))}
@@ -274,7 +305,7 @@
                 <button
                   type="button"
                   class="map-open"
-                  title={open ? 'È la mappa selezionata' : 'Seleziona questa mappa'}
+                  title={open ? 'Mappa selezionata' : 'Seleziona mappa'}
                   aria-pressed={open}
                   onclick={() => store.openMap(map.id)}
                 >
@@ -295,19 +326,27 @@
                   extra={'map-eye' + (store.shows(map.id) ? ' is-shown' : '')}
                   disabled={open}
                   title={open
-                    ? 'La mappa selezionata si vede sempre'
+                    ? 'Sempre in vista'
                     : store.shows(map.id)
-                      ? 'Smetti di mostrarla accanto'
-                      : 'Mostra anche questa, insieme alla selezionata'}
+                      ? 'Togli dalla vista'
+                      : 'Mostra anche questa'}
                   onclick={() => store.toggleShown(map.id)}
                 >
                   <Icon name={store.shows(map.id) ? 'eye' : 'eyeOff'} />
                 </Button>
                 <Button
                   look="icon"
+                  tone="danger"
+                  extra="kill"
                   title="Elimina mappa"
                   disabled={store.maps.length <= 1}
-                  onclick={() => store.deleteMap(map)}
+                  onclick={(event: MouseEvent) =>
+                    ui.askSure(event.currentTarget as HTMLElement, {
+                      title: `Eliminare “${map.name}”?`,
+                      detail: portaVia(map.id) ?? 'È vuota: non porta via niente.',
+                      verb: 'Elimina',
+                      onYes: () => store.deleteMap(map),
+                    })}
                 >
                   <Icon name="trash" />
                 </Button>
@@ -326,7 +365,7 @@
                 <Switch
                   checked={map.published}
                   onchange={(published) => store.patchMap(map, { published })}
-                  label={map.published ? 'Pubblica' : 'Solo tua'}
+                  label={map.published ? 'Mappa pubblica' : 'Mappa privata'}
                   title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}
                 />
               </div>
@@ -348,36 +387,36 @@
 
       <AddRow
         id="map-form"
-        placeholder="Nuova mappa — Islanda, Ristoranti…"
-        title="Aggiungi mappa"
+        placeholder="Nome mappa — es. Islanda"
+        title="Crea mappa"
         bind:value={newMapName}
         onadd={addMap}
       />
 
       {#if store.maps.some((map) => map.published)}
         <div class="profile-link">
-          <span class="eyebrow">Un link per tutte</span>
-          <p>Le mappe pubblicate stanno insieme qui: è l'indirizzo da mettere in bio.</p>
+          <span class="eyebrow">Link del profilo</span>
+          <p>Raccoglie tutte le mappe che hai pubblicato. È l'indirizzo da mettere in bio.</p>
           <LinkRow
             prefix="/u/"
             value={auth.account?.handle ?? ''}
             url={profileUrl(auth.account?.handle ?? '')}
-            title="Copia il link del profilo"
+            title="Copia link"
           />
           <p class="visits" title={COUNT_NOTE}>{visitsOfProfile()}</p>
         </div>
       {/if}
 
       <p class="sheet-note">
-        Ogni mappa è un indice a sé: i suoi posti, i suoi gruppi. Le categorie invece sono tue e
-        valgono su tutte. Quella che pubblichi la vede chi ha il link: i posti segnati come privati
-        restano fuori.
+        Ogni mappa tiene i suoi posti. Categorie e gruppi invece sono tuoi e valgono su tutte le
+        mappe, quindi eliminare una mappa porta via soltanto i posti che ci stavano dentro. La
+        mappa che pubblichi la vede chi ha il link, tranne i posti segnati come privati.
       </p>
     </div>
   {:else}
     <div class="tab-panel">
       {#if mapGroups.length > MANY}
-        <input class="list-filter" type="search" placeholder="Filtra i gruppi" bind:value={groupFilter} />
+        <input class="list-filter" type="search" placeholder="Cerca gruppo" bind:value={groupFilter} />
       {/if}
       <ul id="group-list" data-fade="none" use:fadeEdges>
         {#each visibleGroups as group (group.id)}
@@ -396,7 +435,21 @@
 
               {#snippet trail()}
                 <span class="count">{store.countGroup(group.id) || ''}</span>
-                <Button look="icon" title="Elimina gruppo" onclick={() => store.deleteGroup(group)}>
+                <Button
+                  look="icon"
+                  tone="danger"
+                  extra="kill"
+                  title="Elimina gruppo"
+                  onclick={(event: MouseEvent) =>
+                    ui.askSure(event.currentTarget as HTMLElement, {
+                      title: `Sciogliere “${group.name}”?`,
+                      detail: store.countGroup(group.id)
+                        ? `${conta(store.countGroup(group.id))} resta${store.countGroup(group.id) === 1 ? '' : 'no'} dov'è, senza questo gruppo.`
+                        : undefined,
+                      verb: 'Sciogli',
+                      onYes: () => store.deleteGroup(group),
+                    })}
+                >
                   <Icon name="trash" />
                 </Button>
               {/snippet}
@@ -410,16 +463,17 @@
 
       <AddRow
         id="group-form"
-        placeholder="Nuovo gruppo — Padova, Islanda…"
-        title="Aggiungi gruppo"
+        placeholder="Nome gruppo — es. Padova"
+        title="Crea gruppo"
         bind:value={newGroupName}
         bind:field={groupInput}
         onadd={addGroup}
       />
 
       <p class="sheet-note">
-        Un gruppo è dove stanno i posti: una città, un viaggio, una lista. Un posto ne può portare
-        quanti ne vuoi.
+        Un gruppo tiene insieme i posti di una città, di un viaggio, di una lista. Un posto ne può
+        portare quanti ne vuoi, anche da mappe diverse, perché i gruppi sono tuoi come le
+        categorie.
       </p>
     </div>
   {/if}

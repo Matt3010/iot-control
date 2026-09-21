@@ -59,7 +59,7 @@
             </span>
           </span>
           {#if place.private}
-            <span class="row-lock" title="Privato: resta fuori dalla mappa pubblica">
+            <span class="row-lock" title="Posto privato">
               <Icon name="lock" />
             </span>
           {/if}

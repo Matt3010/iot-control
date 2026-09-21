@@ -10,15 +10,21 @@
    * - `icon`:    un'icona sola, nelle testate e nelle righe
    * - `link`:    un comando scritto piccolo, in mezzo al testo
    * - `danger`:  quello che porta via qualcosa
+   * - `danger-solid`: lo stesso, ma quando è lui la risposta a una domanda
+   *
+   * `tone="danger"` lo tinge di rosso qualunque forma abbia: il rosso in
+   * quest'app vuol dire una cosa sola, «questo porta via qualcosa», e lo dice
+   * il componente, non un foglio di stile qui accanto.
    *
    * Con `href` diventa un link che si veste da bottone. `extra` serve a chi lo
    * ospita per decorarlo (la classe finisce sull'elemento, ma va raggiunta con
    * :global perché il markup è di questo componente).
    */
-  type Look = 'primary' | 'ghost' | 'icon' | 'link' | 'danger';
+  type Look = 'primary' | 'ghost' | 'icon' | 'link' | 'danger' | 'danger-solid';
 
   let {
     look = 'ghost',
+    tone,
     href,
     disabled = false,
     extra = '',
@@ -26,6 +32,7 @@
     ...rest
   }: {
     look?: Look;
+    tone?: 'danger';
     href?: string;
     disabled?: boolean;
     extra?: string;
@@ -45,12 +52,17 @@
     aria-disabled={disabled ? 'true' : undefined}
     tabindex={disabled ? -1 : undefined}
     {...rest}
-    class="btn {look} {extra}"
+    class="btn {look} {tone === 'danger' ? 'is-danger' : ''} {extra}"
   >
     {@render children()}
   </a>
 {:else}
-  <button type="button" {disabled} {...rest} class="btn {look} {extra}">
+  <button
+    type="button"
+    {disabled}
+    {...rest}
+    class="btn {look} {tone === 'danger' ? 'is-danger' : ''} {extra}"
+  >
     {@render children()}
   </button>
 {/if}
@@ -138,11 +150,39 @@
     padding: 10px 10px 10px 0;
     border: 0;
     background: none;
-    color: var(--ink-3);
+    color: color-mix(in srgb, var(--danger) 80%, transparent);
     font-size: 13px;
     transition: color 0.15s;
   }
 
   .danger:hover { color: var(--danger); }
   .danger :global(.ico) { width: 16px; height: 16px; }
+
+  /* ---------------------------------------------------------------- tono -- */
+  /* il rosso si vede prima di leggere: chi porta via qualcosa lo porta addosso */
+  .is-danger { color: color-mix(in srgb, var(--danger) 80%, transparent); }
+
+  .is-danger:hover {
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+  }
+
+  /* --------------------------------------------------------- danger-solid -- */
+  /* quando la domanda è "lo elimino?", la risposta si prende il colore: è
+     l'unica cosa rossa sullo schermo, e non si preme per sbaglio */
+  .danger-solid {
+    padding: 7px 14px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: var(--danger);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 560;
+    letter-spacing: -0.008em;
+    box-shadow: var(--shadow-1);
+    transition: filter 0.15s, transform 0.14s var(--ease);
+  }
+
+  .danger-solid:hover { filter: brightness(1.1); }
+  .danger-solid:active { transform: translateY(1px); }
 </style>

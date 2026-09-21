@@ -109,7 +109,8 @@
       </Button>
       <Button
         look="icon"
-        extra="leave-btn"
+        tone="danger"
+          extra="leave-btn"
         title={'Esci da ' + (auth.account?.email ?? '')}
         onclick={() => auth.leave()}
       >
@@ -138,7 +139,7 @@
         <Button
           look="icon"
           id="add-group"
-          title="Aggiungi un gruppo"
+          title="Nuovo gruppo"
           onclick={() => ui.toggleManage('groups', 'add')}
         >
           <Icon name="plus" />
@@ -147,13 +148,13 @@
       <div id="group-filters">
         {#if store.currentGroups.length}
           <Chip
-            label="Tutti"
+            label="Tutti i posti"
             count={store.currentPlaces.length}
             look={store.activeGroup === null ? 'sel' : 'off'}
             onclick={() => pickGroup(null)}
           />
         {:else}
-          <p class="section-hint">Una città, un viaggio, una lista: i gruppi tagliano l'indice per dove stanno i posti.</p>
+          <p class="section-hint">I gruppi tengono insieme i posti di una città, di un viaggio, di una lista.</p>
         {/if}
         {#each shownGroups as group (group.id)}
           <Chip
@@ -164,9 +165,14 @@
           />
         {/each}
         {#if hiddenGroups > 0}
-          <Chip label={'+' + hiddenGroups} look="off" onclick={() => (allGroups = true)} />
+          <Chip
+            label={'Altri ' + hiddenGroups}
+            look="off"
+            title="Mostra tutti"
+            onclick={() => (allGroups = true)}
+          />
         {:else if allGroups && store.currentGroups.length > CAP.groups}
-          <Chip label="meno" look="off" onclick={() => (allGroups = false)} />
+          <Chip label="Mostra meno" look="off" onclick={() => (allGroups = false)} />
         {/if}
       </div>
     {/if}
@@ -175,26 +181,26 @@
       <PanelSkeleton />
     {:else}
       {#if store.categories.length}
-        <div class="panel-row">
+        <div class="panel-row is-cut">
           <span class="eyebrow">Categorie</span>
           <span class="row-actions">
             {#if store.categories.length > 1}
+              <!-- l'occhio dice come stanno adesso le categorie, come nella scheda
+                   delle mappe: aperto se sono sulla mappa, chiuso se le hai tolte -->
               <Button
-                look="link"
-                title={everythingVisible
-                  ? 'Togli dalla mappa tutte le categorie'
-                  : 'Rimetti sulla mappa tutte le categorie'}
+                look="icon"
+                extra={'see-all' + (everythingVisible ? '' : ' is-off')}
+                title={everythingVisible ? 'Nascondi tutte' : 'Mostra tutte'}
                 onclick={() =>
                   everythingVisible ? store.hideAllCategories() : store.showAllCategories()}
               >
-                <!-- prima diceva "nessuna"/"tutte": sembrava uno stato, invece e' un comando -->
-                {everythingVisible ? 'nascondi tutte' : 'mostra tutte'}
+                <Icon name={everythingVisible ? 'eye' : 'eyeOff'} />
               </Button>
             {/if}
             <Button
               look="icon"
               id="add-category"
-              title="Aggiungi una categoria"
+              title="Nuova categoria"
               onclick={() => ui.toggleManage('categories', 'add')}
             >
               <Icon name="plus" />
@@ -214,17 +220,22 @@
             />
           {/each}
           {#if hiddenCategories > 0}
-            <Chip label={'+' + hiddenCategories} look="off" onclick={() => (allCategories = true)} />
+            <Chip
+              label={'Altre ' + hiddenCategories}
+              look="off"
+              title="Mostra tutte"
+              onclick={() => (allCategories = true)}
+            />
           {:else if allCategories && store.categories.length > CAP.categories}
-            <Chip label="meno" look="off" onclick={() => (allCategories = false)} />
+            <Chip label="Mostra meno" look="off" onclick={() => (allCategories = false)} />
           {/if}
         </div>
       {/if}
 
       {#if store.currentPlaces.length}
-        <div class="panel-row" id="list-head">
+        <div class="panel-row is-cut" id="list-head">
           <!-- due modi di leggere lo stesso indice: il riquadro, o le gambe -->
-          <div class="modes" role="group" aria-label="Cosa elencare">
+          <div class="modes" role="group" aria-label="Quali posti elencare">
             <button
               type="button"
               class="mode"
@@ -241,12 +252,10 @@
               class="mode"
               class:is-on={near}
               aria-pressed={near}
-              title={here.spot
-                ? 'I tuoi posti più vicini, ovunque siano'
-                : 'Chiede al browser dove sei, poi elenca i posti più vicini'}
+              title={here.spot ? 'I posti più vicini a te' : 'Usa la tua posizione'}
               onclick={goNear}
             >
-              {here.asking ? 'Ti cerco…' : 'Vicino a me'}
+              {here.asking ? 'Rilevo la posizione…' : 'Vicino a me'}
             </button>
           </div>
           <span class="list-end">
@@ -256,7 +265,7 @@
             <span
               class="list-hint"
               hidden={near}
-              title="Le distanze partono dal centro della mappa, il cerchietto chiaro"
+              title="Misurate dal centro della mappa"
               onpointerenter={() => document.body.classList.add('centre-hint')}
               onpointerleave={() => document.body.classList.remove('centre-hint')}
             >
@@ -313,14 +322,6 @@
 
 /* i bottoni sono di <Button>: le decorazioni li raggiungono con :global */
 .panel-head :global(.panel-toggle) { margin-right: -4px; }
-
-/* uscire è l'unica cosa qui dentro che ti porta fuori: si veste di conseguenza */
-.panel-head :global(.leave-btn) { color: color-mix(in srgb, var(--danger) 80%, transparent); }
-
-.panel-head :global(.leave-btn:hover) {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
-}
 
 /* quando la mappa è pubblica il link si accende: lo stato si vede da lì */
 .panel-head :global(.share-btn.is-public) { color: var(--ink); background: var(--sunken-hover); }
@@ -393,6 +394,17 @@
   padding: 0 8px;
   margin-bottom: -4px;
 }
+
+/* gruppi, categorie ed elenco sono tre cose diverse: un filo lo dice senza
+   parlare. Il primo non ce l'ha: sopra di lui c'è già il bordo della ricerca. */
+.panel-row.is-cut {
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline-soft);
+}
+
+/* l'occhio segue le categorie: smorto quando le hai tolte tutte */
+:global(.see-all) { color: var(--ink-2); }
+:global(.see-all.is-off) { color: var(--ink-3); }
 
 .row-actions {
   display: inline-flex;

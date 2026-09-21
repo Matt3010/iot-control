@@ -72,9 +72,14 @@ class Store {
     return id === this.activeMap?.id || this.extraMapIds.includes(id);
   }
 
-  /** Gruppi e posti delle mappe accese: il resto esiste, ma non adesso. */
+  /**
+   * I gruppi sono tuoi e valgono su tutte le mappe: qui restano quelli che
+   * hanno almeno un posto fra quelli che stai guardando, se no l'elenco si
+   * riempirebbe di nomi che adesso non tagliano niente.
+   */
   get currentGroups(): Group[] {
-    return this.groups.filter((group) => this.shows(group.mapId));
+    const usati = new Set(this.currentPlaces.flatMap((place) => place.groupIds));
+    return this.groups.filter((group) => usati.has(group.id));
   }
 
   get currentPlaces(): LocalPlace[] {
@@ -97,7 +102,8 @@ class Store {
       ? this.extraMapIds.filter((other) => other !== id)
       : [...this.extraMapIds, id];
     writeJSON('pi.maps', this.extraMapIds);
-    // un gruppo è di una mappa sola: cambiando cosa si vede può non esserci più
+    // un gruppo si vede se qualcosa ci sta dentro: cambiando cosa guardi può
+    // restare senza posti, e allora smette di essere un filtro
     if (this.activeGroup && !this.currentGroups.some((group) => group.id === this.activeGroup)) {
       this.setGroup(null);
     }
@@ -127,22 +133,21 @@ class Store {
     }
   }
 
-  /** Una mappa si porta via i suoi gruppi e i suoi posti: l'undo li rimette. */
+  /** Una mappa si porta via i suoi posti, e nient'altro: l'undo li rimette. */
   deleteMap(map: PlaceMap): void {
     if (this.maps.length <= 1) {
-      toast.show('Una mappa deve restare');
+      toast.show('Non puoi eliminare la tua unica mappa');
       return;
     }
 
     const index = this.maps.indexOf(map);
-    const groups = this.groups.filter((group) => group.mapId === map.id);
     const places = this.places.filter((place) => place.mapId === map.id);
     // annullare deve riportare la schermata com'era, comprese le mappe accese
     const wasActive = this.activeMapId;
     const wasExtra = [...this.extraMapIds];
 
+    // se ne va la mappa e se ne vanno i suoi posti: i gruppi sono tuoi e restano
     this.maps.splice(index, 1);
-    this.groups = this.groups.filter((group) => group.mapId !== map.id);
     this.places = this.places.filter((place) => place.mapId !== map.id);
     this.#forget(map.id);
     if (this.activeMap && this.activeMapId !== this.activeMap.id) {
@@ -157,7 +162,6 @@ class Store {
       run: () => {
         cancel();
         this.maps.splice(index, 0, map);
-        this.groups = [...this.groups, ...groups];
         this.places = [...this.places, ...places];
         this.activeMapId = wasActive;
         this.extraMapIds = wasExtra;
@@ -332,8 +336,8 @@ class Store {
 
   /* ----------------------------------------------------------------- groups */
 
-  async createGroup(name: string, mapId = this.activeMap?.id): Promise<Group> {
-    const created = await api.post<Group>('/groups', { name, mapId });
+  async createGroup(name: string): Promise<Group> {
+    const created = await api.post<Group>('/groups', { name });
     this.groups.push(created);
     return created;
   }

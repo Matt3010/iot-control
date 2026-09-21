@@ -5,21 +5,21 @@ import type { Group } from '../types.js';
 export class GroupRepository {
   constructor(private readonly tx: Transaction) {}
 
-  /** I gruppi stanno dentro una mappa: fuori da lì non vogliono dire niente. */
-  findAllOfMaps(mapIds: string[]): Group[] {
-    return this.tx.data.groups.filter((group) => mapIds.includes(group.mapId));
+  /** I gruppi sono di chi li ha fatti, e valgono su tutte le sue mappe. */
+  findAllOf(ownerId: string): Group[] {
+    return this.tx.data.groups.filter((group) => group.ownerId === ownerId);
   }
 
   findById(id: string): Group | undefined {
     return this.tx.data.groups.find((group) => group.id === id);
   }
 
-  existsInMap(mapId: string, id: string): boolean {
-    return this.findById(id)?.mapId === mapId;
+  owns(ownerId: string, id: string): boolean {
+    return this.findById(id)?.ownerId === ownerId;
   }
 
-  insert(mapId: string, name: string): Group {
-    const group: Group = { id: `grp-${randomUUID()}`, mapId, name };
+  insert(ownerId: string, name: string): Group {
+    const group: Group = { id: `grp-${randomUUID()}`, ownerId, name };
     this.tx.data.groups.push(group);
     this.tx.markDirty();
     return group;
@@ -39,14 +39,5 @@ export class GroupRepository {
     this.tx.data.groups.splice(at, 1);
     this.tx.markDirty();
     return true;
-  }
-
-  deleteByMap(mapId: string): number {
-    const survivors = this.tx.data.groups.filter((group) => group.mapId !== mapId);
-    const removed = this.tx.data.groups.length - survivors.length;
-    if (!removed) return 0;
-    this.tx.data.groups = survivors;
-    this.tx.markDirty();
-    return removed;
   }
 }

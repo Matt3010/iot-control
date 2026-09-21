@@ -49,12 +49,13 @@ function migratePlace(place: Place & { groupId?: string }): Place {
 
 /**
  * Dati scritti quando l'indice era uno solo: diventano la prima mappa del
- * primo che si era registrato, e le categorie passano a lui.
+ * primo che si era registrato, e le categorie passano a lui. I gruppi, che per
+ * un po' sono stati di una mappa, passano a chi quella mappa ce l'aveva.
  */
 function migrateToMaps(data: Database): Database {
   const orphans =
     data.places.some((place) => !place.mapId) ||
-    data.groups.some((group) => !group.mapId) ||
+    data.groups.some((group) => !group.ownerId) ||
     data.categories.some((category) => !category.ownerId);
   if (!orphans) return data;
 
@@ -75,7 +76,11 @@ function migrateToMaps(data: Database): Database {
     users: data.users,
     maps: data.maps.length ? data.maps : [first],
     categories: data.categories.map((category: Category) => ({ ...category, ownerId: category.ownerId ?? owner })),
-    groups: data.groups.map((group: Group) => ({ ...group, mapId: group.mapId ?? first.id })),
+    groups: data.groups.map((group: Group & { mapId?: string }) => {
+      const { mapId, ...rest } = group;
+      const casa = data.maps.find((map) => map.id === mapId);
+      return { ...rest, ownerId: group.ownerId ?? casa?.ownerId ?? owner };
+    }),
     places: data.places.map((place: Place) => ({ ...place, mapId: place.mapId ?? first.id })),
   };
 }

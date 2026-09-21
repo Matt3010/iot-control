@@ -73,7 +73,7 @@
 
     <footer class="foot">
       <span>Anche tu hai dei posti da tenere insieme?</span>
-      <Button look="primary" href="/">Fai la tua</Button>
+      <Button look="primary" href="/">Crea la tua mappa</Button>
     </footer>
   </div>
 </div>

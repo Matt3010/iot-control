@@ -78,7 +78,7 @@
           type="password"
           name="password"
           autocomplete={creating ? 'new-password' : 'current-password'}
-          placeholder={creating ? 'almeno otto caratteri' : '••••••••'}
+          placeholder={creating ? 'Almeno 8 caratteri' : '••••••••'}
           required
           minlength={creating ? 8 : undefined}
           bind:value={password}
@@ -91,7 +91,7 @@
             type="text"
             name="handle"
             autocomplete="username"
-            placeholder="come-ti-chiami"
+            placeholder="nome-utente"
             required
             minlength="3"
             maxlength="20"

@@ -162,7 +162,7 @@
   <div class="notice surface">
     <h1>Questa mappa non c'è</h1>
     <p>Forse chi l'ha fatta non l'ha ancora pubblicata, o l'indirizzo è cambiato.</p>
-    <Button look="primary" href="/" extra="start">Fai la tua</Button>
+    <Button look="primary" href="/" extra="start">Crea la tua mappa</Button>
   </div>
 {:else if data}
   <div id="map" bind:this={container}></div>

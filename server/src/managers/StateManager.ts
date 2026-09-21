@@ -21,7 +21,7 @@ export class StateManager {
       return {
         maps,
         categories: new CategoryRepository(tx).findAllOf(ownerId),
-        groups: new GroupRepository(tx).findAllOfMaps(ids),
+        groups: new GroupRepository(tx).findAllOf(ownerId),
         places: new PlaceRepository(tx).findAllOfMaps(ids),
       };
     });
