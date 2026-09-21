@@ -57,6 +57,15 @@ class Auth {
     this.needsSetup = false;
   }
 
+  /**
+   * I conteggi delle visite arrivano con l'account, e cambiano mentre l'app è
+   * aperta: quando vai a guardarli, prima si rileggono.
+   */
+  async refresh(): Promise<void> {
+    const fresh = await api.get<Account>('/auth/me').catch(() => null);
+    if (fresh) this.account = fresh;
+  }
+
   async leave(): Promise<void> {
     await api.post('/auth/logout', {}).catch(() => undefined);
     this.account = null;

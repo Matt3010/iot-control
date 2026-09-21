@@ -20,10 +20,22 @@
   let newGroupName = $state('');
   let newMapName = $state('');
 
+  /**
+   * Le visite arrivano mentre guardi altro: aprendo questa scheda si rileggono,
+   * altrimenti resteresti al numero di quando sei entrato.
+   */
+  $effect(() => {
+    if (ui.manageTab !== 'maps') return;
+    void auth.refresh();
+    void store.refreshMaps();
+  });
+
   /** Come si conta, detto una volta sola e appeso a ogni numero. */
   const COUNT_NOTE =
-    "Un'apertura per persona ogni mezz'ora. Chi sei lo indoviniamo da indirizzo " +
-    'e browser, non lo conserviamo, e le tue visite non contano.';
+    "Un'apertura per persona ogni mezz'ora. Chi sei lo indoviniamo da indirizzo e " +
+    'browser, e non lo conserviamo: dalla stessa rete con lo stesso browser sei ' +
+    'sempre la stessa persona, anche in incognito. Le visite fatte mentre sei ' +
+    'entrato nel tuo account non contano.';
 
   /** Oltre una decina di voci scorrerle non basta più: serve poterle cercare. */
   const MANY = 8;
@@ -282,7 +294,7 @@
                     <span class="visits-from">{`· ${map.viewsFromProfile} dal profilo`}</span>
                   {/if}
                 {:else}
-                  Nessuno l'ha ancora aperto.
+                  Ancora nessuna visita.
                 {/if}
               </p>
             {/if}
@@ -322,7 +334,7 @@
                 </span>
               {/if}
             {:else}
-              Nessuno l'ha ancora aperto.
+              Ancora nessuna visita.
             {/if}
           </p>
         </div>

@@ -103,6 +103,12 @@ class Store {
     }
   }
 
+  /** Solo le mappe, per rileggere i conteggi senza ricaricare tutto l'indice. */
+  async refreshMaps(): Promise<void> {
+    const fresh = await api.get<PlaceMap[]>('/maps').catch(() => null);
+    if (fresh) this.maps = fresh;
+  }
+
   async createMap(name: string): Promise<PlaceMap> {
     const created = await api.post<PlaceMap>('/maps', { name });
     this.maps.push(created);
