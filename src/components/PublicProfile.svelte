@@ -35,7 +35,7 @@
           <p class="tally">
             {data.maps.length}
             {data.maps.length === 1 ? 'mappa' : 'mappe'} · {total}
-            {total === 1 ? 'posto' : 'posti'}
+            {total === 1 ? 'luogo' : 'luoghi'}
           </p>
         {/if}
       </header>
@@ -53,7 +53,7 @@
                 </span>
                 <span class="row-text">
                   <span class="name">{map.name}</span>
-                  <span class="count">{map.places} {map.places === 1 ? 'posto' : 'posti'}</span>
+                  <span class="count">{map.places} {map.places === 1 ? 'luogo' : 'luoghi'}</span>
                 </span>
                 <Icon name="submit" />
               </a>
@@ -72,7 +72,7 @@
     {/if}
 
     <footer class="foot">
-      <span>Anche tu hai dei posti da tenere insieme?</span>
+      <span>Anche tu hai dei luoghi da tenere insieme?</span>
       <Button look="primary" href="/">Crea la tua mappa</Button>
     </footer>
   </div>

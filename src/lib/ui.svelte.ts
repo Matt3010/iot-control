@@ -1,3 +1,4 @@
+import { readJSON, writeJSON } from './storage';
 import type { Draft } from './types';
 
 export type Sheet = 'none' | 'place' | 'manage';
@@ -26,11 +27,32 @@ export interface ColorRequest {
   onPick: (color: string) => void;
 }
 
+/**
+ * La scheda di destra resta dove l'hai lasciata: ricaricare la pagina non deve
+ * farti ritrovare da capo la linguetta che stavi guardando.
+ */
+const RICORDO = 'pi.scheda';
+interface Ricordo {
+  aperta: boolean;
+  tab: ManageTab;
+}
+const ricordo = readJSON<Ricordo>(RICORDO, { aperta: false, tab: 'categories' });
+
 /** Which panels are open, and what the place sheet is editing. */
 class Ui {
-  sheet = $state<Sheet>('none');
-  manageTab = $state<ManageTab>('categories');
+  sheet = $state<Sheet>(ricordo.aperta ? 'manage' : 'none');
+  #tab = $state<ManageTab>(ricordo.tab);
   draft = $state<Draft | null>(null);
+
+  /** La linguetta si legge come un campo, ma passando di qui si ricorda. */
+  get manageTab(): ManageTab {
+    return this.#tab;
+  }
+
+  set manageTab(tab: ManageTab) {
+    this.#tab = tab;
+    this.#ricorda();
+  }
   picking = $state(false);
   paletteOpen = $state(false);
   emoji = $state<EmojiRequest | null>(null);
@@ -67,9 +89,10 @@ class Ui {
   openManage(tab: ManageTab = 'categories', intent: 'browse' | 'add' = 'browse'): void {
     this.panelWish = 'auto';
     this.#placePaused = this.sheet === 'place';
-    this.manageTab = tab;
+    this.#tab = tab;
     this.manageIntent = intent;
     this.sheet = 'manage';
+    this.#ricorda();
   }
 
   closeManage(): void {
@@ -77,6 +100,7 @@ class Ui {
     this.color = null;
     this.sheet = this.#placePaused && this.draft ? 'place' : 'none';
     this.#placePaused = false;
+    this.#ricorda();
   }
 
   toggleManage(tab: ManageTab = 'categories', intent: 'browse' | 'add' = 'browse'): void {
@@ -104,6 +128,11 @@ class Ui {
     this.emoji = null;
     this.color = null;
     this.sure = { anchor, ...question };
+  }
+
+  /** Questo browser e basta: quale scheda era aperta, e su quale linguetta. */
+  #ricorda(): void {
+    writeJSON(RICORDO, { aperta: this.sheet === 'manage', tab: this.#tab });
   }
 
   /** Esc unwinds the overlay one layer at a time, topmost first. */

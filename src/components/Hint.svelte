@@ -4,7 +4,7 @@
 
 {#if ui.picking}
   <div id="hint">
-    Clicca sulla mappa dove si trova il posto
+    Clicca sulla mappa dove si trova il luogo
     <kbd>Esc</kbd>
   </div>
 {/if}

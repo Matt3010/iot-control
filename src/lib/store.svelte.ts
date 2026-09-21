@@ -157,7 +157,7 @@ class Store {
 
     const cancel = this.#defer((options) => api.delete(`/maps/${map.id}`, options).catch(() => undefined));
 
-    toast.show(places.length ? `"${map.name}" e ${places.length} posti eliminati` : `"${map.name}" eliminata`, {
+    toast.show(places.length ? `"${map.name}" e ${places.length} luoghi eliminati` : `"${map.name}" eliminata`, {
       label: 'Annulla',
       run: () => {
         cancel();
@@ -320,7 +320,7 @@ class Store {
       api.delete(`/categories/${category.id}`, options).catch(() => undefined),
     );
 
-    const swept = orphans.length === 1 ? 'un posto' : `${orphans.length} posti`;
+    const swept = orphans.length === 1 ? 'un luogo' : `${orphans.length} luoghi`;
     toast.show(
       orphans.length ? `"${category.name}" e ${swept} eliminati` : `"${category.name}" eliminata`,
       {
@@ -365,7 +365,7 @@ class Store {
       api.delete(`/groups/${group.id}`, options).catch(() => undefined),
     );
 
-    const freed = members.length === 1 ? 'un posto resta' : `${members.length} posti restano`;
+    const freed = members.length === 1 ? 'un luogo resta' : `${members.length} luoghi restano`;
     toast.show(members.length ? `"${group.name}" sciolto, ${freed}` : `"${group.name}" eliminato`,
       {
         label: 'Annulla',

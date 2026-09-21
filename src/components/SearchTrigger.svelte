@@ -7,7 +7,7 @@
 
 <button id="search-trigger" type="button" onclick={() => (ui.paletteOpen = true)}>
   <Icon name="search" />
-  <span>Cerca un posto o un indirizzo</span>
+  <span>Cerca un luogo o un indirizzo</span>
   <kbd>{isMac ? '⌘K' : 'Ctrl K'}</kbd>
 </button>
 

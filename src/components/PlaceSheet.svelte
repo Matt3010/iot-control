@@ -56,7 +56,7 @@
   <aside id="place-sheet" class="surface" use:swipeToClose={() => ui.closePlace()}>
     <header>
       <span class="head-text">
-        <h2 id="place-title">{editing ? 'Modifica posto' : 'Nuovo posto'}</h2>
+        <h2 id="place-title">{editing ? 'Modifica luogo' : 'Nuovo luogo'}</h2>
         {#if store.shownMaps.length > 1}
           <span class="head-where">in {store.maps.find((m) => m.id === (draft.mapId ?? store.activeMap?.id))?.name}</span>
         {/if}
@@ -68,7 +68,7 @@
 
     <form id="place-form" onsubmit={save}>
       <label class="field">
-        <span class="eyebrow">Nome del posto</span>
+        <span class="eyebrow">Nome del luogo</span>
         <!-- svelte-ignore a11y_autofocus -->
         <!-- binding a funzione: chiudendo la scheda la bozza sparisce un attimo
              prima del componente, e una lettura secca solleverebbe -->
@@ -126,7 +126,7 @@
     <Switch
       checked={draft.private ?? false}
       onchange={(value) => draft && (draft.private = value)}
-      label="Posto privato"
+      label="Luogo privato"
       note="Non compare nella mappa pubblica."
     />
 
@@ -150,12 +150,12 @@
           extra="kill"
           onclick={(event: MouseEvent) =>
             ui.askSure(event.currentTarget as HTMLElement, {
-              title: `Eliminare “${draft.name || 'questo posto'}”?`,
+              title: `Eliminare “${draft.name || 'questo luogo'}”?`,
               verb: 'Elimina',
               onYes: remove,
             })}
         >
-          <Icon name="trash" /> Elimina posto
+          <Icon name="trash" /> Elimina luogo
         </Button>
       {/if}
       <Button look="ghost" onclick={() => ui.closePlace()}>Annulla</Button>

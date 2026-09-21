@@ -94,7 +94,7 @@
             : undefined}
         >
           {store.currentPlaces.length}
-          {store.currentPlaces.length === 1 ? 'posto' : 'posti'}
+          {store.currentPlaces.length === 1 ? 'luogo' : 'luoghi'}
         </span>
       {/if}
       <Button
@@ -148,13 +148,13 @@
       <div id="group-filters">
         {#if store.currentGroups.length}
           <Chip
-            label="Tutti i posti"
+            label="Tutti i luoghi"
             count={store.currentPlaces.length}
             look={store.activeGroup === null ? 'sel' : 'off'}
             onclick={() => pickGroup(null)}
           />
         {:else}
-          <p class="section-hint">I gruppi tengono insieme i posti di una città, di un viaggio, di una lista.</p>
+          <p class="section-hint">I gruppi tengono insieme i luoghi di una città, di un viaggio, di una lista.</p>
         {/if}
         {#each shownGroups as group (group.id)}
           <Chip
@@ -235,13 +235,13 @@
       {#if store.currentPlaces.length}
         <div class="panel-row is-cut" id="list-head">
           <!-- due modi di leggere lo stesso indice: il riquadro, o le gambe -->
-          <div class="modes" role="group" aria-label="Quali posti elencare">
+          <div class="modes" role="group" aria-label="Quali luoghi elencare">
             <button
               type="button"
               class="mode"
               class:is-on={!near}
               aria-pressed={!near}
-              title="I posti inquadrati adesso"
+              title="I luoghi inquadrati adesso"
               onclick={() => store.setListMode('view')}
             >
               In vista
@@ -252,7 +252,7 @@
               class="mode"
               class:is-on={near}
               aria-pressed={near}
-              title={here.spot ? 'I posti più vicini a te' : 'Usa la tua posizione'}
+              title={here.spot ? 'I luoghi più vicini a te' : 'Usa la tua posizione'}
               onclick={goNear}
             >
               {here.asking ? 'Rilevo la posizione…' : 'Vicino a me'}

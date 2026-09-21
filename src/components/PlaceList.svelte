@@ -27,8 +27,8 @@
   {#if rows.length === 0}
     <li class="row-empty">
       {near
-        ? 'Nessun posto: i filtri qui sopra li stanno escludendo tutti.'
-        : 'Nessun posto in questa parte di mappa.'}
+        ? 'Nessun luogo: i filtri qui sopra li stanno escludendo tutti.'
+        : 'Nessun luogo in questa parte di mappa.'}
     </li>
   {:else}
     {#each rows as { place, distance } (place.key)}
@@ -59,7 +59,7 @@
             </span>
           </span>
           {#if place.private}
-            <span class="row-lock" title="Posto privato">
+            <span class="row-lock" title="Luogo privato">
               <Icon name="lock" />
             </span>
           {/if}

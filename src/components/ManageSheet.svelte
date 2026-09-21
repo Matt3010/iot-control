@@ -17,7 +17,7 @@
   import Button from './Button.svelte';
 
   /** Una volta sola, perché le domande parlino tutte la stessa lingua. */
-  const conta = (n: number): string => (n === 1 ? 'un posto' : `${n} posti`);
+  const conta = (n: number): string => (n === 1 ? 'un luogo' : `${n} luoghi`);
 
   /**
    * Eliminare una mappa porta via i suoi posti, e nient'altro: categorie e
@@ -25,9 +25,9 @@
    * l'unico modo perché una conferma serva a qualcosa.
    */
   function portaVia(mapId: string): string | undefined {
-    const posti = store.places.filter((place) => place.mapId === mapId).length;
-    if (!posti) return undefined;
-    return `Se ne ${posti === 1 ? 'va' : 'vanno'} con lei ${conta(posti)}. Categorie e gruppi restano.`;
+    const luoghi = store.places.filter((place) => place.mapId === mapId).length;
+    if (!luoghi) return undefined;
+    return `Se ne ${luoghi === 1 ? 'va' : 'vanno'} con lei ${conta(luoghi)}. Categorie e gruppi restano.`;
   }
 
   let newEmoji = $state(DEFAULT_EMOJI);
@@ -356,7 +356,7 @@
               <div class="map-foot">
                 <span class="map-meta">
                   {places}
-                  {places === 1 ? 'posto' : 'posti'}{open
+                  {places === 1 ? 'luogo' : 'luoghi'}{open
                     ? ' · selezionata'
                     : store.shows(map.id)
                       ? ' · in vista'
@@ -408,9 +408,9 @@
       {/if}
 
       <p class="sheet-note">
-        Ogni mappa tiene i suoi posti. Categorie e gruppi invece sono tuoi e valgono su tutte le
-        mappe, quindi eliminare una mappa porta via soltanto i posti che ci stavano dentro. La
-        mappa che pubblichi la vede chi ha il link, tranne i posti segnati come privati.
+        Ogni mappa tiene i suoi luoghi. Categorie e gruppi invece sono tuoi e valgono su tutte le
+        mappe, quindi eliminare una mappa porta via soltanto i luoghi che ci stavano dentro. La
+        mappa che pubblichi la vede chi ha il link, tranne i luoghi segnati come privati.
       </p>
     </div>
   {:else}
@@ -471,7 +471,7 @@
       />
 
       <p class="sheet-note">
-        Un gruppo tiene insieme i posti di una città, di un viaggio, di una lista. Un posto ne può
+        Un gruppo tiene insieme i luoghi di una città, di un viaggio, di una lista. Un luogo ne può
         portare quanti ne vuoi, anche da mappe diverse, perché i gruppi sono tuoi come le
         categorie.
       </p>
@@ -600,7 +600,7 @@
 .map-open :global(.ico) { width: 15px; height: 15px; }
 
 /* la riga sotto vive nella stessa colonna del resto: niente rientro. I due
-   pezzi poggiano in basso: il conto dei posti sta sul fondo dell'interruttore,
+   pezzi poggiano in basso: il conto dei luoghi sta sul fondo dell'interruttore,
    non a mezz'aria in mezzo alla sua pista. */
 .map-foot {
   display: flex;

@@ -140,9 +140,10 @@ export function pinIcon({ color, emoji, extra = '', locked = false }: PinLook): 
     html:
       `<div class="pin ${extra}" style="--c:${color ?? DEFAULT_COLOR}">` +
       `<span>${emoji ?? DEFAULT_EMOJI}</span>${lock}</div>`,
-    iconSize: [36, 36],
-    iconAnchor: [18, 36],
-    popupAnchor: [0, -34],
+    // la punta sta in fondo, ed e' lei a toccare il luogo
+    iconSize: [34, 42],
+    iconAnchor: [17, 42],
+    popupAnchor: [0, -38],
   });
 }
 
@@ -158,18 +159,21 @@ function clusterIcon(cluster: MarkerCluster): L.DivIcon {
     tally.set(colour, (tally.get(colour) ?? 0) + 1);
   }
 
-  let at = 0;
-  const stops: string[] = [];
-  for (const [colour, count] of tally) {
-    const end = at + (count / children.length) * 100;
-    stops.push(`${colour} ${at}% ${end}%`);
-    at = end;
-  }
+  /*
+   * Un grappolo non e' un buco sulla mappa: e' un chip come quelli del
+   * pannello, che dice quanti luoghi ci sono e di che colore. I pallini stanno
+   * impilati come le facce di una squadra, dal piu' numeroso in giu', e oltre
+   * tre si smette di contarli: quello che serve e' il colpo d'occhio.
+   */
+  const colours = [...tally.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const dots = colours.map(([colour]) => `<i style="--c:${colour}"></i>`).join('');
 
   return L.divIcon({
     className: '',
-    html: `<div class="cluster" style="background:conic-gradient(${stops.join(',')})"><span>${children.length}</span></div>`,
-    iconSize: [44, 44],
+    html: `<div class="cluster"><span class="cluster-dots">${dots}</span>${children.length}</div>`,
+    // niente misura: la pastiglia e' larga quanto il suo contenuto, e si
+    // centra da sola sul punto (vedi .cluster in styles/map.css)
+    iconSize: undefined,
   });
 }
 

@@ -11,15 +11,15 @@
   {#if noCategories}
     <p class="empty-title">Si comincia da una categoria.</p>
     <p class="empty-line">
-      Le dai un'emoji e un colore, e diventa il segno dei posti che ci metti dentro.
+      Le dai un'emoji e un colore, e diventa il segno dei luoghi che ci metti dentro.
     </p>
     <Button look="ghost" onclick={() => ui.openManage('categories', 'add')}>
       Crea una categoria
     </Button>
   {:else}
-    <p class="empty-title">Nessun posto, per ora.</p>
+    <p class="empty-title">Nessun luogo, per ora.</p>
     <ol class="empty-steps">
-      <li><b>Aggiungi posto</b>, poi clicca sulla mappa dove si trova.</li>
+      <li><b>Aggiungi luogo</b>, poi clicca sulla mappa dove si trova.</li>
       <li>Oppure <kbd>{isMac ? '⌘K' : 'Ctrl K'}</kbd> e cerca un indirizzo.</li>
     </ol>
   {/if}

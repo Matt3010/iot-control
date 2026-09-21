@@ -10,7 +10,7 @@
   onclick={() => ui.setPicking(!ui.picking)}
 >
   <Icon name="plus" />
-  <span class="add-label">{ui.picking ? 'Annulla' : 'Aggiungi posto'}</span>
+  <span class="add-label">{ui.picking ? 'Annulla' : 'Aggiungi luogo'}</span>
 </button>
 
 <style>

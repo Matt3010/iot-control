@@ -187,7 +187,7 @@
         type="text"
         autocomplete="off"
         spellcheck="false"
-        placeholder="Cerca tra i tuoi posti, o un indirizzo"
+        placeholder="Cerca tra i tuoi luoghi, o un indirizzo"
         bind:this={input}
         bind:value={query}
         onkeydown={onKeydown}
@@ -199,7 +199,7 @@
     <div id="palette-results" bind:this={results}>
       {#if placeRows.length}
         <div class="palette-section">
-          <span class="eyebrow">I tuoi posti</span>
+          <span class="eyebrow">I tuoi luoghi</span>
           {#if !query.trim()}<span class="palette-meta">i più vicini</span>{/if}
         </div>
       {/if}
@@ -234,7 +234,7 @@
         <p class="palette-empty">
           {query.trim().length < 3
             ? 'Scrivi almeno tre lettere per cercare anche tra gli indirizzi.'
-            : 'Nessun posto e nessun indirizzo con questo nome.'}
+            : 'Nessun luogo e nessun indirizzo con questo nome.'}
         </p>
       {/if}
     </div>

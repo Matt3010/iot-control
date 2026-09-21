@@ -173,7 +173,7 @@
       <h1>{data.map.name}</h1>
       <p class="count">
         {data.places.length}
-        {data.places.length === 1 ? 'posto' : 'posti'}
+        {data.places.length === 1 ? 'luogo' : 'luoghi'}
         {#if data.categories.length}
           · {data.categories.length}
           {data.categories.length === 1 ? 'categoria' : 'categorie'}
