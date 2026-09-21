@@ -51,6 +51,8 @@ export class MapRepository {
       name,
       slug: this.freeSlug(ownerId, name),
       published: false,
+      views: 0,
+      viewsFromProfile: 0,
       createdAt: new Date().toISOString(),
     };
     this.tx.data.maps.push(map);
@@ -64,6 +66,15 @@ export class MapRepository {
     Object.assign(current, patch);
     this.tx.markDirty();
     return current;
+  }
+
+  /** Una visita in più a questa mappa, e da dove arrivava. */
+  countVisit(id: string, fromProfile = false): void {
+    const map = this.findById(id);
+    if (!map) return;
+    map.views = (map.views ?? 0) + 1;
+    if (fromProfile) map.viewsFromProfile = (map.viewsFromProfile ?? 0) + 1;
+    this.tx.markDirty();
   }
 
   delete(id: string): boolean {

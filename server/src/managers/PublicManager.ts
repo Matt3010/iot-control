@@ -26,9 +26,27 @@ export interface PublicProfile {
  * che non hai segnato come privati. Le categorie e i gruppi che restano sono
  * quelli che quei posti usano davvero.
  */
+export interface Visit {
+  /** Falso se è la stessa persona di poco fa: una ricarica non è una visita. */
+  fresh: boolean;
+  /** Chi sta guardando, se è entrato: le visite del padrone non si contano. */
+  viewer: string | null;
+  /** La stessa persona aveva aperto il profilo poco prima. */
+  fromProfile?: boolean;
+  /** È la prima mappa che apre dopo il profilo: il profilo lo conta una volta. */
+  firstAfterProfile?: boolean;
+}
+
+const counts = (visit: Visit | undefined, ownerId: string) =>
+  !!visit?.fresh && visit.viewer !== ownerId;
+
 export class PublicManager {
-  /** `handle` assente: è un link vecchio, di quando l'indirizzo era solo lo slug. */
-  map(handle: string | undefined, slug: string): Promise<PublicMap> {
+  /**
+   * `handle` assente: è un link vecchio, di quando l'indirizzo era solo lo
+   * slug. `count` dice se questa apertura vale una visita: non vale se è la
+   * stessa persona di poco fa, o se è chi la mappa ce l'ha.
+   */
+  map(handle: string | undefined, slug: string, visit?: Visit): Promise<PublicMap> {
     return store.transaction((tx) => {
       const users = new UserRepository(tx);
       const maps = new MapRepository(tx);
@@ -43,6 +61,10 @@ export class PublicManager {
       if (!map?.published) throw notFound('mappa inesistente');
 
       const owner = users.findById(map.ownerId);
+      if (counts(visit, map.ownerId)) {
+        maps.countVisit(map.id, !!visit?.fromProfile);
+        if (visit?.firstAfterProfile) users.countFollowed(map.ownerId);
+      }
       const places = new PlaceRepository(tx)
         .findAllOfMaps([map.id])
         .filter((place) => !place.private);
@@ -62,10 +84,12 @@ export class PublicManager {
     });
   }
 
-  profile(handle: string): Promise<PublicProfile> {
+  profile(handle: string, visit?: Visit): Promise<PublicProfile> {
     return store.transaction((tx) => {
-      const owner = new UserRepository(tx).findByHandle(handle);
+      const users = new UserRepository(tx);
+      const owner = users.findByHandle(handle);
       if (!owner) throw notFound('profilo inesistente');
+      if (counts(visit, owner.id)) users.countVisit(owner.id);
 
       const maps = new MapRepository(tx).findPublishedOf(owner.id);
       const places = new PlaceRepository(tx).findAllOfMaps(maps.map((map) => map.id));

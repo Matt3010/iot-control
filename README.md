@@ -22,6 +22,12 @@ Niente categorie preimpostate, niente fronzoli.
   è di sola lettura, con l'elenco dei posti di lato. Anche lì c'è il tasto "dove sono": chi apre
   il link mentre gira per quella città vede il puntino, e l'elenco si riordina dal più vicino
   con le distanze.
+- **Quante volte è stato usato un link**: sotto ogni indirizzo, nella scheda delle mappe, c'è il
+  conto delle visite — e per le mappe quante di quelle arrivavano dal profilo, per il profilo
+  quante hanno poi aperto una mappa. Si conta **un'apertura per persona ogni mezz'ora**: chi sei
+  lo si indovina da indirizzo e browser, l'impronta è un hash che vive in memoria e non viene
+  mai scritto, e le visite di chi è entrato nel proprio account non contano. Chi guarda la
+  pagina pubblica quei numeri non li vede.
 - **Aggiungi posto**: premi il bottone, clicca il punto sulla mappa (il pin si può trascinare),
   dai nome, categoria, gruppo e note. Un posto può essere segnato **privato**. Il pin compare subito: il salvataggio viaggia dietro, e se
   il server rifiuta la riga torna indietro da sola.

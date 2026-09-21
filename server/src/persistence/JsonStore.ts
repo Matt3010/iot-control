@@ -8,10 +8,15 @@ import type { Category, Database, Group, Place, PlaceMap, User } from '../types.
 function migrateHandles(users: User[]): User[] {
   const taken = new Set(users.map((user) => user.handle).filter(Boolean));
   return users.map((user) => {
-    if (user.handle) return user;
+    const counted = {
+      ...user,
+      profileViews: user.profileViews ?? 0,
+      profileFollowed: user.profileFollowed ?? 0,
+    };
+    if (counted.handle) return counted;
     const handle = uniqueSlug(user.email.split('@')[0] ?? 'io', (candidate) => taken.has(candidate));
     taken.add(handle);
-    return { ...user, handle };
+    return { ...counted, handle };
   });
 }
 
@@ -20,10 +25,16 @@ function migrateSlugs(maps: PlaceMap[]): PlaceMap[] {
   const key = (ownerId: string, slug: string) => `${ownerId}/${slug}`;
   const taken = new Set(maps.filter((map) => map.slug).map((map) => key(map.ownerId, map.slug)));
   return maps.map((map) => {
-    if (map.slug) return { ...map, published: map.published ?? false };
+    const counted = {
+      ...map,
+      published: map.published ?? false,
+      views: map.views ?? 0,
+      viewsFromProfile: map.viewsFromProfile ?? 0,
+    };
+    if (counted.slug) return counted;
     const slug = uniqueSlug(slugify(map.name), (candidate) => taken.has(key(map.ownerId, candidate)));
     taken.add(key(map.ownerId, slug));
-    return { ...map, slug, published: map.published ?? false };
+    return { ...counted, slug };
   });
 }
 
@@ -52,6 +63,8 @@ function migrateToMaps(data: Database): Database {
     name: 'La mia mappa',
     slug: 'la-mia-mappa',
     published: false,
+    views: 0,
+    viewsFromProfile: 0,
     createdAt: new Date().toISOString(),
   };
 

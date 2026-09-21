@@ -28,10 +28,28 @@ export class UserRepository {
     );
   }
 
-  insert(data: Omit<User, 'id' | 'createdAt'>): User {
+  /** Una visita in più al profilo pubblico. */
+  countVisit(id: string): void {
+    const user = this.findById(id);
+    if (!user) return;
+    user.profileViews = (user.profileViews ?? 0) + 1;
+    this.tx.markDirty();
+  }
+
+  /** Una di quelle visite ha poi aperto una mappa. */
+  countFollowed(id: string): void {
+    const user = this.findById(id);
+    if (!user) return;
+    user.profileFollowed = (user.profileFollowed ?? 0) + 1;
+    this.tx.markDirty();
+  }
+
+  insert(data: Omit<User, 'id' | 'createdAt' | 'profileViews' | 'profileFollowed'>): User {
     const user: User = {
       id: `usr-${randomUUID()}`,
       ...data,
+      profileViews: 0,
+      profileFollowed: 0,
       createdAt: new Date().toISOString(),
     };
     this.tx.data.users.push(user);

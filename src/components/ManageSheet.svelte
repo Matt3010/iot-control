@@ -20,6 +20,11 @@
   let newGroupName = $state('');
   let newMapName = $state('');
 
+  /** Come si conta, detto una volta sola e appeso a ogni numero. */
+  const COUNT_NOTE =
+    "Un'apertura per persona ogni mezz'ora. Chi sei lo indoviniamo da indirizzo " +
+    'e browser, non lo conserviamo, e le tue visite non contano.';
+
   /** Oltre una decina di voci scorrerle non basta più: serve poterle cercare. */
   const MANY = 8;
   let categoryFilter = $state('');
@@ -269,6 +274,17 @@
                 {url}
                 onchange={(slug) => store.patchMap(map, { slug })}
               />
+              <p class="visits" title={COUNT_NOTE}>
+                {#if map.views}
+                  <b>{map.views}</b>
+                  {map.views === 1 ? 'visita' : 'visite'}
+                  {#if map.viewsFromProfile}
+                    <span class="visits-from">{`· ${map.viewsFromProfile} dal profilo`}</span>
+                  {/if}
+                {:else}
+                  Nessuno l'ha ancora aperto.
+                {/if}
+              </p>
             {/if}
           </li>
         {/each}
@@ -292,6 +308,23 @@
             url={profileUrl(auth.account?.handle ?? '')}
             title="Copia il link del profilo"
           />
+          <p class="visits" title={COUNT_NOTE}>
+            {#if auth.account?.profileViews}
+              <b>{auth.account.profileViews}</b>
+              {auth.account.profileViews === 1 ? 'visita' : 'visite'}
+              {#if auth.account.profileFollowed}
+                <span class="visits-from">
+                  {`· ${auth.account.profileFollowed} ${
+                    auth.account.profileFollowed === 1
+                      ? 'ha aperto una mappa'
+                      : 'hanno aperto una mappa'
+                  }`}
+                </span>
+              {/if}
+            {:else}
+              Nessuno l'ha ancora aperto.
+            {/if}
+          </p>
         </div>
       {/if}
 
@@ -527,6 +560,18 @@
 }
 
 .profile-link p { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
+
+/* il conto sta sotto al link, smorzato: è una nota, non un titolo */
+.visits {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.visits b { font-weight: 600; color: var(--ink-2); }
+.visits-from { color: var(--ink-3); }
 
 /* lì dentro la riga sta su una scheda, non su una card: si smorza */
 .profile-link :global(.link-row) { background: var(--sunken); box-shadow: none; }

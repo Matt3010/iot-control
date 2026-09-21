@@ -7,6 +7,10 @@ export interface User {
   /** scrypt: sale e derivata, mai la password. */
   salt: string;
   hash: string;
+  /** Quante volte è stato aperto /u/<handle>. Le tue visite non contano. */
+  profileViews: number;
+  /** Di quelle visite, quante hanno poi aperto una delle tue mappe. */
+  profileFollowed: number;
   createdAt: string;
 }
 
@@ -22,6 +26,10 @@ export interface PlaceMap {
   slug: string;
   /** Finché è falso la mappa non esiste per nessuno tranne che per te. */
   published: boolean;
+  /** Quante volte è stato aperto il suo link pubblico. */
+  views: number;
+  /** Di quelle, quante venivano dal profilo: la stessa persona, poco prima. */
+  viewsFromProfile: number;
   createdAt: string;
 }
 

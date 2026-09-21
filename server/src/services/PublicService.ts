@@ -1,10 +1,11 @@
-import type { CategoryView, GroupView, MapView, PlaceView } from '../dto/views.js';
-import { toCategoryView, toGroupView, toMapView, toPlaceView } from '../dto/views.js';
+import type { CategoryView, GroupView, PlaceView, PublicMapView } from '../dto/views.js';
+import { toCategoryView, toGroupView, toPlaceView, toPublicMapView } from '../dto/views.js';
+import type { Visit } from '../managers/PublicManager.js';
 import { publicManager } from '../managers/PublicManager.js';
 
-export interface PublicMapView {
+export interface PublicMapPage {
   handle: string;
-  map: MapView;
+  map: PublicMapView;
   categories: CategoryView[];
   groups: GroupView[];
   places: PlaceView[];
@@ -12,27 +13,27 @@ export interface PublicMapView {
 
 export interface PublicProfileView {
   handle: string;
-  maps: (MapView & { places: number; emojis: string[] })[];
+  maps: (PublicMapView & { places: number; emojis: string[] })[];
 }
 
 export class PublicService {
-  async map(handle: string | undefined, slug: string): Promise<PublicMapView> {
-    const found = await publicManager.map(handle, slug);
+  async map(handle: string | undefined, slug: string, visit?: Visit): Promise<PublicMapPage> {
+    const found = await publicManager.map(handle, slug, visit);
     return {
       handle: found.handle,
-      map: toMapView(found.map),
+      map: toPublicMapView(found.map),
       categories: found.categories.map(toCategoryView),
       groups: found.groups.map(toGroupView),
       places: found.places.map(toPlaceView),
     };
   }
 
-  async profile(handle: string): Promise<PublicProfileView> {
-    const found = await publicManager.profile(handle);
+  async profile(handle: string, visit?: Visit): Promise<PublicProfileView> {
+    const found = await publicManager.profile(handle, visit);
     return {
       handle: found.handle,
       maps: found.maps.map((entry) => ({
-        ...toMapView(entry.map),
+        ...toPublicMapView(entry.map),
         places: entry.places,
         emojis: entry.emojis,
       })),

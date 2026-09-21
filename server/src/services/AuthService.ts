@@ -10,6 +10,10 @@ export interface UserView {
   id: string;
   email: string;
   handle: string;
+  /** Quante volte hanno aperto il tuo /u/<handle>. */
+  profileViews: number;
+  /** Di quelle, quante hanno poi aperto una delle tue mappe. */
+  profileFollowed: number;
   createdAt: string;
 }
 
@@ -18,7 +22,14 @@ export interface Session {
   token: string;
 }
 
-const toUserView = ({ id, email, handle, createdAt }: User): UserView => ({ id, email, handle, createdAt });
+const toUserView = ({ id, email, handle, profileViews, profileFollowed, createdAt }: User): UserView => ({
+  id,
+  email,
+  handle,
+  profileViews: profileViews ?? 0,
+  profileFollowed: profileFollowed ?? 0,
+  createdAt,
+});
 
 const sign = (user: User): string =>
   jwt.sign({ sub: user.id }, resolveSecret(), { expiresIn: `${config.auth.ttlDays}d` });

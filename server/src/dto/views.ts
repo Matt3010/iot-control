@@ -14,8 +14,15 @@ export interface MapView {
   name: string;
   slug: string;
   published: boolean;
+  /** Quante volte è stato usato il suo link: lo vede solo chi la possiede. */
+  views: number;
+  /** Di quelle, quante arrivavano dal profilo. */
+  viewsFromProfile: number;
   createdAt: string;
 }
+
+/** Quello che di una mappa può vedere un estraneo: i conteggi non sono suoi. */
+export type PublicMapView = Omit<MapView, 'views' | 'viewsFromProfile'>;
 
 export interface GroupView {
   id: string;
@@ -45,13 +52,20 @@ export interface StateView {
 
 export const toCategoryView = ({ id, name, emoji, color }: Category): CategoryView => ({ id, name, emoji, color });
 
-export const toMapView = ({ id, name, slug, published, createdAt }: PlaceMap): MapView => ({
-  id,
-  name,
-  slug,
-  published: published ?? false,
-  createdAt,
+export const toMapView = (map: PlaceMap): MapView => ({
+  id: map.id,
+  name: map.name,
+  slug: map.slug,
+  published: map.published ?? false,
+  views: map.views ?? 0,
+  viewsFromProfile: map.viewsFromProfile ?? 0,
+  createdAt: map.createdAt,
 });
+
+export const toPublicMapView = (map: PlaceMap): PublicMapView => {
+  const { views: _quante, viewsFromProfile: _daDove, ...outside } = toMapView(map);
+  return outside;
+};
 
 export const toGroupView = ({ id, mapId, name }: Group): GroupView => ({ id, mapId, name });
 
