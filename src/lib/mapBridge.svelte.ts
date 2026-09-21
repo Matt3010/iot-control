@@ -1,5 +1,6 @@
 import type { Map as LeafletMap, Marker } from 'leaflet';
-import { CLUSTER_OFF_AT } from './mapkit';
+import { here } from './here.svelte';
+import { CLUSTER_OFF_AT, metersBetween } from './mapkit';
 import type { LocalPlace } from './types';
 
 /**
@@ -79,7 +80,13 @@ class MapBridge {
     return this.#live?.getBounds().contains([lat, lng]) ?? false;
   }
 
-  distanceFromCentre(lat: number, lng: number): number {
+  /**
+   * Da dove si misura: da te, se ci hai fatto sapere dove sei; se no dal
+   * centro di quello che stai guardando.
+   */
+  distanceFrom(lat: number, lng: number): number {
+    const me = here.spot;
+    if (me) return metersBetween([me.lat, me.lng], [lat, lng]);
     return this.#live?.getCenter().distanceTo([lat, lng]) ?? 0;
   }
 }

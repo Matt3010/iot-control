@@ -1,6 +1,7 @@
 <script lang="ts">
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { auth } from '../lib/auth.svelte';
+  import { here } from '../lib/here.svelte';
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
@@ -42,7 +43,7 @@
     mapBridge.view.moves; // re-read whenever the map settles somewhere new
     return store.currentPlaces
       .filter((place) => store.visible(place) && mapBridge.contains(place.lat, place.lng))
-      .map((place) => ({ place, distance: mapBridge.distanceFromCentre(place.lat, place.lng) }))
+      .map((place) => ({ place, distance: mapBridge.distanceFrom(place.lat, place.lng) }))
       .sort((a, b) => a.distance - b.distance);
   });
 
@@ -203,7 +204,13 @@
       {#if store.currentPlaces.length}
         <div class="panel-row" id="list-head">
           <span class="eyebrow">In vista</span>
-          <span id="list-count" class="tally">{rows.length}</span>
+          <span class="list-end">
+            <!-- i chilometri partono da qualcosa: qui si dice da cosa -->
+            <span class="list-hint">
+              {here.spot ? 'da dove sei' : 'dal centro'}
+            </span>
+            <span id="list-count" class="tally">{rows.length}</span>
+          </span>
         </div>
         <PlaceList {rows} />
       {:else}
@@ -264,6 +271,15 @@
   background: var(--sunken);
   border-radius: 99px;
   padding: 2px 9px;
+}
+
+.list-end { display: flex; align-items: center; gap: 8px; }
+
+.list-hint {
+  font-size: 10.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-3);
 }
 
 .panel-row {

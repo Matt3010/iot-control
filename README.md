@@ -11,10 +11,15 @@ Niente categorie preimpostate, niente fronzoli.
 
 - **Mappa full-screen** (Leaflet + tile OpenStreetMap, nessuna API key).
 - **Più mappe**: il nome in alto a sinistra le cambia e ne crea di nuove. Una mappa è un indice
-  a sé — i suoi posti, i suoi gruppi — mentre le categorie sono tue e valgono su tutte.
-- **Link pubblici**: ogni mappa si può pubblicare a `/m/<indirizzo>`, e tutte quelle pubblicate
-  stanno insieme in `/u/<il-tuo-nome>` — quello è il link da mettere in bio. I posti segnati
-  privati restano fuori, e da fuori la pagina è di sola lettura.
+  a sé — i suoi posti, i suoi gruppi — mentre le categorie sono tue e valgono su tutte. Una è
+  **selezionata** (è lì che finisce quello che aggiungi); le altre le accendi con l'occhio e i
+  loro pin compaiono accanto ai suoi, con l'indice che dice da quale mappa viene ogni riga.
+- **Link pubblici**: ogni mappa si può pubblicare a `/u/<il-tuo-nome>/<indirizzo>`, e tutte
+  quelle pubblicate stanno insieme in `/u/<il-tuo-nome>` — quello è il link da mettere in bio.
+  Siccome l'indirizzo sta sotto il tuo nome, la tua "pizzerie" non toglie il posto a quella di
+  nessun altro. I vecchi link `/m/<indirizzo>` rispondono ancora e si correggono da soli. I
+  posti segnati privati restano fuori (sulla mappa portano un lucchetto), e da fuori la pagina
+  è di sola lettura, con l'elenco dei posti di lato.
 - **Aggiungi posto**: premi il bottone, clicca il punto sulla mappa (il pin si può trascinare),
   dai nome, categoria, gruppo e note. Un posto può essere segnato **privato**. Il pin compare subito: il salvataggio viaggia dietro, e se
   il server rifiuta la riga torna indietro da sola.
@@ -24,9 +29,11 @@ Niente categorie preimpostate, niente fronzoli.
 - **Gruppi**: filtro a parte dalle categorie, e un posto ne porta quanti ne vuoi — la stessa
   pizzeria può stare in "Padova" e in "Da rifare". Scegli un gruppo e la mappa ci vola, i
   conteggi delle categorie si ricalcolano dentro quel gruppo: *pizzeria a Padova* è due clic.
-- **L'indice nel pannello**: i posti inquadrati in quel momento, dal più vicino al centro
-  mappa. Passi sopra una riga e il suo pin si solleva; ci clicchi e la mappa ci vola aprendo
-  la scheda.
+- **L'indice nel pannello**: i posti inquadrati in quel momento, dal più vicino. Il tasto sopra
+  allo zoom chiede al browser dove sei: compare il puntino con il suo alone e le distanze
+  partono da lì (l'intestazione dice *da dove sei* invece di *dal centro*). Senza permesso — o
+  senza https — si misura dal centro di quello che stai guardando. Passi sopra una riga e il suo
+  pin si solleva; ci clicchi e la mappa ci vola aprendo la scheda.
 - **Cluster**: quando i pin si accavallano diventano un disco che porta i colori delle
   categorie che contiene, e si apre allo zoom.
 - **Categorie**: le crei tu, con emoji scelta da un picker completo e un colore. Eliminare una
@@ -34,7 +41,8 @@ Niente categorie preimpostate, niente fronzoli.
   quell'etichetta.
 - **Niente finestre di conferma**: quel che elimini sparisce subito, con sei secondi di
   "Annulla" nel toast. Solo allo scadere la cancellazione parte davvero.
-- **Si entra con email e password**, e un accesso se lo crea chiunque. I dati stanno sul server
+- **Si entra con email, password e nome utente** (quello del link pubblico: si propone da sé
+  dall'email), e un accesso se lo crea chiunque. I dati stanno sul server
   in un unico `places.json`: chi entra vede lo stesso indice — l'accesso protegge, non divide.
 
 ## Il front-end

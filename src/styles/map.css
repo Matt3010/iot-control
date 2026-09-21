@@ -112,6 +112,76 @@
 
 .leaflet-bottom.leaflet-left { margin-bottom: env(safe-area-inset-bottom); }
 
+/* --------------------------------------------------------------- dove sei */
+
+/* il tasto sta sopra allo zoom e ne porta lo stesso vestito */
+.locate {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--shadow-1), inset 0 1px 0 var(--highlight);
+}
+
+.locate a {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--ink-2);
+  transition: background 0.14s, color 0.14s;
+}
+
+.locate a:hover { background: var(--sunken-hover); color: var(--ink); }
+.locate .ico { width: 16px; height: 16px; }
+
+/* mentre cerca gira; quando ti ha trovato resta acceso */
+.finding-me .locate .ico { animation: spin 0.9s linear infinite; }
+.found-me .locate a { color: var(--me); }
+
+/* il puntino di dove sei: pulsa piano, e l'alone dice quanto è incerto */
+.me {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+}
+
+.me::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--me) 30%, transparent);
+  animation: me-pulse 2.6s var(--ease) infinite;
+}
+
+.me-dot {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--me);
+  border: 2.5px solid #fff;
+  box-shadow: 0 2px 8px rgb(10 13 18 / 0.45);
+}
+
+.me-halo {
+  stroke: var(--me);
+  stroke-opacity: 0.35;
+  stroke-width: 1;
+  fill: var(--me);
+  fill-opacity: 0.1;
+}
+
+@keyframes me-pulse {
+  0% { transform: scale(0.55); opacity: 0.85; }
+  70%, 100% { transform: scale(2.3); opacity: 0; }
+}
+
 .leaflet-control-zoom {
   border: 1px solid var(--hairline) !important;
   border-radius: var(--r-md) !important;

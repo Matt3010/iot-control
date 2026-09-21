@@ -8,6 +8,7 @@ import {
   EyeOff,
   LogOut,
   Link2,
+  LocateFixed,
   Lock,
   Mail,
   ChevronDown,
@@ -44,6 +45,7 @@ export const ICONS = {
   alert: AlertCircle,
   eye: Eye,
   layers: Layers,
+  locate: LocateFixed,
   eyeOff: EyeOff,
   check: Check,
 } as const;

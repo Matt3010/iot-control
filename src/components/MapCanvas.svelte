@@ -1,7 +1,8 @@
 <script lang="ts">
   import L, { type Marker } from 'leaflet';
+  import { here } from '../lib/here.svelte';
   import { mapBridge } from '../lib/mapBridge.svelte';
-  import { clusterGroup, createMap, DEFAULT_COLOR, glyph, pinIcon } from '../lib/mapkit';
+  import { clusterGroup, createMap, DEFAULT_COLOR, glyph, meIcon, pinIcon } from '../lib/mapkit';
   import { readJSON, writeJSON } from '../lib/storage';
   import { store } from '../lib/store.svelte';
   import type { Category, LocalPlace } from '../lib/types';
@@ -77,7 +78,9 @@
 
   $effect(() => {
     const saved = readJSON('pi.view', { lat: 41.9, lng: 12.5, zoom: 6 });
-    map = createMap(container).setView([saved.lat, saved.lng], saved.zoom);
+    map = createMap(container, {}, () =>
+      here.locate((spot) => map.setView([spot.lat, spot.lng], Math.max(map.getZoom(), 14))),
+    ).setView([saved.lat, saved.lng], saved.zoom);
     clusters = clusterGroup().addTo(map);
 
     mapBridge.attach(map, markers);
@@ -153,6 +156,34 @@
       if (onMap && !clusters.hasLayer(marker)) clusters.addLayer(marker);
       if (!onMap && clusters.hasLayer(marker)) clusters.removeLayer(marker);
     }
+  });
+
+  /** Il puntino di dove sei, con l'alone dell'incertezza intorno. */
+  $effect(() => {
+    const spot = here.spot;
+    if (!map || !spot) return;
+
+    const me = L.marker([spot.lat, spot.lng], {
+      icon: meIcon(),
+      interactive: false,
+      zIndexOffset: -500,
+    }).addTo(map);
+    const halo = L.circle([spot.lat, spot.lng], {
+      radius: spot.accuracy,
+      className: 'me-halo',
+      interactive: false,
+    }).addTo(map);
+
+    return () => {
+      me.remove();
+      halo.remove();
+    };
+  });
+
+  /** Mentre cerca, il tasto lo dice: la classe sta sul body come le altre. */
+  $effect(() => {
+    document.body.classList.toggle('finding-me', here.asking);
+    document.body.classList.toggle('found-me', !!here.spot);
   });
 
   /** The draft pin: draggable, and tinted like the category chosen in the form. */

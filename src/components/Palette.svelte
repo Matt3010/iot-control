@@ -45,7 +45,7 @@
       else if (place.groupIds.some((id) => normalise(store.groupOf(id)?.name ?? '').includes(needle))) rank = 3;
       else if (normalise(place.note ?? '').includes(needle)) rank = 4;
       if (rank === Number.POSITIVE_INFINITY) continue;
-      scored.push({ place, rank, distance: mapBridge.distanceFromCentre(place.lat, place.lng) });
+      scored.push({ place, rank, distance: mapBridge.distanceFrom(place.lat, place.lng) });
     }
 
     return scored.sort((a, b) => a.rank - b.rank || a.distance - b.distance).slice(0, 8);

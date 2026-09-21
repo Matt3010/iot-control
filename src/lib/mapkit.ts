@@ -27,13 +27,58 @@ export function glyph(name: IconName): SVGElement {
   return svg;
 }
 
-/** La mappa con cui si lavora: i controlli in basso a sinistra, l'angolo destro libero. */
-export function createMap(container: HTMLElement, options: L.MapOptions = {}): L.Map {
+/**
+ * La mappa con cui si lavora: i controlli in basso a sinistra, l'angolo destro
+ * libero. Con `onLocate` il tasto "dove sono" sta sopra allo zoom, come ci si
+ * aspetta.
+ */
+export function createMap(
+  container: HTMLElement,
+  options: L.MapOptions = {},
+  onLocate?: () => void,
+): L.Map {
   const map = L.map(container, { zoomControl: false, attributionControl: false, ...options });
   L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map);
+  // l'angolo impila dal basso nell'ordine in cui si aggiungono: prima lo zoom,
+  // poi il tasto, che così gli sta sopra
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
+  if (onLocate) locateControl(onLocate).addTo(map);
   L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
   return map;
+}
+
+/** Un tasto in mezzo ai controlli di Leaflet, con il loro stesso vestito. */
+function locateControl(onLocate: () => void): L.Control {
+  const control = new L.Control({ position: 'bottomleft' });
+  control.onAdd = () => {
+    const wrap = L.DomUtil.create('div', 'leaflet-control locate');
+    const button = L.DomUtil.create('a', '', wrap) as HTMLAnchorElement;
+    button.href = '#';
+    button.title = 'Dove sono';
+    button.setAttribute('role', 'button');
+    button.append(glyph('locate'));
+    L.DomEvent.on(button, 'click', (event) => {
+      L.DomEvent.stop(event);
+      onLocate();
+    });
+    return wrap;
+  };
+  return control;
+}
+
+/** Quanti metri ci sono fra due punti, senza tirare in ballo una mappa. */
+export function metersBetween(from: L.LatLngExpression, to: L.LatLngExpression): number {
+  return L.latLng(from).distanceTo(to);
+}
+
+/** Il puntino di dove sei: non si clicca, sta sotto ai pin. */
+export function meIcon(): L.DivIcon {
+  return L.divIcon({
+    className: '',
+    html: '<div class="me"><span class="me-dot"></span></div>',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
 }
 
 /** La stessa mappa, ma solo da guardare: nessun controllo, nessun gesto. */
