@@ -60,9 +60,12 @@
   });
 
   /** Chiedere "vicino a me" senza aver mai detto dove sei attiva la domanda. */
-  function goNear() {
+  async function goNear() {
     store.setListMode('near');
-    if (!here.spot) here.locate();
+    if (here.spot) return;
+    // se il permesso non arriva, il modo non può restare acceso a vuoto:
+    // sarebbe una preferenza che scatta da sola al prossimo "dove sono"
+    if (!(await here.locate())) store.setListMode('view');
   }
 
   function pickGroup(id: string | null) {

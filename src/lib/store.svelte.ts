@@ -131,6 +131,9 @@ class Store {
     const index = this.maps.indexOf(map);
     const groups = this.groups.filter((group) => group.mapId === map.id);
     const places = this.places.filter((place) => place.mapId === map.id);
+    // annullare deve riportare la schermata com'era, comprese le mappe accese
+    const wasActive = this.activeMapId;
+    const wasExtra = [...this.extraMapIds];
 
     this.maps.splice(index, 1);
     this.groups = this.groups.filter((group) => group.mapId !== map.id);
@@ -150,7 +153,10 @@ class Store {
         this.maps.splice(index, 0, map);
         this.groups = [...this.groups, ...groups];
         this.places = [...this.places, ...places];
-        this.openMap(map.id);
+        this.activeMapId = wasActive;
+        this.extraMapIds = wasExtra;
+        writeJSON('pi.map', wasActive);
+        writeJSON('pi.maps', wasExtra);
       },
     });
   }

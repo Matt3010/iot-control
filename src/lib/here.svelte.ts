@@ -20,31 +20,36 @@ class Here {
     return typeof navigator !== 'undefined' && 'geolocation' in navigator && window.isSecureContext;
   }
 
-  locate(then?: (spot: Spot) => void): void {
-    if (this.asking) return;
+  /** Torna il punto, o null se non si è potuto: chi ha chiesto deve saperlo. */
+  locate(then?: (spot: Spot) => void): Promise<Spot | null> {
+    if (this.asking) return Promise.resolve(this.spot);
 
     if (!this.available) {
       toast.show('Il browser dà la posizione solo su https');
-      return;
+      return Promise.resolve(null);
     }
 
     this.asking = true;
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        this.asking = false;
-        this.spot = { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy };
-        then?.(this.spot);
-      },
-      (error) => {
-        this.asking = false;
-        toast.show(
-          error.code === error.PERMISSION_DENIED
-            ? 'Senza il permesso resto al centro della mappa'
-            : 'Non sono riuscito a trovarti',
-        );
-      },
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 },
-    );
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          this.asking = false;
+          this.spot = { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy };
+          then?.(this.spot);
+          resolve(this.spot);
+        },
+        (error) => {
+          this.asking = false;
+          toast.show(
+            error.code === error.PERMISSION_DENIED
+              ? 'Senza il permesso resto al centro della mappa'
+              : 'Non sono riuscito a trovarti',
+          );
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 },
+      );
+    });
   }
 
   forget(): void {

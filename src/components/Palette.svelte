@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatDistance, normalise } from '../lib/format';
+  import { here } from '../lib/here.svelte';
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { store } from '../lib/store.svelte';
   import type { LocalPlace } from '../lib/types';
@@ -45,7 +46,13 @@
       else if (place.groupIds.some((id) => normalise(store.groupOf(id)?.name ?? '').includes(needle))) rank = 3;
       else if (normalise(place.note ?? '').includes(needle)) rank = 4;
       if (rank === Number.POSITIVE_INFINITY) continue;
-      scored.push({ place, rank, distance: mapBridge.distanceFrom(place.lat, place.lng) });
+      // stessa origine dell'indice: altrimenti due distanze diverse per lo
+      // stesso posto, sulla stessa schermata
+      scored.push({
+        place,
+        rank,
+        distance: mapBridge.distanceFrom(place.lat, place.lng, origin()),
+      });
     }
 
     return scored.sort((a, b) => a.rank - b.rank || a.distance - b.distance).slice(0, 8);
@@ -160,6 +167,9 @@
       rows[selected]?.pick();
     }
   }
+
+  /** In "vicino a me" si misura da te; altrimenti dal centro del riquadro. */
+  const origin = () => (store.listMode === 'near' ? here.spot : null);
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
