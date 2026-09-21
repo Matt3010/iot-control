@@ -1,13 +1,14 @@
 import type { NextFunction, Request, Response } from 'express';
+import { ownerOf } from '../auth/owner.js';
 import type { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import { categoryService } from '../services/CategoryService.js';
 
 /** HTTP in, HTTP out. Anything else belongs a layer down. */
 export class CategoryController {
-  list = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await categoryService.list());
+      res.json(await categoryService.list(ownerOf(req)));
     } catch (error) {
       next(error);
     }
@@ -15,7 +16,7 @@ export class CategoryController {
 
   create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.status(201).json(await categoryService.create(dtoOf<CreateCategoryDto>(req)));
+      res.status(201).json(await categoryService.create(ownerOf(req), dtoOf<CreateCategoryDto>(req)));
     } catch (error) {
       next(error);
     }
@@ -23,7 +24,7 @@ export class CategoryController {
 
   update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await categoryService.update(req.params.id as string, dtoOf<UpdateCategoryDto>(req)));
+      res.json(await categoryService.update(ownerOf(req), req.params.id as string, dtoOf<UpdateCategoryDto>(req)));
     } catch (error) {
       next(error);
     }
@@ -31,7 +32,7 @@ export class CategoryController {
 
   remove = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await categoryService.remove(req.params.id as string);
+      await categoryService.remove(ownerOf(req), req.params.id as string);
       res.status(204).end();
     } catch (error) {
       next(error);

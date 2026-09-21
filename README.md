@@ -1,16 +1,19 @@
 # Place Index
 
-Mappa a schermo intero dove segni i posti che ti interessano. Ogni posto appartiene a una
-categoria, che gli dà emoji e colore sulla mappa, e può stare in quanti gruppi vuoi — una
-città, un viaggio, una lista. Niente account, niente categorie preimpostate, niente fronzoli.
+Mappa a schermo intero dove segni i posti che ti interessano. Di mappe puoi averne quante
+vuoi — i ristoranti, un viaggio, le case viste — e ognuna ha i suoi posti e i suoi gruppi. Ogni
+posto appartiene a una categoria, che gli dà emoji e colore, e può stare in quanti gruppi vuoi.
+Niente categorie preimpostate, niente fronzoli.
 
 ![Place Index](docs/preview.png)
 
 ## Cosa fa
 
 - **Mappa full-screen** (Leaflet + tile OpenStreetMap, nessuna API key).
+- **Più mappe**: il nome in alto a sinistra le cambia e ne crea di nuove. Una mappa è un indice
+  a sé — i suoi posti, i suoi gruppi — mentre le categorie sono tue e valgono su tutte.
 - **Aggiungi posto**: premi il bottone, clicca il punto sulla mappa (il pin si può trascinare),
-  dai nome, categoria, gruppo e note. Il pin compare subito: il salvataggio viaggia dietro, e se
+  dai nome, categoria, gruppo e note. Un posto può essere segnato **privato**. Il pin compare subito: il salvataggio viaggia dietro, e se
   il server rifiuta la riga torna indietro da sola.
 - **⌘K**: una sola casella che cerca prima tra i *tuoi* posti — per nome, categoria, gruppo o
   note — e poi tra gli indirizzi di OpenStreetMap. Frecce per muoverti, Invio per aprire. Da un
@@ -91,6 +94,10 @@ Express in TypeScript, a livelli, ognuno con un mestiere solo:
   disco solo se arriva in fondo — un'eccezione a metà è un rollback. Le transazioni sono
   serializzate, quindi due richieste non si sovrascrivono. La scrittura passa per un file
   vicino e una `rename`, così un crash non lascia mezzo file.
+- **Chi possiede cosa**: le mappe e le categorie sono dell'account, i gruppi e i posti stanno
+  dentro una mappa. Ogni lettura e ogni scrittura passano da lì, così la mappa di un altro
+  semplicemente non esiste. Un account senza mappe non esiste: la prima nasce da sola, e
+  l'ultima non si può cancellare.
 - **Invarianti di dominio** (una categoria si porta via i suoi posti, un gruppo cancellato si
   limita a sfilarsi dai posti che lo portavano, un posto non può puntare a id inesistenti)
   stanno nei manager, dentro la stessa transazione. I record scritti quando un posto poteva
@@ -175,12 +182,14 @@ Ogni file si porta dietro le proprie regole per lo schermo stretto: non c'è un 
 | `GET` | `/api/auth/state` | pubblica: dice se c'è già qualcuno e se ci si può iscrivere |
 | `POST` | `/api/auth/register` `/api/auth/login` | `{ email, password }`, rispondono col cookie |
 | `POST` `GET` | `/api/auth/logout` `/api/auth/me` | uscire, e sapere chi si è |
-| `GET` | `/api/state` | `{ categories, groups, places }`: da qui parte il client |
+| `GET` | `/api/state` | `{ maps, categories, groups, places }`: da qui parte il client |
 | `GET` `POST` | `/api/categories` | `{ name, emoji?, color? }` |
 | `PUT` `DELETE` | `/api/categories/:id` | la cancellazione porta via anche i posti della categoria |
-| `GET` `POST` | `/api/groups` | `{ name }` |
+| `GET` `POST` | `/api/groups` | `{ mapId, name }` |
 | `PUT` `DELETE` | `/api/groups/:id` | la cancellazione sfila l'etichetta dai posti, non li elimina |
-| `GET` `POST` | `/api/places` | `{ name, categoryId, groupIds?, lat, lng, note? }` |
+| `GET` `POST` | `/api/maps` | `{ name }` |
+| `PUT` `DELETE` | `/api/maps/:id` | cancellarla porta via i suoi gruppi e posti; l'ultima resta |
+| `GET` `POST` | `/api/places` | `{ mapId, name, categoryId, groupIds?, lat, lng, note?, private? }` |
 | `PUT` `DELETE` | `/api/places/:id` | il `PUT` è parziale: manda solo i campi che cambiano |
 
 Gli errori arrivano come `{ error, details? }`: `400` per un DTO non valido o un riferimento

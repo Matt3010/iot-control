@@ -35,7 +35,7 @@
     const needle = normalise(query.trim());
     const scored: { place: LocalPlace; rank: number; distance: number }[] = [];
 
-    for (const place of store.places) {
+    for (const place of store.currentPlaces) {
       const name = normalise(place.name);
       let rank = Number.POSITIVE_INFINITY;
       if (!needle) rank = 5;

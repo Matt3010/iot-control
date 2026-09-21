@@ -2,18 +2,20 @@ import { api } from './api';
 import { DEFAULT_EMOJI, SUGGESTED } from './format';
 import { readJSON, writeJSON } from './storage';
 import { toast, UNDO_MS } from './toast.svelte';
-import type { Category, Draft, Group, LocalPlace, Place, Snapshot } from './types';
+import type { Category, Draft, Group, LocalPlace, Place, PlaceMap, Snapshot } from './types';
 
 const withKey = (place: Place): LocalPlace => ({ ...place, key: crypto.randomUUID() });
 
 /** What the server is allowed to see of a place. */
-const placePayload = (draft: Required<Pick<Draft, 'lat' | 'lng'>> & Partial<Draft>) => ({
+const placePayload = (mapId: string, draft: Required<Pick<Draft, 'lat' | 'lng'>> & Partial<Draft>) => ({
+  mapId,
   name: draft.name ?? '',
   note: draft.note ?? '',
   categoryId: draft.categoryId ?? '',
   groupIds: draft.groupIds ?? [],
   lat: draft.lat,
   lng: draft.lng,
+  private: draft.private ?? false,
 });
 
 interface PendingDelete {
@@ -21,6 +23,9 @@ interface PendingDelete {
 }
 
 class Store {
+  maps = $state<PlaceMap[]>([]);
+  /** Quale mappa stai guardando: è una scelta di questo browser. */
+  activeMapId = $state<string | null>(readJSON('pi.map', null));
   categories = $state<Category[]>([]);
   groups = $state<Group[]>([]);
   places = $state<LocalPlace[]>([]);
@@ -45,6 +50,75 @@ class Store {
     }
   }
 
+  /* ------------------------------------------------------------------ maps */
+
+  get activeMap(): PlaceMap | undefined {
+    return this.maps.find((map) => map.id === this.activeMapId) ?? this.maps[0];
+  }
+
+  /** Gruppi e posti della mappa aperta: il resto esiste, ma non adesso. */
+  get currentGroups(): Group[] {
+    return this.groups.filter((group) => group.mapId === this.activeMap?.id);
+  }
+
+  get currentPlaces(): LocalPlace[] {
+    return this.places.filter((place) => place.mapId === this.activeMap?.id);
+  }
+
+  openMap(id: string): void {
+    this.activeMapId = id;
+    writeJSON('pi.map', id);
+    this.setGroup(null);
+  }
+
+  async createMap(name: string): Promise<PlaceMap> {
+    const created = await api.post<PlaceMap>('/maps', { name });
+    this.maps.push(created);
+    this.openMap(created.id);
+    return created;
+  }
+
+  async patchMap(map: PlaceMap, name: string): Promise<void> {
+    const before = map.name;
+    map.name = name;
+    try {
+      Object.assign(map, await api.put<PlaceMap>(`/maps/${map.id}`, { name }));
+    } catch (error) {
+      map.name = before;
+      toast.show((error as Error).message);
+    }
+  }
+
+  /** Una mappa si porta via i suoi gruppi e i suoi posti: l'undo li rimette. */
+  deleteMap(map: PlaceMap): void {
+    if (this.maps.length <= 1) {
+      toast.show('Una mappa deve restare');
+      return;
+    }
+
+    const index = this.maps.indexOf(map);
+    const groups = this.groups.filter((group) => group.mapId === map.id);
+    const places = this.places.filter((place) => place.mapId === map.id);
+
+    this.maps.splice(index, 1);
+    this.groups = this.groups.filter((group) => group.mapId !== map.id);
+    this.places = this.places.filter((place) => place.mapId !== map.id);
+    if (this.activeMap) this.openMap(this.activeMap.id);
+
+    const cancel = this.#defer((options) => api.delete(`/maps/${map.id}`, options).catch(() => undefined));
+
+    toast.show(places.length ? `"${map.name}" e ${places.length} posti eliminati` : `"${map.name}" eliminata`, {
+      label: 'Annulla',
+      run: () => {
+        cancel();
+        this.maps.splice(index, 0, map);
+        this.groups = [...this.groups, ...groups];
+        this.places = [...this.places, ...places];
+        this.openMap(map.id);
+      },
+    });
+  }
+
   /* ----------------------------------------------------------------- reads */
 
   categoryOf(id: string): Category | undefined {
@@ -63,25 +137,36 @@ class Store {
     return !this.activeGroup || place.groupIds.includes(this.activeGroup);
   }
 
-  /** Two filters, one question: is this place on the map right now? */
+  /** Tre domande in una: è di questa mappa, la sua categoria è accesa, è nel gruppo scelto? */
   visible(place: Place): boolean {
-    return !this.hiddenCategories.includes(place.categoryId) && this.inScope(place);
+    return (
+      place.mapId === this.activeMap?.id &&
+      !this.hiddenCategories.includes(place.categoryId) &&
+      this.inScope(place)
+    );
   }
 
   countIn(categoryId: string): number {
-    return this.places.filter((place) => place.categoryId === categoryId && this.inScope(place)).length;
+    return this.currentPlaces.filter((place) => place.categoryId === categoryId && this.inScope(place)).length;
   }
 
   countGroup(groupId: string): number {
-    return this.places.filter((place) => place.groupIds.includes(groupId)).length;
+    return this.currentPlaces.filter((place) => place.groupIds.includes(groupId)).length;
   }
 
   async load(): Promise<void> {
     try {
       const snapshot = await api.get<Snapshot>('/state');
+      this.maps = snapshot.maps ?? [];
       this.categories = snapshot.categories;
       this.groups = snapshot.groups ?? [];
       this.places = snapshot.places.map(withKey);
+
+      // la mappa scelta l'altra volta potrebbe non esserci più
+      if (!this.maps.some((map) => map.id === this.activeMapId)) {
+        this.activeMapId = this.maps[0]?.id ?? null;
+        writeJSON('pi.map', this.activeMapId);
+      }
     } finally {
       this.loading = false;
     }
@@ -187,7 +272,7 @@ class Store {
   /* ----------------------------------------------------------------- groups */
 
   async createGroup(name: string): Promise<Group> {
-    const created = await api.post<Group>('/groups', { name });
+    const created = await api.post<Group>('/groups', { name, mapId: this.activeMap?.id });
     this.groups.push(created);
     return created;
   }
@@ -232,7 +317,8 @@ class Store {
 
   /** Shown immediately; the server's answer replaces it in place. */
   async savePlace(draft: Draft): Promise<void> {
-    const payload = placePayload(draft);
+    const mapId = this.activeMap?.id ?? '';
+    const payload = placePayload(mapId, draft);
     const existing = draft.key ? this.places.find((place) => place.key === draft.key) : undefined;
 
     if (existing) {

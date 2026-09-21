@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsLatitude,
   IsLongitude,
   IsNotEmpty,
@@ -13,6 +14,11 @@ import {
 const trim = () => Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
 
 export class CreatePlaceDto {
+  @IsString()
+  @IsNotEmpty({ message: 'serve la mappa a cui appartiene' })
+  @MaxLength(80)
+  mapId!: string;
+
   @trim()
   @IsString()
   @IsNotEmpty({ message: 'il nome è obbligatorio' })
@@ -45,6 +51,11 @@ export class CreatePlaceDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+
+  /** Un posto privato resta fuori da quello che si pubblica. */
+  @IsOptional()
+  @IsBoolean()
+  private?: boolean;
 }
 
 export class UpdatePlaceDto {
@@ -83,4 +94,8 @@ export class UpdatePlaceDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  private?: boolean;
 }

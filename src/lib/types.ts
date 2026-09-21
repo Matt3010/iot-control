@@ -1,3 +1,9 @@
+export interface PlaceMap {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -7,11 +13,13 @@ export interface Category {
 
 export interface Group {
   id: string;
+  mapId: string;
   name: string;
 }
 
 export interface Place {
   id: string;
+  mapId: string;
   name: string;
   categoryId: string;
   /** A place can sit in several groups at once, or in none. */
@@ -19,6 +27,8 @@ export interface Place {
   lat: number;
   lng: number;
   note: string;
+  /** Un posto privato resta fuori da quello che si pubblica. */
+  private: boolean;
   createdAt: string;
 }
 
@@ -32,6 +42,7 @@ export interface LocalPlace extends Place {
 }
 
 export interface Snapshot {
+  maps: PlaceMap[];
   categories: Category[];
   groups: Group[];
   places: Place[];
@@ -41,6 +52,7 @@ export interface Snapshot {
 export interface Draft {
   key?: string;
   id?: string;
+  private?: boolean;
   name?: string;
   note?: string;
   categoryId?: string;

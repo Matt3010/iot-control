@@ -5,20 +5,12 @@ import type { Place } from '../types.js';
 export class PlaceRepository {
   constructor(private readonly tx: Transaction) {}
 
-  findAll(): Place[] {
-    return this.tx.data.places;
+  findAllOfMaps(mapIds: string[]): Place[] {
+    return this.tx.data.places.filter((place) => mapIds.includes(place.mapId));
   }
 
   findById(id: string): Place | undefined {
     return this.tx.data.places.find((place) => place.id === id);
-  }
-
-  findByCategory(categoryId: string): Place[] {
-    return this.tx.data.places.filter((place) => place.categoryId === categoryId);
-  }
-
-  findByGroup(groupId: string): Place[] {
-    return this.tx.data.places.filter((place) => place.groupIds.includes(groupId));
   }
 
   insert(data: Omit<Place, 'id' | 'createdAt'>): Place {
@@ -44,6 +36,7 @@ export class PlaceRepository {
     return true;
   }
 
+  /** Una categoria si porta via i suoi posti, ovunque siano. */
   deleteByCategory(categoryId: string): number {
     const survivors = this.tx.data.places.filter((place) => place.categoryId !== categoryId);
     const removed = this.tx.data.places.length - survivors.length;
@@ -53,9 +46,18 @@ export class PlaceRepository {
     return removed;
   }
 
-  /** A group is a label: detaching leaves the places, minus that one label. */
+  deleteByMap(mapId: string): number {
+    const survivors = this.tx.data.places.filter((place) => place.mapId !== mapId);
+    const removed = this.tx.data.places.length - survivors.length;
+    if (!removed) return 0;
+    this.tx.data.places = survivors;
+    this.tx.markDirty();
+    return removed;
+  }
+
+  /** Un gruppo è un'etichetta: sfilarla lascia i posti dove sono. */
   detachFromGroup(groupId: string): number {
-    const members = this.findByGroup(groupId);
+    const members = this.tx.data.places.filter((place) => place.groupIds.includes(groupId));
     for (const place of members) place.groupIds = place.groupIds.filter((id) => id !== groupId);
     if (members.length) this.tx.markDirty();
     return members.length;

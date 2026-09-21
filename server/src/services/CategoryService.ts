@@ -8,20 +8,20 @@ import { categoryManager } from '../managers/CategoryManager.js';
  * this layer decides what a caller gets back, in view shape.
  */
 export class CategoryService {
-  async list(): Promise<CategoryView[]> {
-    return (await categoryManager.list()).map(toCategoryView);
+  async list(ownerId: string): Promise<CategoryView[]> {
+    return (await categoryManager.list(ownerId)).map(toCategoryView);
   }
 
-  async create(dto: CreateCategoryDto): Promise<CategoryView> {
-    return toCategoryView(await categoryManager.create(dto));
+  async create(ownerId: string, dto: CreateCategoryDto): Promise<CategoryView> {
+    return toCategoryView(await categoryManager.create(ownerId, dto));
   }
 
-  async update(id: string, dto: UpdateCategoryDto): Promise<CategoryView> {
-    return toCategoryView(await categoryManager.update(id, dto));
+  async update(ownerId: string, id: string, dto: UpdateCategoryDto): Promise<CategoryView> {
+    return toCategoryView(await categoryManager.update(ownerId, id, dto));
   }
 
-  async remove(id: string): Promise<{ removedPlaces: number }> {
-    return categoryManager.remove(id);
+  async remove(ownerId: string, id: string): Promise<{ removedPlaces: number }> {
+    return categoryManager.remove(ownerId, id);
   }
 }
 

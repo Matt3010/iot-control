@@ -7,6 +7,7 @@
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import Icon from './Icon.svelte';
+  import MapSwitcher from './MapSwitcher.svelte';
   import PanelSkeleton from './PanelSkeleton.svelte';
   import PlaceList from './PlaceList.svelte';
   import SearchTrigger from './SearchTrigger.svelte';
@@ -24,11 +25,11 @@
   let allGroups = $state(false);
   let allCategories = $state(false);
 
-  const shownGroups = $derived(allGroups ? store.groups : store.groups.slice(0, CAP.groups));
+  const shownGroups = $derived(allGroups ? store.currentGroups : store.currentGroups.slice(0, CAP.groups));
   const shownCategories = $derived(
     allCategories ? store.categories : store.categories.slice(0, CAP.categories),
   );
-  const hiddenGroups = $derived(store.groups.length - shownGroups.length);
+  const hiddenGroups = $derived(store.currentGroups.length - shownGroups.length);
   const hiddenCategories = $derived(store.categories.length - shownCategories.length);
   const everythingVisible = $derived(store.hiddenCategories.length === 0);
 
@@ -39,7 +40,7 @@
   /** The index itself: what is on screen right now, nearest first. */
   const rows = $derived.by(() => {
     mapBridge.view.moves; // re-read whenever the map settles somewhere new
-    return store.places
+    return store.currentPlaces
       .filter((place) => store.visible(place) && mapBridge.contains(place.lat, place.lng))
       .map((place) => ({ place, distance: mapBridge.distanceFromCentre(place.lat, place.lng) }))
       .sort((a, b) => a.distance - b.distance);
@@ -48,7 +49,7 @@
   function pickGroup(id: string | null) {
     store.setGroup(id === store.activeGroup ? null : id);
     if (!store.activeGroup) return;
-    const points = store.places
+    const points = store.currentPlaces
       .filter(
         (place) =>
           place.groupIds.includes(store.activeGroup!) && !store.hiddenCategories.includes(place.categoryId),
@@ -60,12 +61,12 @@
 
 <div id="panel" class="surface" class:is-collapsed={collapsed}>
   <div class="panel-head">
-    <span class="wordmark"><Icon name="pin" /> Place Index</span>
+    <MapSwitcher />
     <span class="panel-head-end">
       {#if !store.loading}
         <span id="place-count" class="tally">
-          {store.places.length}
-          {store.places.length === 1 ? 'posto' : 'posti'}
+          {store.currentPlaces.length}
+          {store.currentPlaces.length === 1 ? 'posto' : 'posti'}
         </span>
       {/if}
       <button
@@ -107,10 +108,10 @@
         </button>
       </div>
       <div id="group-filters">
-        {#if store.groups.length}
+        {#if store.currentGroups.length}
           <Chip
             label="Tutti"
-            count={store.places.length}
+            count={store.currentPlaces.length}
             look={store.activeGroup === null ? 'sel' : 'off'}
             onclick={() => pickGroup(null)}
           />
@@ -127,7 +128,7 @@
         {/each}
         {#if hiddenGroups > 0}
           <Chip label={'+' + hiddenGroups} look="off" onclick={() => (allGroups = true)} />
-        {:else if allGroups && store.groups.length > CAP.groups}
+        {:else if allGroups && store.currentGroups.length > CAP.groups}
           <Chip label="meno" look="off" onclick={() => (allGroups = false)} />
         {/if}
       </div>
@@ -182,7 +183,7 @@
         </div>
       {/if}
 
-      {#if store.places.length}
+      {#if store.currentPlaces.length}
         <div class="panel-row" id="list-head">
           <span class="eyebrow">In vista</span>
           <span id="list-count" class="tally">{rows.length}</span>
@@ -221,6 +222,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 2px 4px 0 6px;
 }
 
@@ -229,20 +231,10 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: none;
 }
 
 .panel-toggle { margin-right: -4px; }
-
-.wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13.5px;
-  font-weight: 620;
-  letter-spacing: -0.02em;
-}
-
-.wordmark :global(.ico) { width: 16px; height: 16px; color: var(--ink-2); }
 
 .tally {
   font-size: 11.5px;

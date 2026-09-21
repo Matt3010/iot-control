@@ -10,13 +10,13 @@ const DEFAULT_COLOR = '#2274a5';
 
 /** Business rules for categories; every method is one transaction. */
 export class CategoryManager {
-  list(): Promise<Category[]> {
-    return store.transaction((tx) => new CategoryRepository(tx).findAll());
+  list(ownerId: string): Promise<Category[]> {
+    return store.transaction((tx) => new CategoryRepository(tx).findAllOf(ownerId));
   }
 
-  create(dto: CreateCategoryDto): Promise<Category> {
+  create(ownerId: string, dto: CreateCategoryDto): Promise<Category> {
     return store.transaction((tx) =>
-      new CategoryRepository(tx).insert({
+      new CategoryRepository(tx).insert(ownerId, {
         name: dto.name,
         emoji: dto.emoji || DEFAULT_EMOJI,
         color: dto.color ?? DEFAULT_COLOR,
@@ -24,11 +24,11 @@ export class CategoryManager {
     );
   }
 
-  update(id: string, dto: UpdateCategoryDto): Promise<Category> {
+  update(ownerId: string, id: string, dto: UpdateCategoryDto): Promise<Category> {
     return store.transaction((tx) => {
-      const updated = new CategoryRepository(tx).update(id, dto);
-      if (!updated) throw notFound('categoria inesistente');
-      return updated;
+      const categories = new CategoryRepository(tx);
+      if (!categories.owns(ownerId, id)) throw notFound('categoria inesistente');
+      return categories.update(id, dto) as Category;
     });
   }
 
@@ -36,12 +36,11 @@ export class CategoryManager {
    * A category owns its places, so both go in the same transaction: either the
    * category and its places are gone, or nothing is.
    */
-  remove(id: string): Promise<{ removedPlaces: number }> {
+  remove(ownerId: string, id: string): Promise<{ removedPlaces: number }> {
     return store.transaction((tx) => {
       const categories = new CategoryRepository(tx);
-      const places = new PlaceRepository(tx);
-      if (!categories.exists(id)) throw notFound('categoria inesistente');
-      const removedPlaces = places.deleteByCategory(id);
+      if (!categories.owns(ownerId, id)) throw notFound('categoria inesistente');
+      const removedPlaces = new PlaceRepository(tx).deleteByCategory(id);
       categories.delete(id);
       return { removedPlaces };
     });

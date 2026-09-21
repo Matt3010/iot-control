@@ -4,6 +4,11 @@ import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 const trim = () => Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
 
 export class CreateGroupDto {
+  @IsString()
+  @IsNotEmpty({ message: 'serve la mappa a cui appartiene' })
+  @MaxLength(80)
+  mapId!: string;
+
   @trim()
   @IsString()
   @IsNotEmpty({ message: 'il nome è obbligatorio' })

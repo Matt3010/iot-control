@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { resolveSecret } from '../auth/secret.js';
 import { config } from '../config.js';
 import type { CredentialsDto } from '../dto/auth.dto.js';
+import { mapManager } from '../managers/MapManager.js';
 import { userManager } from '../managers/UserManager.js';
 import type { User } from '../types.js';
 
@@ -31,11 +32,14 @@ export class AuthService {
   async register(dto: CredentialsDto): Promise<Session> {
     const { signupOpen } = await this.state();
     const user = await userManager.register(dto, signupOpen);
+    // Si entra e c'è già una mappa: nessuno deve inventarsi da dove partire.
+    await mapManager.ensureOne(user.id);
     return { user: toUserView(user), token: sign(user) };
   }
 
   async login(dto: CredentialsDto): Promise<Session> {
     const user = await userManager.authenticate(dto);
+    await mapManager.ensureOne(user.id);
     return { user: toUserView(user), token: sign(user) };
   }
 

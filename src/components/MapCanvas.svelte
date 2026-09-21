@@ -167,7 +167,7 @@
   /** Markers follow the places, the filters, and whatever is being edited. */
   $effect(() => {
     if (!clusters) return;
-    const living = new Set(store.places.map((place) => place.key));
+    const living = new Set(store.currentPlaces.map((place) => place.key));
 
     for (const [key, marker] of markers) {
       if (!living.has(key)) {
@@ -176,7 +176,7 @@
       }
     }
 
-    for (const place of store.places) {
+    for (const place of store.currentPlaces) {
       const category = store.categoryOf(place.categoryId);
       let marker = markers.get(place.key);
 

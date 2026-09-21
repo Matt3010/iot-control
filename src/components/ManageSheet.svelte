@@ -12,6 +12,7 @@
   let newColor = $state<string>(SUGGESTED[0]!);
   let newCategoryName = $state('');
   let newGroupName = $state('');
+  let newMapName = $state('');
 
   /** Oltre una decina di voci scorrerle non basta più: serve poterle cercare. */
   const MANY = 8;
@@ -33,7 +34,7 @@
     categoryFilter.trim() ? store.categories.filter((c) => match(c.name, categoryFilter)) : store.categories,
   );
   const visibleGroups = $derived(
-    groupFilter.trim() ? store.groups.filter((g) => match(g.name, groupFilter)) : store.groups,
+    groupFilter.trim() ? store.currentGroups.filter((g) => match(g.name, groupFilter)) : store.currentGroups,
   );
 
   async function addCategory(event: SubmitEvent) {
@@ -48,6 +49,19 @@
       newColor = SUGGESTED[(SUGGESTED.indexOf(newColor as never) + 1) % SUGGESTED.length]!;
       if (ui.draft) ui.draft.categoryId = created.id;
       toast.show(`Categoria "${created.name}" creata`);
+    } catch (error) {
+      toast.show((error as Error).message);
+    }
+  }
+
+  async function addMap(event: SubmitEvent) {
+    event.preventDefault();
+    const name = newMapName.trim();
+    if (!name) return;
+    try {
+      const created = await store.createMap(name);
+      newMapName = '';
+      toast.show(`"${created.name}" è la mappa aperta`);
     } catch (error) {
       toast.show((error as Error).message);
     }
@@ -94,6 +108,15 @@
       onclick={() => (ui.manageTab = 'groups')}
     >
       Gruppi
+    </button>
+    <button
+      class="tab"
+      class:is-on={ui.manageTab === 'maps'}
+      type="button"
+      role="tab"
+      onclick={() => (ui.manageTab = 'maps')}
+    >
+      Mappe
     </button>
   </div>
 
@@ -177,9 +200,56 @@
         </button>
       </form>
     </div>
+  {:else if ui.manageTab === 'maps'}
+    <div class="tab-panel">
+      <ul id="map-list" data-fade="none" use:fadeEdges>
+        {#each store.maps as map (map.id)}
+          <li class:is-open={map.id === store.activeMap?.id}>
+            <button
+              type="button"
+              class="ghost-icon"
+              title={map.id === store.activeMap?.id ? 'È la mappa aperta' : 'Apri questa mappa'}
+              onclick={() => store.openMap(map.id)}
+            >
+              <Icon name="pin" />
+            </button>
+            <input
+              type="text"
+              maxlength="40"
+              value={map.name}
+              onchange={(event) => store.patchMap(map, event.currentTarget.value)}
+            />
+            <span class="count">
+              {store.places.filter((place) => place.mapId === map.id).length || ''}
+            </span>
+            <button
+              type="button"
+              class="ghost-icon"
+              title="Elimina mappa"
+              disabled={store.maps.length <= 1}
+              onclick={() => store.deleteMap(map)}
+            >
+              <Icon name="trash" />
+            </button>
+          </li>
+        {/each}
+      </ul>
+
+      <form id="map-form" class="add-row" class:is-ready={newMapName.trim()} onsubmit={addMap}>
+        <input name="name" required maxlength="40" placeholder="Nuova mappa — Islanda, Ristoranti…" bind:value={newMapName} />
+        <button type="submit" class="ghost-icon add-go" title="Aggiungi mappa">
+          <Icon name="plus" />
+        </button>
+      </form>
+
+      <p class="sheet-note">
+        Ogni mappa è un indice a sé: i suoi posti, i suoi gruppi. Le categorie invece sono tue e
+        valgono su tutte.
+      </p>
+    </div>
   {:else}
     <div class="tab-panel">
-      {#if store.groups.length > MANY}
+      {#if store.currentGroups.length > MANY}
         <input class="list-filter" type="search" placeholder="Filtra i gruppi" bind:value={groupFilter} />
       {/if}
       <ul id="group-list" data-fade="none" use:fadeEdges>
@@ -202,7 +272,7 @@
             </button>
           </li>
         {/each}
-        {#if store.groups.length && !visibleGroups.length}
+        {#if store.currentGroups.length && !visibleGroups.length}
           <li class="list-empty">Nessun gruppo con questo nome.</li>
         {/if}
       </ul>
@@ -354,13 +424,45 @@
 
 /* category manager -------------------------------------------------------- */
 
-#group-list {
+#group-list, #map-list {
   list-style: none;
   margin: 0 0 8px;
   padding: 0;
   display: grid;
   gap: 6px;
 }
+
+#map-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--r-md);
+  transition: background 0.15s;
+}
+
+#map-list li:hover { background: var(--sunken); }
+
+/* la mappa aperta si riconosce: il suo pin è acceso */
+#map-list li.is-open :global(.ico) { color: var(--ink); }
+
+#map-list input {
+  background: var(--sunken);
+  border-color: transparent;
+  padding: 6px 8px;
+  font-weight: 500;
+}
+
+#map-list li:hover input { background: var(--sunken-hover); }
+
+#map-list .count {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+#map-list .ghost-icon:disabled { opacity: 0.35; cursor: default; }
 
 #group-list:empty { display: none; }
 
@@ -383,7 +485,7 @@
 }
 
 /* la lista scorre dentro di sé: la riga che aggiunge resta sempre sotto gli occhi */
-#category-list, #group-list {
+#category-list, #group-list, #map-list {
   max-height: min(46vh, 340px);
   overflow-y: auto;
   overscroll-behavior: contain;

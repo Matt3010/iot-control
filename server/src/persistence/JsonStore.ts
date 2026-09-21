@@ -1,15 +1,44 @@
 import fs from 'node:fs/promises';
 import { config, dataFile } from '../config.js';
-import type { Database, Place } from '../types.js';
+import { randomUUID } from 'node:crypto';
+import type { Category, Database, Group, Place, PlaceMap } from '../types.js';
 
-/** Records written when a place could only belong to one group. */
-function migrate(place: Place & { groupId?: string }): Place {
+/** Un posto scritto quando poteva stare in un gruppo solo. */
+function migratePlace(place: Place & { groupId?: string }): Place {
   if (Array.isArray(place.groupIds)) return place;
   const { groupId, ...rest } = place;
   return { ...rest, groupIds: groupId ? [groupId] : [] };
 }
 
-const empty = (): Database => ({ users: [], categories: [], groups: [], places: [] });
+/**
+ * Dati scritti quando l'indice era uno solo: diventano la prima mappa del
+ * primo che si era registrato, e le categorie passano a lui.
+ */
+function migrateToMaps(data: Database): Database {
+  const orphans =
+    data.places.some((place) => !place.mapId) ||
+    data.groups.some((group) => !group.mapId) ||
+    data.categories.some((category) => !category.ownerId);
+  if (!orphans) return data;
+
+  const owner = data.users[0]?.id ?? '';
+  const first: PlaceMap = data.maps[0] ?? {
+    id: `map-${randomUUID()}`,
+    ownerId: owner,
+    name: 'La mia mappa',
+    createdAt: new Date().toISOString(),
+  };
+
+  return {
+    users: data.users,
+    maps: data.maps.length ? data.maps : [first],
+    categories: data.categories.map((category: Category) => ({ ...category, ownerId: category.ownerId ?? owner })),
+    groups: data.groups.map((group: Group) => ({ ...group, mapId: group.mapId ?? first.id })),
+    places: data.places.map((place: Place) => ({ ...place, mapId: place.mapId ?? first.id })),
+  };
+}
+
+const empty = (): Database => ({ users: [], maps: [], categories: [], groups: [], places: [] });
 
 /**
  * The working copy a unit of work mutates. Nothing reaches the disk until the
@@ -48,12 +77,13 @@ export class JsonStore {
   private async load(): Promise<Database> {
     try {
       const parsed = JSON.parse(await fs.readFile(dataFile, 'utf8')) as Partial<Database>;
-      return {
+      return migrateToMaps({
         users: Array.isArray(parsed.users) ? parsed.users : [],
+        maps: Array.isArray(parsed.maps) ? parsed.maps : [],
         categories: Array.isArray(parsed.categories) ? parsed.categories : [],
         groups: Array.isArray(parsed.groups) ? parsed.groups : [],
-        places: Array.isArray(parsed.places) ? parsed.places.map(migrate) : [],
-      };
+        places: Array.isArray(parsed.places) ? parsed.places.map(migratePlace) : [],
+      });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       await this.commit(empty());

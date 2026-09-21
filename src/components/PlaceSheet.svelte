@@ -41,7 +41,7 @@
   }
 
   function remove() {
-    const place = store.places.find((candidate) => candidate.key === draft?.key);
+    const place = store.currentPlaces.find((candidate) => candidate.key === draft?.key);
     ui.closePlace();
     if (place) store.deletePlace(place);
   }
@@ -93,7 +93,7 @@
       </div>
     </div>
 
-    {#if store.groups.length}
+    {#if store.currentGroups.length}
       <div class="field" id="group-field">
         <span class="eyebrow">Gruppo</span>
         <div id="group-choice" class="chips">
@@ -102,7 +102,7 @@
             look={draft.groupIds?.length ? 'off' : 'sel'}
             onclick={() => (draft.groupIds = [])}
           />
-          {#each store.groups as group (group.id)}
+          {#each store.currentGroups as group (group.id)}
             <Chip
               label={group.name}
               look={draft.groupIds?.includes(group.id) ? 'sel' : 'off'}
@@ -112,6 +112,19 @@
         </div>
       </div>
     {/if}
+
+    <label class="switch">
+      <input
+        type="checkbox"
+        checked={draft.private ?? false}
+        onchange={(event) => draft && (draft.private = event.currentTarget.checked)}
+      />
+      <span class="switch-track"><span class="switch-dot"></span></span>
+      <span class="switch-text">
+        <span class="switch-name">Privato</span>
+        <span class="switch-note">Resta fuori dalla mappa che pubblichi.</span>
+      </span>
+    </label>
 
     <label class="field">
       <span class="eyebrow">Note</span>
@@ -141,6 +154,52 @@
 
 <style>
 #place-form { display: grid; gap: 14px; }
+
+/* un interruttore, non una casella: la differenza si vede da lontano */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  border-radius: 99px;
+  background: var(--sunken-hover);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  transition: background 0.18s;
+}
+
+.switch-dot {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-1);
+  transition: transform 0.18s var(--ease);
+}
+
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track .switch-dot { transform: translateX(16px); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.switch-text { display: grid; gap: 1px; }
+.switch-name { font-size: 13px; font-weight: 540; }
+.switch-note { font-size: 11.5px; color: var(--ink-3); }
 
 /* the container is drawn here; the chips inside it come from <Chip> */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }

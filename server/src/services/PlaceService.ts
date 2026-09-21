@@ -4,20 +4,20 @@ import { toPlaceView } from '../dto/views.js';
 import { placeManager } from '../managers/PlaceManager.js';
 
 export class PlaceService {
-  async list(): Promise<PlaceView[]> {
-    return (await placeManager.list()).map(toPlaceView);
+  async list(ownerId: string): Promise<PlaceView[]> {
+    return (await placeManager.list(ownerId)).map(toPlaceView);
   }
 
-  async create(dto: CreatePlaceDto): Promise<PlaceView> {
-    return toPlaceView(await placeManager.create(dto));
+  async create(ownerId: string, dto: CreatePlaceDto): Promise<PlaceView> {
+    return toPlaceView(await placeManager.create(ownerId, dto));
   }
 
-  async update(id: string, dto: UpdatePlaceDto): Promise<PlaceView> {
-    return toPlaceView(await placeManager.update(id, dto));
+  async update(ownerId: string, id: string, dto: UpdatePlaceDto): Promise<PlaceView> {
+    return toPlaceView(await placeManager.update(ownerId, id, dto));
   }
 
-  async remove(id: string): Promise<void> {
-    return placeManager.remove(id);
+  async remove(ownerId: string, id: string): Promise<void> {
+    return placeManager.remove(ownerId, id);
   }
 }
 
