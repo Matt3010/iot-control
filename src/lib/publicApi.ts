@@ -10,7 +10,7 @@ export interface PublicMapPayload {
 
 export interface PublicProfilePayload {
   handle: string;
-  maps: (PlaceMap & { places: number })[];
+  maps: (PlaceMap & { places: number; emojis: string[] })[];
 }
 
 /** Le due letture che non chiedono di entrare. */

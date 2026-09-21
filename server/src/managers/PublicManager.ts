@@ -17,7 +17,8 @@ export interface PublicMap {
 
 export interface PublicProfile {
   handle: string;
-  maps: { map: PlaceMap; places: number }[];
+  /** `emojis`: un assaggio di cosa c'è dentro, senza aprirla. */
+  maps: { map: PlaceMap; places: number; emojis: string[] }[];
 }
 
 /**
@@ -68,13 +69,19 @@ export class PublicManager {
 
       const maps = new MapRepository(tx).findPublishedOf(owner.id);
       const places = new PlaceRepository(tx).findAllOfMaps(maps.map((map) => map.id));
+      const categories = new CategoryRepository(tx).findAllOf(owner.id);
+      const emojiOf = new Map(categories.map((category) => [category.id, category.emoji]));
 
       return {
         handle: owner.handle,
-        maps: maps.map((map) => ({
-          map,
-          places: places.filter((place) => place.mapId === map.id && !place.private).length,
-        })),
+        maps: maps.map((map) => {
+          const inside = places.filter((place) => place.mapId === map.id && !place.private);
+          // le prime quattro categorie diverse: bastano a far capire che aria tira
+          const emojis = [...new Set(inside.map((place) => emojiOf.get(place.categoryId)))]
+            .filter((emoji): emoji is string => !!emoji)
+            .slice(0, 4);
+          return { map, places: inside.length, emojis };
+        }),
       };
     });
   }

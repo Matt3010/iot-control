@@ -12,7 +12,7 @@ export interface PublicMapView {
 
 export interface PublicProfileView {
   handle: string;
-  maps: (MapView & { places: number })[];
+  maps: (MapView & { places: number; emojis: string[] })[];
 }
 
 export class PublicService {
@@ -31,7 +31,11 @@ export class PublicService {
     const found = await publicManager.profile(handle);
     return {
       handle: found.handle,
-      maps: found.maps.map((entry) => ({ ...toMapView(entry.map), places: entry.places })),
+      maps: found.maps.map((entry) => ({
+        ...toMapView(entry.map),
+        places: entry.places,
+        emojis: entry.emojis,
+      })),
     };
   }
 }

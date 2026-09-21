@@ -163,11 +163,14 @@
               <button
                 class="link-btn"
                 type="button"
-                title={everythingVisible ? 'Nascondile tutte' : 'Mostrale tutte'}
+                title={everythingVisible
+                  ? 'Togli dalla mappa tutte le categorie'
+                  : 'Rimetti sulla mappa tutte le categorie'}
                 onclick={() =>
                   everythingVisible ? store.hideAllCategories() : store.showAllCategories()}
               >
-                {everythingVisible ? 'nessuna' : 'tutte'}
+                <!-- prima diceva "nessuna"/"tutte": sembrava uno stato, invece e' un comando -->
+                {everythingVisible ? 'nascondi tutte' : 'mostra tutte'}
               </button>
             {/if}
             <button

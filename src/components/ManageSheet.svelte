@@ -315,6 +315,7 @@
       <ul id="group-list" data-fade="none" use:fadeEdges>
         {#each visibleGroups as group (group.id)}
           <li>
+            <span class="group-mark" aria-hidden="true"><Icon name="tag" /></span>
             <input
               type="text"
               maxlength="40"
@@ -606,37 +607,71 @@
 
 #category-list:empty { display: none; }
 
-#category-list li {
+/* Le tre schede parlano la stessa lingua: una card, un segno a sinistra, il
+   nome che è un titolo finché non lo tocchi, e le cose da fare a destra. */
+#category-list li, #group-list li {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px;
+  gap: 4px;
+  padding: 5px 6px;
   border-radius: var(--r-md);
-  transition: background 0.15s;
-}
-
-#category-list li:hover { background: var(--sunken); }
-
-/* un campo deve sembrare un campo anche prima che ci passi sopra il mouse */
-#category-list input[type="text"], #group-list input {
   background: var(--sunken);
-  border-color: transparent;
-  padding: 6px 8px;
-  font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--hairline-soft);
+  transition: background 0.16s;
 }
 
-#category-list li:hover input[type="text"],
-#group-list li:hover input { background: var(--sunken-hover); }
+#category-list li:hover, #group-list li:hover { background: var(--sunken-hover); }
 
-#category-list .count {
-  font-size: 11px;
+#category-list input[type="text"], #group-list input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 7px;
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+  font-size: 13.5px;
+  font-weight: 560;
+  letter-spacing: -0.012em;
+}
+
+#category-list input[type="text"]:hover, #group-list input:hover { background: var(--glass-strong); }
+
+#category-list input[type="text"]:focus, #group-list input:focus {
+  background: var(--glass-strong);
+  box-shadow: 0 0 0 1px var(--hairline);
+}
+
+#category-list .count, #group-list .count {
+  padding: 0 4px;
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
   white-space: nowrap;
 }
 
-/* the list is a dense row of controls; the form below is the roomy one */
-#category-list .emoji-btn { width: 32px; height: 32px; font-size: 16px; }
+/* l'emoji della categoria è il suo ritratto: sta in un bollo come il pin
+   della mappa, non in un tasto qualsiasi */
+#category-list .emoji-btn {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  border-radius: 50%;
+  background: none;
+}
 
-#category-list .swatch { width: 24px; height: 24px; margin: 0 2px; }
+#category-list .emoji-btn:hover { background: var(--glass-strong); }
+
+#category-list .swatch { width: 22px; height: 22px; margin: 0 3px; }
+
+/* i gruppi non hanno un'emoji: al suo posto un segno smorto, per il ritmo */
+.group-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  color: var(--ink-3);
+}
+
+.group-mark :global(.ico) { width: 15px; height: 15px; }
 </style>
