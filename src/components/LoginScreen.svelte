@@ -4,6 +4,7 @@
   import Icon from './Icon.svelte';
   import MapBackdrop from './MapBackdrop.svelte';
   import Stop from './Stop.svelte';
+  import Button from './Button.svelte';
 
   let email = $state('');
   let password = $state('');
@@ -123,10 +124,10 @@
       />
     {/if}
 
-    <button class="primary go" type="submit" disabled={working}>
+    <Button look="primary" type="submit" extra="go" disabled={working}>
       {working ? 'Un attimo…' : creating ? "Crea l'accesso" : 'Entra'}
       <Icon name="submit" />
-    </button>
+    </Button>
 
     {#if !firstRun && !errorLeadsBack}
       {#if auth.signupOpen}
@@ -236,7 +237,7 @@
     border-left: 2px dashed color-mix(in srgb, var(--ink-3) 45%, transparent);
   }
 
-  .go {
+  .route :global(.go) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -245,8 +246,8 @@
     font-size: 14.5px;
   }
 
-  .go :global(.ico) { width: 17px; height: 17px; }
-  .go:disabled { opacity: 0.6; }
+  .route :global(.go .ico) { width: 17px; height: 17px; }
+  .route :global(.go:disabled) { opacity: 0.6; }
 
   .route-foot {
     margin: -8px 0 0;
