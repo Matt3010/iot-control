@@ -1,5 +1,6 @@
 <script lang="ts">
   import { auth } from './lib/auth.svelte';
+  import { readRoute } from './lib/routing';
   import { store } from './lib/store.svelte';
   import { toast } from './lib/toast.svelte';
   import { ui } from './lib/ui.svelte';
@@ -8,6 +9,8 @@
   import EmojiPopover from './components/EmojiPopover.svelte';
   import Hint from './components/Hint.svelte';
   import LoginScreen from './components/LoginScreen.svelte';
+  import PublicMap from './components/PublicMap.svelte';
+  import PublicProfile from './components/PublicProfile.svelte';
   import ManageSheet from './components/ManageSheet.svelte';
   import MapCanvas from './components/MapCanvas.svelte';
   import Palette from './components/Palette.svelte';
@@ -15,9 +18,12 @@
   import PlaceSheet from './components/PlaceSheet.svelte';
   import Toast from './components/Toast.svelte';
 
+  /** /m/<slug> e /u/<handle> sono pubblici: non chiedono nulla a nessuno. */
+  const route = readRoute();
+
   // Prima si vede chi c'è: l'indice si carica solo per chi è entrato, e si
   // ricarica se rientra con un altro account.
-  auth.load();
+  if (route.kind === 'app') auth.load();
 
   $effect(() => {
     if (!auth.account) return;
@@ -85,7 +91,11 @@
 
 <svelte:window onkeydown={onKeydown} onpointerdown={onPointerdown} />
 
-{#if auth.checking}
+{#if route.kind === 'map'}
+  <PublicMap slug={route.slug} />
+{:else if route.kind === 'profile'}
+  <PublicProfile handle={route.handle} />
+{:else if auth.checking}
   <!-- un istante di niente: meglio del lampo della porta a chi è già dentro -->
 {:else if !auth.account}
   <LoginScreen />

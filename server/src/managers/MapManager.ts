@@ -27,7 +27,13 @@ export class MapManager {
     return store.transaction((tx) => {
       const maps = new MapRepository(tx);
       if (!maps.owns(ownerId, id)) throw notFound('mappa inesistente');
-      return maps.update(id, { name: dto.name }) as PlaceMap;
+
+      const patch: Partial<PlaceMap> = {};
+      if (dto.name !== undefined) patch.name = dto.name;
+      if (dto.published !== undefined) patch.published = dto.published;
+      // l'indirizzo pubblico lo scegli tu, ma unico resta
+      if (dto.slug !== undefined) patch.slug = maps.freeSlug(dto.slug, id);
+      return maps.update(id, patch) as PlaceMap;
     });
   }
 

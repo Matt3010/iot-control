@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireUser } from '../auth/strategy.js';
 import { authController } from '../controllers/AuthController.js';
 import { mapController } from '../controllers/MapController.js';
+import { publicController } from '../controllers/PublicController.js';
 import { categoryController } from '../controllers/CategoryController.js';
 import { groupController } from '../controllers/GroupController.js';
 import { placeController } from '../controllers/PlaceController.js';
@@ -20,6 +21,10 @@ apiRouter.get('/auth/state', authController.state);
 apiRouter.post('/auth/register', validateBody(CredentialsDto), authController.register);
 apiRouter.post('/auth/login', validateBody(CredentialsDto), authController.login);
 apiRouter.post('/auth/logout', authController.logout);
+
+// quello che si può guardare senza entrare: solo mappe pubblicate
+apiRouter.get('/public/m/:slug', publicController.map);
+apiRouter.get('/public/u/:handle', publicController.profile);
 
 // --- da qui in poi serve essere entrati ------------------------------------
 apiRouter.use(requireUser);

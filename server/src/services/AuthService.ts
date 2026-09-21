@@ -9,6 +9,7 @@ import type { User } from '../types.js';
 export interface UserView {
   id: string;
   email: string;
+  handle: string;
   createdAt: string;
 }
 
@@ -17,7 +18,7 @@ export interface Session {
   token: string;
 }
 
-const toUserView = ({ id, email, createdAt }: User): UserView => ({ id, email, createdAt });
+const toUserView = ({ id, email, handle, createdAt }: User): UserView => ({ id, email, handle, createdAt });
 
 const sign = (user: User): string =>
   jwt.sign({ sub: user.id }, resolveSecret(), { expiresIn: `${config.auth.ttlDays}d` });

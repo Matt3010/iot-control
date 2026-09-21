@@ -1,6 +1,9 @@
 export interface PlaceMap {
   id: string;
   name: string;
+  /** L'indirizzo pubblico: /m/<slug>. */
+  slug: string;
+  published: boolean;
   createdAt: string;
 }
 

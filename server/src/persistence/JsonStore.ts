@@ -1,7 +1,30 @@
 import fs from 'node:fs/promises';
 import { config, dataFile } from '../config.js';
 import { randomUUID } from 'node:crypto';
-import type { Category, Database, Group, Place, PlaceMap } from '../types.js';
+import { slugify, uniqueSlug } from '../auth/slug.js';
+import type { Category, Database, Group, Place, PlaceMap, User } from '../types.js';
+
+/** Chi si era registrato prima che esistessero i link pubblici. */
+function migrateHandles(users: User[]): User[] {
+  const taken = new Set(users.map((user) => user.handle).filter(Boolean));
+  return users.map((user) => {
+    if (user.handle) return user;
+    const handle = uniqueSlug(user.email.split('@')[0] ?? 'io', (candidate) => taken.has(candidate));
+    taken.add(handle);
+    return { ...user, handle };
+  });
+}
+
+/** Mappe nate prima che si potessero pubblicare. */
+function migrateSlugs(maps: PlaceMap[]): PlaceMap[] {
+  const taken = new Set(maps.map((map) => map.slug).filter(Boolean));
+  return maps.map((map) => {
+    if (map.slug) return { ...map, published: map.published ?? false };
+    const slug = uniqueSlug(slugify(map.name), (candidate) => taken.has(candidate));
+    taken.add(slug);
+    return { ...map, slug, published: map.published ?? false };
+  });
+}
 
 /** Un posto scritto quando poteva stare in un gruppo solo. */
 function migratePlace(place: Place & { groupId?: string }): Place {
@@ -26,6 +49,8 @@ function migrateToMaps(data: Database): Database {
     id: `map-${randomUUID()}`,
     ownerId: owner,
     name: 'La mia mappa',
+    slug: 'la-mia-mappa',
+    published: false,
     createdAt: new Date().toISOString(),
   };
 
@@ -78,8 +103,8 @@ export class JsonStore {
     try {
       const parsed = JSON.parse(await fs.readFile(dataFile, 'utf8')) as Partial<Database>;
       return migrateToMaps({
-        users: Array.isArray(parsed.users) ? parsed.users : [],
-        maps: Array.isArray(parsed.maps) ? parsed.maps : [],
+        users: migrateHandles(Array.isArray(parsed.users) ? parsed.users : []),
+        maps: migrateSlugs(Array.isArray(parsed.maps) ? parsed.maps : []),
         categories: Array.isArray(parsed.categories) ? parsed.categories : [],
         groups: Array.isArray(parsed.groups) ? parsed.groups : [],
         places: Array.isArray(parsed.places) ? parsed.places.map(migratePlace) : [],

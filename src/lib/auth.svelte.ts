@@ -3,6 +3,8 @@ import { api, onUnauthorized } from './api';
 export interface Account {
   id: string;
   email: string;
+  /** Il nome nel link del profilo: /u/<handle>. */
+  handle: string;
   createdAt: string;
 }
 

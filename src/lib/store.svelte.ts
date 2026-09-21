@@ -78,13 +78,13 @@ class Store {
     return created;
   }
 
-  async patchMap(map: PlaceMap, name: string): Promise<void> {
-    const before = map.name;
-    map.name = name;
+  async patchMap(map: PlaceMap, patch: { name?: string; slug?: string; published?: boolean }): Promise<void> {
+    const before = { ...map };
+    Object.assign(map, patch);
     try {
-      Object.assign(map, await api.put<PlaceMap>(`/maps/${map.id}`, { name }));
+      Object.assign(map, await api.put<PlaceMap>(`/maps/${map.id}`, { name: map.name, ...patch }));
     } catch (error) {
-      map.name = before;
+      Object.assign(map, before);
       toast.show((error as Error).message);
     }
   }

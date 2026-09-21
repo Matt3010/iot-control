@@ -21,7 +21,11 @@ export function createApp(): express.Express {
 
   // The built front-end rides along, so one container is the whole thing.
   app.use(express.static(config.clientDir, { index: 'index.html' }));
-  app.get('*splat', (_req, res, next) => {
+  // Ogni altro indirizzo è una pagina dell'app: /m/<slug>, /u/<handle>, o l'app
+  // stessa. Niente jolly nel percorso: in Express 5 la sintassi è cambiata e
+  // un '*' scritto male non matcha niente.
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
     res.sendFile(path.join(config.clientDir, 'index.html'), (error) => (error ? next() : undefined));
   });
 

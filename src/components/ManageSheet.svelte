@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { auth } from '../lib/auth.svelte';
   import { DEFAULT_EMOJI, normalise, SUGGESTED } from '../lib/format';
+  import { mapUrl, profileUrl } from '../lib/routing';
   import { fadeEdges } from '../lib/overflow';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
@@ -13,6 +15,17 @@
   let newCategoryName = $state('');
   let newGroupName = $state('');
   let newMapName = $state('');
+  let copied = $state('');
+
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = text;
+      setTimeout(() => (copied = copied === text ? '' : copied), 1600);
+    } catch {
+      toast.show('Copia non riuscita: il link è quello che vedi');
+    }
+  }
 
   /** Oltre una decina di voci scorrerle non basta più: serve poterle cercare. */
   const MANY = 8;
@@ -217,7 +230,7 @@
               type="text"
               maxlength="40"
               value={map.name}
-              onchange={(event) => store.patchMap(map, event.currentTarget.value)}
+              onchange={(event) => store.patchMap(map, { name: event.currentTarget.value })}
             />
             <span class="count">
               {store.places.filter((place) => place.mapId === map.id).length || ''}
@@ -232,6 +245,46 @@
               <Icon name="trash" />
             </button>
           </li>
+
+          <li class="share" class:is-public={map.published}>
+            <label class="switch">
+              <input
+                type="checkbox"
+                checked={map.published}
+                onchange={(event) => store.patchMap(map, { published: event.currentTarget.checked })}
+              />
+              <span class="switch-track"><span class="switch-dot"></span></span>
+              <span class="switch-text">
+                <span class="switch-name">{map.published ? 'Pubblica' : 'Solo tua'}</span>
+                <span class="switch-note">
+                  {map.published
+                    ? 'Chi ha il link la vede — i posti privati restano fuori.'
+                    : 'Accendi per poterla condividere.'}
+                </span>
+              </span>
+            </label>
+
+            {#if map.published}
+              <div class="link-row">
+                <span class="link-prefix">/m/</span>
+                <input
+                  class="link-slug"
+                  type="text"
+                  maxlength="40"
+                  value={map.slug}
+                  onchange={(event) => store.patchMap(map, { slug: event.currentTarget.value })}
+                />
+                <button
+                  type="button"
+                  class="ghost-icon"
+                  title="Copia il link"
+                  onclick={() => copy(mapUrl(map.slug))}
+                >
+                  <Icon name={copied === mapUrl(map.slug) ? 'check' : 'link'} />
+                </button>
+              </div>
+            {/if}
+          </li>
         {/each}
       </ul>
 
@@ -241,6 +294,25 @@
           <Icon name="plus" />
         </button>
       </form>
+
+      {#if store.maps.some((map) => map.published)}
+        <div class="profile-link">
+          <span class="eyebrow">Un link per tutte</span>
+          <p>Le mappe pubblicate stanno insieme qui: è l'indirizzo da mettere in bio.</p>
+          <div class="link-row">
+            <span class="link-prefix">/u/</span>
+            <span class="link-handle">{auth.account?.handle}</span>
+            <button
+              type="button"
+              class="ghost-icon"
+              title="Copia il link del profilo"
+              onclick={() => copy(profileUrl(auth.account?.handle ?? ''))}
+            >
+              <Icon name={copied === profileUrl(auth.account?.handle ?? '') ? 'check' : 'link'} />
+            </button>
+          </div>
+        </div>
+      {/if}
 
       <p class="sheet-note">
         Ogni mappa è un indice a sé: i suoi posti, i suoi gruppi. Le categorie invece sono tue e
@@ -463,6 +535,88 @@
 }
 
 #map-list .ghost-icon:disabled { opacity: 0.35; cursor: default; }
+
+/* la riga sotto ogni mappa: pubblicarla e portarsi via il link */
+#map-list .share {
+  display: grid;
+  gap: 8px;
+  margin: -2px 0 6px 38px;
+  padding: 10px 10px 10px 0;
+}
+
+#map-list .share.is-public { border-left: 2px solid color-mix(in srgb, var(--ink-3) 35%, transparent); padding-left: 10px; margin-left: 30px; }
+
+.switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  border-radius: 99px;
+  background: var(--sunken-hover);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  transition: background 0.18s;
+}
+
+.switch-dot {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-1);
+  transition: transform 0.18s var(--ease);
+}
+
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track .switch-dot { transform: translateX(14px); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.switch-text { display: grid; gap: 1px; }
+.switch-name { font-size: 12.5px; font-weight: 540; }
+.switch-note { font-size: 11px; line-height: 1.4; color: var(--ink-3); }
+
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 2px 2px 8px;
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+
+.link-prefix, .link-handle {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.link-handle { color: var(--ink); font-weight: 540; flex: 1; }
+
+.link-slug {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 4px;
+  background: none;
+  border-color: transparent;
+  font-size: 12px;
+}
+
+.link-slug:hover, .link-slug:focus { background: var(--glass-strong); box-shadow: none; }
+
+.profile-link {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline-soft);
+}
+
+.profile-link p { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
 
 #group-list:empty { display: none; }
 

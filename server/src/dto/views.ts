@@ -12,6 +12,8 @@ export interface CategoryView {
 export interface MapView {
   id: string;
   name: string;
+  slug: string;
+  published: boolean;
   createdAt: string;
 }
 
@@ -43,7 +45,13 @@ export interface StateView {
 
 export const toCategoryView = ({ id, name, emoji, color }: Category): CategoryView => ({ id, name, emoji, color });
 
-export const toMapView = ({ id, name, createdAt }: PlaceMap): MapView => ({ id, name, createdAt });
+export const toMapView = ({ id, name, slug, published, createdAt }: PlaceMap): MapView => ({
+  id,
+  name,
+  slug,
+  published: published ?? false,
+  createdAt,
+});
 
 export const toGroupView = ({ id, mapId, name }: Group): GroupView => ({ id, mapId, name });
 

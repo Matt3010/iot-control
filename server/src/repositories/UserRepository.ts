@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { uniqueSlug } from '../auth/slug.js';
 import type { Transaction } from '../persistence/JsonStore.js';
 import type { User } from '../types.js';
 
@@ -17,8 +18,23 @@ export class UserRepository {
     return this.tx.data.users.find((user) => user.email === email);
   }
 
-  insert(data: Omit<User, 'id' | 'createdAt'>): User {
-    const user: User = { id: `usr-${randomUUID()}`, ...data, createdAt: new Date().toISOString() };
+  findByHandle(handle: string): User | undefined {
+    return this.tx.data.users.find((user) => user.handle === handle);
+  }
+
+  freeHandle(wanted: string, except?: string): string {
+    return uniqueSlug(wanted, (candidate) =>
+      this.tx.data.users.some((user) => user.handle === candidate && user.id !== except),
+    );
+  }
+
+  insert(data: Omit<User, 'id' | 'createdAt' | 'handle'>): User {
+    const user: User = {
+      id: `usr-${randomUUID()}`,
+      ...data,
+      handle: this.freeHandle(data.email.split('@')[0] ?? 'io'),
+      createdAt: new Date().toISOString(),
+    };
     this.tx.data.users.push(user);
     this.tx.markDirty();
     return user;

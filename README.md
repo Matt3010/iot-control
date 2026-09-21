@@ -12,6 +12,9 @@ Niente categorie preimpostate, niente fronzoli.
 - **Mappa full-screen** (Leaflet + tile OpenStreetMap, nessuna API key).
 - **Più mappe**: il nome in alto a sinistra le cambia e ne crea di nuove. Una mappa è un indice
   a sé — i suoi posti, i suoi gruppi — mentre le categorie sono tue e valgono su tutte.
+- **Link pubblici**: ogni mappa si può pubblicare a `/m/<indirizzo>`, e tutte quelle pubblicate
+  stanno insieme in `/u/<il-tuo-nome>` — quello è il link da mettere in bio. I posti segnati
+  privati restano fuori, e da fuori la pagina è di sola lettura.
 - **Aggiungi posto**: premi il bottone, clicca il punto sulla mappa (il pin si può trascinare),
   dai nome, categoria, gruppo e note. Un posto può essere segnato **privato**. Il pin compare subito: il salvataggio viaggia dietro, e se
   il server rifiuta la riga torna indietro da sola.
@@ -73,6 +76,18 @@ derivata `scrypt` col suo sale, e il confronto è a tempo costante.
 
 La schermata d'ingresso è la mappa con due tappe: un pin per l'email, uno per la password,
 uniti da un tratteggio.
+
+## Quello che si vede da fuori
+
+Due indirizzi pubblici, entrambi senza login:
+
+- `/m/<indirizzo>` — una mappa pubblicata, in sola lettura: pin, schede, indicazioni.
+- `/u/<nome>` — tutte le mappe pubblicate di una persona, con quanti posti hanno.
+
+Una mappa nasce **non pubblicata**. Quando la pubblichi escono solo i posti non privati, e con
+loro solo le categorie e i gruppi che quei posti usano davvero: niente tassonomia inutilizzata,
+niente email, niente id di cose che non si vedono. L'indirizzo lo puoi scegliere, e resta unico
+fra tutte le mappe; il tuo nome nel profilo nasce dalla tua email e resta unico fra le persone.
 
 ## Il backend
 
@@ -180,6 +195,8 @@ Ogni file si porta dietro le proprie regole per lo schermo stretto: non c'è un 
 | Metodo | Rotta | Note |
 | --- | --- | --- |
 | `GET` | `/api/auth/state` | pubblica: dice se c'è già qualcuno e se ci si può iscrivere |
+| `GET` | `/api/public/m/:slug` | pubblica: una mappa pubblicata, senza i posti privati |
+| `GET` | `/api/public/u/:handle` | pubblica: le mappe pubblicate di una persona |
 | `POST` | `/api/auth/register` `/api/auth/login` | `{ email, password }`, rispondono col cookie |
 | `POST` `GET` | `/api/auth/logout` `/api/auth/me` | uscire, e sapere chi si è |
 | `GET` | `/api/state` | `{ maps, categories, groups, places }`: da qui parte il client |
@@ -188,7 +205,7 @@ Ogni file si porta dietro le proprie regole per lo schermo stretto: non c'è un 
 | `GET` `POST` | `/api/groups` | `{ mapId, name }` |
 | `PUT` `DELETE` | `/api/groups/:id` | la cancellazione sfila l'etichetta dai posti, non li elimina |
 | `GET` `POST` | `/api/maps` | `{ name }` |
-| `PUT` `DELETE` | `/api/maps/:id` | cancellarla porta via i suoi gruppi e posti; l'ultima resta |
+| `PUT` `DELETE` | `/api/maps/:id` | accetta anche `{ slug, published }`; cancellarla porta via i suoi gruppi e posti, e l'ultima resta |
 | `GET` `POST` | `/api/places` | `{ mapId, name, categoryId, groupIds?, lat, lng, note?, private? }` |
 | `PUT` `DELETE` | `/api/places/:id` | il `PUT` è parziale: manda solo i campi che cambiano |
 

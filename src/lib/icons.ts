@@ -1,6 +1,8 @@
 import {
   ArrowRight,
+  Check,
   LogOut,
+  Link2,
   Lock,
   Mail,
   ChevronDown,
@@ -32,6 +34,8 @@ export const ICONS = {
   mail: Mail,
   lock: Lock,
   logout: LogOut,
+  link: Link2,
+  check: Check,
 } as const;
 
 export type IconName = keyof typeof ICONS;

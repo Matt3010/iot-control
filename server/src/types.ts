@@ -2,6 +2,8 @@ export interface User {
   id: string;
   /** Minuscola e ripulita: è la chiave con cui si entra. */
   email: string;
+  /** Il nome nel link pubblico del profilo: /u/<handle>. */
+  handle: string;
   /** scrypt: sale e derivata, mai la password. */
   salt: string;
   hash: string;
@@ -16,6 +18,10 @@ export interface PlaceMap {
   id: string;
   ownerId: string;
   name: string;
+  /** Il nome nel link pubblico della mappa: /m/<slug>. */
+  slug: string;
+  /** Finché è falso la mappa non esiste per nessuno tranne che per te. */
+  published: boolean;
   createdAt: string;
 }
 
