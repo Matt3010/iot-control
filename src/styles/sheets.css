@@ -43,11 +43,120 @@ aside header {
   margin-top: 2px;
 }
 
+/* tabs -------------------------------------------------------------------- */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 12px;
+  border-radius: 99px;
+  background: var(--sunken);
+}
+
+.tab {
+  flex: 1;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 99px;
+  background: none;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-weight: 540;
+  transition: background 0.16s, color 0.16s, box-shadow 0.16s;
+}
+
+.tab:hover { color: var(--ink-2); }
+
+.tab.is-on {
+  background: var(--glass-strong);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+/* the row that adds one more ----------------------------------------------- */
+
+.add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px dashed var(--hairline);
+  border-radius: var(--r-md);
+  transition: border-color 0.16s, background 0.16s, box-shadow 0.16s;
+}
+
+.add-row input[name="name"] {
+  background: none;
+  border-color: transparent;
+  padding: 6px 8px;
+}
+
+.add-row:focus-within {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.add-go { color: var(--ink-3); }
+
+.add-row.is-ready .add-go {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.add-row .emoji-btn { width: 32px; height: 32px; font-size: 16px; }
+.add-row .swatch { width: 26px; height: 26px; border-radius: var(--r-sm); }
+
+.sheet-note {
+  margin: 12px 2px 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
 /* category manager -------------------------------------------------------- */
+
+#group-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+#group-list:empty { display: none; }
+
+#group-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--r-md);
+  transition: background 0.15s;
+}
+
+#group-list li:hover { background: var(--sunken); }
+
+#group-list input {
+  background: none;
+  border-color: transparent;
+  padding: 6px 8px;
+  font-weight: 500;
+}
+
+#group-list li:hover input { background: var(--glass-strong); }
+
+#group-list .count {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
 
 #category-list {
   list-style: none;
-  margin: 0 0 16px;
+  margin: 0 0 8px;
   padding: 0;
   display: grid;
   gap: 6px;
@@ -81,10 +190,6 @@ aside header {
   color: var(--ink-3);
   white-space: nowrap;
 }
-
-#category-form { display: grid; gap: 10px; border-top: 1px solid var(--hairline-soft); padding-top: 14px; }
-
-.category-row { display: flex; align-items: center; gap: 8px; }
 
 /* the list is a dense row of controls; the form below is the roomy one */
 #category-list .emoji-btn { width: 32px; height: 32px; font-size: 16px; }

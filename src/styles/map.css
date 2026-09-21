@@ -215,4 +215,9 @@
 
   /* an open sheet fills the bottom: the zoom would sit under it */
   .sheet-open .leaflet-control-zoom { display: none; }
+
+  /* attribution is not optional, so it rides above the sheet (JS measures it) */
+  .sheet-open .leaflet-bottom.leaflet-left {
+    margin-bottom: calc(var(--sheet-h, 0px) + 20px + env(safe-area-inset-bottom));
+  }
 }

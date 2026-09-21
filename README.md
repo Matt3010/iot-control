@@ -1,8 +1,8 @@
 # Place Index
 
 Mappa a schermo intero dove segni i posti che ti interessano. Ogni posto appartiene a una
-categoria, e ogni categoria ha una sua emoji e un suo colore: il marker sulla mappa è quello.
-Niente account, niente categorie preimpostate, niente fronzoli.
+categoria, che gli dà emoji e colore sulla mappa, e può stare in un gruppo — una città, un
+viaggio, una lista. Niente account, niente categorie preimpostate, niente fronzoli.
 
 ![Place Index](docs/preview.png)
 
@@ -10,50 +10,48 @@ Niente account, niente categorie preimpostate, niente fronzoli.
 
 - **Mappa full-screen** (Leaflet + tile OpenStreetMap, nessuna API key).
 - **Aggiungi posto**: premi il bottone, clicca il punto sulla mappa (il pin si può trascinare),
-  dai nome, categoria e note. Il pin compare subito: il salvataggio viaggia dietro, e se il
-  server rifiuta la riga torna indietro da sola.
+  dai nome, categoria, gruppo e note. Il pin compare subito: il salvataggio viaggia dietro, e se
+  il server rifiuta la riga torna indietro da sola.
+- **⌘K**: una sola casella che cerca prima tra i *tuoi* posti — per nome, categoria, gruppo o
+  note — e poi tra gli indirizzi di OpenStreetMap. Frecce per muoverti, Invio per aprire. Da un
+  indirizzo nasce un posto nuovo col form già compilato.
+- **Gruppi**: filtro a parte dalle categorie. Scegli "Padova" e la mappa ci vola, i conteggi
+  delle categorie si ricalcolano su quel gruppo: *pizzeria a Padova* è due clic.
 - **L'indice nel pannello**: i posti inquadrati in quel momento, dal più vicino al centro
   mappa. Passi sopra una riga e il suo pin si solleva; ci clicchi e la mappa ci vola aprendo
   la scheda.
 - **Cluster**: quando i pin si accavallano diventano un disco che porta i colori delle
   categorie che contiene, e si apre allo zoom.
-- **Ricerca**: cerca un indirizzo o un locale (Nominatim); dal risultato apri direttamente il
-  form già compilato con nome e indirizzo.
-- **Categorie**: le crei tu, con emoji scelta da un picker completo
-  ([emoji-picker-element](https://github.com/nolanlawson/emoji-picker-element), dati serviti in
-  locale — funziona anche senza rete esterna) e un colore. Eliminare una categoria elimina anche
-  i suoi posti.
-- **Filtri**: i chip in alto a sinistra accendono/spengono le categorie sulla mappa (preferenza
-  locale del browser).
-- **Niente finestre di conferma**: elimini un posto o una categoria e sparisce subito, con
-  sei secondi di "Annulla" nel toast. Solo allo scadere la cancellazione parte davvero.
-- I dati stanno sul server in un unico `places.json`: chiunque apra la pagina vede lo stesso indice.
+- **Categorie**: le crei tu, con emoji scelta da un picker completo e un colore. Eliminare una
+  categoria elimina anche i suoi posti; eliminare un gruppo invece li lascia dove sono, senza
+  etichetta.
+- **Niente finestre di conferma**: quel che elimini sparisce subito, con sei secondi di
+  "Annulla" nel toast. Solo allo scadere la cancellazione parte davvero.
+- I dati stanno sul server in un unico `places.json`: chiunque apra la pagina vede lo stesso
+  indice.
 
-## L'interfaccia
+## Il backend
 
-Tutta la UI è un solo strato di pannelli in vetro sopra la mappa: un'unica scala tipografica
-(Inter, servito in locale), una scala di ombre, una di raggi, una di z-index. La mappa è
-desaturata via CSS così l'unico colore acceso sullo schermo è un marker. Tema chiaro e scuro
-seguono il sistema (`prefers-color-scheme`), incluse le tile, e le animazioni si spengono con
-`prefers-reduced-motion`. Niente font, icone o dati emoji presi da una CDN: tutto è nel bundle
-([Inter](https://fontsource.org/fonts/inter), [Lucide](https://lucide.dev),
-[emoji-picker-element](https://github.com/nolanlawson/emoji-picker-element)).
+Express in TypeScript, a livelli, ognuno con un mestiere solo:
 
-Lo stile sta in `src/styles/`, un file per area, caricati in quest'ordine da `index.css`:
+| livello | cosa fa | esempio |
+| --- | --- | --- |
+| **controller** | solo HTTP: status, body, `try/catch` verso il gestore errori | `PlaceController` |
+| **service** | orchestra il caso d'uso e mappa le entità nelle view | `PlaceService` |
+| **manager** | regole di dominio, e apre **una transazione** per metodo | `PlaceManager` |
+| **repository** | accesso ai dati dentro la transazione | `PlaceRepository` |
+| **DTO** | cosa può entrare, validato con `class-validator` | `CreatePlaceDto` |
 
-| file | cosa tiene |
-| --- | --- |
-| `tokens.css` | colori, inchiostri, ombre, z-index, geometria — e i loro gemelli scuri |
-| `base.css` | reset, cornice di pagina, la superficie in vetro, i due stili di testo |
-| `controls.css` | campi, bottoni, chip, bottone emoji, pastiglia del colore |
-| `panel.css` | il pannello sinistro: ricerca, filtri, indice |
-| `sheets.css` | le due sheet di destra e il popover delle emoji |
-| `map.css` | pin, cluster, popup e il chrome di Leaflet ridisegnato |
-| `hud.css` | bottone aggiungi, pill del suggerimento, toast |
-| `animations.css` | tutti i keyframe, e l'interruttore che li spegne |
-
-Ogni file si porta dietro le proprie regole per lo schermo stretto: non c'è un file
-"responsive" separato da tenere allineato.
+- **Validazione**: un middleware trasforma il body in istanza DTO e ci fa girare
+  `class-validator`; a un controller arriva solo roba già valida. Quando un campo rompe più
+  regole insieme, l'errore restituito è quello più fondamentale ("il nome è obbligatorio", non
+  "troppo lungo").
+- **Transazioni**: `JsonStore.transaction()` dà al lavoro una copia privata dei dati e scrive su
+  disco solo se arriva in fondo — un'eccezione a metà è un rollback. Le transazioni sono
+  serializzate, quindi due richieste non si sovrascrivono. La scrittura passa per un file
+  vicino e una `rename`, così un crash non lascia mezzo file.
+- **Invarianti di dominio** (una categoria si porta via i suoi posti, un gruppo li libera, un
+  posto non può puntare a id inesistenti) stanno nei manager, dentro la stessa transazione.
 
 ## Pubblicare con Docker
 
@@ -82,19 +80,54 @@ Variabili d'ambiente: `PORT` (default `8080`), `DATA_DIR` (default `/data` nell'
 
 ```bash
 npm install
-npm run dev     # Vite su :5173 con proxy /api verso il server Node su :8080
+npm run dev     # tsx watch sull'API (:8080) + Vite (:5173) che le fa da proxy
 ```
 
-`npm run build` genera `dist/`, `npm start` avvia il server che serve API e `dist/` insieme.
+| script | cosa fa |
+| --- | --- |
+| `npm run dev` | API in watch e front-end insieme |
+| `npm run build` | `vite build` in `dist/`, poi `tsc` in `server/dist/` |
+| `npm run typecheck` | solo i tipi, niente output |
+| `npm start` | serve API e front-end compilati dallo stesso processo |
+
+## L'interfaccia
+
+Tutta la UI è un solo strato di pannelli in vetro sopra la mappa: un'unica scala tipografica
+(Inter, servito in locale), una scala di ombre, una di raggi, una di z-index. La mappa è
+desaturata via CSS così l'unico colore acceso sullo schermo è un marker. Tema chiaro e scuro
+seguono il sistema (`prefers-color-scheme`), incluse le tile, e le animazioni si spengono con
+`prefers-reduced-motion`. Niente font, icone o dati emoji presi da una CDN: tutto è nel bundle
+([Inter](https://fontsource.org/fonts/inter), [Lucide](https://lucide.dev),
+[emoji-picker-element](https://github.com/nolanlawson/emoji-picker-element)).
+
+Lo stile sta in `src/styles/`, un file per area, caricati in quest'ordine da `index.css`:
+
+| file | cosa tiene |
+| --- | --- |
+| `tokens.css` | colori, inchiostri, ombre, z-index, geometria — e i loro gemelli scuri |
+| `base.css` | reset, cornice di pagina, la superficie in vetro, i due stili di testo |
+| `controls.css` | campi, bottoni, chip, bottone emoji, pastiglia del colore |
+| `panel.css` | il pannello sinistro: ricerca, filtri, indice |
+| `sheets.css` | le sheet di destra, le loro schede e il popover delle emoji |
+| `map.css` | pin, cluster, popup e il chrome di Leaflet ridisegnato |
+| `palette.css` | la palette ⌘K |
+| `hud.css` | bottone aggiungi, pill del suggerimento, toast |
+| `animations.css` | tutti i keyframe, e l'interruttore che li spegne |
+
+Ogni file si porta dietro le proprie regole per lo schermo stretto: non c'è un file
+"responsive" separato da tenere allineato.
 
 ## API
 
-| Metodo   | Rotta                  | Note                                         |
-| -------- | ---------------------- | -------------------------------------------- |
-| `GET`    | `/api/state`           | `{ categories, places }`                     |
-| `POST`   | `/api/categories`      | `{ name, emoji, color }`                     |
-| `PUT`    | `/api/categories/:id`  | patch parziale                               |
-| `DELETE` | `/api/categories/:id`  | elimina anche i posti della categoria        |
-| `POST`   | `/api/places`          | `{ name, categoryId, lat, lng, note }`       |
-| `PUT`    | `/api/places/:id`      | patch parziale                               |
-| `DELETE` | `/api/places/:id`      |                                              |
+| Metodo | Rotta | Note |
+| --- | --- | --- |
+| `GET` | `/api/state` | `{ categories, groups, places }`: da qui parte il client |
+| `GET` `POST` | `/api/categories` | `{ name, emoji?, color? }` |
+| `PUT` `DELETE` | `/api/categories/:id` | la cancellazione porta via anche i posti della categoria |
+| `GET` `POST` | `/api/groups` | `{ name }` |
+| `PUT` `DELETE` | `/api/groups/:id` | la cancellazione libera i posti, non li elimina |
+| `GET` `POST` | `/api/places` | `{ name, categoryId, groupId?, lat, lng, note? }` |
+| `PUT` `DELETE` | `/api/places/:id` | il `PUT` è parziale: manda solo i campi che cambiano |
+
+Gli errori arrivano come `{ error, details? }`: `400` per un DTO non valido o un riferimento
+inesistente, `404` per un id che non c'è.

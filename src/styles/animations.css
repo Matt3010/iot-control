@@ -28,6 +28,14 @@
   100% { transform: rotate(-45deg) scale(1); }
 }
 
+@keyframes fade {
+  from { opacity: 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(1turn); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

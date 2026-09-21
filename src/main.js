@@ -25,10 +25,19 @@ const $ = (sel) => document.querySelector(sel);
 
 const el = {
   map: $('#map'),
-  search: $('#search'),
-  searchInput: $('#search-input'),
-  searchResults: $('#search-results'),
+  searchTrigger: $('#search-trigger'),
+  searchKey: $('#search-key'),
+  palette: $('#palette'),
+  paletteInput: $('#palette-input'),
+  paletteSpinner: $('#palette-spinner'),
+  paletteResults: $('#palette-results'),
   filters: $('#filters'),
+  groupHead: $('#group-head'),
+  groupFilters: $('#group-filters'),
+  groupField: $('#group-field'),
+  groupChoice: $('#group-choice'),
+  groupList: $('#group-list'),
+  groupForm: $('#group-form'),
   placeCount: $('#place-count'),
   listHead: $('#list-head'),
   listCount: $('#list-count'),
@@ -43,7 +52,8 @@ const el = {
   categoryChoice: $('#category-choice'),
   coords: $('#coords'),
   deleteBtn: $('#place-form [data-delete]'),
-  categorySheet: $('#category-sheet'),
+  manageSheet: $('#manage-sheet'),
+  tabs: document.querySelectorAll('#manage-sheet .tab'),
   categoryList: $('#category-list'),
   categoryForm: $('#category-form'),
   newEmoji: $('#new-emoji'),
@@ -52,9 +62,11 @@ const el = {
   toast: $('#toast'),
 };
 
-const state = { categories: [], places: [] };
+const state = { categories: [], groups: [], places: [] };
 /** Category ids hidden from the map; kept per-browser, not on the server. */
 const hidden = new Set(readJSON('pi.hidden', []));
+/** The group in scope, or null for all of them. Also per-browser. */
+let activeGroup = readJSON('pi.group', null);
 /** Draft place being created or edited: { id?, lat, lng }. */
 let draft = null;
 let draftMarker = null;
@@ -246,6 +258,10 @@ map.on('popupclose', () => {
 });
 
 const categoryOf = (id) => state.categories.find((c) => c.id === id);
+const groupOf = (id) => state.groups.find((g) => g.id === id);
+/** Two filters, one question: is this place on the map right now? */
+const visible = (place) =>
+  !hidden.has(place.categoryId) && (!activeGroup || place.groupId === activeGroup);
 const colorOf = (place) => categoryOf(place.categoryId)?.color || '#6b7280';
 
 /* ------------------------------------------------------------------- pins */
@@ -311,9 +327,9 @@ function renderMarkers() {
     // Rebind every render: the popup must read the place as it is now.
     marker.bindPopup(() => popupFor(place), { closeButton: false, offset: [0, 2] });
 
-    const visible = !hidden.has(place.categoryId);
-    if (visible && !clusters.hasLayer(marker)) clusters.addLayer(marker);
-    if (!visible && clusters.hasLayer(marker)) clusters.removeLayer(marker);
+    const onMap = visible(place);
+    if (onMap && !clusters.hasLayer(marker)) clusters.addLayer(marker);
+    if (!onMap && clusters.hasLayer(marker)) clusters.removeLayer(marker);
   }
 }
 
@@ -407,7 +423,10 @@ function chipFor(category, { on, count }) {
   return chip;
 }
 
-const countIn = (categoryId) => state.places.filter((p) => p.categoryId === categoryId).length;
+const inScope = (place) => !activeGroup || place.groupId === activeGroup;
+const countIn = (categoryId) =>
+  state.places.filter((p) => p.categoryId === categoryId && inScope(p)).length;
+const countGroup = (groupId) => state.places.filter((p) => p.groupId === groupId).length;
 
 function renderFilters() {
   el.filters.textContent = '';
@@ -439,7 +458,7 @@ function renderList() {
   const bounds = map.getBounds();
   const centre = map.getCenter();
   const rows = state.places
-    .filter((place) => !hidden.has(place.categoryId) && bounds.contains([place.lat, place.lng]))
+    .filter((place) => visible(place) && bounds.contains([place.lat, place.lng]))
     .map((place) => ({ place, distance: centre.distanceTo([place.lat, place.lng]) }))
     .sort((a, b) => a.distance - b.distance);
 
@@ -487,6 +506,97 @@ function renderList() {
   el.list.querySelector('.is-active')?.scrollIntoView({ block: 'nearest' });
 }
 
+/** Groups are a scope, not a mix: one at a time, or all of them. */
+function renderGroups() {
+  const has = state.groups.length > 0;
+  el.groupHead.hidden = !has;
+  el.groupFilters.hidden = !has;
+  el.groupFilters.textContent = '';
+  if (!has) return;
+
+  const scopes = [{ id: null, name: 'Tutti', count: state.places.length }].concat(
+    state.groups.map((group) => ({ id: group.id, name: group.name, count: countGroup(group.id) })),
+  );
+
+  for (const scope of scopes) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `chip${scope.id === activeGroup ? ' sel' : ''}`;
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = scope.name;
+    const tally = document.createElement('span');
+    tally.className = 'count';
+    tally.textContent = scope.count;
+    chip.append(name, tally);
+    chip.addEventListener('click', () => {
+      activeGroup = scope.id === activeGroup ? null : scope.id;
+      writeJSON('pi.group', activeGroup);
+      renderAll();
+      if (activeGroup) flyToGroup(activeGroup);
+    });
+    el.groupFilters.append(chip);
+  }
+}
+
+/** Picking "Padova" should take you to Padova, not leave you where you were. */
+function flyToGroup(groupId) {
+  const members = state.places.filter((place) => place.groupId === groupId && !hidden.has(place.categoryId));
+  if (!members.length) return;
+  const bounds = L.latLngBounds(members.map((place) => [place.lat, place.lng]));
+  map.flyToBounds(bounds, { padding: [70, 70], maxZoom: 15, duration: 0.8 });
+}
+
+function renderGroupChoice(selectedId) {
+  el.groupField.hidden = !state.groups.length;
+  el.groupChoice.textContent = '';
+  if (!state.groups.length) return;
+
+  const scopes = [{ id: '', name: 'Nessuno' }].concat(state.groups);
+  for (const scope of scopes) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `chip${scope.id === (selectedId || '') ? ' sel' : ''}`;
+    chip.dataset.id = scope.id;
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = scope.name;
+    chip.append(name);
+    chip.addEventListener('click', () => renderGroupChoice(scope.id));
+    el.groupChoice.append(chip);
+  }
+}
+
+const selectedGroupId = () => el.groupChoice.querySelector('.chip.sel')?.dataset.id || '';
+
+function renderGroupList() {
+  el.groupList.textContent = '';
+  for (const group of state.groups) {
+    const count = countGroup(group.id);
+    const li = document.createElement('li');
+
+    const name = document.createElement('input');
+    name.type = 'text';
+    name.value = group.name;
+    name.maxLength = 40;
+    name.addEventListener('change', () => patchGroup(group, { name: name.value }));
+
+    const tally = document.createElement('span');
+    tally.className = 'count';
+    tally.textContent = count || '';
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'ghost-icon';
+    del.append(icon('trash'));
+    del.title = 'Elimina gruppo';
+    del.addEventListener('click', () => deleteGroup(group));
+
+    li.append(name, tally, del);
+    el.groupList.append(li);
+  }
+}
+
 function renderCategoryChoice(selectedId) {
   el.categoryChoice.textContent = '';
   if (!state.categories.length) {
@@ -494,7 +604,7 @@ function renderCategoryChoice(selectedId) {
     link.type = 'button';
     link.className = 'ghost';
     link.textContent = 'Crea la prima categoria';
-    link.addEventListener('click', () => openCategorySheet());
+    link.addEventListener('click', () => openManageSheet('categories'));
     el.categoryChoice.append(link);
     return;
   }
@@ -558,11 +668,16 @@ function renderCategoryList() {
 }
 
 function renderAll() {
+  renderGroups();
   renderFilters();
   renderList();
   renderCategoryList();
+  renderGroupList();
   renderMarkers();
-  if (!el.placeSheet.hidden) renderCategoryChoice(selectedCategoryId());
+  if (!el.placeSheet.hidden) {
+    renderCategoryChoice(selectedCategoryId());
+    renderGroupChoice(selectedGroupId());
+  }
 }
 
 /* ---------------------------------------------- writes, applied on the spot */
@@ -602,6 +717,48 @@ function deleteCategory(category) {
         cancel();
         state.categories.splice(index, 0, category);
         state.places = [...state.places, ...orphans];
+        renderAll();
+      },
+    },
+  );
+}
+
+async function patchGroup(group, patch) {
+  const before = { ...group };
+  Object.assign(group, patch);
+  renderAll();
+  try {
+    Object.assign(group, await api(`/groups/${group.id}`, { method: 'PUT', body: patch }));
+  } catch (err) {
+    Object.assign(group, before);
+    renderAll();
+    toast(err.message);
+  }
+}
+
+function deleteGroup(group) {
+  const index = state.groups.indexOf(group);
+  const members = state.places.filter((p) => p.groupId === group.id);
+  state.groups.splice(index, 1);
+  for (const place of members) place.groupId = '';
+  if (activeGroup === group.id) {
+    activeGroup = null;
+    writeJSON('pi.group', null);
+  }
+  renderAll();
+
+  const cancel = deferCommit((opts) =>
+    api(`/groups/${group.id}`, { method: 'DELETE', ...opts }).catch(() => {}),
+  );
+
+  toast(
+    members.length ? `"${group.name}" sciolto, ${members.length} posti restano` : `"${group.name}" eliminato`,
+    {
+      label: 'Annulla',
+      onClick: () => {
+        cancel();
+        state.groups.splice(index, 0, group);
+        for (const place of members) place.groupId = group.id;
         renderAll();
       },
     },
@@ -678,15 +835,28 @@ function clearDraftMarker() {
   }
 }
 
-/** On a narrow screen an open sheet covers the bottom, where the map chrome lives. */
+/**
+ * On a narrow screen an open sheet covers the bottom, where the map chrome
+ * lives. The zoom hides; the attribution is not optional, so it is pushed up
+ * by exactly the height of the sheet — which changes as the sheet grows.
+ */
+const measureSheet = (sheet) =>
+  document.body.style.setProperty('--sheet-h', `${Math.round(sheet.getBoundingClientRect().height)}px`);
+
+const sheetSize = new ResizeObserver((entries) => measureSheet(entries[0].target));
+
 function syncSheetState() {
-  const open = !el.placeSheet.hidden || !el.categorySheet.hidden;
-  document.body.classList.toggle('sheet-open', open);
+  const sheet = !el.placeSheet.hidden ? el.placeSheet : !el.manageSheet.hidden ? el.manageSheet : null;
+  document.body.classList.toggle('sheet-open', Boolean(sheet));
+  sheetSize.disconnect();
+  if (!sheet) return document.body.style.removeProperty('--sheet-h');
+  measureSheet(sheet);
+  sheetSize.observe(sheet);
 }
 
 function openPlaceSheet(place) {
   draft = { ...place };
-  closeCategorySheet();
+  closeManageSheet();
   el.placeSheet.hidden = false;
   syncSheetState();
   el.placeTitle.textContent = place.id ? 'Modifica posto' : 'Nuovo posto';
@@ -695,6 +865,8 @@ function openPlaceSheet(place) {
   el.coords.textContent = `${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}`;
   el.deleteBtn.hidden = !place.id;
   renderCategoryChoice(place.categoryId || state.categories[0]?.id);
+  // a new place lands in the group you are looking at
+  renderGroupChoice(place.id ? place.groupId : (place.groupId ?? activeGroup ?? ''));
 
   clearDraftMarker();
   const existing = markers.get(place);
@@ -722,14 +894,33 @@ function closePlaceSheet() {
   syncSheetState();
 }
 
-function openCategorySheet() {
-  el.categorySheet.hidden = false;
+function openManageSheet(tab = 'categories') {
+  el.manageSheet.hidden = false;
+  showTab(tab);
   renderCategoryList();
+  renderGroupList();
   syncSheetState();
 }
 
-function closeCategorySheet() {
-  el.categorySheet.hidden = true;
+/** One list at a time: the sheet holds two, not a pile. */
+function showTab(name) {
+  for (const tab of el.tabs) tab.classList.toggle('is-on', tab.dataset.tab === name);
+  for (const panel of document.querySelectorAll('#manage-sheet .tab-panel')) {
+    panel.hidden = panel.dataset.panel !== name;
+  }
+}
+
+for (const tab of el.tabs) tab.addEventListener('click', () => showTab(tab.dataset.tab));
+
+/** The add row lights up once it has something to add. */
+for (const form of [el.categoryForm, el.groupForm]) {
+  form.addEventListener('input', () => {
+    form.classList.toggle('is-ready', form.elements.name.value.trim().length > 0);
+  });
+}
+
+function closeManageSheet() {
+  el.manageSheet.hidden = true;
   closeEmojiPicker();
   syncSheetState();
 }
@@ -744,6 +935,7 @@ el.placeForm.addEventListener('submit', (event) => {
     name: el.placeForm.elements.name.value.trim(),
     note: el.placeForm.elements.note.value.trim(),
     categoryId,
+    groupId: selectedGroupId(),
     lat: draft.lat,
     lng: draft.lng,
   };
@@ -768,7 +960,7 @@ el.categoryChoice.addEventListener('click', () => {
 for (const button of document.querySelectorAll('[data-close]')) {
   button.addEventListener('click', () => {
     if (button.closest('#place-sheet')) closePlaceSheet();
-    else closeCategorySheet();
+    else closeManageSheet();
   });
 }
 
@@ -779,21 +971,26 @@ el.addBtn.addEventListener('click', () => {
 });
 
 el.manageBtn.addEventListener('click', () => {
-  if (el.categorySheet.hidden) openCategorySheet();
-  else closeCategorySheet();
+  if (el.manageSheet.hidden) openManageSheet();
+  else closeManageSheet();
 });
 
 document.addEventListener('keydown', (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    return el.palette.hidden ? openPalette() : closePalette();
+  }
   if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !el.placeSheet.hidden) {
     event.preventDefault();
     el.placeForm.requestSubmit();
     return;
   }
   if (event.key !== 'Escape') return;
+  if (!el.palette.hidden) return closePalette();
   if (!el.emojiPopover.hidden) return closeEmojiPicker();
   if (picking) return setPicking(false);
   if (!el.placeSheet.hidden) return closePlaceSheet();
-  if (!el.categorySheet.hidden) closeCategorySheet();
+  if (!el.manageSheet.hidden) closeManageSheet();
 });
 
 /* --------------------------------------------------------- category form */
@@ -821,11 +1018,30 @@ el.categoryForm.addEventListener('submit', async (event) => {
     const created = await api('/categories', { method: 'POST', body });
     state.categories.push(created);
     el.categoryForm.reset();
+    el.categoryForm.classList.remove('is-ready');
     newCategoryEmoji = '📍';
     el.newEmoji.textContent = '📍';
     renderAll();
     if (!el.placeSheet.hidden) renderCategoryChoice(created.id);
     toast(`Categoria "${created.name}" creata`);
+  } catch (err) {
+    toast(err.message);
+  }
+});
+
+el.groupForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const name = el.groupForm.elements.name.value.trim();
+  if (!name) return;
+  try {
+    // Awaited like categories: a place cannot point at an id the server lacks.
+    const created = await api('/groups', { method: 'POST', body: { name } });
+    state.groups.push(created);
+    el.groupForm.reset();
+    el.groupForm.classList.remove('is-ready');
+    renderAll();
+    if (!el.placeSheet.hidden) renderGroupChoice(created.id);
+    toast(`Gruppo "${created.name}" creato`);
   } catch (err) {
     toast(err.message);
   }
@@ -899,71 +1115,247 @@ document.addEventListener('pointerdown', (event) => {
   closeEmojiPicker();
 });
 
-/* ---------------------------------------------------------------- search */
+/* --------------------------------------------------------------- palette */
 
-el.search.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const query = el.searchInput.value.trim();
-  if (!query) return;
+const IS_MAC = /mac|iphone|ipad/i.test(navigator.userAgentData?.platform || navigator.platform || navigator.userAgent);
+el.searchKey.textContent = IS_MAC ? '⌘K' : 'Ctrl K';
 
-  showResults([{ label: 'Cerco…', empty: true }]);
-  try {
-    const url = new URL('https://nominatim.openstreetmap.org/search');
-    url.search = new URLSearchParams({ q: query, format: 'jsonv2', limit: '6', 'accept-language': 'it' });
-    const res = await fetch(url, { headers: { accept: 'application/json' } });
-    const hits = res.ok ? await res.json() : [];
-    if (!hits.length) return showResults([{ label: 'Nessun risultato', empty: true }]);
-    showResults(
-      hits.map((hit) => ({
-        label: hit.display_name,
+const palette = { items: [], selected: 0, addresses: [], query: '' };
+let geocodeTimer;
+let geocodeAbort;
+
+const norm = (value) => value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+/** Your own places, ranked: name first, then category, then notes. */
+function matchPlaces(query) {
+  const centre = map.getCenter();
+  const q = norm(query.trim());
+  const hits = [];
+
+  for (const place of state.places) {
+    const name = norm(place.name);
+    let rank = Infinity;
+    if (!q) rank = 5;
+    else if (name.startsWith(q)) rank = 0;
+    else if (name.includes(q)) rank = 1;
+    else if (norm(categoryOf(place.categoryId)?.name || '').includes(q)) rank = 2;
+    else if (norm(groupOf(place.groupId)?.name || '').includes(q)) rank = 3;
+    else if (norm(place.note || '').includes(q)) rank = 4;
+    if (rank === Infinity) continue;
+    hits.push({ place, rank, distance: centre.distanceTo([place.lat, place.lng]) });
+  }
+
+  return hits.sort((a, b) => a.rank - b.rank || a.distance - b.distance).slice(0, 8);
+}
+
+function paletteSection(label, hint) {
+  const head = document.createElement('div');
+  head.className = 'palette-section';
+  const title = document.createElement('span');
+  title.className = 'eyebrow';
+  title.textContent = label;
+  head.append(title);
+  if (hint) {
+    const note = document.createElement('span');
+    note.className = 'palette-meta';
+    note.textContent = hint;
+    head.append(note);
+  }
+  el.paletteResults.append(head);
+}
+
+function paletteRow({ color, emoji, iconName, name, note, meta, onPick }) {
+  const row = document.createElement('div');
+  row.className = 'palette-row';
+  if (color) row.style.setProperty('--c', color);
+
+  const dot = document.createElement('span');
+  dot.className = 'palette-dot';
+  dot.append(emoji ? text(emoji) : icon(iconName));
+
+  const body = document.createElement('span');
+  body.className = 'palette-body';
+  const title = document.createElement('span');
+  title.className = 'palette-name';
+  title.textContent = name;
+  const sub = document.createElement('span');
+  sub.className = 'palette-note';
+  sub.textContent = note || '';
+  body.append(title, sub);
+
+  row.append(dot, body);
+  if (meta) {
+    const tail = document.createElement('span');
+    tail.className = 'palette-meta';
+    tail.textContent = meta;
+    row.append(tail);
+  }
+
+  const index = palette.items.length;
+  row.addEventListener('pointerenter', () => select(index));
+  row.addEventListener('click', onPick);
+  palette.items.push({ row, onPick });
+  el.paletteResults.append(row);
+}
+
+function renderPalette() {
+  el.paletteResults.textContent = '';
+  palette.items = [];
+
+  const places = matchPlaces(palette.query);
+  if (places.length) {
+    paletteSection('I tuoi posti', palette.query.trim() ? undefined : 'i piu vicini');
+    for (const { place, distance } of places) {
+      const category = categoryOf(place.categoryId);
+      paletteRow({
+        color: category?.color,
+        emoji: category?.emoji || '📍',
+        name: place.name,
+        note: [groupOf(place.groupId)?.name, place.note || category?.name].filter(Boolean).join(' · '),
+        meta: formatDistance(distance),
         onPick: () => {
-          hideResults();
-          const lat = Number(hit.lat);
-          const lng = Number(hit.lon);
-          map.setView([lat, lng], Math.max(map.getZoom(), 16));
-          setPicking(false);
-          openPlaceSheet({
-            lat,
-            lng,
-            name: hit.name || hit.display_name.split(',')[0],
-            note: hit.display_name,
-          });
+          closePalette();
+          // searching for something a filter hides should still reveal it
+          let revealed = hidden.delete(place.categoryId);
+          if (activeGroup && place.groupId !== activeGroup) {
+            activeGroup = null;
+            writeJSON('pi.group', null);
+            revealed = true;
+          }
+          if (revealed) {
+            writeJSON('pi.hidden', [...hidden]);
+            renderAll();
+          }
+          focusPlace(place);
         },
-      })),
-    );
-  } catch {
-    showResults([{ label: 'Ricerca non riuscita', empty: true }]);
+      });
+    }
+  }
+
+  palette.addresses.forEach((hit, at) => {
+    if (at === 0) paletteSection('Indirizzi', 'da OpenStreetMap');
+    const label = hit.name || hit.display_name.split(',')[0];
+    paletteRow({
+      iconName: 'pin',
+      name: label,
+      note: hit.display_name,
+      meta: 'nuovo',
+      onPick: () => {
+        closePalette();
+        const lat = Number(hit.lat);
+        const lng = Number(hit.lon);
+        map.setView([lat, lng], Math.max(map.getZoom(), 16));
+        setPicking(false);
+        openPlaceSheet({ lat, lng, name: label, note: hit.display_name });
+      },
+    });
+  });
+
+  if (!palette.items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'palette-empty';
+    empty.textContent =
+      palette.query.trim().length < 3
+        ? 'Scrivi almeno tre lettere per cercare anche tra gli indirizzi.'
+        : 'Nessun posto e nessun indirizzo con questo nome.';
+    el.paletteResults.append(empty);
+  }
+
+  select(Math.min(palette.selected, palette.items.length - 1));
+}
+
+function select(index) {
+  palette.selected = Math.max(0, index);
+  palette.items.forEach((item, at) => item.row.classList.toggle('is-sel', at === palette.selected));
+  palette.items[palette.selected]?.row.scrollIntoView({ block: 'nearest' });
+}
+
+const setSearching = (on) => {
+  el.paletteSpinner.hidden = !on;
+};
+
+/** Addresses cost a round trip, so they follow the typing at a distance. */
+function scheduleGeocode() {
+  clearTimeout(geocodeTimer);
+  geocodeAbort?.abort();
+  const query = palette.query.trim();
+
+  if (query.length < 3) {
+    palette.addresses = [];
+    setSearching(false);
+    return renderPalette();
+  }
+
+  setSearching(true);
+  geocodeTimer = setTimeout(async () => {
+    geocodeAbort = new AbortController();
+    try {
+      const url = new URL('https://nominatim.openstreetmap.org/search');
+      url.search = new URLSearchParams({ q: query, format: 'jsonv2', limit: '5', 'accept-language': 'it' });
+      const res = await fetch(url, { headers: { accept: 'application/json' }, signal: geocodeAbort.signal });
+      palette.addresses = res.ok ? await res.json() : [];
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      palette.addresses = [];
+    }
+    setSearching(false);
+    renderPalette();
+  }, 350);
+}
+
+function openPalette() {
+  el.palette.hidden = false;
+  palette.query = '';
+  palette.addresses = [];
+  palette.selected = 0;
+  el.paletteInput.value = '';
+  setSearching(false);
+  renderPalette();
+  el.paletteInput.focus();
+}
+
+function closePalette() {
+  el.palette.hidden = true;
+  clearTimeout(geocodeTimer);
+  geocodeAbort?.abort();
+  setSearching(false);
+}
+
+el.searchTrigger.addEventListener('click', openPalette);
+
+el.paletteInput.addEventListener('input', () => {
+  palette.query = el.paletteInput.value;
+  palette.selected = 0;
+  renderPalette();
+  scheduleGeocode();
+});
+
+el.paletteInput.addEventListener('keydown', (event) => {
+  const count = Math.max(palette.items.length, 1);
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    select((palette.selected + 1) % count);
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    select((palette.selected - 1 + count) % count);
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    palette.items[palette.selected]?.onPick();
   }
 });
 
-el.searchInput.addEventListener('input', () => {
-  if (!el.searchInput.value) hideResults();
+el.palette.addEventListener('pointerdown', (event) => {
+  if (event.target === el.palette) closePalette();
 });
-
-function showResults(items) {
-  el.searchResults.textContent = '';
-  for (const item of items) {
-    const li = document.createElement('li');
-    li.textContent = item.label;
-    if (item.empty) li.className = 'empty';
-    else li.addEventListener('click', item.onPick);
-    el.searchResults.append(li);
-  }
-  el.searchResults.hidden = false;
-}
-
-function hideResults() {
-  el.searchResults.hidden = true;
-  el.searchResults.textContent = '';
-}
 
 /* ------------------------------------------------------------------ boot */
 
 api('/state')
   .then((data) => {
     state.categories = data.categories;
+    state.groups = data.groups ?? [];
     state.places = data.places;
     renderAll();
-    if (!state.categories.length) openCategorySheet();
+    if (!state.categories.length) openManageSheet();
   })
   .catch((err) => toast(`Caricamento fallito: ${err.message}`));

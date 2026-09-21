@@ -17,16 +17,20 @@
         <span id="place-count" class="tally">0</span>
       </div>
 
-      <form id="search" autocomplete="off">
+      <button id="search-trigger" type="button">
         <i data-icon="search"></i>
-        <input id="search-input" type="search" placeholder="Cerca un indirizzo o un posto" />
-        <button type="submit" class="ghost-icon" title="Cerca"><i data-icon="submit"></i></button>
-      </form>
-      <ul id="search-results" hidden></ul>
+        <span>Cerca un posto o un indirizzo</span>
+        <kbd id="search-key">⌘K</kbd>
+      </button>
+
+      <div class="panel-row" id="group-head" hidden>
+        <span class="eyebrow">Gruppi</span>
+      </div>
+      <div id="group-filters" hidden></div>
 
       <div class="panel-row">
         <span class="eyebrow">Categorie</span>
-        <button id="manage-btn" class="ghost-icon" type="button" title="Gestisci categorie">
+        <button id="manage-btn" class="ghost-icon" type="button" title="Gestisci categorie e gruppi">
           <i data-icon="filters"></i>
         </button>
       </div>
@@ -64,6 +68,10 @@
           <span class="eyebrow">Categoria</span>
           <div id="category-choice" class="chips"></div>
         </div>
+        <div class="field" id="group-field" hidden>
+          <span class="eyebrow">Gruppo</span>
+          <div id="group-choice" class="chips"></div>
+        </div>
         <label class="field">
           <span class="eyebrow">Note</span>
           <textarea name="note" maxlength="500" rows="3" placeholder="Indirizzo, il piatto da non perdere, con chi ci sei stato…"></textarea>
@@ -79,25 +87,55 @@
       </form>
     </aside>
 
-    <!-- Category manager -->
-    <aside id="category-sheet" class="surface" hidden>
+    <!-- Categories and groups, one tab each -->
+    <aside id="manage-sheet" class="surface" hidden>
       <header>
-        <h2>Categorie</h2>
+        <h2>Categorie e gruppi</h2>
         <button class="ghost-icon" type="button" data-close title="Chiudi"><i data-icon="close"></i></button>
       </header>
-      <ul id="category-list"></ul>
-      <form id="category-form">
-        <span class="eyebrow">Nuova categoria</span>
-        <div class="category-row">
+
+      <div class="tabs" role="tablist">
+        <button class="tab is-on" type="button" role="tab" data-tab="categories">Categorie</button>
+        <button class="tab" type="button" role="tab" data-tab="groups">Gruppi</button>
+      </div>
+
+      <div class="tab-panel" data-panel="categories">
+        <ul id="category-list"></ul>
+        <form id="category-form" class="add-row">
           <button type="button" id="new-emoji" class="emoji-btn" title="Scegli emoji">📍</button>
-          <input name="name" required maxlength="40" placeholder="Es. Pizzeria" />
-          <label class="swatch" title="Colore">
-            <input name="color" type="color" value="#e4572e" />
-          </label>
-        </div>
-        <button type="submit" class="primary">Aggiungi categoria</button>
-      </form>
+          <input name="name" required maxlength="40" placeholder="Nuova categoria" />
+          <label class="swatch" title="Colore"><input name="color" type="color" value="#e4572e" /></label>
+          <button type="submit" class="ghost-icon add-go" title="Aggiungi categoria"><i data-icon="plus"></i></button>
+        </form>
+      </div>
+
+      <div class="tab-panel" data-panel="groups" hidden>
+        <ul id="group-list"></ul>
+        <form id="group-form" class="add-row">
+          <input name="name" required maxlength="40" placeholder="Nuovo gruppo — Padova, Islanda…" />
+          <button type="submit" class="ghost-icon add-go" title="Aggiungi gruppo"><i data-icon="plus"></i></button>
+        </form>
+        <p class="sheet-note">Un gruppo è dove stanno i posti: una città, un viaggio, una lista. Un posto ne porta uno solo.</p>
+      </div>
     </aside>
+
+    <!-- ⌘K: your places first, addresses after -->
+    <div id="palette" hidden>
+      <div class="palette-card surface">
+        <div class="palette-field">
+          <i data-icon="search"></i>
+          <input id="palette-input" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="Cerca tra i tuoi posti, o un indirizzo" />
+          <span id="palette-spinner" hidden></span>
+          <kbd>Esc</kbd>
+        </div>
+        <div id="palette-results"></div>
+        <div class="palette-foot">
+          <span><kbd>↑</kbd><kbd>↓</kbd> muoviti</span>
+          <span><kbd>↵</kbd> apri</span>
+        </div>
+      </div>
+    </div>
 
     <div id="emoji-popover" class="surface" hidden><emoji-picker></emoji-picker></div>
 
