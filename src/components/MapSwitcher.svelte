@@ -10,6 +10,39 @@
   let newName = $state('');
   let field = $state<HTMLInputElement>();
 
+  /**
+   * Il menu non puo' vivere dentro il pannello: il pannello ritaglia quello
+   * che esce dai suoi bordi, e il menu veniva tagliato a meta'. Sta appeso al
+   * corpo della pagina, e si mette da solo sotto al tasto che l'ha aperto.
+   */
+  let anchor = $state<HTMLElement>();
+  let menu = $state<HTMLElement>();
+  let at = $state({ left: 0, top: 0, width: 240 });
+
+  /** Appende il nodo al corpo: fuori da ogni ritaglio. */
+  function portal(node: HTMLElement) {
+    document.body.appendChild(node);
+    return {
+      destroy: () => node.remove(),
+    };
+  }
+
+  function apri() {
+    if (open) return (open = false);
+    const r = anchor!.getBoundingClientRect();
+    at = { left: Math.max(8, r.left - 6), top: r.bottom + 8, width: Math.max(240, r.width + 12) };
+    open = true;
+  }
+
+  /** Se sotto non ci sta, si apre all'insu': meglio sopra che fuori schermo. */
+  $effect(() => {
+    if (!open || !menu) return;
+    const alto = menu.offsetHeight;
+    if (at.top + alto <= window.innerHeight - 8) return;
+    const r = anchor!.getBoundingClientRect();
+    at = { ...at, top: Math.max(8, r.top - 8 - alto) };
+  });
+
   $effect(() => {
     if (creating) field?.focus();
   });
@@ -37,9 +70,10 @@
   <button
     class="current"
     type="button"
+    bind:this={anchor}
     aria-expanded={open}
-    title={store.shownMaps.length > 1 ? `Stai guardando ${store.shownMaps.length} mappe` : "Cambia mappa"}
-    onclick={() => (open = !open)}
+    title={store.shownMaps.length > 1 ? `Stai guardando ${store.shownMaps.length} mappe` : 'Cambia mappa'}
+    onclick={apri}
   >
     <Icon name={store.extraMapIds.length ? 'layers' : 'pin'} />
     <span class="current-name">{store.activeMap?.name ?? 'Place Index'}</span>
@@ -47,9 +81,16 @@
   </button>
 
   {#if open}
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="veil" onclick={() => (open = false)}></div>
-    <div class="menu surface">
+    <div class="pop" use:portal>
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="veil" onclick={() => (open = false)}></div>
+      <div
+        class="menu surface"
+        bind:this={menu}
+        style:left="{at.left}px"
+        style:top="{at.top}px"
+        style:width="{at.width}px"
+      >
       <span class="eyebrow">Le tue mappe</span>
       <ul>
         {#each store.maps as map (map.id)}
@@ -111,6 +152,7 @@
           <Icon name="plus" /> Nuova mappa
         </button>
       {/if}
+      </div>
     </div>
   {/if}
 </div>
@@ -147,19 +189,23 @@
 
   .current :global(.ico) { width: 15px; height: 15px; flex: none; color: var(--ink-3); }
 
-  /* chiude il menu cliccando ovunque, senza rubare i clic alla mappa sotto */
-  .veil {
+  /* il menu sta appeso al corpo della pagina: qui dentro ci sono solo lui e
+     il velo che lo chiude */
+  .pop {
     position: fixed;
     inset: 0;
-    z-index: 1;
+    z-index: var(--z-popover);
+  }
+
+  /* chiude il menu cliccando ovunque, senza rubare i clic alla mappa sotto */
+  .veil {
+    position: absolute;
+    inset: 0;
   }
 
   .menu {
     position: absolute;
-    z-index: 2;
-    top: calc(100% + 8px);
-    left: -6px;
-    width: max(220px, 100%);
+    max-width: calc(100vw - 16px);
     padding: 10px;
     display: grid;
     gap: 6px;
