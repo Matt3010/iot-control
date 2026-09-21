@@ -23,9 +23,9 @@
 }
 
 @keyframes pin-drop {
-  0% { opacity: 0; transform: translateY(-12px) scale(0.86); }
-  60% { transform: translateY(0) scale(1.06); }
-  100% { transform: scale(1); }
+  0% { opacity: 0; transform: rotate(-45deg) translate(9px, -9px) scale(0.8); }
+  60% { transform: rotate(-45deg) translate(0, 0) scale(1.06); }
+  100% { transform: rotate(-45deg) scale(1); }
 }
 
 @keyframes fade {

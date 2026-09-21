@@ -140,10 +140,9 @@ export function pinIcon({ color, emoji, extra = '', locked = false }: PinLook): 
     html:
       `<div class="pin ${extra}" style="--c:${color ?? DEFAULT_COLOR}">` +
       `<span>${emoji ?? DEFAULT_EMOJI}</span>${lock}</div>`,
-    // la punta sta in fondo, ed e' lei a toccare il luogo
-    iconSize: [34, 42],
-    iconAnchor: [17, 42],
-    popupAnchor: [0, -38],
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+    popupAnchor: [0, -34],
   });
 }
 
