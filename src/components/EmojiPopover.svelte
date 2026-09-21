@@ -5,8 +5,10 @@
   import { placeBeside } from '../lib/popover';
   import { ui } from '../lib/ui.svelte';
 
-  const request = $derived(ui.emoji!);
-  const at = $derived(placeBeside(request.anchor, 304, 322));
+  const request = $derived(ui.emoji);
+  // Ricrearlo a ogni apertura vorrebbe dire ricaricare e reindicizzare 440KB
+  // di emoji ogni volta: resta montato e si limita a scomparire.
+  const at = $derived(request ? placeBeside(request.anchor, 304, 322) : { left: 0, top: 0 });
 
   const dark = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -43,16 +45,22 @@
 
     const onPick = (event: Event) => {
       const emoji = (event as CustomEvent<{ unicode: string }>).detail.unicode;
-      const pick = request.onPick;
+      const pick = ui.emoji?.onPick;
       ui.emoji = null;
-      pick(emoji);
+      pick?.(emoji);
     };
     node.addEventListener('emoji-click', onPick);
     return () => node.removeEventListener('emoji-click', onPick);
   }
 </script>
 
-<div id="emoji-popover" class="surface" style:left="{at.left}px" style:top="{at.top}px">
+<div
+  id="emoji-popover"
+  class="surface"
+  hidden={!request}
+  style:left="{at.left}px"
+  style:top="{at.top}px"
+>
   <emoji-picker class={dark.matches ? 'dark' : 'light'} use:picker></emoji-picker>
 </div>
 

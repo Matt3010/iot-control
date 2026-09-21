@@ -60,7 +60,16 @@
       <label class="field">
         <span class="eyebrow">Nome</span>
         <!-- svelte-ignore a11y_autofocus -->
-        <input name="name" required maxlength="80" placeholder="Trattoria da Nonna" autofocus bind:value={draft.name} />
+        <!-- binding a funzione: chiudendo la scheda la bozza sparisce un attimo
+             prima del componente, e una lettura secca solleverebbe -->
+        <input
+          name="name"
+          required
+          maxlength="80"
+          placeholder="Trattoria da Nonna"
+          autofocus
+          bind:value={() => draft?.name ?? '', (value) => draft && (draft.name = value)}
+        />
       </label>
 
       <div class="field">
@@ -111,7 +120,7 @@
         maxlength="500"
         rows="3"
         placeholder="Indirizzo, il piatto da non perdere, con chi ci sei stato…"
-        bind:value={draft.note}
+        bind:value={() => draft?.note ?? '', (value) => draft && (draft.note = value)}
       ></textarea>
     </label>
 

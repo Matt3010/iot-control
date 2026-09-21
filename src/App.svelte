@@ -44,6 +44,16 @@
     return () => observer.disconnect();
   });
 
+  /**
+   * Il picker emoji carica e indicizza 440KB di dati: crearlo alla prima
+   * apertura evita il costo a chi non lo usa, e non distruggerlo più evita
+   * di rifarlo ogni volta.
+   */
+  let emojiEverOpened = $state(false);
+  $effect(() => {
+    if (ui.emoji) emojiEverOpened = true;
+  });
+
   function onKeydown(event: KeyboardEvent) {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault();
@@ -80,7 +90,7 @@
 {/if}
 
 {#if ui.paletteOpen}<Palette />{/if}
-{#if ui.emoji}<EmojiPopover />{/if}
+{#if emojiEverOpened}<EmojiPopover />{/if}
 {#if ui.color}<ColorPopover />{/if}
 
 <Toast />
