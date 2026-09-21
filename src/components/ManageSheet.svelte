@@ -4,6 +4,7 @@
   import { mapUrl, profileUrl } from '../lib/routing';
   import { fadeEdges } from '../lib/overflow';
   import { store } from '../lib/store.svelte';
+  import type { PlaceMap } from '../lib/types';
   import { toast } from '../lib/toast.svelte';
   import { swipeToClose } from '../lib/swipe';
   import { ui } from '../lib/ui.svelte';
@@ -30,12 +31,46 @@
     void store.refreshMaps();
   });
 
+  /**
+   * Due numeri, due domande: quante volte il link è stato usato, e quanta
+   * gente diversa l'ha usato. La frase si costruisce qui perché è la stessa
+   * per le mappe e per il profilo, a parte l'ultimo pezzo.
+   */
+  const many = (count: number, one: string, more: string) =>
+    `${count} ${count === 1 ? one : more}`;
+
+  const visitsOfMap = (map: PlaceMap) => {
+    if (!map.views && !map.viewers) return 'Ancora nessuna visita.';
+    const parts = [many(map.views, 'apertura', 'aperture'), many(map.viewers, 'persona', 'persone')];
+    if (map.viewsFromProfile) parts.push(`${map.viewsFromProfile} dal profilo`);
+    return parts.join(' · ');
+  };
+
+  const visitsOfProfile = () => {
+    const me = auth.account;
+    if (!me || (!me.profileViews && !me.profileViewers)) return 'Ancora nessuna visita.';
+    const parts = [
+      many(me.profileViews, 'apertura', 'aperture'),
+      many(me.profileViewers, 'persona', 'persone'),
+    ];
+    if (me.profileFollowed) {
+      parts.push(
+        me.profileFollowed === 1
+          ? '1 ha aperto una mappa'
+          : `${me.profileFollowed} hanno aperto una mappa`,
+      );
+    }
+    return parts.join(' · ');
+  };
+
   /** Come si conta, detto una volta sola e appeso a ogni numero. */
   const COUNT_NOTE =
-    "Un'apertura per persona ogni mezz'ora. Chi sei lo indoviniamo da indirizzo e " +
-    'browser, e non lo conserviamo: dalla stessa rete con lo stesso browser sei ' +
-    'sempre la stessa persona, anche in incognito. Le visite fatte mentre sei ' +
-    'entrato nel tuo account non contano.';
+    'Aperture: quante volte il link è stato usato, senza contare le ricariche ' +
+    'dei primi minuti. Persone: quante impronte diverse in una giornata — chi ' +
+    'torna domani conta di nuovo. Chi sei lo indoviniamo da indirizzo e browser ' +
+    'mescolati a un numero che cambia ogni giorno, non lo conserviamo, e dalla ' +
+    'stessa rete con lo stesso browser sei sempre la stessa persona, anche in ' +
+    'incognito. Le visite fatte mentre sei entrato nel tuo account non contano.';
 
   /** Oltre una decina di voci scorrerle non basta più: serve poterle cercare. */
   const MANY = 8;
@@ -286,17 +321,7 @@
                 {url}
                 onchange={(slug) => store.patchMap(map, { slug })}
               />
-              <p class="visits" title={COUNT_NOTE}>
-                {#if map.views}
-                  <b>{map.views}</b>
-                  {map.views === 1 ? 'visita' : 'visite'}
-                  {#if map.viewsFromProfile}
-                    <span class="visits-from">{`· ${map.viewsFromProfile} dal profilo`}</span>
-                  {/if}
-                {:else}
-                  Ancora nessuna visita.
-                {/if}
-              </p>
+              <p class="visits" title={COUNT_NOTE}>{visitsOfMap(map)}</p>
             {/if}
           </li>
         {/each}
@@ -320,23 +345,7 @@
             url={profileUrl(auth.account?.handle ?? '')}
             title="Copia il link del profilo"
           />
-          <p class="visits" title={COUNT_NOTE}>
-            {#if auth.account?.profileViews}
-              <b>{auth.account.profileViews}</b>
-              {auth.account.profileViews === 1 ? 'visita' : 'visite'}
-              {#if auth.account.profileFollowed}
-                <span class="visits-from">
-                  {`· ${auth.account.profileFollowed} ${
-                    auth.account.profileFollowed === 1
-                      ? 'ha aperto una mappa'
-                      : 'hanno aperto una mappa'
-                  }`}
-                </span>
-              {/if}
-            {:else}
-              Ancora nessuna visita.
-            {/if}
-          </p>
+          <p class="visits" title={COUNT_NOTE}>{visitsOfProfile()}</p>
         </div>
       {/if}
 
@@ -582,8 +591,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.visits b { font-weight: 600; color: var(--ink-2); }
-.visits-from { color: var(--ink-3); }
+
 
 /* lì dentro la riga sta su una scheda, non su una card: si smorza */
 .profile-link :global(.link-row) { background: var(--sunken); box-shadow: none; }

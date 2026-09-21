@@ -22,12 +22,16 @@ Niente categorie preimpostate, niente fronzoli.
   è di sola lettura, con l'elenco dei posti di lato. Anche lì c'è il tasto "dove sono": chi apre
   il link mentre gira per quella città vede il puntino, e l'elenco si riordina dal più vicino
   con le distanze.
-- **Quante volte è stato usato un link**: sotto ogni indirizzo, nella scheda delle mappe, c'è il
-  conto delle visite — e per le mappe quante di quelle arrivavano dal profilo, per il profilo
-  quante hanno poi aperto una mappa. Si conta **un'apertura per persona ogni mezz'ora**: chi sei
-  lo si indovina da indirizzo e browser, l'impronta è un hash che vive in memoria e non viene
-  mai scritto, e le visite di chi è entrato nel proprio account non contano. Chi guarda la
-  pagina pubblica quei numeri non li vede.
+- **Quante volte è stato usato un link**: sotto ogni indirizzo, nella scheda delle mappe, due
+  numeri — *aperture* (quante volte il link è stato usato, scartando le ricariche dei primi
+  cinque minuti) e *persone* (quante impronte diverse in una giornata). Più la provenienza: per
+  una mappa quante di quelle aperture venivano dal profilo, per il profilo quante persone hanno
+  poi aperto una mappa. Il metodo è quello delle statistiche senza banner (Plausible e simili):
+  l'impronta è un hash di indirizzo IP e browser mescolati a un **sale che cambia ogni giorno**,
+  vive in memoria, non tocca mai il disco, e al riavvio si dimentica tutto. Niente cookie sulla
+  pagina pubblica, quindi niente consenso da chiedere — in cambio, dalla stessa rete con lo
+  stesso browser sei sempre la stessa persona, anche in incognito. Le visite fatte mentre sei
+  entrato nel tuo account non contano, e chi guarda la pagina pubblica quei numeri non li vede.
 - **Aggiungi posto**: premi il bottone, clicca il punto sulla mappa (il pin si può trascinare),
   dai nome, categoria, gruppo e note. Un posto può essere segnato **privato**. Il pin compare subito: il salvataggio viaggia dietro, e se
   il server rifiuta la riga torna indietro da sola.

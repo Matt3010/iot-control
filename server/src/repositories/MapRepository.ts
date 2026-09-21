@@ -52,6 +52,7 @@ export class MapRepository {
       slug: this.freeSlug(ownerId, name),
       published: false,
       views: 0,
+      viewers: 0,
       viewsFromProfile: 0,
       createdAt: new Date().toISOString(),
     };
@@ -68,12 +69,13 @@ export class MapRepository {
     return current;
   }
 
-  /** Una visita in più a questa mappa, e da dove arrivava. */
-  countVisit(id: string, fromProfile = false): void {
+  /** Un'apertura, una persona nuova di giornata, o tutte e due. */
+  countVisit(id: string, what: { opened: boolean; newToday: boolean; fromProfile?: boolean }): void {
     const map = this.findById(id);
     if (!map) return;
-    map.views = (map.views ?? 0) + 1;
-    if (fromProfile) map.viewsFromProfile = (map.viewsFromProfile ?? 0) + 1;
+    if (what.opened) map.views = (map.views ?? 0) + 1;
+    if (what.newToday) map.viewers = (map.viewers ?? 0) + 1;
+    if (what.opened && what.fromProfile) map.viewsFromProfile = (map.viewsFromProfile ?? 0) + 1;
     this.tx.markDirty();
   }
 

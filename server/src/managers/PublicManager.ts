@@ -27,8 +27,10 @@ export interface PublicProfile {
  * quelli che quei posti usano davvero.
  */
 export interface Visit {
-  /** Falso se è la stessa persona di poco fa: una ricarica non è una visita. */
-  fresh: boolean;
+  /** Il link è stato usato: non è una ricarica di pochi minuti fa. */
+  opened: boolean;
+  /** Prima volta che questa impronta compare oggi. */
+  newToday: boolean;
   /** Chi sta guardando, se è entrato: le visite del padrone non si contano. */
   viewer: string | null;
   /** La stessa persona aveva aperto il profilo poco prima. */
@@ -37,8 +39,9 @@ export interface Visit {
   firstAfterProfile?: boolean;
 }
 
+/** Del padrone non si conta niente: un numero gonfiato da te non dice nulla. */
 const counts = (visit: Visit | undefined, ownerId: string) =>
-  !!visit?.fresh && visit.viewer !== ownerId;
+  !!visit && visit.viewer !== ownerId && (visit.opened || visit.newToday);
 
 export class PublicManager {
   /**
@@ -61,9 +64,13 @@ export class PublicManager {
       if (!map?.published) throw notFound('mappa inesistente');
 
       const owner = users.findById(map.ownerId);
-      if (counts(visit, map.ownerId)) {
-        maps.countVisit(map.id, !!visit?.fromProfile);
-        if (visit?.firstAfterProfile) users.countFollowed(map.ownerId);
+      if (counts(visit, map.ownerId) && visit) {
+        maps.countVisit(map.id, {
+          opened: visit.opened,
+          newToday: visit.newToday,
+          fromProfile: visit.fromProfile,
+        });
+        if (visit.firstAfterProfile) users.countFollowed(map.ownerId);
       }
       const places = new PlaceRepository(tx)
         .findAllOfMaps([map.id])
@@ -89,7 +96,9 @@ export class PublicManager {
       const users = new UserRepository(tx);
       const owner = users.findByHandle(handle);
       if (!owner) throw notFound('profilo inesistente');
-      if (counts(visit, owner.id)) users.countVisit(owner.id);
+      if (counts(visit, owner.id) && visit) {
+        users.countVisit(owner.id, { opened: visit.opened, newToday: visit.newToday });
+      }
 
       const maps = new MapRepository(tx).findPublishedOf(owner.id);
       const places = new PlaceRepository(tx).findAllOfMaps(maps.map((map) => map.id));

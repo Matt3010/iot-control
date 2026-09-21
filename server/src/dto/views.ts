@@ -16,13 +16,15 @@ export interface MapView {
   published: boolean;
   /** Quante volte è stato usato il suo link: lo vede solo chi la possiede. */
   views: number;
-  /** Di quelle, quante arrivavano dal profilo. */
+  /** Quante persone diverse, contate una volta al giorno. */
+  viewers: number;
+  /** Di quelle aperture, quante arrivavano dal profilo. */
   viewsFromProfile: number;
   createdAt: string;
 }
 
 /** Quello che di una mappa può vedere un estraneo: i conteggi non sono suoi. */
-export type PublicMapView = Omit<MapView, 'views' | 'viewsFromProfile'>;
+export type PublicMapView = Omit<MapView, 'views' | 'viewers' | 'viewsFromProfile'>;
 
 export interface GroupView {
   id: string;
@@ -58,12 +60,13 @@ export const toMapView = (map: PlaceMap): MapView => ({
   slug: map.slug,
   published: map.published ?? false,
   views: map.views ?? 0,
+  viewers: map.viewers ?? 0,
   viewsFromProfile: map.viewsFromProfile ?? 0,
   createdAt: map.createdAt,
 });
 
 export const toPublicMapView = (map: PlaceMap): PublicMapView => {
-  const { views: _quante, viewsFromProfile: _daDove, ...outside } = toMapView(map);
+  const { views: _quante, viewers: _quanti, viewsFromProfile: _daDove, ...outside } = toMapView(map);
   return outside;
 };
 

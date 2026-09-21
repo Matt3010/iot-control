@@ -11,6 +11,7 @@ function migrateHandles(users: User[]): User[] {
     const counted = {
       ...user,
       profileViews: user.profileViews ?? 0,
+      profileViewers: user.profileViewers ?? 0,
       profileFollowed: user.profileFollowed ?? 0,
     };
     if (counted.handle) return counted;
@@ -29,6 +30,7 @@ function migrateSlugs(maps: PlaceMap[]): PlaceMap[] {
       ...map,
       published: map.published ?? false,
       views: map.views ?? 0,
+      viewers: map.viewers ?? 0,
       viewsFromProfile: map.viewsFromProfile ?? 0,
     };
     if (counted.slug) return counted;
@@ -64,6 +66,7 @@ function migrateToMaps(data: Database): Database {
     slug: 'la-mia-mappa',
     published: false,
     views: 0,
+    viewers: 0,
     viewsFromProfile: 0,
     createdAt: new Date().toISOString(),
   };

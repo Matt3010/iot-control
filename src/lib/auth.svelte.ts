@@ -5,8 +5,9 @@ export interface Account {
   email: string;
   /** Il nome nel link del profilo: /u/<handle>. */
   handle: string;
-  /** Quante volte hanno aperto quel link, e quante hanno poi aperto una mappa. */
+  /** Aperture, persone diverse, e quante hanno poi aperto una mappa. */
   profileViews: number;
+  profileViewers: number;
   profileFollowed: number;
   createdAt: string;
 }

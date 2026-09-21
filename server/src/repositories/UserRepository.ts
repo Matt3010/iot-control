@@ -28,11 +28,12 @@ export class UserRepository {
     );
   }
 
-  /** Una visita in più al profilo pubblico. */
-  countVisit(id: string): void {
+  /** Un'apertura del profilo, una persona nuova di giornata, o tutte e due. */
+  countVisit(id: string, what: { opened: boolean; newToday: boolean }): void {
     const user = this.findById(id);
     if (!user) return;
-    user.profileViews = (user.profileViews ?? 0) + 1;
+    if (what.opened) user.profileViews = (user.profileViews ?? 0) + 1;
+    if (what.newToday) user.profileViewers = (user.profileViewers ?? 0) + 1;
     this.tx.markDirty();
   }
 
@@ -44,11 +45,14 @@ export class UserRepository {
     this.tx.markDirty();
   }
 
-  insert(data: Omit<User, 'id' | 'createdAt' | 'profileViews' | 'profileFollowed'>): User {
+  insert(
+    data: Omit<User, 'id' | 'createdAt' | 'profileViews' | 'profileViewers' | 'profileFollowed'>,
+  ): User {
     const user: User = {
       id: `usr-${randomUUID()}`,
       ...data,
       profileViews: 0,
+      profileViewers: 0,
       profileFollowed: 0,
       createdAt: new Date().toISOString(),
     };

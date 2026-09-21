@@ -1,8 +1,9 @@
 export interface PlaceMap {
   id: string;
   name: string;
-  /** Quante volte è stato usato il link pubblico, e quante dal profilo. */
+  /** Aperture del link, persone diverse, e quante di quelle aperture dal profilo. */
   views: number;
+  viewers: number;
   viewsFromProfile: number;
   /** L'indirizzo pubblico: /m/<slug>. */
   slug: string;

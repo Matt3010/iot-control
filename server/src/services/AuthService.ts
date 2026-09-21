@@ -12,6 +12,8 @@ export interface UserView {
   handle: string;
   /** Quante volte hanno aperto il tuo /u/<handle>. */
   profileViews: number;
+  /** Quante persone diverse, contate una volta al giorno. */
+  profileViewers: number;
   /** Di quelle, quante hanno poi aperto una delle tue mappe. */
   profileFollowed: number;
   createdAt: string;
@@ -22,13 +24,14 @@ export interface Session {
   token: string;
 }
 
-const toUserView = ({ id, email, handle, profileViews, profileFollowed, createdAt }: User): UserView => ({
-  id,
-  email,
-  handle,
-  profileViews: profileViews ?? 0,
-  profileFollowed: profileFollowed ?? 0,
-  createdAt,
+const toUserView = (user: User): UserView => ({
+  id: user.id,
+  email: user.email,
+  handle: user.handle,
+  profileViews: user.profileViews ?? 0,
+  profileViewers: user.profileViewers ?? 0,
+  profileFollowed: user.profileFollowed ?? 0,
+  createdAt: user.createdAt,
 });
 
 const sign = (user: User): string =>

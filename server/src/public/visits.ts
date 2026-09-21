@@ -1,53 +1,84 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import type { Request } from 'express';
 import { config } from '../config.js';
 import { resolveSecret } from '../auth/secret.js';
 
 /**
- * Contare quante volte un link è stato usato, senza inseguire nessuno.
+ * Contare quante volte un link è stato usato, senza cookie e senza inseguire
+ * nessuno. È il metodo delle statistiche "senza banner" (Plausible e simili):
  *
- * Di chi arriva non si conserva niente: l'impronta è un hash di IP e browser,
- * vive in memoria mezz'ora e serve a una cosa sola — non contare dieci volte
- * chi ricarica la pagina. Al riavvio si dimentica tutto, e va bene così: al
- * massimo un visitatore viene contato due volte in una giornata.
+ * - di chi arriva non si conserva niente: l'impronta è un hash di indirizzo e
+ *   browser, mescolato con un sale che cambia ogni giorno. Le impronte di ieri
+ *   non sono confrontabili con quelle di oggi nemmeno volendo;
+ * - vive in memoria, non tocca mai il disco, e al riavvio si dimentica tutto.
+ *
+ * Da qui escono due numeri, che rispondono a due domande diverse:
+ *   aperture — quante volte il link è stato usato (le ricariche non contano)
+ *   persone  — quante impronte diverse in una giornata
  */
 
-const FORGET_AFTER = 30 * 60 * 1000;
+/** Riaprire lo stesso link dopo cinque minuti è un'altra apertura. */
+const OPEN_AGAIN_AFTER = 5 * 60 * 1000;
 
-const seen = new Map<string, number>();
+let salt = randomBytes(16).toString('hex');
+let saltedOn = '';
+
+const dayOf = (now: number) => new Date(now).toISOString().slice(0, 10);
+
+/** Chi ha aperto cosa negli ultimi minuti: serve a scartare le ricariche. */
+const recent = new Map<string, number>();
+/** Le impronte viste oggi: si svuota da sola quando cambia il giorno. */
+const today = new Set<string>();
+
+function rotate(now: number): void {
+  const day = dayOf(now);
+  if (day === saltedOn) return;
+  salt = randomBytes(16).toString('hex');
+  saltedOn = day;
+  today.clear();
+  recent.clear();
+}
 
 function fingerprint(req: Request, target: string): string {
-  const raw = `${req.ip ?? ''}|${req.get('user-agent') ?? ''}|${target}`;
+  const raw = `${salt}|${req.ip ?? ''}|${req.get('user-agent') ?? ''}|${target}`;
   return createHash('sha256').update(raw).digest('base64url').slice(0, 22);
 }
 
-function sweep(now: number): void {
-  // la pulizia si fa quando si passa di qui: nessun timer da spegnere
-  if (seen.size < 5000) return;
-  for (const [key, when] of seen) if (now - when > FORGET_AFTER) seen.delete(key);
+export interface Take {
+  /** Il link è stato usato: non è una ricarica di pochi minuti fa. */
+  opened: boolean;
+  /** È la prima volta che questa impronta compare oggi. */
+  newToday: boolean;
 }
 
-/** Vero la prima volta che questa persona apre questo link, poi no per mezz'ora. */
-export function isNewVisit(req: Request, target: string): boolean {
+/** Registra il passaggio e dice cosa vale. */
+export function take(req: Request, target: string): Take {
   const now = Date.now();
-  sweep(now);
+  rotate(now);
+
+  if (recent.size > 10_000) {
+    for (const [key, when] of recent) if (now - when > OPEN_AGAIN_AFTER) recent.delete(key);
+  }
 
   const key = fingerprint(req, target);
-  const last = seen.get(key);
-  seen.set(key, now);
-  return last === undefined || now - last > FORGET_AFTER;
+  const last = recent.get(key);
+  recent.set(key, now);
+
+  const newToday = !today.has(key);
+  today.add(key);
+
+  return { opened: last === undefined || now - last > OPEN_AGAIN_AFTER, newToday };
 }
 
-/** Questa stessa persona ha aperto quell'altro link, poco fa? */
-export function hasSeen(req: Request, target: string): boolean {
-  const when = seen.get(fingerprint(req, target));
-  return when !== undefined && Date.now() - when <= FORGET_AFTER;
-}
+/** Questa stessa impronta ha aperto quell'altro link, oggi? */
+export const seenToday = (req: Request, target: string): boolean =>
+  today.has(fingerprint(req, target));
 
 /** Segna un passaggio senza chiedere niente: serve a non contarlo due volte. */
-export function mark(req: Request, target: string): void {
-  seen.set(fingerprint(req, target), Date.now());
+export function markToday(req: Request, target: string): void {
+  rotate(Date.now());
+  today.add(fingerprint(req, target));
 }
 
 /**
