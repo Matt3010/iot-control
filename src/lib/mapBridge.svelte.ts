@@ -81,12 +81,12 @@ class MapBridge {
   }
 
   /**
-   * Da dove si misura: da te, se ci hai fatto sapere dove sei; se no dal
-   * centro di quello che stai guardando.
+   * Da dove si misura: da un punto, se glielo dai; se no dal centro di quello
+   * che stai guardando. A scegliere è chi chiede, perché l'origine dipende da
+   * cosa sta elencando — e quell'origine deve vedersi sulla mappa.
    */
-  distanceFrom(lat: number, lng: number): number {
-    const me = here.spot;
-    if (me) return metersBetween([me.lat, me.lng], [lat, lng]);
+  distanceFrom(lat: number, lng: number, from: { lat: number; lng: number } | null = here.spot): number {
+    if (from) return metersBetween([from.lat, from.lng], [lat, lng]);
     return this.#live?.getCenter().distanceTo([lat, lng]) ?? 0;
   }
 }

@@ -50,7 +50,12 @@
     mapBridge.view.moves; // re-read whenever the map settles somewhere new
     return store.currentPlaces
       .filter((place) => store.visible(place) && (near || mapBridge.contains(place.lat, place.lng)))
-      .map((place) => ({ place, distance: mapBridge.distanceFrom(place.lat, place.lng) }))
+      // in vista si misura dal centro del riquadro, vicino a me da te: così
+      // l'origine è sempre quella che si vede sulla mappa
+      .map((place) => ({
+        place,
+        distance: mapBridge.distanceFrom(place.lat, place.lng, near ? here.spot : null),
+      }))
       .sort((a, b) => a.distance - b.distance);
   });
 
@@ -247,13 +252,11 @@
             <span
               class="list-hint"
               hidden={near}
-              title={here.spot
-                ? 'Le distanze partono da dove sei'
-                : 'Le distanze partono dal centro della mappa, il cerchietto chiaro'}
+              title="Le distanze partono dal centro della mappa, il cerchietto chiaro"
               onpointerenter={() => document.body.classList.add('centre-hint')}
               onpointerleave={() => document.body.classList.remove('centre-hint')}
             >
-              {here.spot ? 'da dove sei' : 'dal centro'}
+              dal centro
             </span>
             <span id="list-count" class="tally">{rows.length}</span>
           </span>

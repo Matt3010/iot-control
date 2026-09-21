@@ -221,10 +221,10 @@
 <div id="map" bind:this={container}></div>
 
 <!--
-  Finche' non sai dove sei, le distanze partono dal centro di quello che
-  guardi: tanto vale che quel centro si veda. Sparisce appena arriva il
-  puntino blu, che da quel momento e' lui l'origine.
+  In "in vista" le distanze partono dal centro del riquadro: tanto vale che
+  quel centro si veda. In "vicino a me" l'origine e' il puntino blu, e qui non
+  serve piu' niente.
 -->
-{#if !here.spot && store.currentPlaces.length}
+{#if (store.listMode !== 'near' || !here.spot) && store.currentPlaces.length}
   <span id="centre-mark" aria-hidden="true"></span>
 {/if}
