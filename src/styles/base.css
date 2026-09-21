@@ -114,7 +114,23 @@ aside header {
 }
 
 @media (max-width: 600px) {
-aside {
+  /* su un telefono la sheet è una cosa che si spinge via: la maniglia lo dice,
+     e swipeToClose la fa seguire il dito */
+  aside { padding-top: 22px; }
+
+  aside::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 38px;
+    height: 4px;
+    border-radius: 99px;
+    background: var(--hairline);
+  }
+
+  aside {
     top: auto;
     left: 12px;
     right: 12px;

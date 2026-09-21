@@ -2,6 +2,7 @@
   import { DEFAULT_EMOJI, SUGGESTED } from '../lib/format';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
+  import { swipeToClose } from '../lib/swipe';
   import { ui } from '../lib/ui.svelte';
   import Icon from './Icon.svelte';
 
@@ -42,7 +43,7 @@
   }
 </script>
 
-<aside id="manage-sheet" class="surface">
+<aside id="manage-sheet" class="surface" use:swipeToClose={() => ui.closeManage()}>
   <header>
     <h2>Categorie e gruppi</h2>
     <button class="ghost-icon" type="button" title="Chiudi" onclick={() => ui.closeManage()}>
@@ -322,15 +323,6 @@
 
 #group-list li:hover { background: var(--sunken); }
 
-#group-list input {
-  background: none;
-  border-color: transparent;
-  padding: 6px 8px;
-  font-weight: 500;
-}
-
-#group-list li:hover input { background: var(--glass-strong); }
-
 #group-list .count {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -359,14 +351,16 @@
 
 #category-list li:hover { background: var(--sunken); }
 
-#category-list input[type="text"], #category-list input:not([type]) {
-  background: none;
+/* un campo deve sembrare un campo anche prima che ci passi sopra il mouse */
+#category-list input[type="text"], #group-list input {
+  background: var(--sunken);
   border-color: transparent;
   padding: 6px 8px;
   font-weight: 500;
 }
 
-#category-list li:hover input:not([type="color"]) { background: var(--glass-strong); }
+#category-list li:hover input[type="text"],
+#group-list li:hover input { background: var(--sunken-hover); }
 
 #category-list .count {
   font-size: 11px;

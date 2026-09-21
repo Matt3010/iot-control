@@ -3,7 +3,9 @@
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import Chip from './Chip.svelte';
+  import EmptyState from './EmptyState.svelte';
   import Icon from './Icon.svelte';
+  import PanelSkeleton from './PanelSkeleton.svelte';
   import PlaceList from './PlaceList.svelte';
   import SearchTrigger from './SearchTrigger.svelte';
 
@@ -29,12 +31,17 @@
 <div id="panel" class="surface">
   <div class="panel-head">
     <span class="wordmark"><Icon name="pin" /> Place Index</span>
-    <span id="place-count" class="tally">{store.places.length}</span>
+    {#if !store.loading}
+      <span id="place-count" class="tally">
+        {store.places.length}
+        {store.places.length === 1 ? 'posto' : 'posti'}
+      </span>
+    {/if}
   </div>
 
   <SearchTrigger />
 
-  {#if store.groups.length}
+  {#if store.groups.length && !store.loading}
     <div class="panel-row" id="group-head">
       <span class="eyebrow">Gruppi</span>
     </div>
@@ -56,38 +63,46 @@
     </div>
   {/if}
 
-  <div class="panel-row">
-    <span class="eyebrow">Categorie</span>
-    <button
-      id="manage-btn"
-      class="ghost-icon"
-      type="button"
-      title="Gestisci categorie e gruppi"
-      onclick={() => ui.toggleManage()}
-    >
-      <Icon name="filters" />
-    </button>
-  </div>
+  {#if store.loading}
+    <PanelSkeleton />
+  {:else}
+    {#if store.categories.length}
+      <div class="panel-row">
+        <span class="eyebrow">Categorie</span>
+        <button
+          id="manage-btn"
+          class="ghost-icon"
+          type="button"
+          title="Gestisci categorie e gruppi"
+          onclick={() => ui.toggleManage()}
+        >
+          <Icon name="filters" />
+        </button>
+      </div>
 
-  <div id="filters">
-    {#each store.categories as category (category.id)}
-      <Chip
-        color={category.color}
-        emoji={category.emoji}
-        label={category.name}
-        count={store.countIn(category.id)}
-        look={store.hiddenCategories.includes(category.id) ? 'off' : 'on'}
-        onclick={() => store.toggleCategory(category.id)}
-      />
-    {/each}
-  </div>
+      <div id="filters">
+        {#each store.categories as category (category.id)}
+          <Chip
+            color={category.color}
+            emoji={category.emoji}
+            label={category.name}
+            count={store.countIn(category.id)}
+            look={store.hiddenCategories.includes(category.id) ? 'off' : 'on'}
+            onclick={() => store.toggleCategory(category.id)}
+          />
+        {/each}
+      </div>
+    {/if}
 
-  {#if store.places.length}
-    <div class="panel-row" id="list-head">
-      <span class="eyebrow">In vista</span>
-      <span id="list-count" class="tally">{rows.length}</span>
-    </div>
-    <PlaceList {rows} />
+    {#if store.places.length}
+      <div class="panel-row" id="list-head">
+        <span class="eyebrow">In vista</span>
+        <span id="list-count" class="tally">{rows.length}</span>
+      </div>
+      <PlaceList {rows} />
+    {:else}
+      <EmptyState />
+    {/if}
   {/if}
 </div>
 
@@ -152,13 +167,6 @@
 /* filters ----------------------------------------------------------------- */
 
 #filters, #group-filters { display: flex; flex-wrap: wrap; gap: 6px; }
-
-#filters:empty::before {
-  content: "Nessuna categoria. Creane una per iniziare.";
-  font-size: 12.5px;
-  color: var(--ink-3);
-  padding: 2px 6px 4px;
-}
 
 @media (max-width: 600px) {
   #panel {

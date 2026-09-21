@@ -1,6 +1,7 @@
 <script lang="ts">
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
+  import { swipeToClose } from '../lib/swipe';
   import { ui } from '../lib/ui.svelte';
   import Chip from './Chip.svelte';
   import Icon from './Icon.svelte';
@@ -40,7 +41,7 @@
 </script>
 
 {#if draft}
-  <aside id="place-sheet" class="surface">
+  <aside id="place-sheet" class="surface" use:swipeToClose={() => ui.closePlace()}>
     <header>
       <h2 id="place-title">{editing ? 'Modifica posto' : 'Nuovo posto'}</h2>
       <button class="ghost-icon" type="button" title="Chiudi" onclick={() => ui.closePlace()}>

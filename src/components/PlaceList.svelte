@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatDistance } from '../lib/format';
+  import { fadeEdges } from '../lib/overflow';
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { store } from '../lib/store.svelte';
   import type { LocalPlace } from '../lib/types';
@@ -16,7 +17,7 @@
   }
 </script>
 
-<ul id="place-list">
+<ul id="place-list" data-fade="none" use:fadeEdges>
   {#if rows.length === 0}
     <li class="row-empty">Nessun posto in questa parte di mappa.</li>
   {:else}
@@ -48,6 +49,21 @@
 
 <style>
 /* index ------------------------------------------------------------------- */
+
+:global(#place-list[data-fade='bottom']) {
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 22px), transparent);
+}
+
+:global(#place-list[data-fade='top']) {
+  -webkit-mask-image: linear-gradient(0deg, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(0deg, #000 calc(100% - 22px), transparent);
+}
+
+:global(#place-list[data-fade='both']) {
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+}
 
 #place-list {
   list-style: none;

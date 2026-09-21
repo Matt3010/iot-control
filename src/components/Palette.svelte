@@ -75,7 +75,7 @@
       return {
         name: label,
         note: hit.display_name,
-        meta: 'nuovo',
+        meta: 'aggiungi qui',
         pick: () => {
           ui.paletteOpen = false;
           const lat = Number(hit.lat);

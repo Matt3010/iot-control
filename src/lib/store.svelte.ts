@@ -25,6 +25,9 @@ class Store {
   groups = $state<Group[]>([]);
   places = $state<LocalPlace[]>([]);
 
+  /** True until the first snapshot lands: the panel must not claim "zero". */
+  loading = $state(true);
+
   /** Per-browser view preferences, not server state. */
   hiddenCategories = $state<string[]>(readJSON('pi.hidden', []));
   activeGroup = $state<string | null>(readJSON('pi.group', null));
@@ -74,10 +77,14 @@ class Store {
   }
 
   async load(): Promise<void> {
-    const snapshot = await api.get<Snapshot>('/state');
-    this.categories = snapshot.categories;
-    this.groups = snapshot.groups ?? [];
-    this.places = snapshot.places.map(withKey);
+    try {
+      const snapshot = await api.get<Snapshot>('/state');
+      this.categories = snapshot.categories;
+      this.groups = snapshot.groups ?? [];
+      this.places = snapshot.places.map(withKey);
+    } finally {
+      this.loading = false;
+    }
   }
 
   /* ---------------------------------------------------------------- filters */

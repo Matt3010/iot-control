@@ -13,12 +13,9 @@
   import PlaceSheet from './components/PlaceSheet.svelte';
   import Toast from './components/Toast.svelte';
 
-  store
-    .load()
-    .then(() => {
-      if (!store.categories.length) ui.openManage('categories');
-    })
-    .catch((error: Error) => toast.show(`Caricamento fallito: ${error.message}`));
+  // Niente sheet spalancata all'avvio: il pannello dice da solo da dove
+  // si comincia, e la sheet si apre quando la chiedi.
+  store.load().catch((error: Error) => toast.show(`Caricamento fallito: ${error.message}`));
 
   // The map cursor and the bottom-of-screen rules read these off the body.
   $effect(() => {
