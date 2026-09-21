@@ -2,6 +2,8 @@
   import { formatDistance } from '../lib/format';
   import { fadeEdges } from '../lib/overflow';
   import { mapBridge } from '../lib/mapBridge.svelte';
+  import { ui } from '../lib/ui.svelte';
+  import { viewport } from '../lib/viewport.svelte';
   import { store } from '../lib/store.svelte';
   import type { LocalPlace } from '../lib/types';
 
@@ -33,7 +35,11 @@
           onpointerleave={() => mapBridge.highlight(place, false)}
           onfocus={() => mapBridge.highlight(place, true)}
           onblur={() => mapBridge.highlight(place, false)}
-          onclick={() => mapBridge.focus(place)}
+          onclick={() => {
+            // la scheda del posto si apre dove c'è il pannello: fagli spazio
+            if (viewport.narrow) ui.panelWish = 'closed';
+            mapBridge.focus(place);
+          }}
         >
           <span class="row-dot">{category?.emoji ?? '📍'}</span>
           <span class="row-body">

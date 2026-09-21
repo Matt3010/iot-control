@@ -23,10 +23,16 @@ class Ui {
   paletteOpen = $state(false);
   emoji = $state<EmojiRequest | null>(null);
   color = $state<ColorRequest | null>(null);
+  /**
+   * Su schermo stretto il pannello e una scheda non ci stanno insieme:
+   * 'auto' lo fa ridurre quando serve, le altre due sono scelte tue.
+   */
+  panelWish = $state<'auto' | 'open' | 'closed'>('auto');
   /** True while the place sheet is only stepping aside for the manage sheet. */
   #placePaused = false;
 
   openPlace(draft: Draft): void {
+    this.panelWish = 'auto';
     this.draft = draft;
     this.#placePaused = false;
     this.picking = false;
@@ -44,6 +50,7 @@ class Ui {
    * panel to create the category the place you are adding still needs.
    */
   openManage(tab: ManageTab = 'categories'): void {
+    this.panelWish = 'auto';
     this.#placePaused = this.sheet === 'place';
     this.manageTab = tab;
     this.sheet = 'manage';

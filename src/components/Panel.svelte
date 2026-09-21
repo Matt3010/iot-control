@@ -2,12 +2,22 @@
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
+  import { viewport } from '../lib/viewport.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import Icon from './Icon.svelte';
   import PanelSkeleton from './PanelSkeleton.svelte';
   import PlaceList from './PlaceList.svelte';
   import SearchTrigger from './SearchTrigger.svelte';
+
+  /**
+   * Su uno schermo stretto il pannello e una sheet non ci stanno insieme:
+   * aprendo una sheet il pannello si fa piccolo da solo, e resta come lo
+   * lasci se lo apri o lo chiudi a mano.
+   */
+  const collapsed = $derived(
+    viewport.narrow && (ui.panelWish === 'closed' || (ui.panelWish === 'auto' && ui.sheet !== 'none')),
+  );
 
   /** The index itself: what is on screen right now, nearest first. */
   const rows = $derived.by(() => {
@@ -31,7 +41,7 @@
   }
 </script>
 
-<div id="panel" class="surface">
+<div id="panel" class="surface" class:is-collapsed={collapsed}>
   <div class="panel-head">
     <span class="wordmark"><Icon name="pin" /> Place Index</span>
     {#if !store.loading}
@@ -40,10 +50,22 @@
         {store.places.length === 1 ? 'posto' : 'posti'}
       </span>
     {/if}
+    {#if viewport.narrow}
+      <button
+        class="ghost-icon panel-toggle"
+        type="button"
+        aria-expanded={!collapsed}
+        title={collapsed ? 'Mostra filtri ed elenco' : 'Riduci il pannello'}
+        onclick={() => (ui.panelWish = collapsed ? 'open' : 'closed')}
+      >
+        <Icon name={collapsed ? 'expand' : 'collapse'} />
+      </button>
+    {/if}
   </div>
 
   <SearchTrigger />
 
+  {#if !collapsed}
   {#if store.groups.length && !store.loading}
     <div class="panel-row" id="group-head">
       <span class="eyebrow">Gruppi</span>
@@ -106,6 +128,7 @@
     {:else}
       <EmptyState />
     {/if}
+  {/if}
   {/if}
 </div>
 

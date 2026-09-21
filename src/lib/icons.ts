@@ -1,5 +1,7 @@
 import {
   ArrowRight,
+  ChevronDown,
+  ChevronUp,
   MapPin,
   Navigation,
   Pencil,
@@ -22,6 +24,8 @@ export const ICONS = {
   edit: Pencil,
   directions: Navigation,
   undo: Undo2,
+  collapse: ChevronUp,
+  expand: ChevronDown,
 } as const;
 
 export type IconName = keyof typeof ICONS;

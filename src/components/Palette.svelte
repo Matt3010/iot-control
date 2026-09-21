@@ -4,6 +4,7 @@
   import { store } from '../lib/store.svelte';
   import type { LocalPlace } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
+  import { viewport } from '../lib/viewport.svelte';
   import Icon from './Icon.svelte';
 
   interface Hit {
@@ -62,6 +63,7 @@
         meta: formatDistance(distance),
         pick: () => {
           ui.paletteOpen = false;
+          if (viewport.narrow) ui.panelWish = 'closed';
           store.reveal(place);
           mapBridge.focus(place);
         },
