@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { COLORS, DEFAULT_EMOJI } from '../lib/format';
+  import { DEFAULT_EMOJI, SUGGESTED } from '../lib/format';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui } from '../lib/ui.svelte';
   import Icon from './Icon.svelte';
 
   let newEmoji = $state(DEFAULT_EMOJI);
-  let newColor = $state<string>(COLORS[0]);
+  let newColor = $state<string>(SUGGESTED[0]!);
   let newCategoryName = $state('');
   let newGroupName = $state('');
 
@@ -19,7 +19,7 @@
       newCategoryName = '';
       newEmoji = DEFAULT_EMOJI;
       // leave the next colour ready instead of offering the same one again
-      newColor = COLORS[(COLORS.indexOf(newColor as (typeof COLORS)[number]) + 1) % COLORS.length]!;
+      newColor = SUGGESTED[(SUGGESTED.indexOf(newColor as never) + 1) % SUGGESTED.length]!;
       if (ui.draft) ui.draft.categoryId = created.id;
       toast.show(`Categoria "${created.name}" creata`);
     } catch (error) {

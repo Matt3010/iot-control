@@ -1,5 +1,5 @@
 import { api } from './api';
-import { COLORS, DEFAULT_EMOJI } from './format';
+import { DEFAULT_EMOJI, SUGGESTED } from './format';
 import { readJSON, writeJSON } from './storage';
 import { toast, UNDO_MS } from './toast.svelte';
 import type { Category, Draft, Group, LocalPlace, Place, Snapshot } from './types';
@@ -124,7 +124,7 @@ class Store {
     const created = await api.post<Category>('/categories', {
       name,
       emoji: emoji || DEFAULT_EMOJI,
-      color: color || COLORS[0],
+      color: color || SUGGESTED[0]!,
     });
     this.categories.push(created);
     return created;

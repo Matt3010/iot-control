@@ -4,7 +4,7 @@
   import { ui } from '../lib/ui.svelte';
 
   const request = $derived(ui.color!);
-  const at = $derived(placeAnchored(request.anchor, 186, 186));
+  const at = $derived(placeAnchored(request.anchor, 309, 135));
 </script>
 
 <div id="color-popover" class="surface" style:left="{at.left}px" style:top="{at.top}px">
