@@ -6,6 +6,7 @@
   import { viewport } from '../lib/viewport.svelte';
   import { store } from '../lib/store.svelte';
   import type { LocalPlace } from '../lib/types';
+  import Icon from './Icon.svelte';
 
   let { rows }: { rows: { place: LocalPlace; distance: number }[] } = $props();
 
@@ -46,6 +47,11 @@
             <span class="row-name">{place.name}</span>
             <span class="row-note">{place.note || category?.name || ''}</span>
           </span>
+          {#if place.private}
+            <span class="row-lock" title="Privato: resta fuori dalla mappa pubblica">
+              <Icon name="lock" />
+            </span>
+          {/if}
           <span class="row-dist">{formatDistance(distance)}</span>
         </button>
       </li>
@@ -70,6 +76,14 @@
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
   mask-image: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
 }
+
+.row-lock {
+  display: inline-flex;
+  flex: none;
+  color: var(--ink-3);
+}
+
+.row-lock :global(.ico) { width: 12px; height: 12px; }
 
 #place-list {
   list-style: none;

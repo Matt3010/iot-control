@@ -1,5 +1,6 @@
 <script lang="ts">
   import { publicApi, type PublicProfilePayload } from '../lib/publicApi';
+  import { mapPath } from '../lib/routing';
   import Icon from './Icon.svelte';
   import MapBackdrop from './MapBackdrop.svelte';
 
@@ -29,7 +30,7 @@
         <ul>
           {#each data.maps as map (map.id)}
             <li>
-              <a href={'/m/' + map.slug}>
+              <a href={mapPath(data.handle, map.slug)}>
                 <span class="name">{map.name}</span>
                 <span class="count">{map.places} {map.places === 1 ? 'posto' : 'posti'}</span>
                 <Icon name="submit" />

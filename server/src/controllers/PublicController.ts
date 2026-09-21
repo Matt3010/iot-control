@@ -5,7 +5,7 @@ import { publicService } from '../services/PublicService.js';
 export class PublicController {
   map = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await publicService.map(req.params.slug as string));
+      res.json(await publicService.map(req.params.handle as string | undefined, req.params.slug as string));
     } catch (error) {
       next(error);
     }

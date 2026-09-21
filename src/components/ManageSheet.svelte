@@ -219,56 +219,57 @@
     <div class="tab-panel">
       <ul id="map-list" data-fade="none" use:fadeEdges>
         {#each store.maps as map (map.id)}
-          <li class:is-open={map.id === store.activeMap?.id}>
-            <button
-              type="button"
-              class="ghost-icon"
-              title={map.id === store.activeMap?.id ? 'È la mappa aperta' : 'Apri questa mappa'}
-              onclick={() => store.openMap(map.id)}
-            >
-              <Icon name="pin" />
-            </button>
-            <input
-              type="text"
-              maxlength="40"
-              value={map.name}
-              onchange={(event) => store.patchMap(map, { name: event.currentTarget.value })}
-            />
-            <span class="count">
-              {store.places.filter((place) => place.mapId === map.id).length || ''}
-            </span>
-            <button
-              type="button"
-              class="ghost-icon"
-              title="Elimina mappa"
-              disabled={store.maps.length <= 1}
-              onclick={() => store.deleteMap(map)}
-            >
-              <Icon name="trash" />
-            </button>
-          </li>
-
-          <li class="share" class:is-public={map.published}>
-            <label class="switch">
+          {@const open = map.id === store.activeMap?.id}
+          {@const places = store.places.filter((place) => place.mapId === map.id).length}
+          {@const url = mapUrl(auth.account?.handle ?? '', map.slug)}
+          <li class="map-card" class:is-open={open} class:is-public={map.published}>
+            <div class="map-top">
+              <button
+                type="button"
+                class="map-open"
+                title={open ? 'È la mappa aperta' : 'Apri questa mappa'}
+                aria-pressed={open}
+                onclick={() => store.openMap(map.id)}
+              >
+                <Icon name="pin" />
+              </button>
               <input
-                type="checkbox"
-                checked={map.published}
-                onchange={(event) => store.patchMap(map, { published: event.currentTarget.checked })}
+                class="map-name"
+                type="text"
+                maxlength="40"
+                value={map.name}
+                onchange={(event) => store.patchMap(map, { name: event.currentTarget.value })}
               />
-              <span class="switch-track"><span class="switch-dot"></span></span>
-              <span class="switch-text">
-                <span class="switch-name">{map.published ? 'Pubblica' : 'Solo tua'}</span>
-                <span class="switch-note">
-                  {map.published
-                    ? 'Chi ha il link la vede — i posti privati restano fuori.'
-                    : 'Accendi per poterla condividere.'}
-                </span>
+              <button
+                type="button"
+                class="ghost-icon"
+                title="Elimina mappa"
+                disabled={store.maps.length <= 1}
+                onclick={() => store.deleteMap(map)}
+              >
+                <Icon name="trash" />
+              </button>
+            </div>
+
+            <div class="map-foot">
+              <span class="map-meta">
+                {places}
+                {places === 1 ? 'posto' : 'posti'}{open ? ' · aperta' : ''}
               </span>
-            </label>
+              <label class="switch" title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}>
+                <input
+                  type="checkbox"
+                  checked={map.published}
+                  onchange={(event) => store.patchMap(map, { published: event.currentTarget.checked })}
+                />
+                <span class="switch-track"><span class="switch-dot"></span></span>
+                <span class="switch-name">{map.published ? 'Pubblica' : 'Solo tua'}</span>
+              </label>
+            </div>
 
             {#if map.published}
               <div class="link-row">
-                <span class="link-prefix">/m/</span>
+                <span class="link-prefix">/u/{auth.account?.handle}/</span>
                 <input
                   class="link-slug"
                   type="text"
@@ -280,9 +281,9 @@
                   type="button"
                   class="ghost-icon"
                   title="Copia il link"
-                  onclick={() => copy(mapUrl(map.slug))}
+                  onclick={() => copy(url)}
                 >
-                  <Icon name={copied === mapUrl(map.slug) ? 'check' : 'link'} />
+                  <Icon name={copied === url ? 'check' : 'link'} />
                 </button>
               </div>
             {/if}
@@ -318,7 +319,8 @@
 
       <p class="sheet-note">
         Ogni mappa è un indice a sé: i suoi posti, i suoi gruppi. Le categorie invece sono tue e
-        valgono su tutte.
+        valgono su tutte. Quella che pubblichi la vede chi ha il link: i posti segnati come privati
+        restano fuori.
       </p>
     </div>
   {:else}
@@ -506,49 +508,82 @@
   gap: 6px;
 }
 
-#map-list li {
+#map-list { gap: 8px; }
+
+/* ogni mappa è una cosa sola: il nome, quanto contiene, il suo link */
+.map-card {
+  display: grid;
+  gap: 6px;
+  padding: 8px 8px 9px;
+  border-radius: var(--r-md);
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--hairline-soft);
+  transition: background 0.16s, box-shadow 0.16s;
+}
+
+.map-card:hover { background: var(--sunken-hover); }
+
+/* quella aperta porta il segno, non una parola in più */
+.map-card.is-open {
+  background: var(--sunken-hover);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 20%, transparent);
+}
+
+.map-top { display: flex; align-items: center; gap: 4px; }
+
+.map-open {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-3);
+  transition: background 0.14s, color 0.14s;
+}
+
+.map-open:hover { background: var(--glass-strong); color: var(--ink-2); }
+.map-open :global(.ico) { width: 15px; height: 15px; }
+.map-card.is-open .map-open { color: var(--ink); }
+
+/* il nome è un titolo finché non lo tocchi */
+.map-name {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 7px;
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+  font-size: 13.5px;
+  font-weight: 560;
+  letter-spacing: -0.012em;
+}
+
+.map-name:hover { background: var(--glass-strong); }
+.map-name:focus { background: var(--glass-strong); box-shadow: 0 0 0 1px var(--hairline); }
+
+.map-foot {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border-radius: var(--r-md);
-  transition: background 0.15s;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 4px 0 8px;
 }
 
-#map-list li:hover { background: var(--sunken); }
-
-/* la mappa aperta si riconosce: il suo pin è acceso */
-#map-list li.is-open :global(.ico) { color: var(--ink); }
-
-#map-list input {
-  background: var(--sunken);
-  border-color: transparent;
-  padding: 6px 8px;
-  font-weight: 500;
-}
-
-#map-list li:hover input { background: var(--sunken-hover); }
-
-#map-list .count {
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
+.map-meta {
+  font-size: 11.5px;
   color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-#map-list .ghost-icon:disabled { opacity: 0.35; cursor: default; }
+#map-list .ghost-icon:disabled { opacity: 0.3; cursor: default; }
 
-/* la riga sotto ogni mappa: pubblicarla e portarsi via il link */
-#map-list .share {
-  display: grid;
-  gap: 8px;
-  margin: -2px 0 6px 38px;
-  padding: 10px 10px 10px 0;
-}
-
-#map-list .share.is-public { border-left: 2px solid color-mix(in srgb, var(--ink-3) 35%, transparent); padding-left: 10px; margin-left: 30px; }
-
-.switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.switch { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
 .switch-track {
@@ -578,18 +613,28 @@
 .switch input:checked + .switch-track .switch-dot { transform: translateX(14px); }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.switch-text { display: grid; gap: 1px; }
-.switch-name { font-size: 12.5px; font-weight: 540; }
-.switch-note { font-size: 11px; line-height: 1.4; color: var(--ink-3); }
+/* l'etichetta dice lo stato; il perché sta una volta sola, in fondo */
+.switch-name {
+  font-size: 12px;
+  font-weight: 540;
+  color: var(--ink-3);
+  transition: color 0.16s;
+}
+
+.map-card.is-public .switch-name { color: var(--ink); }
 
 .link-row {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 2px 2px 2px 8px;
-  border-radius: var(--r-md);
-  background: var(--sunken);
+  border-radius: var(--r-sm);
+  background: var(--glass-strong);
+  box-shadow: inset 0 0 0 1px var(--hairline-soft);
+  animation: rise 0.2s var(--ease);
 }
+
+.profile-link .link-row { background: var(--sunken); box-shadow: none; }
 
 .link-prefix, .link-handle {
   font-size: 12px;

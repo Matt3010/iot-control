@@ -1,6 +1,6 @@
 import type { CookieOptions, NextFunction, Request, Response } from 'express';
 import { config } from '../config.js';
-import type { CredentialsDto } from '../dto/auth.dto.js';
+import type { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import type { Session } from '../services/AuthService.js';
 import { authService } from '../services/AuthService.js';
@@ -29,7 +29,7 @@ export class AuthController {
 
   register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      this.#open(req, res, await authService.register(dtoOf<CredentialsDto>(req)), 201);
+      this.#open(req, res, await authService.register(dtoOf<RegisterDto>(req)), 201);
     } catch (error) {
       next(error);
     }

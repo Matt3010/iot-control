@@ -32,7 +32,7 @@ export class MapManager {
       if (dto.name !== undefined) patch.name = dto.name;
       if (dto.published !== undefined) patch.published = dto.published;
       // l'indirizzo pubblico lo scegli tu, ma unico resta
-      if (dto.slug !== undefined) patch.slug = maps.freeSlug(dto.slug, id);
+      if (dto.slug !== undefined) patch.slug = maps.freeSlug(ownerId, dto.slug, id);
       return maps.update(id, patch) as PlaceMap;
     });
   }

@@ -16,8 +16,8 @@ export interface PublicProfileView {
 }
 
 export class PublicService {
-  async map(slug: string): Promise<PublicMapView> {
-    const found = await publicManager.map(slug);
+  async map(handle: string | undefined, slug: string): Promise<PublicMapView> {
+    const found = await publicManager.map(handle, slug);
     return {
       handle: found.handle,
       map: toMapView(found.map),

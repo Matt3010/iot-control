@@ -92,7 +92,7 @@
 <svelte:window onkeydown={onKeydown} onpointerdown={onPointerdown} />
 
 {#if route.kind === 'map'}
-  <PublicMap slug={route.slug} />
+  <PublicMap handle={route.handle} slug={route.slug} />
 {:else if route.kind === 'profile'}
   <PublicProfile handle={route.handle} />
 {:else if auth.checking}

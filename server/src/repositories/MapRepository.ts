@@ -19,18 +19,28 @@ export class MapRepository {
     return this.findById(id)?.ownerId === ownerId;
   }
 
-  findBySlug(slug: string): PlaceMap | undefined {
-    return this.tx.data.maps.find((map) => map.slug === slug);
+  findBySlug(ownerId: string, slug: string): PlaceMap | undefined {
+    return this.tx.data.maps.find((map) => map.ownerId === ownerId && map.slug === slug);
+  }
+
+  /** Per i link vecchi, quando l'indirizzo non diceva ancora di chi era. */
+  findPublishedBySlug(slug: string): PlaceMap | undefined {
+    return this.tx.data.maps.find((map) => map.slug === slug && map.published);
   }
 
   findPublishedOf(ownerId: string): PlaceMap[] {
     return this.tx.data.maps.filter((map) => map.ownerId === ownerId && map.published);
   }
 
-  /** Lo slug è l'indirizzo pubblico: deve essere unico fra tutte le mappe. */
-  freeSlug(wanted: string, except?: string): string {
+  /**
+   * L'indirizzo pubblico vive sotto il tuo handle: /u/tu/<slug>. Perciò basta
+   * che sia unico fra le tue mappe — la stessa "pizzerie" può averla chiunque.
+   */
+  freeSlug(ownerId: string, wanted: string, except?: string): string {
     return uniqueSlug(wanted, (candidate) =>
-      this.tx.data.maps.some((map) => map.slug === candidate && map.id !== except),
+      this.tx.data.maps.some(
+        (map) => map.ownerId === ownerId && map.slug === candidate && map.id !== except,
+      ),
     );
   }
 
@@ -39,7 +49,7 @@ export class MapRepository {
       id: `map-${randomUUID()}`,
       ownerId,
       name,
-      slug: this.freeSlug(name),
+      slug: this.freeSlug(ownerId, name),
       published: false,
       createdAt: new Date().toISOString(),
     };

@@ -1,5 +1,5 @@
 import { hashPassword, verifyPassword } from '../auth/password.js';
-import type { CredentialsDto } from '../dto/auth.dto.js';
+import type { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { badRequest } from '../errors/HttpError.js';
 import { store } from '../persistence/JsonStore.js';
 import { UserRepository } from '../repositories/UserRepository.js';
@@ -18,14 +18,16 @@ export class UserManager {
    * Il primo che arriva prende l'indice. Dopo, altri account si aprono solo
    * se chi ospita l'app lo consente.
    */
-  async register(dto: CredentialsDto, opened: boolean): Promise<User> {
+  async register(dto: RegisterDto, opened: boolean): Promise<User> {
     const { salt, hash } = await hashPassword(dto.password);
 
     return store.transaction((tx) => {
       const users = new UserRepository(tx);
       if (users.count() > 0 && !opened) throw badRequest('le iscrizioni sono chiuse');
       if (users.findByEmail(dto.email)) throw badRequest('questa email è già registrata');
-      return users.insert({ email: dto.email, salt, hash });
+      // il nome lo scegli tu, quindi se è preso te lo diciamo invece di cambiartelo
+      if (users.findByHandle(dto.handle)) throw badRequest('questo nome utente è già preso');
+      return users.insert({ email: dto.email, handle: dto.handle, salt, hash });
     });
   }
 

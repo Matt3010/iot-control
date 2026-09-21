@@ -7,7 +7,7 @@ import { categoryController } from '../controllers/CategoryController.js';
 import { groupController } from '../controllers/GroupController.js';
 import { placeController } from '../controllers/PlaceController.js';
 import { stateController } from '../controllers/StateController.js';
-import { CredentialsDto } from '../dto/auth.dto.js';
+import { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/group.dto.js';
 import { MapDto } from '../dto/map.dto.js';
@@ -18,13 +18,15 @@ export const apiRouter = Router();
 
 // --- quel poco che si può fare da fuori ------------------------------------
 apiRouter.get('/auth/state', authController.state);
-apiRouter.post('/auth/register', validateBody(CredentialsDto), authController.register);
+apiRouter.post('/auth/register', validateBody(RegisterDto), authController.register);
 apiRouter.post('/auth/login', validateBody(CredentialsDto), authController.login);
 apiRouter.post('/auth/logout', authController.logout);
 
 // quello che si può guardare senza entrare: solo mappe pubblicate
-apiRouter.get('/public/m/:slug', publicController.map);
 apiRouter.get('/public/u/:handle', publicController.profile);
+apiRouter.get('/public/u/:handle/:slug', publicController.map);
+// l'indirizzo di prima, senza handle: vive per non rompere i link già in giro
+apiRouter.get('/public/m/:slug', publicController.map);
 
 // --- da qui in poi serve essere entrati ------------------------------------
 apiRouter.use(requireUser);

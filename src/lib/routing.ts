@@ -1,18 +1,26 @@
 export type Route =
   | { kind: 'app' }
-  | { kind: 'map'; slug: string }
+  /** Senza handle è un link vecchio: la pagina lo riconosce e si corregge. */
+  | { kind: 'map'; handle?: string; slug: string }
   | { kind: 'profile'; handle: string };
 
-/** Nessun router: due forme di indirizzo e tutto il resto è l'app. */
+/** Nessun router: le mappe stanno sotto chi le ha fatte, il resto è l'app. */
 export function readRoute(path = window.location.pathname): Route {
-  const map = /^\/m\/([a-z0-9-]+)\/?$/i.exec(path);
-  if (map) return { kind: 'map', slug: map[1]!.toLowerCase() };
+  const owned = /^\/u\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/i.exec(path);
+  if (owned) return { kind: 'map', handle: owned[1]!.toLowerCase(), slug: owned[2]!.toLowerCase() };
 
   const profile = /^\/u\/([a-z0-9-]+)\/?$/i.exec(path);
   if (profile) return { kind: 'profile', handle: profile[1]!.toLowerCase() };
 
+  const legacy = /^\/m\/([a-z0-9-]+)\/?$/i.exec(path);
+  if (legacy) return { kind: 'map', slug: legacy[1]!.toLowerCase() };
+
   return { kind: 'app' };
 }
 
-export const mapUrl = (slug: string): string => `${window.location.origin}/m/${slug}`;
+export const mapPath = (handle: string, slug: string): string => `/u/${handle}/${slug}`;
+
+export const mapUrl = (handle: string, slug: string): string =>
+  `${window.location.origin}${mapPath(handle, slug)}`;
+
 export const profileUrl = (handle: string): string => `${window.location.origin}/u/${handle}`;

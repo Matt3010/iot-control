@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { resolveSecret } from '../auth/secret.js';
 import { config } from '../config.js';
-import type { CredentialsDto } from '../dto/auth.dto.js';
+import type { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { mapManager } from '../managers/MapManager.js';
 import { userManager } from '../managers/UserManager.js';
 import type { User } from '../types.js';
@@ -30,7 +30,7 @@ export class AuthService {
     return { needsSetup: count === 0, signupOpen: count === 0 || config.auth.allowSignup };
   }
 
-  async register(dto: CredentialsDto): Promise<Session> {
+  async register(dto: RegisterDto): Promise<Session> {
     const { signupOpen } = await this.state();
     const user = await userManager.register(dto, signupOpen);
     // Si entra e c'è già una mappa: nessuno deve inventarsi da dove partire.

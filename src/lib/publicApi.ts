@@ -24,6 +24,7 @@ async function read<T>(path: string): Promise<T> {
 }
 
 export const publicApi = {
-  map: (slug: string) => read<PublicMapPayload>(`/m/${slug}`),
+  map: (handle: string | undefined, slug: string) =>
+    read<PublicMapPayload>(handle ? `/u/${handle}/${slug}` : `/m/${slug}`),
   profile: (handle: string) => read<PublicProfilePayload>(`/u/${handle}`),
 };

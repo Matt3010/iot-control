@@ -26,12 +26,22 @@ export interface PublicProfile {
  * quelli che quei posti usano davvero.
  */
 export class PublicManager {
-  map(slug: string): Promise<PublicMap> {
+  /** `handle` assente: è un link vecchio, di quando l'indirizzo era solo lo slug. */
+  map(handle: string | undefined, slug: string): Promise<PublicMap> {
     return store.transaction((tx) => {
-      const map = new MapRepository(tx).findBySlug(slug);
+      const users = new UserRepository(tx);
+      const maps = new MapRepository(tx);
+
+      let map;
+      if (handle === undefined) {
+        map = maps.findPublishedBySlug(slug);
+      } else {
+        const of = users.findByHandle(handle);
+        map = of && maps.findBySlug(of.id, slug);
+      }
       if (!map?.published) throw notFound('mappa inesistente');
 
-      const owner = new UserRepository(tx).findById(map.ownerId);
+      const owner = users.findById(map.ownerId);
       const places = new PlaceRepository(tx)
         .findAllOfMaps([map.id])
         .filter((place) => !place.private);

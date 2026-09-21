@@ -3,20 +3,41 @@
   import 'leaflet.markercluster';
   import { formatDistance } from '../lib/format';
   import { publicApi, type PublicMapPayload } from '../lib/publicApi';
-  import { profileUrl } from '../lib/routing';
+  import { mapPath, profileUrl } from '../lib/routing';
   import Icon from './Icon.svelte';
 
-  let { slug }: { slug: string } = $props();
+  let { handle, slug }: { handle?: string; slug: string } = $props();
 
   let data = $state<PublicMapPayload | null>(null);
   let failed = $state('');
   let container = $state<HTMLDivElement>();
+  /** Il posto scelto dalla lista: si vede quale, anche dopo il volo. */
+  let picked = $state('');
+
+  let live: { map: L.Map; clusters: L.MarkerClusterGroup; pins: Map<string, Marker> } | null = null;
+
+  const sorted = $derived([...(data?.places ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'it')));
+
+  /** Dalla riga al pin: se sta in un grappolo, prima lo si apre. */
+  function reveal(id: string): void {
+    picked = id;
+    const pin = live?.pins.get(id);
+    if (!live || !pin) return;
+    live.clusters.zoomToShowLayer(pin, () => {
+      live?.map.setView(pin.getLatLng(), Math.max(live.map.getZoom(), 16));
+      pin.openPopup();
+    });
+  }
 
   const categoryOf = (id: string) => data?.categories.find((category) => category.id === id);
 
   publicApi
-    .map(slug)
-    .then((payload) => (data = payload))
+    .map(handle, slug)
+    .then((payload) => {
+      data = payload;
+      // arrivato da un /m/<slug> di prima: l'indirizzo giusto lo prende ora
+      if (!handle) history.replaceState(null, '', mapPath(payload.handle, payload.map.slug));
+    })
     .catch((error: Error) => (failed = error.message));
 
   function pinIcon(categoryId: string): L.DivIcon {
@@ -86,17 +107,25 @@
     }).addTo(map);
 
     const markers: Marker[] = [];
+    const pins = new Map<string, Marker>();
     for (const place of data.places) {
       const marker = L.marker([place.lat, place.lng], { icon: pinIcon(place.categoryId) });
       marker.bindPopup(() => popupFor(place), { closeButton: false, offset: [0, 2] });
+      marker.on('popupopen', () => (picked = place.id));
       markers.push(marker);
+      pins.set(place.id, marker);
       clusters.addLayer(marker);
     }
+    map.on('popupclose', () => (picked = ''));
+    live = { map, clusters, pins };
 
     if (markers.length) map.fitBounds(L.latLngBounds(data.places.map((p) => [p.lat, p.lng])), { padding: [60, 60] });
     else map.setView([41.9, 12.5], 5);
 
-    return () => map.remove();
+    return () => {
+      live = null;
+      map.remove();
+    };
   });
 </script>
 
@@ -109,15 +138,43 @@
 {:else if data}
   <div id="map" bind:this={container}></div>
 
-  <div class="card surface">
-    <span class="eyebrow">La mappa di {data.handle}</span>
-    <h1>{data.map.name}</h1>
-    <p class="count">
-      {data.places.length}
-      {data.places.length === 1 ? 'posto' : 'posti'}
-      {#if data.categories.length}· {data.categories.length} categorie{/if}
-    </p>
-    <a class="other" href={profileUrl(data.handle)}>Le altre mappe di {data.handle} →</a>
+  <div class="side">
+    <div class="card surface">
+      <span class="eyebrow">La mappa di {data.handle}</span>
+      <h1>{data.map.name}</h1>
+      <p class="count">
+        {data.places.length}
+        {data.places.length === 1 ? 'posto' : 'posti'}
+        {#if data.categories.length}
+          · {data.categories.length}
+          {data.categories.length === 1 ? 'categoria' : 'categorie'}
+        {/if}
+      </p>
+      <a class="other" href={profileUrl(data.handle)}>Le altre mappe di {data.handle} →</a>
+    </div>
+
+    {#if sorted.length}
+      <ul class="list surface">
+        {#each sorted as place (place.id)}
+          <li>
+            <button
+              type="button"
+              class="row"
+              class:is-on={picked === place.id}
+              onclick={() => reveal(place.id)}
+            >
+              <span class="dot" style:--c={categoryOf(place.categoryId)?.color ?? '#6b7280'}>
+                {categoryOf(place.categoryId)?.emoji ?? '📍'}
+              </span>
+              <span class="row-text">
+                <span class="row-name">{place.name}</span>
+                {#if place.note}<span class="row-note">{place.note}</span>{/if}
+              </span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </div>
 
   <a class="made primary" href="/">
@@ -126,16 +183,84 @@
 {/if}
 
 <style>
-  .card {
+  /* la colonna di sinistra: chi l'ha fatta, e cosa c'è dentro */
+  .side {
     position: absolute;
     top: 14px;
     left: 14px;
     z-index: var(--z-panel);
     width: min(300px, calc(100vw - 28px));
+    max-height: calc(100% - 28px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 10px;
+    animation: rise 0.5s var(--ease);
+  }
+
+  .card {
     padding: var(--card-pad);
     display: grid;
     gap: 4px;
-    animation: rise 0.5s var(--ease);
+  }
+
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 6px;
+    display: grid;
+    gap: 2px;
+    align-content: start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: none;
+    text-align: left;
+    transition: background 0.14s;
+  }
+
+  .row:hover { background: var(--sunken); }
+  .row.is-on { background: var(--sunken-hover); }
+
+  /* lo stesso colore del pin sulla mappa: la riga e il puntino sono la stessa cosa */
+  .dot {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--c) 22%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent);
+    font-size: 13px;
+    line-height: 1;
+  }
+
+  .row-text { display: grid; gap: 1px; min-width: 0; }
+
+  .row-name {
+    font-size: 13px;
+    font-weight: 540;
+    letter-spacing: -0.012em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .row-note {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   h1 {
@@ -205,7 +330,8 @@
   }
 
   @media (max-width: 600px) {
-    .card { left: 12px; right: 12px; top: 12px; width: auto; }
+    /* sotto resta il posto per il tasto: la lista si ferma prima */
+    .side { left: 12px; right: 12px; top: 12px; width: auto; max-height: calc(100% - 92px); }
     .made { left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); justify-content: center; }
   }
 </style>

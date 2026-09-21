@@ -15,13 +15,14 @@ function migrateHandles(users: User[]): User[] {
   });
 }
 
-/** Mappe nate prima che si potessero pubblicare. */
+/** Mappe nate prima che si potessero pubblicare. Lo slug basta sia tuo. */
 function migrateSlugs(maps: PlaceMap[]): PlaceMap[] {
-  const taken = new Set(maps.map((map) => map.slug).filter(Boolean));
+  const key = (ownerId: string, slug: string) => `${ownerId}/${slug}`;
+  const taken = new Set(maps.filter((map) => map.slug).map((map) => key(map.ownerId, map.slug)));
   return maps.map((map) => {
     if (map.slug) return { ...map, published: map.published ?? false };
-    const slug = uniqueSlug(slugify(map.name), (candidate) => taken.has(candidate));
-    taken.add(slug);
+    const slug = uniqueSlug(slugify(map.name), (candidate) => taken.has(key(map.ownerId, candidate)));
+    taken.add(key(map.ownerId, slug));
     return { ...map, slug, published: map.published ?? false };
   });
 }

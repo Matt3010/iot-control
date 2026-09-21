@@ -17,10 +17,12 @@
 
   const DEFAULT_COLOR = '#6b7280';
 
-  function pinIcon(category: Category | undefined, extra = ''): L.DivIcon {
+  function pinIcon(category: Category | undefined, extra = '', locked = false): L.DivIcon {
+    // un posto privato lo si riconosce dalla mappa, senza aprirlo
+    const lock = locked ? `<i class="pin-lock">${icon('lock').outerHTML}</i>` : '';
     return L.divIcon({
       className: '',
-      html: `<div class="pin ${extra}" style="--c:${category?.color ?? DEFAULT_COLOR}"><span>${category?.emoji ?? '📍'}</span></div>`,
+      html: `<div class="pin ${extra}" style="--c:${category?.color ?? DEFAULT_COLOR}"><span>${category?.emoji ?? '📍'}</span>${lock}</div>`,
       iconSize: [36, 36],
       iconAnchor: [18, 36],
       popupAnchor: [0, -34],
@@ -72,6 +74,14 @@
     const label = document.createElement('span');
     label.textContent = category?.name ?? 'Senza categoria';
     badge.append(emoji, label);
+
+    if (place.private) {
+      const closed = document.createElement('span');
+      closed.className = 'pop-lock';
+      closed.title = 'Resta fuori dalla mappa pubblica';
+      closed.append(icon('lock'), document.createTextNode('Privato'));
+      badge.after(closed);
+    }
 
     const name = document.createElement('h3');
     name.className = 'pop-name';
@@ -182,14 +192,14 @@
 
       if (!marker) {
         marker = L.marker([place.lat, place.lng], {
-          icon: pinIcon(category),
+          icon: pinIcon(category, '', place.private),
           riseOnHover: true,
           place,
         } as L.MarkerOptions);
         markers.set(place.key, marker);
       } else {
         marker.setLatLng([place.lat, place.lng]);
-        marker.setIcon(pinIcon(category));
+        marker.setIcon(pinIcon(category, '', place.private));
       }
       marker.bindPopup(() => popupFor(place), { closeButton: false, offset: [0, 2], key: place.key } as L.PopupOptions);
 
@@ -214,7 +224,7 @@
     const category = store.categoryOf(draft.categoryId ?? '');
     if (!draftMarker) {
       draftMarker = L.marker([draft.lat, draft.lng], {
-        icon: pinIcon(category, draft.id ? '' : 'draft'),
+        icon: pinIcon(category, draft.id ? '' : 'draft', draft.private ?? false),
         draggable: true,
         zIndexOffset: 1000,
       }).addTo(map);
@@ -227,7 +237,7 @@
       });
     } else {
       draftMarker.setLatLng([draft.lat, draft.lng]);
-      draftMarker.setIcon(pinIcon(category, draft.id ? '' : 'draft'));
+      draftMarker.setIcon(pinIcon(category, draft.id ? '' : 'draft', draft.private ?? false));
     }
   });
 </script>
@@ -260,6 +270,25 @@
   line-height: 1;
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
 }
+
+/* il lucchetto è una toppa sul pin: gira al contrario per restare dritto */
+:global(.pin-lock) {
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  margin-top: -8.5px;
+  border-radius: 50%;
+  transform: rotate(45deg);
+  background: var(--glass-strong);
+  color: var(--ink);
+  box-shadow: 0 2px 5px rgb(10 13 18 / 0.45), inset 0 0 0 1px var(--hairline);
+}
+
+:global(.pin-lock .ico) { width: 10px; height: 10px; stroke-width: 2.4; }
 
 :global(.leaflet-marker-icon:hover .pin), :global(.pin.is-hover) {
   transform: rotate(-45deg) scale(1.12);
@@ -398,6 +427,22 @@
   font-size: 11px;
   font-weight: 500;
 }
+
+:global(.pop-lock) {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 7px 5px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 99px;
+  background: var(--sunken);
+  border: 1px solid var(--hairline);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+:global(.pop-lock .ico) { width: 11px; height: 11px; }
 
 :global(.pop-name) { margin: 0; font-size: 15.5px; font-weight: 620; letter-spacing: -0.018em; }
 

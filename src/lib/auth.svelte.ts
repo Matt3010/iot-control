@@ -42,9 +42,15 @@ class Auth {
     }
   }
 
-  async enter(email: string, password: string, mode: 'login' | 'register'): Promise<void> {
+  async enter(
+    email: string,
+    password: string,
+    mode: 'login' | 'register',
+    handle?: string,
+  ): Promise<void> {
     const path = mode === 'register' ? '/auth/register' : '/auth/login';
-    this.account = await api.post<Account>(path, { email, password });
+    const body = mode === 'register' ? { email, password, handle } : { email, password };
+    this.account = await api.post<Account>(path, body);
     this.needsSetup = false;
   }
 

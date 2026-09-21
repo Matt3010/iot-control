@@ -5,20 +5,36 @@
 
   let email = $state('');
   let password = $state('');
+  let handle = $state('');
   let error = $state('');
   let working = $state(false);
   /** Chi arriva per primo crea; gli altri entrano, o creano se è permesso. */
   let wantsAccount = $state(false);
+  /** Finché non lo tocchi, il nome utente lo proponiamo noi dall'email. */
+  let chosen = $state(false);
 
   const firstRun = $derived(auth.needsSetup);
   const creating = $derived(firstRun || wantsAccount);
+
+  /** Sta in un indirizzo: minuscolo, senza accenti, senza spazi. */
+  const toHandle = (text: string) =>
+    text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 20);
+
+  const suggested = $derived(toHandle(email.split('@')[0] ?? ''));
+  const chosenHandle = $derived(chosen ? handle : suggested);
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
     error = '';
     working = true;
     try {
-      await auth.enter(email.trim(), password, creating ? 'register' : 'login');
+      await auth.enter(email.trim(), password, creating ? 'register' : 'login', chosenHandle);
     } catch (failure) {
       error = (failure as Error).message;
       password = '';
@@ -36,7 +52,7 @@
       <span class="wordmark"><Icon name="pin" /> Place Index</span>
       <h1>{creating ? 'Crea il tuo accesso' : 'Bentornato'}</h1>
       {#if creating}
-        <p>Bastano un'email e una password di almeno otto caratteri.</p>
+        <p>Un nome, un'email e una password di almeno otto caratteri.</p>
       {/if}
     </header>
 
@@ -71,6 +87,33 @@
           />
         </span>
       </label>
+
+      {#if creating}
+        <label class="stop">
+          <span class="stop-pin" style:--c="#1f7a5c"><span class="stop-glyph"><Icon name="handle" /></span></span>
+          <span class="stop-card">
+            <span class="eyebrow">Nome utente</span>
+            <input
+              type="text"
+              name="handle"
+              autocomplete="username"
+              placeholder="come-ti-chiami"
+              required
+              minlength="3"
+              maxlength="20"
+              value={chosenHandle}
+              oninput={(event) => {
+                chosen = true;
+                handle = toHandle(event.currentTarget.value);
+                event.currentTarget.value = handle;
+              }}
+            />
+            <span class="stop-hint">
+              Le tue mappe pubbliche staranno qui: <b>/u/{chosenHandle || 'nome-utente'}</b>
+            </span>
+          </span>
+        </label>
+      {/if}
     </div>
 
     {#if error}
@@ -211,6 +254,18 @@
   .stop-glyph :global(.ico) { width: 16px; height: 16px; }
 
   .stop-card { display: grid; gap: 4px; flex: 1; min-width: 0; }
+
+  /* il link non è una promessa astratta: si legge mentre lo scrivi */
+  .stop-hint {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stop-hint b { font-weight: 560; color: var(--ink-2); }
 
   .route-error {
     margin: -6px 0 0;

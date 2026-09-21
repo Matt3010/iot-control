@@ -28,11 +28,10 @@ export class UserRepository {
     );
   }
 
-  insert(data: Omit<User, 'id' | 'createdAt' | 'handle'>): User {
+  insert(data: Omit<User, 'id' | 'createdAt'>): User {
     const user: User = {
       id: `usr-${randomUUID()}`,
       ...data,
-      handle: this.freeHandle(data.email.split('@')[0] ?? 'io'),
       createdAt: new Date().toISOString(),
     };
     this.tx.data.users.push(user);

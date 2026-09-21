@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  AtSign,
   Check,
   LogOut,
   Link2,
@@ -35,6 +36,7 @@ export const ICONS = {
   lock: Lock,
   logout: LogOut,
   link: Link2,
+  handle: AtSign,
   check: Check,
 } as const;
 
