@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
   import Button from './Button.svelte';
+  import Row from './Row.svelte';
 
   /**
    * La riga in fondo a ogni lista: si scrive un nome e si aggiunge. Il bordo
@@ -37,54 +38,29 @@
   }
 </script>
 
-<form {id} class="add-row" class:is-ready={value.trim()} onsubmit={submit}>
-  {@render before?.()}
-  <input name="name" required maxlength="40" {placeholder} bind:this={field} bind:value />
-  {@render after?.()}
-  <Button look="icon" type="submit" extra="add-go" {title}>
-    <Icon name="plus" />
-  </Button>
+<!-- il modulo non disegna niente: tutta la geometria è quella della riga, e i
+     pezzi stanno nelle stesse fessure delle righe qui sopra -->
+<form class="shell" onsubmit={submit}>
+  <Row dashed {id} class={value.trim() ? 'is-ready' : ''}>
+    {#snippet lead()}{@render before?.()}{/snippet}
+
+    <input name="name" required maxlength="40" {placeholder} bind:this={field} bind:value />
+
+    {#snippet trail()}
+      {@render after?.()}
+      <Button look="icon" type="submit" extra="add-go" {title}>
+        <Icon name="plus" />
+      </Button>
+    {/snippet}
+  </Row>
 </form>
 
 <style>
-  .add-row {
-    display: flex;
-    align-items: center;
-    /* niente spazio fra i comandi: ce l'hanno già dentro, e così le colonne
-       cadono dove cadono nelle righe qui sopra */
-    gap: 0;
-    /* cinque invece di quattro: il bordo tratteggiato occupa un pixel, e senza
-       compensarlo i comandi cadono un pixel più dentro delle righe qui sopra */
-    padding: 5px;
-    border: 1px dashed var(--hairline);
-    border-radius: var(--r-md);
-    transition: border-color 0.16s, background 0.16s, box-shadow 0.16s;
-  }
+  .shell { display: contents; }
 
-  .add-row input[name="name"] {
-    background: none;
-    border-color: transparent;
-    padding: 6px 8px;
-  }
+  :global(.row.is-dashed .add-go) { color: var(--ink-3); }
 
-  /* il fuoco lo mostra la riga intera: il campo non deve farne un secondo */
-  .add-row input[name="name"]:hover,
-  .add-row input[name="name"]:focus {
-    background: none;
-    border-color: transparent;
-    box-shadow: none;
-  }
-
-  .add-row:focus-within {
-    border-style: solid;
-    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-    box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--accent) 10%, transparent);
-  }
-
-  /* il bottone è di <Button>: da qui lo si raggiunge con :global */
-  .add-row :global(.add-go) { color: var(--ink-3); }
-
-  .add-row.is-ready :global(.add-go) {
+  :global(.row.is-dashed.is-ready .add-go) {
     background: var(--accent);
     color: var(--on-accent);
   }

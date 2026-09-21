@@ -384,11 +384,13 @@
   color: var(--ink-3);
 }
 
-/* le intestazioni stanno sulla colonna di tutto il resto: niente rientro */
+/* le intestazioni stanno sulla colonna del contenuto delle righe, non su
+   quella dei loro sfondi: sopra al pallino e sopra ai chilometri */
 .panel-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0 8px;
   margin-bottom: -4px;
 }
 

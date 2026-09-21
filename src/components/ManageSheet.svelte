@@ -12,6 +12,7 @@
   import AddRow from './AddRow.svelte';
   import Icon from './Icon.svelte';
   import LinkRow from './LinkRow.svelte';
+  import Row from './Row.svelte';
   import Switch from './Switch.svelte';
   import Button from './Button.svelte';
 
@@ -182,36 +183,44 @@
       <ul id="category-list" data-fade="none" use:fadeEdges>
         {#each visibleCategories as category (category.id)}
           <li>
-            <button
-              type="button"
-              class="emoji-btn"
-              title="Cambia emoji"
-              onclick={(event) =>
-                ui.askEmoji(event.currentTarget, (emoji) => store.patchCategory(category, { emoji }))}
-            >
-              {category.emoji}
-            </button>
-            <input
-              type="text"
-              maxlength="40"
-              value={category.name}
-              onchange={(event) => store.patchCategory(category, { name: event.currentTarget.value })}
-            />
-            <button
-              type="button"
-              class="swatch"
-              title="Colore"
-              style:--c={category.color}
-              aria-label="Colore"
-              onclick={(event) =>
-                ui.askColor(event.currentTarget, category.color, (color) =>
-                  store.patchCategory(category, { color }),
-                )}
-            ></button>
-            <span class="count">{store.countIn(category.id) || ''}</span>
-            <Button look="icon" title="Elimina categoria" onclick={() => store.deleteCategory(category)}>
-              <Icon name="trash" />
-            </Button>
+            <Row>
+              {#snippet lead()}
+                <button
+                  type="button"
+                  class="emoji-btn"
+                  title="Cambia emoji"
+                  onclick={(event) =>
+                    ui.askEmoji(event.currentTarget, (emoji) => store.patchCategory(category, { emoji }))}
+                >
+                  {category.emoji}
+                </button>
+              {/snippet}
+
+              <input
+                type="text"
+                maxlength="40"
+                value={category.name}
+                onchange={(event) => store.patchCategory(category, { name: event.currentTarget.value })}
+              />
+
+              {#snippet trail()}
+                <button
+                  type="button"
+                  class="swatch"
+                  title="Colore"
+                  style:--c={category.color}
+                  aria-label="Colore"
+                  onclick={(event) =>
+                    ui.askColor(event.currentTarget, category.color, (color) =>
+                      store.patchCategory(category, { color }),
+                    )}
+                ></button>
+                <span class="count">{store.countIn(category.id) || ''}</span>
+                <Button look="icon" title="Elimina categoria" onclick={() => store.deleteCategory(category)}>
+                  <Icon name="trash" />
+                </Button>
+              {/snippet}
+            </Row>
           </li>
         {/each}
         {#if store.categories.length && !visibleCategories.length}
@@ -259,73 +268,80 @@
           {@const open = map.id === store.activeMap?.id}
           {@const places = store.places.filter((place) => place.mapId === map.id).length}
           {@const url = mapUrl(auth.account?.handle ?? '', map.slug)}
-          <li class="map-card" class:is-open={open} class:is-public={map.published}>
-            <div class="map-top">
-              <button
-                type="button"
-                class="map-open"
-                title={open ? 'È la mappa selezionata' : 'Seleziona questa mappa'}
-                aria-pressed={open}
-                onclick={() => store.openMap(map.id)}
-              >
-                <Icon name="pin" />
-              </button>
+          <li>
+            <Row active={open} class={map.published ? 'is-public' : ''}>
+              {#snippet lead()}
+                <button
+                  type="button"
+                  class="map-open"
+                  title={open ? 'È la mappa selezionata' : 'Seleziona questa mappa'}
+                  aria-pressed={open}
+                  onclick={() => store.openMap(map.id)}
+                >
+                  <Icon name="pin" />
+                </button>
+              {/snippet}
+
               <input
-                class="map-name"
                 type="text"
                 maxlength="40"
                 value={map.name}
                 onchange={(event) => store.patchMap(map, { name: event.currentTarget.value })}
               />
-              <Button
-                look="icon"
-                extra={'map-eye' + (store.shows(map.id) ? ' is-shown' : '')}
-                disabled={open}
-                title={open
-                  ? 'La mappa selezionata si vede sempre'
-                  : store.shows(map.id)
-                    ? 'Smetti di mostrarla accanto'
-                    : 'Mostra anche questa, insieme alla selezionata'}
-                onclick={() => store.toggleShown(map.id)}
-              >
-                <Icon name={store.shows(map.id) ? 'eye' : 'eyeOff'} />
-              </Button>
-              <Button
-                look="icon"
-                title="Elimina mappa"
-                disabled={store.maps.length <= 1}
-                onclick={() => store.deleteMap(map)}
-              >
-                <Icon name="trash" />
-              </Button>
-            </div>
 
-            <div class="map-foot">
-              <span class="map-meta">
-                {places}
-                {places === 1 ? 'posto' : 'posti'}{open
-                  ? ' · selezionata'
-                  : store.shows(map.id)
-                    ? ' · in vista'
-                    : ''}
-              </span>
-              <Switch
-                checked={map.published}
-                onchange={(published) => store.patchMap(map, { published })}
-                label={map.published ? 'Pubblica' : 'Solo tua'}
-                title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}
-              />
-            </div>
+              {#snippet trail()}
+                <Button
+                  look="icon"
+                  extra={'map-eye' + (store.shows(map.id) ? ' is-shown' : '')}
+                  disabled={open}
+                  title={open
+                    ? 'La mappa selezionata si vede sempre'
+                    : store.shows(map.id)
+                      ? 'Smetti di mostrarla accanto'
+                      : 'Mostra anche questa, insieme alla selezionata'}
+                  onclick={() => store.toggleShown(map.id)}
+                >
+                  <Icon name={store.shows(map.id) ? 'eye' : 'eyeOff'} />
+                </Button>
+                <Button
+                  look="icon"
+                  title="Elimina mappa"
+                  disabled={store.maps.length <= 1}
+                  onclick={() => store.deleteMap(map)}
+                >
+                  <Icon name="trash" />
+                </Button>
+              {/snippet}
 
-            {#if map.published}
-              <LinkRow
-                prefix={'/u/' + (auth.account?.handle ?? '') + '/'}
-                value={map.slug}
-                {url}
-                onchange={(slug) => store.patchMap(map, { slug })}
-              />
-              <p class="visits" title={COUNT_NOTE}>{visitsOfMap(map)}</p>
-            {/if}
+              {#snippet under()}
+              <div class="map-foot">
+                <span class="map-meta">
+                  {places}
+                  {places === 1 ? 'posto' : 'posti'}{open
+                    ? ' · selezionata'
+                    : store.shows(map.id)
+                      ? ' · in vista'
+                      : ''}
+                </span>
+                <Switch
+                  checked={map.published}
+                  onchange={(published) => store.patchMap(map, { published })}
+                  label={map.published ? 'Pubblica' : 'Solo tua'}
+                  title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}
+                />
+              </div>
+
+              {#if map.published}
+                <LinkRow
+                  prefix={'/u/' + (auth.account?.handle ?? '') + '/'}
+                  value={map.slug}
+                  {url}
+                  onchange={(slug) => store.patchMap(map, { slug })}
+                />
+                <p class="visits" title={COUNT_NOTE}>{visitsOfMap(map)}</p>
+              {/if}
+              {/snippet}
+            </Row>
           </li>
         {/each}
       </ul>
@@ -366,17 +382,25 @@
       <ul id="group-list" data-fade="none" use:fadeEdges>
         {#each visibleGroups as group (group.id)}
           <li>
-            <span class="group-mark" aria-hidden="true"><Icon name="tag" /></span>
-            <input
-              type="text"
-              maxlength="40"
-              value={group.name}
-              onchange={(event) => store.patchGroup(group, { name: event.currentTarget.value })}
-            />
-            <span class="count">{store.countGroup(group.id) || ''}</span>
-            <Button look="icon" title="Elimina gruppo" onclick={() => store.deleteGroup(group)}>
-              <Icon name="trash" />
-            </Button>
+            <Row>
+              {#snippet lead()}
+                <span class="group-mark" aria-hidden="true"><Icon name="tag" /></span>
+              {/snippet}
+
+              <input
+                type="text"
+                maxlength="40"
+                value={group.name}
+                onchange={(event) => store.patchGroup(group, { name: event.currentTarget.value })}
+              />
+
+              {#snippet trail()}
+                <span class="count">{store.countGroup(group.id) || ''}</span>
+                <Button look="icon" title="Elimina gruppo" onclick={() => store.deleteGroup(group)}>
+                  <Icon name="trash" />
+                </Button>
+              {/snippet}
+            </Row>
           </li>
         {/each}
         {#if mapGroups.length && !visibleGroups.length}
@@ -477,9 +501,9 @@
 /* the row that adds one more ----------------------------------------------- */
 
 /* la riga è di AddRow: qui si vestono solo i pezzi che ci mettiamo dentro */
-:global(.add-row) .emoji-btn { width: 28px; height: 28px; margin-left: -4px; font-size: 16px; }
+:global(.row.is-dashed) .emoji-btn { width: 28px; height: 28px; font-size: 16px; }
 
-:global(.add-row) .swatch { width: 22px; height: 22px; margin: 0 3px; }
+:global(.row.is-dashed) .swatch { width: 22px; height: 22px; margin: 0 3px; }
 
 .sheet-note {
   margin: 12px 2px 0;
@@ -500,36 +524,15 @@
 
 #map-list { gap: 8px; }
 
-/* ogni mappa è una cosa sola: il nome, quanto contiene, il suo link */
-.map-card {
-  display: grid;
-  gap: 6px;
-  padding: 8px 8px 9px;
-  border-radius: var(--r-md);
-  background: var(--sunken);
-  box-shadow: inset 0 0 0 1px var(--hairline-soft);
-  transition: background 0.16s, box-shadow 0.16s;
-}
-
-.map-card:hover { background: var(--sunken-hover); }
-
-/* quella selezionata porta il segno, non una parola in più */
-.map-card.is-open {
-  background: var(--sunken-hover);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 20%, transparent);
-}
-
-.map-top { display: flex; align-items: center; gap: 0; }
-
 .map-open {
   display: grid;
   place-items: center;
-  flex: none;
   width: 24px;
   height: 24px;
-  /* il tasto è più largo del suo segno: si tira indietro di quel tanto, così
-     il pin cade sulla stessa riga verticale del resto della card */
-  margin-left: -4px;
+  /* zero, se no resta il padding dei bottoni: lo spazio dentro scenderebbe a
+     dodici e il pin, che ne misura quindici, invece di centrarsi si
+     appoggerebbe a sinistra di un pixel e mezzo */
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: none;
@@ -538,32 +541,16 @@
 }
 
 .map-open:hover { background: var(--glass-strong); color: var(--ink-2); }
+
+:global(.row.is-on) .map-open { color: var(--ink); }
 .map-open :global(.ico) { width: 15px; height: 15px; }
-.map-card.is-open .map-open { color: var(--ink); }
 
-/* il nome è un titolo finché non lo tocchi */
-.map-name {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 6px 5px 5px;
-  background: none;
-  border-color: transparent;
-  box-shadow: none;
-  font-size: 13.5px;
-  font-weight: 560;
-  letter-spacing: -0.012em;
-}
-
-.map-name:hover { background: var(--glass-strong); }
-.map-name:focus { background: var(--glass-strong); box-shadow: 0 0 0 1px var(--hairline); }
-
-/* la riga sotto vive nella stessa colonna del resto: niente rientro. Allineata
-   al centro e non alla riga di base, perché la riga di base di un interruttore
-   è quella della sua pista, non del suo testo: con "baseline" il meta cadeva
-   sette pixel più in basso dell'etichetta. */
+/* la riga sotto vive nella stessa colonna del resto: niente rientro. I due
+   pezzi poggiano in basso: il conto dei posti sta sul fondo dell'interruttore,
+   non a mezz'aria in mezzo alla sua pista. */
 .map-foot {
   display: flex;
-  align-items: center;
+  align-items: end;
   justify-content: space-between;
   gap: 10px;
   padding: 0;
@@ -608,24 +595,6 @@
 
 #group-list:empty { display: none; }
 
-#group-list li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border-radius: var(--r-md);
-  transition: background 0.15s;
-}
-
-#group-list li:hover { background: var(--sunken); }
-
-#group-list .count {
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-3);
-  white-space: nowrap;
-}
-
 /* la lista scorre dentro di sé: la riga che aggiunge resta sempre sotto gli occhi */
 #category-list, #group-list, #map-list {
   max-height: min(46vh, 340px);
@@ -669,65 +638,19 @@
 
 #category-list:empty { display: none; }
 
-/* Le tre schede parlano la stessa lingua: una card, un segno a sinistra, il
-   nome che è un titolo finché non lo tocchi, e le cose da fare a destra. */
-#category-list li, #group-list li {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 5px 6px;
-  border-radius: var(--r-md);
-  background: var(--sunken);
-  box-shadow: inset 0 0 0 1px var(--hairline-soft);
-  transition: background 0.16s;
-}
-
-#category-list li:hover, #group-list li:hover { background: var(--sunken-hover); }
-
-#category-list input[type="text"], #group-list input {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 6px 5px 5px;
-  background: none;
-  border-color: transparent;
-  box-shadow: none;
-  font-size: 13.5px;
-  font-weight: 560;
-  letter-spacing: -0.012em;
-}
-
-#category-list input[type="text"]:hover, #group-list input:hover { background: var(--glass-strong); }
-
-#category-list input[type="text"]:focus, #group-list input:focus {
-  background: var(--glass-strong);
-  box-shadow: 0 0 0 1px var(--hairline);
-}
-
-/* il conto ha una larghezza sua, se no le colonne ballano da riga a riga */
-#category-list .count, #group-list .count, .count {
-  min-width: 22px;
-  padding: 0 4px;
-  text-align: right;
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-3);
-  white-space: nowrap;
-}
-
 /* l'emoji della categoria è il suo ritratto: sta in un bollo come il pin
-   della mappa, non in un tasto qualsiasi */
-/* come nelle card delle mappe: il tasto si tira indietro del suo bordo,
-   così l'emoji cade sulla colonna della card */
+   della mappa, non in un tasto qualsiasi; nella riga che aggiunge è lo stesso
+   bollo, se no la colonna si sposta all'ultima riga */
 #category-list .emoji-btn {
   width: 28px;
   height: 28px;
-  margin-left: -4px;
-  font-size: 16px;
+  border: 0;
   border-radius: 50%;
   background: none;
+  font-size: 16px;
 }
 
-#category-list .emoji-btn:hover { background: var(--glass-strong); }
+#category-list .emoji-btn:hover { background: var(--glass-strong); transform: none; }
 
 #category-list .swatch { width: 22px; height: 22px; margin: 0 3px; }
 
@@ -735,10 +658,8 @@
 .group-mark {
   display: grid;
   place-items: center;
-  flex: none;
   width: 28px;
   height: 28px;
-  margin-left: -4px;
   color: var(--ink-3);
 }
 
