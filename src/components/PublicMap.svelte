@@ -1,6 +1,8 @@
 <script lang="ts">
   import L, { type Marker } from 'leaflet';
-  import { clusterGroup, createMap, DEFAULT_COLOR, pinIcon } from '../lib/mapkit';
+  import { formatDistance } from '../lib/format';
+  import { here } from '../lib/here.svelte';
+  import { clusterGroup, createMap, DEFAULT_COLOR, meIcon, metersBetween, pinIcon } from '../lib/mapkit';
   import { publicApi, type PublicMapPayload } from '../lib/publicApi';
   import { mapPath, profileUrl } from '../lib/routing';
   import Icon from './Icon.svelte';
@@ -14,9 +16,23 @@
   /** Il posto scelto dalla lista: si vede quale, anche dopo il volo. */
   let picked = $state('');
 
-  let live: { map: L.Map; clusters: L.MarkerClusterGroup; pins: Map<string, Marker> } | null = null;
+  let live = $state<{ map: L.Map; clusters: L.MarkerClusterGroup; pins: Map<string, Marker> } | null>(
+    null,
+  );
 
-  const sorted = $derived([...(data?.places ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'it')));
+  /**
+   * Chi guarda la mappa di un altro spesso è in quella città: se ci fa sapere
+   * dov'è, l'elenco si riordina dal più vicino e dice quanto dista. Senza un
+   * "qui", l'unico ordine sensato è alfabetico.
+   */
+  const distanceTo = (place: { lat: number; lng: number }) =>
+    here.spot ? metersBetween([here.spot.lat, here.spot.lng], [place.lat, place.lng]) : 0;
+
+  const sorted = $derived(
+    [...(data?.places ?? [])].sort((a, b) =>
+      here.spot ? distanceTo(a) - distanceTo(b) : a.name.localeCompare(b.name, 'it'),
+    ),
+  );
 
   /** Dalla riga al pin: se sta in un grappolo, prima lo si apre. */
   function reveal(id: string): void {
@@ -80,7 +96,9 @@
   $effect(() => {
     if (!container || !data) return;
 
-    const map = createMap(container);
+    const map = createMap(container, {}, () =>
+      here.locate((spot) => map.setView([spot.lat, spot.lng], Math.max(map.getZoom(), 14))),
+    );
     const clusters = clusterGroup().addTo(map);
 
     const markers: Marker[] = [];
@@ -107,6 +125,36 @@
       live = null;
       map.remove();
     };
+  });
+
+  /** Il puntino di dove sei, con il suo alone: lo stesso dell'app. */
+  $effect(() => {
+    const map = live?.map;
+    const spot = here.spot;
+    if (!map || !spot) return;
+
+    const me = L.marker([spot.lat, spot.lng], {
+      icon: meIcon(),
+      interactive: false,
+      zIndexOffset: -500,
+    }).addTo(map);
+    const halo = L.circle([spot.lat, spot.lng], {
+      radius: spot.accuracy,
+      className: 'me-halo',
+      interactive: false,
+    }).addTo(map);
+
+    return () => {
+      me.remove();
+      halo.remove();
+    };
+  });
+
+  /** Lo stato del tasto sta sul body, come nell'app. */
+  $effect(() => {
+    document.body.classList.toggle('finding-me', here.asking);
+    document.body.classList.toggle('found-me', !!here.spot);
+    return () => document.body.classList.remove('finding-me', 'found-me');
   });
 </script>
 
@@ -151,6 +199,9 @@
                 <span class="row-name">{place.name}</span>
                 {#if place.note}<span class="row-note">{place.note}</span>{/if}
               </span>
+              {#if here.spot}
+                <span class="row-far">{formatDistance(distanceTo(place))}</span>
+              {/if}
             </button>
           </li>
         {/each}
@@ -234,6 +285,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .row-far {
+    flex: none;
+    font-size: 11px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
   }
 
   .row-note {

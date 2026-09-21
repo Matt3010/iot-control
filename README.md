@@ -19,7 +19,9 @@ Niente categorie preimpostate, niente fronzoli.
   Siccome l'indirizzo sta sotto il tuo nome, la tua "pizzerie" non toglie il posto a quella di
   nessun altro. I vecchi link `/m/<indirizzo>` rispondono ancora e si correggono da soli. I
   posti segnati privati restano fuori (sulla mappa portano un lucchetto), e da fuori la pagina
-  è di sola lettura, con l'elenco dei posti di lato.
+  è di sola lettura, con l'elenco dei posti di lato. Anche lì c'è il tasto "dove sono": chi apre
+  il link mentre gira per quella città vede il puntino, e l'elenco si riordina dal più vicino
+  con le distanze.
 - **Aggiungi posto**: premi il bottone, clicca il punto sulla mappa (il pin si può trascinare),
   dai nome, categoria, gruppo e note. Un posto può essere segnato **privato**. Il pin compare subito: il salvataggio viaggia dietro, e se
   il server rifiuta la riga torna indietro da sola.
