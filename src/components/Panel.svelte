@@ -205,8 +205,17 @@
         <div class="panel-row" id="list-head">
           <span class="eyebrow">In vista</span>
           <span class="list-end">
-            <!-- i chilometri partono da qualcosa: qui si dice da cosa -->
-            <span class="list-hint">
+            <!-- i chilometri partono da qualcosa: qui si dice da cosa, e
+                 passandoci sopra quel qualcosa si illumina sulla mappa -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <span
+              class="list-hint"
+              title={here.spot
+                ? 'Le distanze partono da dove sei'
+                : 'Le distanze partono dal centro della mappa, il cerchietto chiaro'}
+              onpointerenter={() => document.body.classList.add('centre-hint')}
+              onpointerleave={() => document.body.classList.remove('centre-hint')}
+            >
               {here.spot ? 'da dove sei' : 'dal centro'}
             </span>
             <span id="list-count" class="tally">{rows.length}</span>

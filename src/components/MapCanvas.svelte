@@ -219,3 +219,12 @@
 </script>
 
 <div id="map" bind:this={container}></div>
+
+<!--
+  Finche' non sai dove sei, le distanze partono dal centro di quello che
+  guardi: tanto vale che quel centro si veda. Sparisce appena arriva il
+  puntino blu, che da quel momento e' lui l'origine.
+-->
+{#if !here.spot && store.currentPlaces.length}
+  <span id="centre-mark" aria-hidden="true"></span>
+{/if}

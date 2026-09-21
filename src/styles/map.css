@@ -112,6 +112,38 @@
 
 .leaflet-bottom.leaflet-left { margin-bottom: env(safe-area-inset-bottom); }
 
+/* ------------------------------------------------------------- il centro */
+
+/* Sta fermo al centro della finestra, come la mappa sotto: e' l'origine
+   delle distanze finche' non sai dove sei. Non si clicca. */
+#centre-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: var(--z-panel);
+  width: 15px;
+  height: 15px;
+  margin: -7.5px 0 0 -7.5px;
+  border-radius: 50%;
+  border: 1.5px solid rgb(255 255 255 / 0.55);
+  box-shadow: 0 0 0 1px rgb(10 13 18 / 0.35), inset 0 0 0 1px rgb(10 13 18 / 0.25);
+  opacity: 0.45;
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s var(--ease);
+}
+
+#centre-mark::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.85);
+  box-shadow: 0 0 0 1px rgb(10 13 18 / 0.35);
+}
+
+/* passando sopra l'etichetta nell'indice, il centro si fa riconoscere */
+.centre-hint #centre-mark { opacity: 1; transform: scale(1.3); }
+
 /* --------------------------------------------------------------- dove sei */
 
 /* il tasto sta sopra allo zoom e ne porta lo stesso vestito */
