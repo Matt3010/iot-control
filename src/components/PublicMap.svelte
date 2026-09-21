@@ -276,7 +276,8 @@
     line-height: 1;
   }
 
-  .row-text { display: grid; gap: 1px; min-width: 0; }
+  /* come nell'indice: il testo si prende lo spazio, le distanze si incolonnano */
+  .row-text { display: grid; flex: 1; gap: 1px; min-width: 0; }
 
   .row-name {
     font-size: 13px;
@@ -289,6 +290,8 @@
 
   .row-far {
     flex: none;
+    margin-left: auto;
+    text-align: right;
     font-size: 11px;
     color: var(--ink-3);
     font-variant-numeric: tabular-nums;

@@ -114,8 +114,10 @@
 
 #place-list {
   list-style: none;
-  margin: -4px -4px 0;
-  padding: 0 4px 4px;
+  /* le righe sporgono di otto pixel per parte: la lista si allarga di
+     altrettanto, altrimenti spunta una barra di scorrimento orizzontale */
+  margin: -4px -12px 0;
+  padding: 0 12px 4px;
   display: grid;
   gap: 2px;
   min-height: 0;
@@ -123,11 +125,16 @@
   overscroll-behavior: contain;
 }
 
+/* Lo sfondo della riga respira otto pixel più largo del testo, ma il testo
+   resta sulla colonna del pannello: così i chilometri finiscono sotto al
+   conteggio, e il pallino sotto alle intestazioni. */
 .row {
   display: flex;
   align-items: center;
   gap: 9px;
-  width: 100%;
+  /* un <button> con width:auto si stringe sul contenuto: la larghezza va detta */
+  width: calc(100% + 16px);
+  margin: 0 -8px;
   padding: 7px 8px;
   border: 0;
   border-radius: var(--r-md);

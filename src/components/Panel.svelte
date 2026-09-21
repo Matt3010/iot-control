@@ -384,11 +384,11 @@
   color: var(--ink-3);
 }
 
+/* le intestazioni stanno sulla colonna di tutto il resto: niente rientro */
 .panel-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-left: 6px;
   margin-bottom: -4px;
 }
 
