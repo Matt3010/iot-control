@@ -1,0 +1,13 @@
+services:
+  place-index:
+    build: .
+    image: place-index
+    container_name: place-index
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - place-index-data:/data
+
+volumes:
+  place-index-data:

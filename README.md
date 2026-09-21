@@ -1,79 +1,64 @@
-# 🚀 Restaurant Index
+# Place Index
 
-Il mio indice personale dei ristoranti, reso come un **diorama spaziale isometrico**
-con [Three.js](https://threejs.org/) — nello stile del
-[Kenney Space Kit](https://kenney.nl/assets/space-kit). Una colonia rocciosa che
-galleggia nel buio: ogni ristorante è una struttura, ci clicchi sopra e si apre la
-scheda con categoria, voto, prezzo e note. Astronauti (e qualche alieno) girano tra
-gli avamposti.
+Mappa a schermo intero dove segni i posti che ti interessano. Ogni posto appartiene a una
+categoria, e ogni categoria ha una sua emoji e un suo colore: il marker sulla mappa è quello.
+Niente account, niente categorie preimpostate, niente fronzoli.
 
-![anteprima](docs/preview.png)
+## Cosa fa
 
-## ✨ Cosa fa
+- **Mappa full-screen** (Leaflet + tile OpenStreetMap, nessuna API key).
+- **Aggiungi posto**: premi il bottone, clicca il punto sulla mappa (il pin si può trascinare),
+  dai nome, categoria e note.
+- **Ricerca**: cerca un indirizzo o un locale (Nominatim); dal risultato apri direttamente il
+  form già compilato con nome e indirizzo.
+- **Categorie**: le crei tu, con emoji scelta da un picker completo
+  ([emoji-picker-element](https://github.com/nolanlawson/emoji-picker-element), dati serviti in
+  locale — funziona anche senza rete esterna) e un colore. Eliminare una categoria elimina anche
+  i suoi posti.
+- **Filtri**: i chip in alto a sinistra accendono/spengono le categorie sulla mappa (preferenza
+  locale del browser).
+- I dati stanno sul server in un unico `places.json`: chiunque apra la pagina vede lo stesso indice.
 
-- **Isola-colonia galleggiante** generata proceduralmente: terreno roccioso a
-  **livelli/terrazze**, base rastremata che galleggia nel vuoto, sfondo scuro,
-  luci da studio con ombre morbide e vignettatura — la resa del sample Kenney.
-- **Ogni ristorante = una struttura spaziale** (hangar, cupole, gantry) con una
-  **piazzola colorata** per categoria e un piccolo prop a tema che ruota accanto
-  (parabola, rover, navetta…).
-- **Razzo** centrale assemblato dai pezzi del kit, parabole, rover, navette in
-  hovering, barili, rocce, crateri e meteore sparsi come nel diorama.
-- **Astronauti e alieni** che camminano a saltelli tra le strutture.
-- **Etichette olografiche** fluttuanti con nome + pallino colore-categoria.
-- **Clic su una struttura / etichetta** → scheda dettaglio + zoom della camera.
-- **Ricerca** per nome, cucina, città o note; **sidebar** Index / Map / Saved.
-- **➕ Aggiungi** un ristorante dal browser: compare subito sulla colonia. I
-  preferiti restano salvati in `localStorage`.
+## Pubblicare con Docker
 
-## 🎮 Controlli
+```bash
+docker compose up -d --build
+```
 
-| Azione | Come |
-|--------|------|
-| Ruotare | trascina con il tasto sinistro |
-| Zoom | rotellina / pizzica su mobile |
-| Pan | tasto destro (o due dita) |
-| Aprire un ristorante | clic sulla struttura o sull'etichetta |
+Poi apri <http://localhost:8080>. I dati finiscono nel volume `place-index-data` montato su `/data`.
 
-## 🚀 Avvio
+Senza compose:
+
+```bash
+docker build -t place-index .
+docker run -d --name place-index -p 8080:8080 -v place-index-data:/data place-index
+```
+
+Per tenere i dati in una cartella del host invece che in un volume:
+`-v /percorso/sul/host:/data`.
+
+Variabili d'ambiente: `PORT` (default `8080`), `DATA_DIR` (default `/data` nell'immagine).
+
+> Non c'è autenticazione: se lo esponi su internet, mettilo dietro un reverse proxy con basic
+> auth o su una rete privata.
+
+## Sviluppo
 
 ```bash
 npm install
-npm run dev      # server di sviluppo (Vite)
-npm run build    # build di produzione in dist/
-npm run preview  # anteprima della build
+npm run dev     # Vite su :5173 con proxy /api verso il server Node su :8080
 ```
 
-## 🧱 Struttura
+`npm run build` genera `dist/`, `npm start` avvia il server che serve API e `dist/` insieme.
 
-```
-public/assets/models/space/   # modelli GLB del Kenney Space Kit
-src/
-  main.js                     # renderer, camera iso ortografica, luci studio, raycast, loop
-  world.js                    # terreno a livelli, base galleggiante, strutture, props, astronauti
-  assets.js                   # GLTFLoader con cache + normalizzazione dei modelli
-  data.js                     # categorie (→ strutture) + ristoranti demo
-  ui.js                       # ricerca, sidebar, scheda, modale "Aggiungi", preferiti
-  style.css                   # interfaccia "mission control"
-```
+## API
 
-I dati partono da un set demo (`src/data.js`); i preferiti e i ristoranti aggiunti
-vivono in `localStorage`. Prossimo passo naturale: persistenza versionata o backend.
-
-## 🎨 Crediti asset — CC0
-
-Modelli 3D di **[Kenney](https://kenney.nl)**, in
-**[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)** (dominio pubblico,
-uso libero anche commerciale):
-
-- **[Space Kit](https://kenney.nl/assets/space-kit)** — strutture, razzo, veicoli,
-  parabole, astronauti/alieni, rocce e crateri. La palette del terreno
-  (`#e88463` / `#b25f43`) è quella originale del kit.
-
-Per aggiungere altri pezzi: scarica lo zip da kenney.nl, copia i `.glb`
-(formato GLTF/GLB, autonomi) in `public/assets/models/space/` e referenziali da
-`data.js` / `world.js`.
-
-Librerie: [Three.js](https://threejs.org/) (MIT), [Vite](https://vitejs.dev/) (MIT).
-Font: [Baloo 2](https://fonts.google.com/specimen/Baloo+2) e
-[Nunito](https://fonts.google.com/specimen/Nunito) (OFL).
+| Metodo   | Rotta                  | Note                                         |
+| -------- | ---------------------- | -------------------------------------------- |
+| `GET`    | `/api/state`           | `{ categories, places }`                     |
+| `POST`   | `/api/categories`      | `{ name, emoji, color }`                     |
+| `PUT`    | `/api/categories/:id`  | patch parziale                               |
+| `DELETE` | `/api/categories/:id`  | elimina anche i posti della categoria        |
+| `POST`   | `/api/places`          | `{ name, categoryId, lat, lng, note }`       |
+| `PUT`    | `/api/places/:id`      | patch parziale                               |
+| `DELETE` | `/api/places/:id`      |                                              |

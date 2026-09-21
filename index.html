@@ -2,94 +2,70 @@
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Restaurant Index</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="./src/style.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#111418" />
+    <title>Place Index</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>" />
   </head>
   <body>
-    <!-- 3D world -->
-    <div id="scene"></div>
-    <!-- vignette to focus the diorama -->
-    <div id="vignette"></div>
-    <!-- DOM labels drawn on top of the 3D scene -->
-    <div id="labels"></div>
+    <div id="map"></div>
 
-    <!-- Loading overlay -->
-    <div id="loader">
-      <div class="loader-card">
-        <div class="loader-spinner"></div>
-        <div class="loader-text">Sto assemblando la colonia…</div>
-      </div>
+    <!-- Search + category filters -->
+    <div id="panel">
+      <form id="search" autocomplete="off">
+        <input id="search-input" type="search" placeholder="Cerca un indirizzo o un posto…" />
+        <button type="submit" title="Cerca">⌕</button>
+      </form>
+      <ul id="search-results" hidden></ul>
+
+      <div id="filters"></div>
+
+      <button id="manage-btn" class="link-btn" type="button">Gestisci categorie</button>
     </div>
 
-    <!-- UI overlay -->
-    <header id="topbar">
-      <h1 class="brand">Restaurant&nbsp;Index</h1>
-      <div class="search">
-        <span class="search-icon">⌕</span>
-        <input id="search-input" type="text" placeholder="Cerca ristoranti, cucine, città…" autocomplete="off" />
-        <button id="search-clear" class="search-clear" title="Pulisci" hidden>×</button>
-      </div>
-    </header>
+    <button id="add-btn" type="button">＋ Aggiungi posto</button>
 
-    <nav id="sidebar">
-      <button class="side-btn is-active" data-view="index"><span class="ico">🏠</span><span>Index</span></button>
-      <button class="side-btn" data-view="map"><span class="ico">🗺️</span><span>Map</span></button>
-      <button class="side-btn" data-view="saved"><span class="ico">❤️</span><span>Saved</span></button>
-    </nav>
+    <div id="hint" hidden>Clicca sulla mappa per scegliere il punto · <kbd>Esc</kbd> annulla</div>
 
-    <button id="add-btn">＋ Aggiungi</button>
-
-    <!-- Restaurant detail card -->
-    <aside id="card" hidden>
-      <button class="card-close" title="Chiudi">×</button>
-      <div class="card-cat"></div>
-      <h2 class="card-name"></h2>
-      <div class="card-sub"></div>
-      <div class="card-stats">
-        <div class="stat"><span class="stat-val card-rating"></span><span class="stat-lbl">voto</span></div>
-        <div class="stat"><span class="stat-val card-price"></span><span class="stat-lbl">prezzo</span></div>
-      </div>
-      <p class="card-notes"></p>
-      <div class="card-actions">
-        <button class="card-save">❤️ Salva</button>
-        <button class="card-focus">🎯 Inquadra</button>
-      </div>
-    </aside>
-
-    <!-- Add restaurant modal -->
-    <div id="add-modal" hidden>
-      <form class="add-form" autocomplete="off">
-        <h2>Nuovo ristorante</h2>
-        <label>Nome<input name="name" required maxlength="40" placeholder="Es. Trattoria da Nonna" /></label>
-        <label>Categoria
-          <select name="category"></select>
-        </label>
-        <div class="row">
-          <label>Città<input name="city" maxlength="30" placeholder="Roma" /></label>
-          <label>Prezzo
-            <select name="price"><option>€</option><option>€€</option><option>€€€</option><option>€€€€</option></select>
-          </label>
-        </div>
-        <label>Voto <span class="rating-out">4.5</span>
-          <input name="rating" type="range" min="1" max="5" step="0.1" value="4.5" />
-        </label>
-        <label>Note<textarea name="notes" maxlength="160" rows="2" placeholder="Il piatto da non perdere…"></textarea></label>
-        <div class="add-actions">
-          <button type="button" class="btn-ghost" data-close>Annulla</button>
-          <button type="submit" class="btn-primary">Aggiungi all'isola</button>
+    <!-- Add / edit place -->
+    <aside id="place-sheet" hidden>
+      <header>
+        <h2 id="place-title">Nuovo posto</h2>
+        <button class="close" type="button" data-close>×</button>
+      </header>
+      <form id="place-form">
+        <label>Nome<input name="name" required maxlength="80" placeholder="Es. Trattoria da Nonna" /></label>
+        <span class="label">Categoria</span>
+        <div id="category-choice" class="chips"></div>
+        <label>Indirizzo / note<textarea name="note" maxlength="500" rows="2" placeholder="Via Roma 1 · il piatto da non perdere…"></textarea></label>
+        <p id="coords" class="coords"></p>
+        <div class="actions">
+          <button type="button" class="ghost" data-delete hidden>Elimina</button>
+          <button type="button" class="ghost" data-close>Annulla</button>
+          <button type="submit" class="primary">Salva</button>
         </div>
       </form>
-    </div>
+    </aside>
 
-    <div id="hint">Trascina per ruotare · rotellina per zoom · clic su una struttura</div>
+    <!-- Category manager -->
+    <aside id="category-sheet" hidden>
+      <header>
+        <h2>Categorie</h2>
+        <button class="close" type="button" data-close>×</button>
+      </header>
+      <ul id="category-list"></ul>
+      <form id="category-form">
+        <button type="button" id="new-emoji" class="emoji-btn" title="Scegli emoji">📍</button>
+        <input name="name" required maxlength="40" placeholder="Nuova categoria" />
+        <input name="color" type="color" value="#2274a5" title="Colore" />
+        <button type="submit" class="primary">Aggiungi</button>
+      </form>
+    </aside>
 
-    <script type="module" src="./src/main.js"></script>
+    <div id="emoji-popover" hidden><emoji-picker class="light"></emoji-picker></div>
+
+    <div id="toast" hidden></div>
+
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

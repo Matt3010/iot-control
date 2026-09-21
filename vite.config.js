@@ -1,15 +1,17 @@
 import { defineConfig } from 'vite';
 
-// Static SPA. Assets under /public are served as-is and copied to dist on build.
+// In dev, Vite serves the UI on 5173 and proxies /api to the Node server on 8080.
+// In production the same Node server serves dist/ and the API together.
 export default defineConfig({
-  base: './',
   build: {
     target: 'es2020',
     outDir: 'dist',
-    assetsInlineLimit: 0,
   },
   server: {
     host: true,
     port: 5173,
+    proxy: {
+      '/api': 'http://localhost:8080',
+    },
   },
 });

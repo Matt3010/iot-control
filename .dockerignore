@@ -1,0 +1,8 @@
+node_modules
+dist
+data
+.git
+.idea
+docs
+*.local
+.DS_Store
