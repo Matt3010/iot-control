@@ -246,6 +246,9 @@
             aria-label="Colore"
             onclick={(event) => ui.askColor(event.currentTarget, newColor, (color) => (newColor = color))}
           ></button>
+          <!-- il posto del conteggio resta vuoto, ma resta: così il colore e il
+               tasto cadono nella stessa colonna delle righe qui sopra -->
+          <span class="count" aria-hidden="true"></span>
         {/snippet}
       </AddRow>
     </div>
@@ -474,9 +477,9 @@
 /* the row that adds one more ----------------------------------------------- */
 
 /* la riga è di AddRow: qui si vestono solo i pezzi che ci mettiamo dentro */
-:global(.add-row) .emoji-btn { width: 32px; height: 32px; font-size: 16px; }
+:global(.add-row) .emoji-btn { width: 28px; height: 28px; margin-left: -4px; font-size: 16px; }
 
-:global(.add-row) .swatch { width: 24px; height: 24px; margin: 0 2px; }
+:global(.add-row) .swatch { width: 22px; height: 22px; margin: 0 3px; }
 
 .sheet-note {
   margin: 12px 2px 0;
@@ -700,8 +703,11 @@
   box-shadow: 0 0 0 1px var(--hairline);
 }
 
-#category-list .count, #group-list .count {
+/* il conto ha una larghezza sua, se no le colonne ballano da riga a riga */
+#category-list .count, #group-list .count, .count {
+  min-width: 22px;
   padding: 0 4px;
+  text-align: right;
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);

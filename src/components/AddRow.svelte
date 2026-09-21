@@ -50,8 +50,12 @@
   .add-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px;
+    /* niente spazio fra i comandi: ce l'hanno già dentro, e così le colonne
+       cadono dove cadono nelle righe qui sopra */
+    gap: 0;
+    /* cinque invece di quattro: il bordo tratteggiato occupa un pixel, e senza
+       compensarlo i comandi cadono un pixel più dentro delle righe qui sopra */
+    padding: 5px;
     border: 1px dashed var(--hairline);
     border-radius: var(--r-md);
     transition: border-color 0.16s, background 0.16s, box-shadow 0.16s;
