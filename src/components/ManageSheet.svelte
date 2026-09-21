@@ -5,6 +5,7 @@
   import { toast } from '../lib/toast.svelte';
   import { swipeToClose } from '../lib/swipe';
   import { ui } from '../lib/ui.svelte';
+  import { viewport } from '../lib/viewport.svelte';
   import Icon from './Icon.svelte';
 
   let newEmoji = $state(DEFAULT_EMOJI);
@@ -15,6 +16,14 @@
   /** Oltre una decina di voci scorrerle non basta più: serve poterle cercare. */
   const MANY = 8;
   let categoryFilter = $state('');
+  let categoryInput = $state<HTMLInputElement>();
+  let groupInput = $state<HTMLInputElement>();
+
+  /** Arrivando dal + il cursore è già nel campo; su telefono no, aprirebbe la tastiera. */
+  $effect(() => {
+    if (ui.manageIntent !== 'add' || viewport.narrow) return;
+    (ui.manageTab === 'groups' ? groupInput : categoryInput)?.focus();
+  });
   let groupFilter = $state('');
 
   const match = (name: string, needle: string) =>
@@ -147,7 +156,14 @@
         >
           {newEmoji}
         </button>
-        <input name="name" required maxlength="40" placeholder="Nuova categoria" bind:value={newCategoryName} />
+        <input
+          name="name"
+          required
+          maxlength="40"
+          placeholder="Nuova categoria"
+          bind:this={categoryInput}
+          bind:value={newCategoryName}
+        />
         <button
           type="button"
           class="swatch"
@@ -192,7 +208,14 @@
       </ul>
 
       <form id="group-form" class="add-row" class:is-ready={newGroupName.trim()} onsubmit={addGroup}>
-        <input name="name" required maxlength="40" placeholder="Nuovo gruppo — Padova, Islanda…" bind:value={newGroupName} />
+        <input
+          name="name"
+          required
+          maxlength="40"
+          placeholder="Nuovo gruppo — Padova, Islanda…"
+          bind:this={groupInput}
+          bind:value={newGroupName}
+        />
         <button type="submit" class="ghost-icon add-go" title="Aggiungi gruppo">
           <Icon name="plus" />
         </button>

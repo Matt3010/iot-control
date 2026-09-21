@@ -76,7 +76,7 @@
         <span class="eyebrow">Categoria</span>
         <div id="category-choice" class="chips">
           {#if store.categories.length === 0}
-            <button type="button" class="ghost" onclick={() => ui.openManage('categories')}>
+            <button type="button" class="ghost" onclick={() => ui.openManage('categories', 'add')}>
               Crea la prima categoria
             </button>
           {:else}

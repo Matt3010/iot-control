@@ -28,6 +28,8 @@ class Ui {
    * 'auto' lo fa ridurre quando serve, le altre due sono scelte tue.
    */
   panelWish = $state<'auto' | 'open' | 'closed'>('auto');
+  /** 'add' significa: ho premuto + , mettimi il cursore nel campo giusto. */
+  manageIntent = $state<'browse' | 'add'>('browse');
   /** True while the place sheet is only stepping aside for the manage sheet. */
   #placePaused = false;
 
@@ -49,10 +51,11 @@ class Ui {
    * One sheet at a time, but a draft in progress survives: you open this very
    * panel to create the category the place you are adding still needs.
    */
-  openManage(tab: ManageTab = 'categories'): void {
+  openManage(tab: ManageTab = 'categories', intent: 'browse' | 'add' = 'browse'): void {
     this.panelWish = 'auto';
     this.#placePaused = this.sheet === 'place';
     this.manageTab = tab;
+    this.manageIntent = intent;
     this.sheet = 'manage';
   }
 
@@ -63,9 +66,9 @@ class Ui {
     this.#placePaused = false;
   }
 
-  toggleManage(): void {
-    if (this.sheet === 'manage') this.closeManage();
-    else this.openManage();
+  toggleManage(tab: ManageTab = 'categories', intent: 'browse' | 'add' = 'browse'): void {
+    if (this.sheet === 'manage' && this.manageTab === tab) this.closeManage();
+    else this.openManage(tab, intent);
   }
 
   setPicking(on: boolean): void {

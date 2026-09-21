@@ -84,17 +84,30 @@
   <SearchTrigger />
 
   {#if !collapsed}
-    {#if store.groups.length && !store.loading}
+    {#if store.categories.length && !store.loading}
       <div class="panel-row" id="group-head">
         <span class="eyebrow">Gruppi</span>
+        <button
+          id="add-group"
+          class="ghost-icon"
+          type="button"
+          title="Aggiungi un gruppo"
+          onclick={() => ui.toggleManage('groups', 'add')}
+        >
+          <Icon name="plus" />
+        </button>
       </div>
       <div id="group-filters">
-        <Chip
-          label="Tutti"
-          count={store.places.length}
-          look={store.activeGroup === null ? 'sel' : 'off'}
-          onclick={() => pickGroup(null)}
-        />
+        {#if store.groups.length}
+          <Chip
+            label="Tutti"
+            count={store.places.length}
+            look={store.activeGroup === null ? 'sel' : 'off'}
+            onclick={() => pickGroup(null)}
+          />
+        {:else}
+          <p class="section-hint">Una città, un viaggio, una lista: i gruppi tagliano l'indice per dove stanno i posti.</p>
+        {/if}
         {#each shownGroups as group (group.id)}
           <Chip
             label={group.name}
@@ -130,13 +143,13 @@
               </button>
             {/if}
             <button
-              id="manage-btn"
+              id="add-category"
               class="ghost-icon"
               type="button"
-              title="Gestisci categorie e gruppi"
-              onclick={() => ui.toggleManage()}
+              title="Aggiungi una categoria"
+              onclick={() => ui.toggleManage('categories', 'add')}
             >
-              <Icon name="filters" />
+              <Icon name="plus" />
             </button>
           </span>
         </div>
@@ -259,6 +272,14 @@
 }
 
 .link-btn:hover { background: var(--sunken-hover); color: var(--ink); }
+
+.section-hint {
+  margin: 0;
+  padding: 0 6px 2px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
 
 /* filters ----------------------------------------------------------------- */
 

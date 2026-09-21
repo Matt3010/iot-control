@@ -12,7 +12,7 @@
     <p class="empty-line">
       Le dai un'emoji e un colore: sarà il marker dei posti che ci metti dentro.
     </p>
-    <button type="button" class="ghost" onclick={() => ui.openManage('categories')}>
+    <button type="button" class="ghost" onclick={() => ui.openManage('categories', 'add')}>
       Crea una categoria
     </button>
   {:else}
