@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { DEFAULT_EMOJI, SUGGESTED } from '../lib/format';
+  import { DEFAULT_EMOJI, normalise, SUGGESTED } from '../lib/format';
+  import { fadeEdges } from '../lib/overflow';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { swipeToClose } from '../lib/swipe';
@@ -10,6 +11,21 @@
   let newColor = $state<string>(SUGGESTED[0]!);
   let newCategoryName = $state('');
   let newGroupName = $state('');
+
+  /** Oltre una decina di voci scorrerle non basta più: serve poterle cercare. */
+  const MANY = 8;
+  let categoryFilter = $state('');
+  let groupFilter = $state('');
+
+  const match = (name: string, needle: string) =>
+    normalise(name).includes(normalise(needle.trim()));
+
+  const visibleCategories = $derived(
+    categoryFilter.trim() ? store.categories.filter((c) => match(c.name, categoryFilter)) : store.categories,
+  );
+  const visibleGroups = $derived(
+    groupFilter.trim() ? store.groups.filter((g) => match(g.name, groupFilter)) : store.groups,
+  );
 
   async function addCategory(event: SubmitEvent) {
     event.preventDefault();
@@ -74,8 +90,11 @@
 
   {#if ui.manageTab === 'categories'}
     <div class="tab-panel">
-      <ul id="category-list">
-        {#each store.categories as category (category.id)}
+      {#if store.categories.length > MANY}
+        <input class="list-filter" type="search" placeholder="Filtra le categorie" bind:value={categoryFilter} />
+      {/if}
+      <ul id="category-list" data-fade="none" use:fadeEdges>
+        {#each visibleCategories as category (category.id)}
           <li>
             <button
               type="button"
@@ -114,6 +133,9 @@
             </button>
           </li>
         {/each}
+        {#if store.categories.length && !visibleCategories.length}
+          <li class="list-empty">Nessuna categoria con questo nome.</li>
+        {/if}
       </ul>
 
       <form id="category-form" class="add-row" class:is-ready={newCategoryName.trim()} onsubmit={addCategory}>
@@ -141,8 +163,11 @@
     </div>
   {:else}
     <div class="tab-panel">
-      <ul id="group-list">
-        {#each store.groups as group (group.id)}
+      {#if store.groups.length > MANY}
+        <input class="list-filter" type="search" placeholder="Filtra i gruppi" bind:value={groupFilter} />
+      {/if}
+      <ul id="group-list" data-fade="none" use:fadeEdges>
+        {#each visibleGroups as group (group.id)}
           <li>
             <input
               type="text"
@@ -161,6 +186,9 @@
             </button>
           </li>
         {/each}
+        {#if store.groups.length && !visibleGroups.length}
+          <li class="list-empty">Nessun gruppo con questo nome.</li>
+        {/if}
       </ul>
 
       <form id="group-form" class="add-row" class:is-ready={newGroupName.trim()} onsubmit={addGroup}>
@@ -171,7 +199,8 @@
       </form>
 
       <p class="sheet-note">
-        Un gruppo è dove stanno i posti: una città, un viaggio, una lista. Un posto ne porta uno solo.
+        Un gruppo è dove stanno i posti: una città, un viaggio, una lista. Un posto ne può portare
+        quanti ne vuoi.
       </p>
     </div>
   {/if}
@@ -328,6 +357,39 @@
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
   white-space: nowrap;
+}
+
+/* la lista scorre dentro di sé: la riga che aggiunge resta sempre sotto gli occhi */
+#category-list, #group-list {
+  max-height: min(46vh, 340px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+:global(#category-list[data-fade='bottom']), :global(#group-list[data-fade='bottom']) {
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 20px), transparent);
+}
+
+:global(#category-list[data-fade='top']), :global(#group-list[data-fade='top']) {
+  -webkit-mask-image: linear-gradient(0deg, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(0deg, #000 calc(100% - 20px), transparent);
+}
+
+:global(#category-list[data-fade='both']), :global(#group-list[data-fade='both']) {
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+}
+
+.list-filter {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.list-empty {
+  padding: 10px 8px;
+  font-size: 12.5px;
+  color: var(--ink-3);
 }
 
 #category-list {

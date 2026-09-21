@@ -15,6 +15,22 @@
    * aprendo una sheet il pannello si fa piccolo da solo, e resta come lo
    * lasci se lo apri o lo chiudi a mano.
    */
+  /**
+   * Oltre una certa soglia i chip diventano un muro: si mostrano i primi e
+   * il resto sta dietro a un "+N", che resta aperto se lo apri.
+   */
+  const CAP = { groups: 6, categories: 8 };
+  let allGroups = $state(false);
+  let allCategories = $state(false);
+
+  const shownGroups = $derived(allGroups ? store.groups : store.groups.slice(0, CAP.groups));
+  const shownCategories = $derived(
+    allCategories ? store.categories : store.categories.slice(0, CAP.categories),
+  );
+  const hiddenGroups = $derived(store.groups.length - shownGroups.length);
+  const hiddenCategories = $derived(store.categories.length - shownCategories.length);
+  const everythingVisible = $derived(store.hiddenCategories.length === 0);
+
   const collapsed = $derived(
     viewport.narrow && (ui.panelWish === 'closed' || (ui.panelWish === 'auto' && ui.sheet !== 'none')),
   );
@@ -79,7 +95,7 @@
           look={store.activeGroup === null ? 'sel' : 'off'}
           onclick={() => pickGroup(null)}
         />
-        {#each store.groups as group (group.id)}
+        {#each shownGroups as group (group.id)}
           <Chip
             label={group.name}
             count={store.countGroup(group.id)}
@@ -87,6 +103,11 @@
             onclick={() => pickGroup(group.id)}
           />
         {/each}
+        {#if hiddenGroups > 0}
+          <Chip label={'+' + hiddenGroups} look="off" onclick={() => (allGroups = true)} />
+        {:else if allGroups && store.groups.length > CAP.groups}
+          <Chip label="meno" look="off" onclick={() => (allGroups = false)} />
+        {/if}
       </div>
     {/if}
 
@@ -96,19 +117,32 @@
       {#if store.categories.length}
         <div class="panel-row">
           <span class="eyebrow">Categorie</span>
-          <button
-            id="manage-btn"
-            class="ghost-icon"
-            type="button"
-            title="Gestisci categorie e gruppi"
-            onclick={() => ui.toggleManage()}
-          >
-            <Icon name="filters" />
-          </button>
+          <span class="row-actions">
+            {#if store.categories.length > 1}
+              <button
+                class="link-btn"
+                type="button"
+                title={everythingVisible ? 'Nascondile tutte' : 'Mostrale tutte'}
+                onclick={() =>
+                  everythingVisible ? store.hideAllCategories() : store.showAllCategories()}
+              >
+                {everythingVisible ? 'nessuna' : 'tutte'}
+              </button>
+            {/if}
+            <button
+              id="manage-btn"
+              class="ghost-icon"
+              type="button"
+              title="Gestisci categorie e gruppi"
+              onclick={() => ui.toggleManage()}
+            >
+              <Icon name="filters" />
+            </button>
+          </span>
         </div>
 
         <div id="filters">
-          {#each store.categories as category (category.id)}
+          {#each shownCategories as category (category.id)}
             <Chip
               color={category.color}
               emoji={category.emoji}
@@ -118,6 +152,11 @@
               onclick={() => store.toggleCategory(category.id)}
             />
           {/each}
+          {#if hiddenCategories > 0}
+            <Chip label={'+' + hiddenCategories} look="off" onclick={() => (allCategories = true)} />
+          {:else if allCategories && store.categories.length > CAP.categories}
+            <Chip label="meno" look="off" onclick={() => (allCategories = false)} />
+          {/if}
         </div>
       {/if}
 
@@ -200,6 +239,26 @@
   padding-left: 6px;
   margin-bottom: -4px;
 }
+
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.link-btn {
+  border: 0;
+  border-radius: 99px;
+  padding: 3px 8px;
+  background: none;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, color 0.15s;
+}
+
+.link-btn:hover { background: var(--sunken-hover); color: var(--ink); }
 
 /* filters ----------------------------------------------------------------- */
 

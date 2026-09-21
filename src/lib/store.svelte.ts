@@ -96,6 +96,17 @@ class Store {
     writeJSON('pi.hidden', this.hiddenCategories);
   }
 
+  /** Tutte o nessuna: con trenta categorie spegnerle a una a una non è un lavoro. */
+  showAllCategories(): void {
+    this.hiddenCategories = [];
+    writeJSON('pi.hidden', this.hiddenCategories);
+  }
+
+  hideAllCategories(): void {
+    this.hiddenCategories = this.categories.map((category) => category.id);
+    writeJSON('pi.hidden', this.hiddenCategories);
+  }
+
   setGroup(id: string | null): void {
     this.activeGroup = id;
     writeJSON('pi.group', id);
