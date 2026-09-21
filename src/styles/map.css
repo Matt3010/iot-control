@@ -121,24 +121,39 @@
   top: 50%;
   left: 50%;
   z-index: var(--z-panel);
-  width: 15px;
-  height: 15px;
-  margin: -7.5px 0 0 -7.5px;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
   border-radius: 50%;
-  border: 1.5px solid rgb(255 255 255 / 0.55);
-  box-shadow: 0 0 0 1px rgb(10 13 18 / 0.35), inset 0 0 0 1px rgb(10 13 18 / 0.25);
-  opacity: 0.45;
+  /* bianco pieno con un contorno scuro: si legge sia sull'asfalto che sui
+     parchi, senza dover alzare la voce */
+  border: 1.5px solid rgb(255 255 255 / 0.95);
+  box-shadow: 0 0 0 1.5px rgb(10 13 18 / 0.5), inset 0 0 0 1.5px rgb(10 13 18 / 0.45);
+  opacity: 0.8;
   pointer-events: none;
   transition: opacity 0.18s, transform 0.18s var(--ease);
+}
+
+/* i quattro trattini fanno il mirino: un cerchietto da solo sembrerebbe un pin */
+#centre-mark::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  background:
+    linear-gradient(rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.95)) 50% 0 / 1.5px 4px no-repeat,
+    linear-gradient(rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.95)) 50% 100% / 1.5px 4px no-repeat,
+    linear-gradient(rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.95)) 0 50% / 4px 1.5px no-repeat,
+    linear-gradient(rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.95)) 100% 50% / 4px 1.5px no-repeat;
+  filter: drop-shadow(0 0 1px rgb(10 13 18 / 0.6));
 }
 
 #centre-mark::after {
   content: "";
   position: absolute;
-  inset: 5px;
+  inset: 5.5px;
   border-radius: 50%;
-  background: rgb(255 255 255 / 0.85);
-  box-shadow: 0 0 0 1px rgb(10 13 18 / 0.35);
+  background: rgb(255 255 255 / 0.95);
+  box-shadow: 0 0 0 1px rgb(10 13 18 / 0.45);
 }
 
 /* passando sopra l'etichetta nell'indice, il centro si fa riconoscere */
