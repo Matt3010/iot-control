@@ -9,23 +9,14 @@
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
   import Icon from './Icon.svelte';
+  import LinkRow from './LinkRow.svelte';
+  import Switch from './Switch.svelte';
 
   let newEmoji = $state(DEFAULT_EMOJI);
   let newColor = $state<string>(SUGGESTED[0]!);
   let newCategoryName = $state('');
   let newGroupName = $state('');
   let newMapName = $state('');
-  let copied = $state('');
-
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      copied = text;
-      setTimeout(() => (copied = copied === text ? '' : copied), 1600);
-    } catch {
-      toast.show('Copia non riuscita: il link è quello che vedi');
-    }
-  }
 
   /** Oltre una decina di voci scorrerle non basta più: serve poterle cercare. */
   const MANY = 8;
@@ -256,36 +247,21 @@
                 {places}
                 {places === 1 ? 'posto' : 'posti'}{open ? ' · aperta' : ''}
               </span>
-              <label class="switch" title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}>
-                <input
-                  type="checkbox"
-                  checked={map.published}
-                  onchange={(event) => store.patchMap(map, { published: event.currentTarget.checked })}
-                />
-                <span class="switch-track"><span class="switch-dot"></span></span>
-                <span class="switch-name">{map.published ? 'Pubblica' : 'Solo tua'}</span>
-              </label>
+              <Switch
+                checked={map.published}
+                onchange={(published) => store.patchMap(map, { published })}
+                label={map.published ? 'Pubblica' : 'Solo tua'}
+                title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}
+              />
             </div>
 
             {#if map.published}
-              <div class="link-row">
-                <span class="link-prefix">/u/{auth.account?.handle}/</span>
-                <input
-                  class="link-slug"
-                  type="text"
-                  maxlength="40"
-                  value={map.slug}
-                  onchange={(event) => store.patchMap(map, { slug: event.currentTarget.value })}
-                />
-                <button
-                  type="button"
-                  class="ghost-icon"
-                  title="Copia il link"
-                  onclick={() => copy(url)}
-                >
-                  <Icon name={copied === url ? 'check' : 'link'} />
-                </button>
-              </div>
+              <LinkRow
+                prefix={'/u/' + (auth.account?.handle ?? '') + '/'}
+                value={map.slug}
+                {url}
+                onchange={(slug) => store.patchMap(map, { slug })}
+              />
             {/if}
           </li>
         {/each}
@@ -302,18 +278,12 @@
         <div class="profile-link">
           <span class="eyebrow">Un link per tutte</span>
           <p>Le mappe pubblicate stanno insieme qui: è l'indirizzo da mettere in bio.</p>
-          <div class="link-row">
-            <span class="link-prefix">/u/</span>
-            <span class="link-handle">{auth.account?.handle}</span>
-            <button
-              type="button"
-              class="ghost-icon"
-              title="Copia il link del profilo"
-              onclick={() => copy(profileUrl(auth.account?.handle ?? ''))}
-            >
-              <Icon name={copied === profileUrl(auth.account?.handle ?? '') ? 'check' : 'link'} />
-            </button>
-          </div>
+          <LinkRow
+            prefix="/u/"
+            value={auth.account?.handle ?? ''}
+            url={profileUrl(auth.account?.handle ?? '')}
+            title="Copia il link del profilo"
+          />
         </div>
       {/if}
 
@@ -583,78 +553,6 @@
 
 #map-list .ghost-icon:disabled { opacity: 0.3; cursor: default; }
 
-.switch { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-
-.switch-track {
-  position: relative;
-  flex: none;
-  width: 34px;
-  height: 20px;
-  border-radius: 99px;
-  background: var(--sunken-hover);
-  box-shadow: inset 0 0 0 1px var(--hairline);
-  transition: background 0.18s;
-}
-
-.switch-dot {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--glass-strong);
-  box-shadow: var(--shadow-1);
-  transition: transform 0.18s var(--ease);
-}
-
-.switch input:checked + .switch-track { background: var(--accent); }
-.switch input:checked + .switch-track .switch-dot { transform: translateX(14px); }
-.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-/* l'etichetta dice lo stato; il perché sta una volta sola, in fondo */
-.switch-name {
-  font-size: 12px;
-  font-weight: 540;
-  color: var(--ink-3);
-  transition: color 0.16s;
-}
-
-.map-card.is-public .switch-name { color: var(--ink); }
-
-.link-row {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 2px 2px 8px;
-  border-radius: var(--r-sm);
-  background: var(--glass-strong);
-  box-shadow: inset 0 0 0 1px var(--hairline-soft);
-  animation: rise 0.2s var(--ease);
-}
-
-.profile-link .link-row { background: var(--sunken); box-shadow: none; }
-
-.link-prefix, .link-handle {
-  font-size: 12px;
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-}
-
-.link-handle { color: var(--ink); font-weight: 540; flex: 1; }
-
-.link-slug {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 4px;
-  background: none;
-  border-color: transparent;
-  font-size: 12px;
-}
-
-.link-slug:hover, .link-slug:focus { background: var(--glass-strong); box-shadow: none; }
-
 .profile-link {
   display: grid;
   gap: 6px;
@@ -664,6 +562,9 @@
 }
 
 .profile-link p { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
+
+/* lì dentro la riga sta su una scheda, non su una card: si smorza */
+.profile-link :global(.link-row) { background: var(--sunken); box-shadow: none; }
 
 #group-list:empty { display: none; }
 

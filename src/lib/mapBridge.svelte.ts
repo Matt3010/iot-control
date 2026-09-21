@@ -23,8 +23,24 @@ class MapBridge {
     this.#markers = markers;
   }
 
+  /** La mappa se ne va (uscita, ricarica a caldo): il ponte non la trattiene. */
+  detach(map: LeafletMap): void {
+    if (this.#map !== map) return; // ne è già arrivata un'altra: non è roba sua
+    this.#map = null;
+    this.#markers = new Map();
+  }
+
+  /**
+   * Una mappa rimossa lascia in giro l'oggetto ma non i suoi pannelli: chiederle
+   * i confini la farebbe scoppiare. Qui passa solo se è ancora viva.
+   */
+  get #live(): LeafletMap | null {
+    const map = this.#map;
+    return map && (map as unknown as { _mapPane?: HTMLElement })._mapPane ? map : null;
+  }
+
   get map(): LeafletMap | null {
-    return this.#map;
+    return this.#live;
   }
 
   markerFor(place: LocalPlace): Marker | undefined {
@@ -41,7 +57,7 @@ class MapBridge {
   }
 
   focus(place: LocalPlace): void {
-    const map = this.#map;
+    const map = this.#live;
     const marker = this.markerFor(place);
     if (!map || !marker) return;
     map.flyTo([place.lat, place.lng], Math.max(map.getZoom(), CLUSTER_OFF_AT), { duration: 0.7 });
@@ -50,23 +66,23 @@ class MapBridge {
 
   /** Picking "Padova" should take you to Padova, not leave you where you were. */
   flyToPoints(points: [number, number][]): void {
-    const map = this.#map;
+    const map = this.#live;
     if (!map || !points.length) return;
     map.flyToBounds(points, { padding: [70, 70], maxZoom: 15, duration: 0.8 });
   }
 
   goTo(lat: number, lng: number, minZoom: number): void {
-    const map = this.#map;
+    const map = this.#live;
     if (!map) return;
     map.setView([lat, lng], Math.max(map.getZoom(), minZoom));
   }
 
   contains(lat: number, lng: number): boolean {
-    return this.#map?.getBounds().contains([lat, lng]) ?? false;
+    return this.#live?.getBounds().contains([lat, lng]) ?? false;
   }
 
   distanceFromCentre(lat: number, lng: number): number {
-    return this.#map?.getCenter().distanceTo([lat, lng]) ?? 0;
+    return this.#live?.getCenter().distanceTo([lat, lng]) ?? 0;
   }
 }
 

@@ -169,6 +169,7 @@
     });
 
     return () => {
+      mapBridge.detach(map);
       map.remove();
       markers.clear();
     };

@@ -1,4 +1,5 @@
 import {
+  AlertCircle,
   ArrowRight,
   AtSign,
   Check,
@@ -37,6 +38,7 @@ export const ICONS = {
   logout: LogOut,
   link: Link2,
   handle: AtSign,
+  alert: AlertCircle,
   check: Check,
 } as const;
 

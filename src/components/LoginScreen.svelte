@@ -1,7 +1,9 @@
 <script lang="ts">
   import { auth } from '../lib/auth.svelte';
+  import Alert from './Alert.svelte';
   import Icon from './Icon.svelte';
   import MapBackdrop from './MapBackdrop.svelte';
+  import Stop from './Stop.svelte';
 
   let email = $state('');
   let password = $state('');
@@ -15,6 +17,8 @@
 
   const firstRun = $derived(auth.needsSetup);
   const creating = $derived(firstRun || wantsAccount);
+  /** Quando l'errore porta già la sua via d'uscita, in fondo non serve ripeterla. */
+  const errorLeadsBack = $derived(creating && !firstRun && /email.*registrata/.test(error));
 
   /** Sta in un indirizzo: minuscolo, senza accenti, senza spazi. */
   const toHandle = (text: string) =>
@@ -57,67 +61,66 @@
     </header>
 
     <div class="stops">
-      <label class="stop">
-        <span class="stop-pin" style:--c="#2f6fed"><span class="stop-glyph"><Icon name="mail" /></span></span>
-        <span class="stop-card">
-          <span class="eyebrow">Email</span>
-          <input
-            type="email"
-            name="email"
-            autocomplete="username"
-            placeholder="tu@esempio.it"
-            required
-            bind:value={email}
-          />
-        </span>
-      </label>
+      <Stop icon="mail" color="#2f6fed" label="Email">
+        <input
+          type="email"
+          name="email"
+          autocomplete="username"
+          placeholder="tu@esempio.it"
+          required
+          bind:value={email}
+        />
+      </Stop>
 
-      <label class="stop">
-        <span class="stop-pin" style:--c="#6a4c93"><span class="stop-glyph"><Icon name="lock" /></span></span>
-        <span class="stop-card">
-          <span class="eyebrow">Password</span>
-          <input
-            type="password"
-            name="password"
-            autocomplete={creating ? 'new-password' : 'current-password'}
-            placeholder={creating ? 'almeno otto caratteri' : '••••••••'}
-            required
-            minlength={creating ? 8 : undefined}
-            bind:value={password}
-          />
-        </span>
-      </label>
+      <Stop icon="lock" color="#6a4c93" label="Password">
+        <input
+          type="password"
+          name="password"
+          autocomplete={creating ? 'new-password' : 'current-password'}
+          placeholder={creating ? 'almeno otto caratteri' : '••••••••'}
+          required
+          minlength={creating ? 8 : undefined}
+          bind:value={password}
+        />
+      </Stop>
 
       {#if creating}
-        <label class="stop">
-          <span class="stop-pin" style:--c="#1f7a5c"><span class="stop-glyph"><Icon name="handle" /></span></span>
-          <span class="stop-card">
-            <span class="eyebrow">Nome utente</span>
-            <input
-              type="text"
-              name="handle"
-              autocomplete="username"
-              placeholder="come-ti-chiami"
-              required
-              minlength="3"
-              maxlength="20"
-              value={chosenHandle}
-              oninput={(event) => {
-                chosen = true;
-                handle = toHandle(event.currentTarget.value);
-                event.currentTarget.value = handle;
-              }}
-            />
-            <span class="stop-hint">
-              Le tue mappe pubbliche staranno qui: <b>/u/{chosenHandle || 'nome-utente'}</b>
-            </span>
+        <Stop icon="handle" color="#1f7a5c" label="Nome utente">
+          <input
+            type="text"
+            name="handle"
+            autocomplete="username"
+            placeholder="come-ti-chiami"
+            required
+            minlength="3"
+            maxlength="20"
+            value={chosenHandle}
+            oninput={(event) => {
+              chosen = true;
+              handle = toHandle(event.currentTarget.value);
+              event.currentTarget.value = handle;
+            }}
+          />
+          <span class="stop-hint">
+            Le tue mappe pubbliche staranno qui: <b>/u/{chosenHandle || 'nome-utente'}</b>
           </span>
-        </label>
+        </Stop>
       {/if}
     </div>
 
     {#if error}
-      <p class="route-error" role="alert">{error}</p>
+      <Alert
+        message={error}
+        action={errorLeadsBack
+          ? {
+              label: 'Entra',
+              run: () => {
+                wantsAccount = false;
+                error = '';
+              },
+            }
+          : undefined}
+      />
     {/if}
 
     <button class="primary go" type="submit" disabled={working}>
@@ -125,7 +128,7 @@
       <Icon name="submit" />
     </button>
 
-    {#if !firstRun}
+    {#if !firstRun && !errorLeadsBack}
       {#if auth.signupOpen}
         <p class="route-foot">
           {creating ? 'Hai già un accesso?' : "Non ce l'hai ancora?"}
@@ -211,52 +214,8 @@
     gap: 14px;
   }
 
-  .stops::before {
-    content: "";
-    position: absolute;
-    left: 17px;
-    top: 34px;
-    bottom: 34px;
-    width: 0;
-    border-left: 2px dashed color-mix(in srgb, var(--ink-3) 45%, transparent);
-  }
-
-  .stop {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .stop-pin {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: 36px;
-    height: 36px;
-    border-radius: 50% 50% 50% 6px;
-    transform: rotate(-45deg);
-    background: var(--c);
-    background-image: linear-gradient(135deg, rgb(255 255 255 / 0.32), rgb(255 255 255 / 0) 55%);
-    border: 2px solid rgb(255 255 255 / 0.92);
-    box-shadow: 0 5px 14px -4px rgb(10 13 18 / 0.55), inset 0 -2px 6px rgb(0 0 0 / 0.14);
-  }
-
-  .stop-glyph {
-    display: grid;
-    place-items: center;
-    transform: rotate(45deg);
-    color: #fff;
-  }
-
-  .stop-glyph :global(.ico) { width: 16px; height: 16px; }
-
-  .stop-card { display: grid; gap: 4px; flex: 1; min-width: 0; }
-
-  /* il link non è una promessa astratta: si legge mentre lo scrivi */
-  .stop-hint {
+  /* i campi dentro le tappe sono di un altro componente: vanno raggiunti */
+  .stops :global(.stop-hint) {
     font-size: 11px;
     line-height: 1.4;
     color: var(--ink-3);
@@ -265,12 +224,16 @@
     white-space: nowrap;
   }
 
-  .stop-hint b { font-weight: 560; color: var(--ink-2); }
+  .stops :global(.stop-hint b) { font-weight: 560; color: var(--ink-2); }
 
-  .route-error {
-    margin: -6px 0 0;
-    font-size: 12.5px;
-    color: var(--danger);
+  .stops::before {
+    content: "";
+    position: absolute;
+    left: 17px;
+    top: 34px;
+    bottom: 34px;
+    width: 0;
+    border-left: 2px dashed color-mix(in srgb, var(--ink-3) 45%, transparent);
   }
 
   .go {
@@ -301,10 +264,6 @@
     font-weight: 560;
     text-decoration: underline;
     text-underline-offset: 2px;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .stop-pin { border-color: rgb(255 255 255 / 0.8); }
   }
 
   @media (max-width: 600px) {
