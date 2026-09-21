@@ -235,6 +235,7 @@
             >
               In vista
             </button>
+            <span class="split" aria-hidden="true"></span>
             <button
               type="button"
               class="mode"
@@ -336,36 +337,44 @@
 
 .list-end { display: flex; align-items: center; gap: 8px; }
 
-/* l'interruttore dell'indice: due parole in una pista, non due bottoni */
+/* la testata appartiene alla lista che sta sotto, non allo spazio sopra */
+#list-head { margin-top: 10px; }
+
+/* Non un interruttore appoggiato sopra il pannello, ma la stessa etichetta
+   delle altre sezioni che sa stare in due modi: quella accesa è il titolo,
+   l'altra è lì pronta. */
 .modes {
   display: flex;
   align-items: center;
-  gap: 1px;
-  padding: 2px;
-  margin-left: -2px;
-  border-radius: 99px;
-  background: var(--sunken);
+  gap: 8px;
 }
 
 .mode {
-  padding: 3px 9px;
+  padding: 0;
   border: 0;
-  border-radius: 99px;
   background: none;
-  color: var(--ink-3);
   font-size: 10.5px;
-  font-weight: 620;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  letter-spacing: 0.085em;
   text-transform: uppercase;
-  transition: background 0.16s, color 0.16s;
+  color: var(--ink-3);
+  opacity: 0.55;
+  transition: color 0.16s, opacity 0.16s;
 }
 
-.mode:hover { color: var(--ink-2); }
+.mode:hover { opacity: 1; }
 
 .mode.is-on {
-  background: var(--glass-strong);
   color: var(--ink);
-  box-shadow: var(--shadow-1);
+  opacity: 1;
+}
+
+.modes .split {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  opacity: 0.35;
 }
 
 .list-hint {
