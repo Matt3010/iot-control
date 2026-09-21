@@ -34,6 +34,13 @@
   --shadow-2: 0 2px 6px rgb(10 13 18 / 0.06), 0 14px 32px -10px rgb(10 13 18 / 0.22);
   --shadow-3: 0 4px 10px rgb(10 13 18 / 0.08), 0 28px 60px -16px rgb(10 13 18 / 0.34);
 
+  /* stacking: Leaflet's control corners sit at 1000, the overlay goes above */
+  --z-panel: 1100;
+  --z-hint: 1200;
+  --z-sheet: 1300;
+  --z-popover: 1400;
+  --z-toast: 1500;
+
   /* geometry */
   --r-lg: 20px;
   --r-md: 13px;
@@ -245,7 +252,7 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
   position: absolute;
   top: 14px;
   left: 14px;
-  z-index: 500;
+  z-index: var(--z-panel);
   width: min(326px, calc(100vw - 28px));
   max-height: calc(100vh - 116px);
   padding: 12px;
@@ -408,7 +415,7 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
   position: absolute;
   right: 18px;
   bottom: calc(22px + env(safe-area-inset-bottom));
-  z-index: 500;
+  z-index: var(--z-panel);
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -444,7 +451,7 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
   top: 18px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 550;
+  z-index: var(--z-hint);
   display: flex;
   align-items: center;
   gap: 9px;
@@ -477,7 +484,7 @@ aside {
   position: absolute;
   top: 14px;
   right: 14px;
-  z-index: 600;
+  z-index: var(--z-sheet);
   width: min(356px, calc(100vw - 28px));
   max-height: calc(100vh - 28px);
   padding: 16px;
@@ -610,7 +617,7 @@ aside header {
 
 #emoji-popover {
   position: absolute;
-  z-index: 900;
+  z-index: var(--z-popover);
   padding: 0;
   overflow: hidden;
   border-radius: var(--r-lg);
@@ -816,7 +823,7 @@ emoji-picker {
   position: absolute;
   left: 50%;
   bottom: calc(28px + env(safe-area-inset-bottom));
-  z-index: 900;
+  z-index: var(--z-toast);
   padding: 10px 18px;
   border-radius: 99px;
   background: rgb(14 17 22 / 0.88);
@@ -896,6 +903,11 @@ emoji-picker {
 
   #hint { top: auto; bottom: calc(76px + env(safe-area-inset-bottom)); }
   #toast { bottom: calc(76px + env(safe-area-inset-bottom)); }
+
+  /* an open sheet fills the bottom: the add button and the zoom would sit under it */
+  .sheet-open #add-btn,
+  .sheet-open .leaflet-control-zoom { display: none; }
+  .sheet-open #toast { bottom: calc(12px + env(safe-area-inset-bottom)); }
 
   /* keep zoom + attribution clear of the full-width add button */
   .leaflet-bottom.leaflet-left { margin-bottom: calc(62px + env(safe-area-inset-bottom)); }

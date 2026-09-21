@@ -350,10 +350,17 @@ function clearDraftMarker() {
   }
 }
 
+/** On a narrow screen an open sheet covers the bottom, where the map chrome lives. */
+function syncSheetState() {
+  const open = !el.placeSheet.hidden || !el.categorySheet.hidden;
+  document.body.classList.toggle('sheet-open', open);
+}
+
 function openPlaceSheet(place) {
   draft = { ...place };
   closeCategorySheet();
   el.placeSheet.hidden = false;
+  syncSheetState();
   el.placeTitle.textContent = place.id ? 'Modifica posto' : 'Nuovo posto';
   el.placeForm.elements.name.value = place.name || '';
   el.placeForm.elements.note.value = place.note || '';
@@ -382,16 +389,19 @@ function closePlaceSheet() {
   el.placeSheet.hidden = true;
   draft = null;
   clearDraftMarker();
+  syncSheetState();
 }
 
 function openCategorySheet() {
   el.categorySheet.hidden = false;
   renderCategoryList();
+  syncSheetState();
 }
 
 function closeCategorySheet() {
   el.categorySheet.hidden = true;
   closeEmojiPicker();
+  syncSheetState();
 }
 
 el.placeForm.addEventListener('submit', async (event) => {
