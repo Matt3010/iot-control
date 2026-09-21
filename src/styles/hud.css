@@ -74,6 +74,8 @@
 #toast {
   position: absolute;
   left: 50%;
+  /* the resting state has to centre on its own: toast-in only animates from it */
+  transform: translateX(-50%);
   bottom: calc(28px + env(safe-area-inset-bottom));
   z-index: var(--z-toast);
   display: flex;
