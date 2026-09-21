@@ -39,14 +39,26 @@
     viewport.narrow && (ui.panelWish === 'closed' || (ui.panelWish === 'auto' && ui.sheet !== 'none')),
   );
 
-  /** The index itself: what is on screen right now, nearest first. */
+  /** Il modo "vicino a me" vale solo se sappiamo dove sei. */
+  const near = $derived(store.listMode === 'near' && !!here.spot);
+
+  /**
+   * L'indice: quello che è inquadrato adesso, dal più vicino. Oppure, in
+   * strada, i più vicini a te ovunque siano: lì il riquadro non conta.
+   */
   const rows = $derived.by(() => {
     mapBridge.view.moves; // re-read whenever the map settles somewhere new
     return store.currentPlaces
-      .filter((place) => store.visible(place) && mapBridge.contains(place.lat, place.lng))
+      .filter((place) => store.visible(place) && (near || mapBridge.contains(place.lat, place.lng)))
       .map((place) => ({ place, distance: mapBridge.distanceFrom(place.lat, place.lng) }))
       .sort((a, b) => a.distance - b.distance);
   });
+
+  /** Chiedere "vicino a me" senza aver mai detto dove sei attiva la domanda. */
+  function goNear() {
+    store.setListMode('near');
+    if (!here.spot) here.locate();
+  }
 
   function pickGroup(id: string | null) {
     store.setGroup(id === store.activeGroup ? null : id);
@@ -203,13 +215,38 @@
 
       {#if store.currentPlaces.length}
         <div class="panel-row" id="list-head">
-          <span class="eyebrow">In vista</span>
+          <!-- due modi di leggere lo stesso indice: il riquadro, o le gambe -->
+          <div class="modes" role="group" aria-label="Cosa elencare">
+            <button
+              type="button"
+              class="mode"
+              class:is-on={!near}
+              aria-pressed={!near}
+              title="I posti inquadrati adesso"
+              onclick={() => store.setListMode('view')}
+            >
+              In vista
+            </button>
+            <button
+              type="button"
+              class="mode"
+              class:is-on={near}
+              aria-pressed={near}
+              title={here.spot
+                ? 'I tuoi posti più vicini, ovunque siano'
+                : 'Chiede al browser dove sei, poi elenca i posti più vicini'}
+              onclick={goNear}
+            >
+              {here.asking ? 'Ti cerco…' : 'Vicino a me'}
+            </button>
+          </div>
           <span class="list-end">
             <!-- i chilometri partono da qualcosa: qui si dice da cosa, e
                  passandoci sopra quel qualcosa si illumina sulla mappa -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <span
               class="list-hint"
+              hidden={near}
               title={here.spot
                 ? 'Le distanze partono da dove sei'
                 : 'Le distanze partono dal centro della mappa, il cerchietto chiaro'}
@@ -221,7 +258,7 @@
             <span id="list-count" class="tally">{rows.length}</span>
           </span>
         </div>
-        <PlaceList {rows} />
+        <PlaceList {rows} {near} />
       {:else}
         <EmptyState />
       {/if}
@@ -292,6 +329,38 @@
 }
 
 .list-end { display: flex; align-items: center; gap: 8px; }
+
+/* l'interruttore dell'indice: due parole in una pista, non due bottoni */
+.modes {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  margin-left: -2px;
+  border-radius: 99px;
+  background: var(--sunken);
+}
+
+.mode {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 99px;
+  background: none;
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background 0.16s, color 0.16s;
+}
+
+.mode:hover { color: var(--ink-2); }
+
+.mode.is-on {
+  background: var(--glass-strong);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
 
 .list-hint {
   font-size: 10.5px;

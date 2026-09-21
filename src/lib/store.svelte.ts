@@ -38,6 +38,11 @@ class Store {
   /** Per-browser view preferences, not server state. */
   hiddenCategories = $state<string[]>(readJSON('pi.hidden', []));
   activeGroup = $state<string | null>(readJSON('pi.group', null));
+  /**
+   * Cosa elenca il pannello: quello che sta nel riquadro ('view'), oppure i
+   * posti più vicini a te ovunque siano ('near'). In strada serve il secondo.
+   */
+  listMode = $state<'view' | 'near'>(readJSON('pi.list', 'view'));
 
   /** Deletes shown as done but not yet sent, so "Annulla" costs nothing. */
   #pending = new Set<PendingDelete>();
@@ -154,6 +159,11 @@ class Store {
     if (!this.extraMapIds.includes(id)) return;
     this.extraMapIds = this.extraMapIds.filter((other) => other !== id);
     writeJSON('pi.maps', this.extraMapIds);
+  }
+
+  setListMode(mode: 'view' | 'near'): void {
+    this.listMode = mode;
+    writeJSON('pi.list', mode);
   }
 
   /* ----------------------------------------------------------------- reads */

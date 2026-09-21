@@ -29,11 +29,14 @@ Niente categorie preimpostate, niente fronzoli.
 - **Gruppi**: filtro a parte dalle categorie, e un posto ne porta quanti ne vuoi — la stessa
   pizzeria può stare in "Padova" e in "Da rifare". Scegli un gruppo e la mappa ci vola, i
   conteggi delle categorie si ricalcolano dentro quel gruppo: *pizzeria a Padova* è due clic.
-- **L'indice nel pannello**: i posti inquadrati in quel momento, dal più vicino. Il tasto sopra
-  allo zoom chiede al browser dove sei: compare il puntino con il suo alone e le distanze
-  partono da lì (l'intestazione dice *da dove sei* invece di *dal centro*). Senza permesso — o
-  senza https — si misura dal centro di quello che stai guardando. Passi sopra una riga e il suo
-  pin si solleva; ci clicchi e la mappa ci vola aprendo la scheda.
+- **L'indice nel pannello**, in due modi. *In vista*: i posti inquadrati in quel momento, dal
+  più vicino. *Vicino a me*: i tuoi posti più vicini **ovunque siano**, che è quello che serve
+  in strada — sei a Porta Romana, i posti buoni sono a Brera, e la lista non è più vuota. Il
+  tasto sopra allo zoom chiede al browser dove sei: compare il puntino con il suo alone e le
+  distanze partono da lì (l'intestazione dice *da dove sei* invece di *dal centro*, e il centro
+  è quel cerchietto chiaro in mezzo alla mappa). Senza permesso — o senza https — si misura dal
+  centro di quello che stai guardando. Passi sopra una riga e il suo pin si solleva; ci clicchi
+  e la mappa ci vola aprendo la scheda.
 - **Cluster**: quando i pin si accavallano diventano un disco che porta i colori delle
   categorie che contiene, e si apre allo zoom.
 - **Categorie**: le crei tu, con emoji scelta da un picker completo e un colore. Eliminare una

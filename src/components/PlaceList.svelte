@@ -9,7 +9,10 @@
   import type { LocalPlace } from '../lib/types';
   import Icon from './Icon.svelte';
 
-  let { rows }: { rows: { place: LocalPlace; distance: number }[] } = $props();
+  let {
+    rows,
+    near = false,
+  }: { rows: { place: LocalPlace; distance: number }[]; near?: boolean } = $props();
 
   /** Keep the row of the open popup in sight without stealing the scroll. */
   function followActive(node: HTMLLIElement) {
@@ -23,7 +26,11 @@
 
 <ul id="place-list" data-fade="none" use:fadeEdges>
   {#if rows.length === 0}
-    <li class="row-empty">Nessun posto in questa parte di mappa.</li>
+    <li class="row-empty">
+      {near
+        ? 'Nessun posto: i filtri qui sopra li stanno escludendo tutti.'
+        : 'Nessun posto in questa parte di mappa.'}
+    </li>
   {:else}
     {#each rows as { place, distance } (place.key)}
       {@const category = store.categoryOf(place.categoryId)}
