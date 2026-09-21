@@ -1,10 +1,25 @@
 import '@fontsource-variable/inter/wght.css';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'emoji-picker-element';
 // Emoji data is bundled and served locally: no CDN call at runtime.
 import emojiDataUrl from 'emoji-picker-element-data/en/emojibase/data.json?url';
 import L from 'leaflet';
-import './style.css';
+import 'leaflet.markercluster';
+import {
+  ArrowRight,
+  MapPin,
+  Navigation,
+  Pencil,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  Undo2,
+  X,
+  createElement,
+} from 'lucide';
+import './styles/index.css';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -15,6 +30,9 @@ const el = {
   searchResults: $('#search-results'),
   filters: $('#filters'),
   placeCount: $('#place-count'),
+  listHead: $('#list-head'),
+  listCount: $('#list-count'),
+  list: $('#place-list'),
   manageBtn: $('#manage-btn'),
   addBtn: $('#add-btn'),
   addLabel: $('#add-btn .add-label'),
@@ -41,16 +59,38 @@ const hidden = new Set(readJSON('pi.hidden', []));
 let draft = null;
 let draftMarker = null;
 let picking = false;
+/** place object -> marker. Keyed by object so a temporary id can be swapped in place. */
 const markers = new Map();
+let activePlace = null;
 
-const icon = (paths, size = 16) =>
-  `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style="width:${size}px;height:${size}px">${paths}</svg>`;
+/* ------------------------------------------------------------------ icons */
 
 const ICONS = {
-  edit: icon('<path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="M13.5 7.5 16.5 10.5"/>'),
-  directions: icon('<path d="M3 11.5 21 4l-7.5 17-2-7-8.5-2.5Z"/>'),
-  trash: icon('<path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13M10 11v6M14 11v6"/>'),
+  pin: MapPin,
+  search: Search,
+  submit: ArrowRight,
+  filters: SlidersHorizontal,
+  plus: Plus,
+  close: X,
+  trash: Trash2,
+  edit: Pencil,
+  directions: Navigation,
+  undo: Undo2,
 };
+
+function icon(name) {
+  const svg = createElement(ICONS[name]);
+  svg.setAttribute('class', 'ico');
+  svg.setAttribute('aria-hidden', 'true');
+  return svg;
+}
+
+/** Swap every <i data-icon="…"> placeholder for its drawn icon. */
+function drawIcons(root = document) {
+  for (const node of root.querySelectorAll('[data-icon]')) node.replaceWith(icon(node.dataset.icon));
+}
+
+drawIcons();
 
 /* ---------------------------------------------------------------- storage */
 
@@ -86,19 +126,66 @@ async function api(path, options = {}) {
   return res.status === 204 ? null : res.json();
 }
 
+/* ------------------------------------------------------------------ toast */
+
 let toastTimer;
-function toast(message) {
-  el.toast.textContent = message;
+
+function toast(message, action) {
+  el.toast.textContent = '';
+  const text = document.createElement('span');
+  text.textContent = message;
+  el.toast.append(text);
+
+  if (action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'toast-action';
+    button.append(icon('undo'), action.label);
+    button.addEventListener('click', () => {
+      hideToast();
+      action.onClick();
+    });
+    el.toast.append(button);
+  }
+
   el.toast.hidden = false;
   // restart the entrance animation on a repeated toast
   el.toast.style.animation = 'none';
   void el.toast.offsetWidth;
   el.toast.style.animation = '';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    el.toast.hidden = true;
-  }, 2600);
+  toastTimer = setTimeout(hideToast, action ? UNDO_MS : 2600);
 }
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  el.toast.hidden = true;
+}
+
+/* ------------------------------------------------- deletes, with a way back */
+
+const UNDO_MS = 6000;
+/** Deletes shown as done but not yet sent, so "Annulla" costs nothing. */
+const pending = new Set();
+
+function deferCommit(commit) {
+  const entry = { commit };
+  pending.add(entry);
+  const timer = setTimeout(() => {
+    pending.delete(entry);
+    commit();
+  }, UNDO_MS);
+  return () => {
+    clearTimeout(timer);
+    pending.delete(entry);
+  };
+}
+
+// Leaving the page confirms whatever is still waiting: the UI already said it was gone.
+addEventListener('pagehide', () => {
+  for (const entry of pending) entry.commit({ keepalive: true });
+  pending.clear();
+});
 
 /* -------------------------------------------------------------------- map */
 
@@ -126,9 +213,20 @@ darkQuery.addEventListener('change', syncPickerTheme);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
 
+const CLUSTER_OFF_AT = 17;
+
+const clusters = L.markerClusterGroup({
+  maxClusterRadius: 54,
+  disableClusteringAtZoom: CLUSTER_OFF_AT,
+  spiderfyOnMaxZoom: false,
+  showCoverageOnHover: false,
+  iconCreateFunction: clusterIcon,
+}).addTo(map);
+
 map.on('moveend', () => {
   const c = map.getCenter();
   writeJSON('pi.view', { lat: c.lat, lng: c.lng, zoom: map.getZoom() });
+  renderList();
 });
 
 map.on('click', (event) => {
@@ -137,7 +235,20 @@ map.on('click', (event) => {
   openPlaceSheet({ lat: event.latlng.lat, lng: event.latlng.lng });
 });
 
+map.on('popupopen', (event) => {
+  activePlace = event.popup._source?.options.place ?? null;
+  renderList();
+});
+
+map.on('popupclose', () => {
+  activePlace = null;
+  renderList();
+});
+
 const categoryOf = (id) => state.categories.find((c) => c.id === id);
+const colorOf = (place) => categoryOf(place.categoryId)?.color || '#6b7280';
+
+/* ------------------------------------------------------------------- pins */
 
 function pinIcon(category, extraClass = '') {
   const color = category?.color || '#6b7280';
@@ -151,63 +262,126 @@ function pinIcon(category, extraClass = '') {
   });
 }
 
+/** A cluster wears the colours of what it hides: one arc per category. */
+function clusterIcon(cluster) {
+  const children = cluster.getAllChildMarkers();
+  const tally = new Map();
+  for (const marker of children) {
+    const color = colorOf(marker.options.place);
+    tally.set(color, (tally.get(color) || 0) + 1);
+  }
+
+  let at = 0;
+  const stops = [];
+  for (const [color, count] of tally) {
+    const end = at + (count / children.length) * 100;
+    stops.push(`${color} ${at}% ${end}%`);
+    at = end;
+  }
+
+  return L.divIcon({
+    className: '',
+    html: `<div class="cluster" style="background:conic-gradient(${stops.join(',')})"><span>${children.length}</span></div>`,
+    iconSize: [44, 44],
+  });
+}
+
 function renderMarkers() {
-  for (const [id, marker] of markers) {
-    if (!state.places.some((p) => p.id === id)) {
-      marker.remove();
-      markers.delete(id);
+  for (const [place, marker] of markers) {
+    if (!state.places.includes(place)) {
+      clusters.removeLayer(marker);
+      markers.delete(place);
     }
   }
 
   for (const place of state.places) {
     const category = categoryOf(place.categoryId);
-    let marker = markers.get(place.id);
+    let marker = markers.get(place);
     if (!marker) {
-      marker = L.marker([place.lat, place.lng], { icon: pinIcon(category), riseOnHover: true });
-      markers.set(place.id, marker);
+      marker = L.marker([place.lat, place.lng], {
+        icon: pinIcon(category),
+        riseOnHover: true,
+        place,
+      });
+      markers.set(place, marker);
     } else {
       marker.setLatLng([place.lat, place.lng]);
       marker.setIcon(pinIcon(category));
     }
-    // Rebind every render: the closure must see the freshly loaded place.
+    // Rebind every render: the popup must read the place as it is now.
     marker.bindPopup(() => popupFor(place), { closeButton: false, offset: [0, 2] });
 
     const visible = !hidden.has(place.categoryId);
-    if (visible && !map.hasLayer(marker)) marker.addTo(map);
-    if (!visible && map.hasLayer(marker)) marker.remove();
+    if (visible && !clusters.hasLayer(marker)) clusters.addLayer(marker);
+    if (!visible && clusters.hasLayer(marker)) clusters.removeLayer(marker);
   }
 }
 
 function popupFor(place) {
   const category = categoryOf(place.categoryId);
   const node = document.createElement('div');
-  node.innerHTML = `
-    <span class="pop-cat"><span class="emo"></span><span class="cat-name"></span></span>
-    <h3 class="pop-name"></h3>
-    <p class="pop-note"></p>
-    <div class="pop-actions">
-      <button type="button" data-edit>${ICONS.edit}<span>Modifica</span></button>
-      <a target="_blank" rel="noreferrer">${ICONS.directions}<span>Indicazioni</span></a>
-    </div>`;
 
-  const badge = node.querySelector('.pop-cat');
+  const badge = document.createElement('span');
+  badge.className = 'pop-cat';
   badge.style.setProperty('--c', category?.color || '#6b7280');
-  badge.querySelector('.emo').textContent = category?.emoji || '📍';
-  badge.querySelector('.cat-name').textContent = category?.name || 'Senza categoria';
+  const emo = document.createElement('span');
+  emo.className = 'emo';
+  emo.textContent = category?.emoji || '📍';
+  const catName = document.createElement('span');
+  catName.textContent = category?.name || 'Senza categoria';
+  badge.append(emo, catName);
 
-  node.querySelector('.pop-name').textContent = place.name;
-  const note = node.querySelector('.pop-note');
+  const name = document.createElement('h3');
+  name.className = 'pop-name';
+  name.textContent = place.name;
+
+  const note = document.createElement('p');
+  note.className = 'pop-note';
   note.textContent = place.note || '';
   note.hidden = !place.note;
-  node.querySelector('a').href = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
-  node.querySelector('[data-edit]').addEventListener('click', () => {
+
+  const actions = document.createElement('div');
+  actions.className = 'pop-actions';
+
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.append(icon('edit'), text('Modifica'));
+  edit.addEventListener('click', () => {
     map.closePopup();
     openPlaceSheet(place);
   });
+
+  const directions = document.createElement('a');
+  directions.target = '_blank';
+  directions.rel = 'noreferrer';
+  directions.href = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
+  directions.append(icon('directions'), text('Indicazioni'));
+
+  actions.append(edit, directions);
+  node.append(badge, name, note, actions);
   return node;
 }
 
-/* ----------------------------------------------------------------- panels */
+const text = (value) => document.createTextNode(value);
+
+/** Lift the pin that belongs to a row being pointed at. */
+function highlight(place, on) {
+  const marker = markers.get(place);
+  const pin = marker?._icon?.firstElementChild;
+  if (!pin) return;
+  pin.classList.toggle('is-hover', on);
+  marker.setZIndexOffset(on ? 900 : 0);
+}
+
+function focusPlace(place) {
+  const marker = markers.get(place);
+  if (!marker) return;
+  // Past CLUSTER_OFF_AT every marker stands on its own, so the popup can open.
+  map.flyTo([place.lat, place.lng], Math.max(map.getZoom(), CLUSTER_OFF_AT), { duration: 0.7 });
+  map.once('moveend', () => clusters.zoomToShowLayer(marker, () => marker.openPopup()));
+}
+
+/* ------------------------------------------------------------------ panel */
 
 function chipFor(category, { on, count }) {
   const chip = document.createElement('button');
@@ -215,12 +389,21 @@ function chipFor(category, { on, count }) {
   chip.className = `chip ${on ? 'on' : 'off'}`;
   chip.style.setProperty('--c', category.color);
   chip.dataset.id = category.id;
-  chip.innerHTML = `<span class="emo"></span><span class="name"></span>${
-    count === undefined ? '' : '<span class="count"></span>'
-  }`;
-  chip.querySelector('.emo').textContent = category.emoji;
-  chip.querySelector('.name').textContent = category.name;
-  if (count !== undefined) chip.querySelector('.count').textContent = count;
+
+  const emo = document.createElement('span');
+  emo.className = 'emo';
+  emo.textContent = category.emoji;
+  const name = document.createElement('span');
+  name.className = 'name';
+  name.textContent = category.name;
+  chip.append(emo, name);
+
+  if (count !== undefined) {
+    const tally = document.createElement('span');
+    tally.className = 'count';
+    tally.textContent = count;
+    chip.append(tally);
+  }
   return chip;
 }
 
@@ -237,9 +420,71 @@ function renderFilters() {
       writeJSON('pi.hidden', [...hidden]);
       renderFilters();
       renderMarkers();
+      renderList();
     });
     el.filters.append(chip);
   }
+}
+
+const formatDistance = (metres) =>
+  metres < 950 ? `${Math.round(metres / 10) * 10} m` : `${(metres / 1000).toFixed(metres < 9500 ? 1 : 0)} km`;
+
+/** The index itself: what is on screen right now, nearest first. */
+function renderList() {
+  el.listHead.hidden = !state.places.length;
+  el.list.hidden = !state.places.length;
+  el.list.textContent = '';
+  if (!state.places.length) return;
+
+  const bounds = map.getBounds();
+  const centre = map.getCenter();
+  const rows = state.places
+    .filter((place) => !hidden.has(place.categoryId) && bounds.contains([place.lat, place.lng]))
+    .map((place) => ({ place, distance: centre.distanceTo([place.lat, place.lng]) }))
+    .sort((a, b) => a.distance - b.distance);
+
+  el.listCount.textContent = rows.length;
+
+  if (!rows.length) {
+    const empty = document.createElement('li');
+    empty.className = 'row-empty';
+    empty.textContent = 'Nessun posto in questa parte di mappa.';
+    el.list.append(empty);
+    return;
+  }
+
+  for (const { place, distance } of rows) {
+    const category = categoryOf(place.categoryId);
+    const row = document.createElement('li');
+    row.className = `row${place === activePlace ? ' is-active' : ''}`;
+    row.style.setProperty('--c', category?.color || '#6b7280');
+
+    const dot = document.createElement('span');
+    dot.className = 'row-dot';
+    dot.textContent = category?.emoji || '📍';
+
+    const body = document.createElement('span');
+    body.className = 'row-body';
+    const name = document.createElement('span');
+    name.className = 'row-name';
+    name.textContent = place.name;
+    const note = document.createElement('span');
+    note.className = 'row-note';
+    note.textContent = place.note || category?.name || '';
+    body.append(name, note);
+
+    const away = document.createElement('span');
+    away.className = 'row-dist';
+    away.textContent = formatDistance(distance);
+
+    row.append(dot, body, away);
+    row.addEventListener('pointerenter', () => highlight(place, true));
+    row.addEventListener('pointerleave', () => highlight(place, false));
+    row.addEventListener('click', () => focusPlace(place));
+    el.list.append(row);
+  }
+
+  el.list.querySelector('.is-active')?.scrollIntoView({ block: 'nearest' });
 }
 
 function renderCategoryChoice(selectedId) {
@@ -277,7 +522,7 @@ function renderCategoryList() {
     emojiBtn.addEventListener('click', () => {
       openEmojiPicker(emojiBtn, (emoji) => {
         emojiBtn.textContent = emoji;
-        saveCategory(category.id, { emoji });
+        patchCategory(category, { emoji });
       });
     });
 
@@ -285,7 +530,7 @@ function renderCategoryList() {
     name.type = 'text';
     name.value = category.name;
     name.maxLength = 40;
-    name.addEventListener('change', () => saveCategory(category.id, { name: name.value }));
+    name.addEventListener('change', () => patchCategory(category, { name: name.value }));
 
     const swatch = document.createElement('label');
     swatch.className = 'swatch';
@@ -293,7 +538,7 @@ function renderCategoryList() {
     const color = document.createElement('input');
     color.type = 'color';
     color.value = category.color;
-    color.addEventListener('change', () => saveCategory(category.id, { color: color.value }));
+    color.addEventListener('change', () => patchCategory(category, { color: color.value }));
     swatch.append(color);
 
     const tally = document.createElement('span');
@@ -303,32 +548,115 @@ function renderCategoryList() {
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'ghost-icon';
-    del.innerHTML = ICONS.trash;
+    del.append(icon('trash'));
     del.title = 'Elimina categoria';
-    del.addEventListener('click', async () => {
-      const warning = count
-        ? `Eliminare "${category.name}" e i ${count} posti che contiene?`
-        : `Eliminare "${category.name}"?`;
-      if (!confirm(warning)) return;
-      try {
-        await api(`/categories/${category.id}`, { method: 'DELETE' });
-        await load();
-        toast('Categoria eliminata');
-      } catch (err) {
-        toast(err.message);
-      }
-    });
+    del.addEventListener('click', () => deleteCategory(category));
 
     li.append(emojiBtn, name, swatch, tally, del);
     el.categoryList.append(li);
   }
 }
 
-async function saveCategory(id, patch) {
+function renderAll() {
+  renderFilters();
+  renderList();
+  renderCategoryList();
+  renderMarkers();
+  if (!el.placeSheet.hidden) renderCategoryChoice(selectedCategoryId());
+}
+
+/* ---------------------------------------------- writes, applied on the spot */
+
+/** Category edits are safe to apply first: the id never changes. */
+async function patchCategory(category, patch) {
+  const before = { ...category };
+  Object.assign(category, patch);
+  renderAll();
   try {
-    await api(`/categories/${id}`, { method: 'PUT', body: patch });
-    await load();
+    Object.assign(category, await api(`/categories/${category.id}`, { method: 'PUT', body: patch }));
   } catch (err) {
+    Object.assign(category, before);
+    renderAll();
+    toast(err.message);
+  }
+}
+
+function deleteCategory(category) {
+  const index = state.categories.indexOf(category);
+  const orphans = state.places.filter((p) => p.categoryId === category.id);
+  state.categories.splice(index, 1);
+  state.places = state.places.filter((p) => p.categoryId !== category.id);
+  renderAll();
+
+  const cancel = deferCommit((opts) =>
+    api(`/categories/${category.id}`, { method: 'DELETE', ...opts }).catch(() => {}),
+  );
+
+  toast(
+    orphans.length
+      ? `"${category.name}" e ${orphans.length} posti eliminati`
+      : `"${category.name}" eliminata`,
+    {
+      label: 'Annulla',
+      onClick: () => {
+        cancel();
+        state.categories.splice(index, 0, category);
+        state.places = [...state.places, ...orphans];
+        renderAll();
+      },
+    },
+  );
+}
+
+function deletePlace(place) {
+  const index = state.places.indexOf(place);
+  if (index < 0) return;
+  state.places.splice(index, 1);
+  renderAll();
+
+  const cancel = deferCommit((opts) =>
+    api(`/places/${place.id}`, { method: 'DELETE', ...opts }).catch(() => {}),
+  );
+
+  toast(`"${place.name}" eliminato`, {
+    label: 'Annulla',
+    onClick: () => {
+      cancel();
+      state.places.splice(index, 0, place);
+      renderAll();
+    },
+  });
+}
+
+async function savePlace(body) {
+  const existing = draft.id && state.places.find((p) => p.id === draft.id);
+
+  if (existing) {
+    const before = { ...existing };
+    Object.assign(existing, body);
+    renderAll();
+    try {
+      Object.assign(existing, await api(`/places/${existing.id}`, { method: 'PUT', body }));
+      renderAll();
+    } catch (err) {
+      Object.assign(existing, before);
+      renderAll();
+      toast(err.message);
+    }
+    return;
+  }
+
+  // Shown immediately under a temporary id; the server's answer replaces it in place.
+  const place = { id: `tmp-${Date.now()}`, ...body, createdAt: new Date().toISOString() };
+  state.places.push(place);
+  renderAll();
+  try {
+    Object.assign(place, await api('/places', { method: 'POST', body }));
+    renderAll();
+  } catch (err) {
+    const index = state.places.indexOf(place);
+    if (index >= 0) state.places.splice(index, 1);
+    renderAll();
     toast(err.message);
   }
 }
@@ -369,19 +697,20 @@ function openPlaceSheet(place) {
   renderCategoryChoice(place.categoryId || state.categories[0]?.id);
 
   clearDraftMarker();
-  if (!place.id) {
-    draftMarker = L.marker([place.lat, place.lng], {
-      icon: pinIcon(categoryOf(selectedCategoryId()), 'draft'),
-      draggable: true,
-      zIndexOffset: 1000,
-    }).addTo(map);
-    draftMarker.on('dragend', () => {
-      const { lat, lng } = draftMarker.getLatLng();
-      draft.lat = lat;
-      draft.lng = lng;
-      el.coords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    });
-  }
+  const existing = markers.get(place);
+  if (existing) clusters.removeLayer(existing);
+  draftMarker = L.marker([place.lat, place.lng], {
+    icon: pinIcon(categoryOf(selectedCategoryId()), place.id ? '' : 'draft'),
+    draggable: true,
+    zIndexOffset: 1000,
+  }).addTo(map);
+  draftMarker.on('dragend', () => {
+    const { lat, lng } = draftMarker.getLatLng();
+    draft.lat = lat;
+    draft.lng = lng;
+    el.coords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  });
+
   el.placeForm.elements.name.focus();
 }
 
@@ -389,6 +718,7 @@ function closePlaceSheet() {
   el.placeSheet.hidden = true;
   draft = null;
   clearDraftMarker();
+  renderMarkers();
   syncSheetState();
 }
 
@@ -404,42 +734,30 @@ function closeCategorySheet() {
   syncSheetState();
 }
 
-el.placeForm.addEventListener('submit', async (event) => {
+el.placeForm.addEventListener('submit', (event) => {
   event.preventDefault();
   if (!draft) return;
   const categoryId = selectedCategoryId();
   if (!categoryId) return toast('Scegli o crea una categoria');
 
   const body = {
-    name: el.placeForm.elements.name.value,
-    note: el.placeForm.elements.note.value,
+    name: el.placeForm.elements.name.value.trim(),
+    note: el.placeForm.elements.note.value.trim(),
     categoryId,
     lat: draft.lat,
     lng: draft.lng,
   };
-  try {
-    if (draft.id) await api(`/places/${draft.id}`, { method: 'PUT', body });
-    else await api('/places', { method: 'POST', body });
-    closePlaceSheet();
-    // A place saved into a filtered-out category would otherwise vanish.
-    if (hidden.delete(categoryId)) writeJSON('pi.hidden', [...hidden]);
-    await load();
-    toast(body.name ? `"${body.name}" salvato` : 'Salvato');
-  } catch (err) {
-    toast(err.message);
-  }
+  const editing = Boolean(draft.id);
+  savePlace(body);
+  closePlaceSheet();
+  toast(editing ? `"${body.name}" aggiornato` : `"${body.name}" salvato`);
 });
 
-el.deleteBtn.addEventListener('click', async () => {
-  if (!draft?.id || !confirm('Eliminare questo posto?')) return;
-  try {
-    await api(`/places/${draft.id}`, { method: 'DELETE' });
-    closePlaceSheet();
-    await load();
-    toast('Posto eliminato');
-  } catch (err) {
-    toast(err.message);
-  }
+el.deleteBtn.addEventListener('click', () => {
+  const place = draft?.id && state.places.find((p) => p.id === draft.id);
+  if (!place) return;
+  closePlaceSheet();
+  deletePlace(place);
 });
 
 // Keep the draft pin in sync with the category picked in the form.
@@ -466,6 +784,11 @@ el.manageBtn.addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !el.placeSheet.hidden) {
+    event.preventDefault();
+    el.placeForm.requestSubmit();
+    return;
+  }
   if (event.key !== 'Escape') return;
   if (!el.emojiPopover.hidden) return closeEmojiPicker();
   if (picking) return setPicking(false);
@@ -487,17 +810,20 @@ el.newEmoji.addEventListener('click', () => {
 el.categoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const body = {
-    name: el.categoryForm.elements.name.value,
+    name: el.categoryForm.elements.name.value.trim(),
     emoji: newCategoryEmoji,
     color: el.categoryForm.elements.color.value,
   };
-  if (!body.name.trim()) return;
+  if (!body.name) return;
   try {
+    // Awaited, not optimistic: a place cannot be saved against a category id
+    // the server has never seen.
     const created = await api('/categories', { method: 'POST', body });
+    state.categories.push(created);
     el.categoryForm.reset();
     newCategoryEmoji = '📍';
     el.newEmoji.textContent = '📍';
-    await load();
+    renderAll();
     if (!el.placeSheet.hidden) renderCategoryChoice(created.id);
     toast(`Categoria "${created.name}" creata`);
   } catch (err) {
@@ -547,8 +873,7 @@ function openEmojiPicker(anchor, onPick) {
 
   // Beside the sheet when there is room, so the form stays readable while picking.
   const beside = sheet && sheet.left - POPOVER.w - POPOVER.gap > 8 ? sheet.left - POPOVER.w - POPOVER.gap : null;
-  const left =
-    beside ?? Math.min(Math.max(8, rect.left), window.innerWidth - POPOVER.w - 8);
+  const left = beside ?? Math.min(Math.max(8, rect.left), window.innerWidth - POPOVER.w - 8);
   const below = rect.bottom + POPOVER.h + POPOVER.gap < window.innerHeight;
   const top = Math.min(
     Math.max(8, beside ? rect.top - 8 : below ? rect.bottom + POPOVER.gap : rect.top - POPOVER.h - POPOVER.gap),
@@ -634,17 +959,11 @@ function hideResults() {
 
 /* ------------------------------------------------------------------ boot */
 
-async function load() {
-  const data = await api('/state');
-  state.categories = data.categories;
-  state.places = data.places;
-  renderFilters();
-  renderCategoryList();
-  renderMarkers();
-}
-
-load()
-  .then(() => {
+api('/state')
+  .then((data) => {
+    state.categories = data.categories;
+    state.places = data.places;
+    renderAll();
     if (!state.categories.length) openCategorySheet();
   })
   .catch((err) => toast(`Caricamento fallito: ${err.message}`));

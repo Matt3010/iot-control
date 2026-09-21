@@ -1,0 +1,85 @@
+/* Base
+   Reset, page frame, the glass surface shared by panel, sheets and popover,
+   and the two type styles used throughout. */
+
+* { box-sizing: border-box; }
+
+/* several overlay pieces set their own display, which would beat the UA rule */
+[hidden] { display: none !important; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  letter-spacing: -0.006em;
+  color: var(--ink);
+  background: #e8ebef;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+  body { background: #0b0d10; }
+}
+
+#map { position: absolute; inset: 0; }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.ico {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* glass surface shared by panel, sheets, popover */
+.surface {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2), inset 0 1px 0 var(--highlight);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .surface { background: var(--glass-strong); }
+}
+
+/* thin scrollbars inside the overlay */
+.surface ::-webkit-scrollbar, .surface::-webkit-scrollbar { width: 8px; height: 8px; }
+.surface ::-webkit-scrollbar-thumb, .surface::-webkit-scrollbar-thumb {
+  background: var(--hairline);
+  border-radius: 99px;
+}
+
+/* ---------------------------------------------------------------- typography */
+
+h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: -0.017em;
+}
+
+.eyebrow {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.085em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}

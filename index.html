@@ -10,46 +10,37 @@
   <body>
     <div id="map"></div>
 
-    <!-- Left rail: identity, search, filters -->
+    <!-- Left rail: identity, search, filters, the index itself -->
     <div id="panel" class="surface">
       <div class="panel-head">
-        <span class="wordmark">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 10c0 5.25-8 12-8 12s-8-6.75-8-12a8 8 0 1 1 16 0Z" />
-            <circle cx="12" cy="10" r="2.75" />
-          </svg>
-          Place Index
-        </span>
+        <span class="wordmark"><i data-icon="pin"></i> Place Index</span>
         <span id="place-count" class="tally">0</span>
       </div>
 
       <form id="search" autocomplete="off">
-        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.6-3.6" />
-        </svg>
+        <i data-icon="search"></i>
         <input id="search-input" type="search" placeholder="Cerca un indirizzo o un posto" />
-        <button type="submit" class="ghost-icon" title="Cerca">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m0 0-5-5m5 5-5 5" /></svg>
-        </button>
+        <button type="submit" class="ghost-icon" title="Cerca"><i data-icon="submit"></i></button>
       </form>
       <ul id="search-results" hidden></ul>
 
       <div class="panel-row">
         <span class="eyebrow">Categorie</span>
         <button id="manage-btn" class="ghost-icon" type="button" title="Gestisci categorie">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
-            <circle cx="16" cy="7" r="2.2" />
-            <circle cx="10" cy="17" r="2.2" />
-          </svg>
+          <i data-icon="filters"></i>
         </button>
       </div>
       <div id="filters"></div>
+
+      <div class="panel-row" id="list-head" hidden>
+        <span class="eyebrow">In vista</span>
+        <span id="list-count" class="tally">0</span>
+      </div>
+      <ul id="place-list" hidden></ul>
     </div>
 
     <button id="add-btn" type="button">
-      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+      <i data-icon="plus"></i>
       <span class="add-label">Aggiungi posto</span>
     </button>
 
@@ -62,9 +53,7 @@
     <aside id="place-sheet" class="surface" hidden>
       <header>
         <h2 id="place-title">Nuovo posto</h2>
-        <button class="ghost-icon" type="button" data-close title="Chiudi">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-        </button>
+        <button class="ghost-icon" type="button" data-close title="Chiudi"><i data-icon="close"></i></button>
       </header>
       <form id="place-form">
         <label class="field">
@@ -82,10 +71,7 @@
         <p id="coords" class="coords"></p>
         <div class="actions">
           <button type="button" class="danger-link" data-delete hidden>
-            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13M10 11v6M14 11v6" />
-            </svg>
-            Elimina
+            <i data-icon="trash"></i> Elimina
           </button>
           <button type="button" class="ghost" data-close>Annulla</button>
           <button type="submit" class="primary">Salva</button>
@@ -97,9 +83,7 @@
     <aside id="category-sheet" class="surface" hidden>
       <header>
         <h2>Categorie</h2>
-        <button class="ghost-icon" type="button" data-close title="Chiudi">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-        </button>
+        <button class="ghost-icon" type="button" data-close title="Chiudi"><i data-icon="close"></i></button>
       </header>
       <ul id="category-list"></ul>
       <form id="category-form">

@@ -18,6 +18,8 @@
     "emoji-picker-element": "^1.22.8",
     "emoji-picker-element-data": "^1.8.0",
     "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
+    "lucide": "^1.47.0",
     "vite": "^6.0.7"
   }
 }

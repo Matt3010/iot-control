@@ -1,0 +1,15 @@
+/* ==========================================================================
+   Place Index — overlay design system
+   A single elevated layer of glass sitting on top of the map: one type scale,
+   one shadow scale, one radius scale, tinted per category where it matters.
+   Load order is the cascade order; each file owns its own narrow-screen rules.
+   ========================================================================== */
+
+@import './tokens.css';
+@import './base.css';
+@import './controls.css';
+@import './panel.css';
+@import './sheets.css';
+@import './map.css';
+@import './hud.css';
+@import './animations.css';

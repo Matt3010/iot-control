@@ -1,0 +1,41 @@
+/* Animations
+   Every keyframe in one place, and the switch that turns them all off.
+   No fill-mode: the resting state is always the element's own style. */
+
+/* -------------------------------------------------------------- animations */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+@keyframes drop-in {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes pin-drop {
+  0% { opacity: 0; transform: rotate(-45deg) translate(9px, -9px) scale(0.8); }
+  60% { transform: rotate(-45deg) translate(0, 0) scale(1.06); }
+  100% { transform: rotate(-45deg) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes sheet-in-mobile {
+  from { opacity: 0; transform: translateY(16px); }
+}
