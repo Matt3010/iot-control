@@ -8,6 +8,10 @@
 
   let email = $state('');
   let password = $state('');
+  /** La seconda volta serve a scoprire i refusi finché si può ancora. */
+  let conferma = $state('');
+  /** L'occhiolino vale per tutte e due: se guardi, guardi quello che scrivi. */
+  let mostra = $state(false);
   let handle = $state('');
   let error = $state('');
   let working = $state(false);
@@ -36,6 +40,12 @@
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
+    // meglio dirlo qui che dopo un viaggio fino al server
+    if (creating && password !== conferma) {
+      error = 'Le due password non coincidono';
+      conferma = '';
+      return;
+    }
     error = '';
     working = true;
     try {
@@ -43,6 +53,7 @@
     } catch (failure) {
       error = (failure as Error).message;
       password = '';
+      conferma = '';
     } finally {
       working = false;
     }
@@ -74,16 +85,57 @@
       </Stop>
 
       <Stop icon="lock" color="#6a4c93" label="Password">
-        <input
-          type="password"
-          name="password"
-          autocomplete={creating ? 'new-password' : 'current-password'}
-          placeholder={creating ? 'Almeno 8 caratteri' : '••••••••'}
-          required
-          minlength={creating ? 8 : undefined}
-          bind:value={password}
-        />
+        <span class="peek">
+          <input
+            type={mostra ? 'text' : 'password'}
+            name="password"
+            autocomplete={creating ? 'new-password' : 'current-password'}
+            placeholder={creating ? 'Almeno 8 caratteri' : '••••••••'}
+            required
+            minlength={creating ? 8 : undefined}
+            bind:value={password}
+          />
+          <button
+            type="button"
+            class="peek-btn"
+            title={mostra ? 'Nascondi' : 'Mostra'}
+            aria-label={mostra ? 'Nascondi la password' : 'Mostra la password'}
+            aria-pressed={mostra}
+            onclick={() => (mostra = !mostra)}
+          >
+            <Icon name={mostra ? 'eyeOff' : 'eye'} />
+          </button>
+        </span>
       </Stop>
+
+      {#if creating}
+        <Stop icon="check" color="#6a4c93" label="Conferma password">
+          <span class="peek">
+            <input
+              type={mostra ? 'text' : 'password'}
+              name="conferma"
+              autocomplete="new-password"
+              placeholder="La stessa di sopra"
+              required
+              minlength="8"
+              bind:value={conferma}
+            />
+            <button
+              type="button"
+              class="peek-btn"
+              title={mostra ? 'Nascondi' : 'Mostra'}
+              aria-label={mostra ? 'Nascondi la password' : 'Mostra la password'}
+              aria-pressed={mostra}
+              onclick={() => (mostra = !mostra)}
+            >
+              <Icon name={mostra ? 'eyeOff' : 'eye'} />
+            </button>
+          </span>
+          {#if conferma && password !== conferma}
+            <span class="stop-hint stop-no">Non coincide con quella sopra.</span>
+          {/if}
+        </Stop>
+      {/if}
 
       {#if creating}
         <Stop icon="handle" color="#1f7a5c" label="Nome utente">
@@ -214,6 +266,36 @@
     display: grid;
     gap: 14px;
   }
+
+  /* l'occhiolino sta dentro al campo, all'altezza del testo */
+  .peek { position: relative; display: block; }
+
+  .peek input { width: 100%; padding-right: 40px; }
+
+  .peek-btn {
+    position: absolute;
+    top: 50%;
+    right: 5px;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    margin-top: -15px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .peek-btn:hover { background: var(--sunken); color: var(--ink-2); }
+  .peek-btn[aria-pressed="true"] { color: var(--ink-2); }
+  .peek-btn :global(.ico) { width: 16px; height: 16px; }
+
+  /* quando le due non coincidono lo si dice subito, sotto al campo */
+  .stops :global(.stop-no) { color: color-mix(in srgb, var(--danger) 85%, var(--ink-3)); }
 
   /* i campi dentro le tappe sono di un altro componente: vanno raggiunti */
   .stops :global(.stop-hint) {
