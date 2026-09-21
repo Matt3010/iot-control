@@ -1,7 +1,6 @@
 <script lang="ts">
   import L, { type Marker } from 'leaflet';
-  import 'leaflet.markercluster';
-  import { formatDistance } from '../lib/format';
+  import { clusterGroup, createMap, DEFAULT_COLOR, pinIcon } from '../lib/mapkit';
   import { publicApi, type PublicMapPayload } from '../lib/publicApi';
   import { mapPath, profileUrl } from '../lib/routing';
   import Icon from './Icon.svelte';
@@ -39,17 +38,6 @@
       if (!handle) history.replaceState(null, '', mapPath(payload.handle, payload.map.slug));
     })
     .catch((error: Error) => (failed = error.message));
-
-  function pinIcon(categoryId: string): L.DivIcon {
-    const category = categoryOf(categoryId);
-    return L.divIcon({
-      className: '',
-      html: `<div class="pin" style="--c:${category?.color ?? '#6b7280'}"><span>${category?.emoji ?? '📍'}</span></div>`,
-      iconSize: [36, 36],
-      iconAnchor: [18, 36],
-      popupAnchor: [0, -34],
-    });
-  }
 
   /** Sola lettura: niente modifica, niente eliminazione, solo il posto e le indicazioni. */
   function popupFor(place: PublicMapPayload['places'][number]): HTMLElement {
@@ -91,25 +79,17 @@
   $effect(() => {
     if (!container || !data) return;
 
-    const map = L.map(container, { zoomControl: false, attributionControl: false });
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
-    L.control.zoom({ position: 'bottomleft' }).addTo(map);
-    L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
-
-    const clusters = L.markerClusterGroup({
-      maxClusterRadius: 54,
-      disableClusteringAtZoom: 17,
-      spiderfyOnMaxZoom: false,
-      showCoverageOnHover: false,
-    }).addTo(map);
+    const map = createMap(container);
+    const clusters = clusterGroup().addTo(map);
 
     const markers: Marker[] = [];
     const pins = new Map<string, Marker>();
     for (const place of data.places) {
-      const marker = L.marker([place.lat, place.lng], { icon: pinIcon(place.categoryId) });
+      const category = categoryOf(place.categoryId);
+      const marker = L.marker([place.lat, place.lng], {
+        icon: pinIcon({ color: category?.color, emoji: category?.emoji }),
+        colour: category?.color ?? DEFAULT_COLOR,
+      } as L.MarkerOptions);
       marker.bindPopup(() => popupFor(place), { closeButton: false, offset: [0, 2] });
       marker.on('popupopen', () => (picked = place.id));
       markers.push(marker);

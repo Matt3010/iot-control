@@ -1,8 +1,6 @@
 import type { Map as LeafletMap, Marker } from 'leaflet';
+import { CLUSTER_OFF_AT } from './mapkit';
 import type { LocalPlace } from './types';
-
-/** Past this zoom every marker stands on its own, so a popup can open. */
-export const CLUSTER_OFF_AT = 17;
 
 /**
  * The map is imperative by nature. This is the seam: the map component fills

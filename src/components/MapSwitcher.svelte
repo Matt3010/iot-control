@@ -2,6 +2,7 @@
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui } from '../lib/ui.svelte';
+  import AddRow from './AddRow.svelte';
   import Icon from './Icon.svelte';
 
   let open = $state(false);
@@ -13,10 +14,7 @@
     if (creating) field?.focus();
   });
 
-  async function create(event: SubmitEvent) {
-    event.preventDefault();
-    const name = newName.trim();
-    if (!name) return;
+  async function create(name: string) {
     try {
       const created = await store.createMap(name);
       newName = '';
@@ -86,15 +84,13 @@
       </button>
 
       {#if creating}
-        <form class="add-row" onsubmit={create}>
-          <input
-            maxlength="40"
-            placeholder="Nome della mappa"
-            bind:this={field}
-            bind:value={newName}
-          />
-          <button type="submit" class="ghost-icon add-go" title="Crea"><Icon name="plus" /></button>
-        </form>
+        <AddRow
+          placeholder="Nome della mappa"
+          title="Crea"
+          bind:value={newName}
+          bind:field={field}
+          onadd={create}
+        />
       {:else}
         <button type="button" class="new" onclick={() => (creating = true)}>
           <Icon name="plus" /> Nuova mappa

@@ -129,10 +129,6 @@ class Store {
     return this.groups.find((group) => group.id === id);
   }
 
-  colorOf(place: Place): string {
-    return this.categoryOf(place.categoryId)?.color ?? '#6b7280';
-  }
-
   inScope(place: Place): boolean {
     return !this.activeGroup || place.groupIds.includes(this.activeGroup);
   }

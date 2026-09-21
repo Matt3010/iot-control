@@ -1,26 +1,12 @@
 <script lang="ts">
-  import L from 'leaflet';
+  import { stillMap } from '../lib/mapkit';
 
   /** La stessa mappa dell'app, ma solo da guardare: è lo sfondo della porta. */
   let container = $state<HTMLDivElement>();
 
   $effect(() => {
     if (!container) return;
-    const map = L.map(container, {
-      center: [45.4668, 9.1905],
-      zoom: 14,
-      zoomControl: false,
-      attributionControl: false,
-      dragging: false,
-      scrollWheelZoom: false,
-      doubleClickZoom: false,
-      touchZoom: false,
-      boxZoom: false,
-      keyboard: false,
-    });
-
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-
+    const map = stillMap(container, { center: [45.4668, 9.1905], zoom: 14 });
     return () => map.remove();
   });
 </script>

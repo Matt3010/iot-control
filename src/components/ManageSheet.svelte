@@ -8,6 +8,7 @@
   import { swipeToClose } from '../lib/swipe';
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
+  import AddRow from './AddRow.svelte';
   import Icon from './Icon.svelte';
   import LinkRow from './LinkRow.svelte';
   import Switch from './Switch.svelte';
@@ -41,10 +42,7 @@
     groupFilter.trim() ? store.currentGroups.filter((g) => match(g.name, groupFilter)) : store.currentGroups,
   );
 
-  async function addCategory(event: SubmitEvent) {
-    event.preventDefault();
-    const name = newCategoryName.trim();
-    if (!name) return;
+  async function addCategory(name: string) {
     try {
       const created = await store.createCategory(name, newEmoji, newColor);
       newCategoryName = '';
@@ -58,10 +56,7 @@
     }
   }
 
-  async function addMap(event: SubmitEvent) {
-    event.preventDefault();
-    const name = newMapName.trim();
-    if (!name) return;
+  async function addMap(name: string) {
     try {
       const created = await store.createMap(name);
       newMapName = '';
@@ -71,10 +66,7 @@
     }
   }
 
-  async function addGroup(event: SubmitEvent) {
-    event.preventDefault();
-    const name = newGroupName.trim();
-    if (!name) return;
+  async function addGroup(name: string) {
     try {
       const created = await store.createGroup(name);
       newGroupName = '';
@@ -176,35 +168,35 @@
         {/if}
       </ul>
 
-      <form id="category-form" class="add-row" class:is-ready={newCategoryName.trim()} onsubmit={addCategory}>
-        <button
-          type="button"
-          class="emoji-btn"
-          title="Scegli emoji"
-          onclick={(event) => ui.askEmoji(event.currentTarget, (emoji) => (newEmoji = emoji))}
-        >
-          {newEmoji}
-        </button>
-        <input
-          name="name"
-          required
-          maxlength="40"
-          placeholder="Nuova categoria"
-          bind:this={categoryInput}
-          bind:value={newCategoryName}
-        />
-        <button
-          type="button"
-          class="swatch"
-          title="Colore"
-          style:--c={newColor}
-          aria-label="Colore"
-          onclick={(event) => ui.askColor(event.currentTarget, newColor, (color) => (newColor = color))}
-        ></button>
-        <button type="submit" class="ghost-icon add-go" title="Aggiungi categoria">
-          <Icon name="plus" />
-        </button>
-      </form>
+      <AddRow
+        id="category-form"
+        placeholder="Nuova categoria"
+        title="Aggiungi categoria"
+        bind:value={newCategoryName}
+        bind:field={categoryInput}
+        onadd={addCategory}
+      >
+        {#snippet before()}
+          <button
+            type="button"
+            class="emoji-btn"
+            title="Scegli emoji"
+            onclick={(event) => ui.askEmoji(event.currentTarget, (emoji) => (newEmoji = emoji))}
+          >
+            {newEmoji}
+          </button>
+        {/snippet}
+        {#snippet after()}
+          <button
+            type="button"
+            class="swatch"
+            title="Colore"
+            style:--c={newColor}
+            aria-label="Colore"
+            onclick={(event) => ui.askColor(event.currentTarget, newColor, (color) => (newColor = color))}
+          ></button>
+        {/snippet}
+      </AddRow>
     </div>
   {:else if ui.manageTab === 'maps'}
     <div class="tab-panel">
@@ -267,12 +259,13 @@
         {/each}
       </ul>
 
-      <form id="map-form" class="add-row" class:is-ready={newMapName.trim()} onsubmit={addMap}>
-        <input name="name" required maxlength="40" placeholder="Nuova mappa — Islanda, Ristoranti…" bind:value={newMapName} />
-        <button type="submit" class="ghost-icon add-go" title="Aggiungi mappa">
-          <Icon name="plus" />
-        </button>
-      </form>
+      <AddRow
+        id="map-form"
+        placeholder="Nuova mappa — Islanda, Ristoranti…"
+        title="Aggiungi mappa"
+        bind:value={newMapName}
+        onadd={addMap}
+      />
 
       {#if store.maps.some((map) => map.published)}
         <div class="profile-link">
@@ -323,19 +316,14 @@
         {/if}
       </ul>
 
-      <form id="group-form" class="add-row" class:is-ready={newGroupName.trim()} onsubmit={addGroup}>
-        <input
-          name="name"
-          required
-          maxlength="40"
-          placeholder="Nuovo gruppo — Padova, Islanda…"
-          bind:this={groupInput}
-          bind:value={newGroupName}
-        />
-        <button type="submit" class="ghost-icon add-go" title="Aggiungi gruppo">
-          <Icon name="plus" />
-        </button>
-      </form>
+      <AddRow
+        id="group-form"
+        placeholder="Nuovo gruppo — Padova, Islanda…"
+        title="Aggiungi gruppo"
+        bind:value={newGroupName}
+        bind:field={groupInput}
+        onadd={addGroup}
+      />
 
       <p class="sheet-note">
         Un gruppo è dove stanno i posti: una città, un viaggio, una lista. Un posto ne può portare
@@ -420,46 +408,10 @@
 
 /* the row that adds one more ----------------------------------------------- */
 
-.add-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border: 1px dashed var(--hairline);
-  border-radius: var(--r-md);
-  transition: border-color 0.16s, background 0.16s, box-shadow 0.16s;
-}
+/* la riga è di AddRow: qui si vestono solo i pezzi che ci mettiamo dentro */
+:global(.add-row) .emoji-btn { width: 32px; height: 32px; font-size: 16px; }
 
-.add-row input[name="name"] {
-  background: none;
-  border-color: transparent;
-  padding: 6px 8px;
-}
-
-/* the row shows the focus for the whole group; the field must not add a second */
-.add-row input[name="name"]:hover,
-.add-row input[name="name"]:focus {
-  background: none;
-  border-color: transparent;
-  box-shadow: none;
-}
-
-.add-row:focus-within {
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-  box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--accent) 10%, transparent);
-}
-
-.add-go { color: var(--ink-3); }
-
-.add-row.is-ready .add-go {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.add-row .emoji-btn { width: 32px; height: 32px; font-size: 16px; }
-
-.add-row .swatch { width: 24px; height: 24px; margin: 0 2px; }
+:global(.add-row) .swatch { width: 24px; height: 24px; margin: 0 2px; }
 
 .sheet-note {
   margin: 12px 2px 0;
