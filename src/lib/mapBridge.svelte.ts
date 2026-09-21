@@ -1,0 +1,73 @@
+import type { Map as LeafletMap, Marker } from 'leaflet';
+import type { LocalPlace } from './types';
+
+/** Past this zoom every marker stands on its own, so a popup can open. */
+export const CLUSTER_OFF_AT = 17;
+
+/**
+ * The map is imperative by nature. This is the seam: the map component fills
+ * it in, the panels call it, and the view it publishes is reactive so the
+ * index can say what is on screen.
+ */
+class MapBridge {
+  /** Bumped by the map on every moveend: whoever reads it re-runs. */
+  view = $state({ lat: 41.9, lng: 12.5, zoom: 6, moves: 0 });
+  /** The place whose popup is open, so the index can point at the same row. */
+  activeKey = $state<string | null>(null);
+
+  #map: LeafletMap | null = null;
+  #markers = new Map<string, Marker>();
+
+  attach(map: LeafletMap, markers: Map<string, Marker>): void {
+    this.#map = map;
+    this.#markers = markers;
+  }
+
+  get map(): LeafletMap | null {
+    return this.#map;
+  }
+
+  markerFor(place: LocalPlace): Marker | undefined {
+    return this.#markers.get(place.key);
+  }
+
+  /** Lift the pin that belongs to a row being pointed at. */
+  highlight(place: LocalPlace, on: boolean): void {
+    const marker = this.markerFor(place);
+    const pin = (marker as unknown as { _icon?: HTMLElement })?._icon?.firstElementChild;
+    if (!marker || !pin) return;
+    pin.classList.toggle('is-hover', on);
+    marker.setZIndexOffset(on ? 900 : 0);
+  }
+
+  focus(place: LocalPlace): void {
+    const map = this.#map;
+    const marker = this.markerFor(place);
+    if (!map || !marker) return;
+    map.flyTo([place.lat, place.lng], Math.max(map.getZoom(), CLUSTER_OFF_AT), { duration: 0.7 });
+    map.once('moveend', () => marker.openPopup());
+  }
+
+  /** Picking "Padova" should take you to Padova, not leave you where you were. */
+  flyToPoints(points: [number, number][]): void {
+    const map = this.#map;
+    if (!map || !points.length) return;
+    map.flyToBounds(points, { padding: [70, 70], maxZoom: 15, duration: 0.8 });
+  }
+
+  goTo(lat: number, lng: number, minZoom: number): void {
+    const map = this.#map;
+    if (!map) return;
+    map.setView([lat, lng], Math.max(map.getZoom(), minZoom));
+  }
+
+  contains(lat: number, lng: number): boolean {
+    return this.#map?.getBounds().contains([lat, lng]) ?? false;
+  }
+
+  distanceFromCentre(lat: number, lng: number): number {
+    return this.#map?.getCenter().distanceTo([lat, lng]) ?? 0;
+  }
+}
+
+export const mapBridge = new MapBridge();

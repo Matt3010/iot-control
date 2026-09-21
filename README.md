@@ -30,6 +30,27 @@ viaggio, una lista. Niente account, niente categorie preimpostate, niente fronzo
 - I dati stanno sul server in un unico `places.json`: chiunque apra la pagina vede lo stesso
   indice.
 
+## Il front-end
+
+Svelte 5 in TypeScript, con Vite. La mappa resta imperativa — Leaflet vuole
+comandare il suo DOM — e tutto il resto è dichiarativo intorno a lei:
+
+| cartella | cosa tiene |
+| --- | --- |
+| `src/lib/store.svelte.ts` | lo stato dell'indice e le scritture: ottimistiche, con rollback, e le cancellazioni con la finestra di undo |
+| `src/lib/ui.svelte.ts` | quale pannello è aperto, cosa sta modificando, quale popover è in ballo |
+| `src/lib/mapBridge.svelte.ts` | la cucitura con Leaflet: i pannelli chiedono "vola qui", la mappa pubblica dove si trova |
+| `src/lib/` (resto) | `api`, `types`, `format`, `popover`, `storage`, `toast` |
+| `src/components/` | un file per pezzo di interfaccia: pannello, lista, sheet, palette, popover, toast |
+
+Lo stato vive in classi con le rune (`$state`), quindi le stesse regole valgono
+ovunque: un posto salvato compare subito perché la lista, i marker e i conteggi
+leggono tutti la stessa cosa.
+
+Il foglio di stile è rimasto globale invece di finire dentro i componenti: è un
+sistema di design unico per tutta l'app, e tenerlo in un posto solo rende
+evidente quando due cose dovrebbero somigliarsi.
+
 ## Il backend
 
 Express in TypeScript, a livelli, ognuno con un mestiere solo:
@@ -87,7 +108,7 @@ npm run dev     # tsx watch sull'API (:8080) + Vite (:5173) che le fa da proxy
 | --- | --- |
 | `npm run dev` | API in watch e front-end insieme |
 | `npm run build` | `vite build` in `dist/`, poi `tsc` in `server/dist/` |
-| `npm run typecheck` | solo i tipi, niente output |
+| `npm run typecheck` | i tipi del server, niente output |
 | `npm start` | serve API e front-end compilati dallo stesso processo |
 
 ## L'interfaccia

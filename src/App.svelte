@@ -1,0 +1,89 @@
+<script lang="ts">
+  import { store } from './lib/store.svelte';
+  import { toast } from './lib/toast.svelte';
+  import { ui } from './lib/ui.svelte';
+  import AddButton from './components/AddButton.svelte';
+  import ColorPopover from './components/ColorPopover.svelte';
+  import EmojiPopover from './components/EmojiPopover.svelte';
+  import Hint from './components/Hint.svelte';
+  import ManageSheet from './components/ManageSheet.svelte';
+  import MapCanvas from './components/MapCanvas.svelte';
+  import Palette from './components/Palette.svelte';
+  import Panel from './components/Panel.svelte';
+  import PlaceSheet from './components/PlaceSheet.svelte';
+  import Toast from './components/Toast.svelte';
+
+  store
+    .load()
+    .then(() => {
+      if (!store.categories.length) ui.openManage('categories');
+    })
+    .catch((error: Error) => toast.show(`Caricamento fallito: ${error.message}`));
+
+  // The map cursor and the bottom-of-screen rules read these off the body.
+  $effect(() => {
+    document.body.classList.toggle('picking', ui.picking);
+    document.body.classList.toggle('sheet-open', ui.sheet !== 'none');
+  });
+
+  /**
+   * On a narrow screen an open sheet covers the bottom, where the map chrome
+   * lives. The zoom hides; the attribution is not optional, so it is pushed up
+   * by exactly the height of the sheet — which changes as the sheet grows.
+   */
+  $effect(() => {
+    // effects run after the DOM settles, so the open sheet is already there
+    const which = ui.sheet;
+    const node = which === 'none' ? null : document.querySelector<HTMLElement>(`#${which}-sheet`);
+    if (!node) {
+      document.body.style.removeProperty('--sheet-h');
+      return;
+    }
+    const measure = () =>
+      document.body.style.setProperty('--sheet-h', `${Math.round(node.getBoundingClientRect().height)}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  });
+
+  function onKeydown(event: KeyboardEvent) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      ui.paletteOpen = !ui.paletteOpen;
+      return;
+    }
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && ui.sheet === 'place') {
+      event.preventDefault();
+      document.querySelector<HTMLFormElement>('#place-form')?.requestSubmit();
+      return;
+    }
+    if (event.key === 'Escape') ui.escape();
+  }
+
+  /** A click anywhere else closes whichever popover is open. */
+  function onPointerdown(event: PointerEvent) {
+    const target = event.target as HTMLElement;
+    if (ui.emoji && !target.closest('#emoji-popover') && !target.closest('.emoji-btn')) ui.emoji = null;
+    if (ui.color && !target.closest('#color-popover') && !target.closest('.swatch')) ui.color = null;
+  }
+</script>
+
+<svelte:window onkeydown={onKeydown} onpointerdown={onPointerdown} />
+
+<MapCanvas />
+<Panel />
+<AddButton />
+<Hint />
+
+{#if ui.sheet === 'place' && ui.draft}
+  <PlaceSheet />
+{:else if ui.sheet === 'manage'}
+  <ManageSheet />
+{/if}
+
+{#if ui.paletteOpen}<Palette />{/if}
+{#if ui.emoji}<EmojiPopover />{/if}
+{#if ui.color}<ColorPopover />{/if}
+
+<Toast />
