@@ -1,8 +1,8 @@
 # Place Index
 
 Mappa a schermo intero dove segni i posti che ti interessano. Ogni posto appartiene a una
-categoria, che gli dà emoji e colore sulla mappa, e può stare in un gruppo — una città, un
-viaggio, una lista. Niente account, niente categorie preimpostate, niente fronzoli.
+categoria, che gli dà emoji e colore sulla mappa, e può stare in quanti gruppi vuoi — una
+città, un viaggio, una lista. Niente account, niente categorie preimpostate, niente fronzoli.
 
 ![Place Index](docs/preview.png)
 
@@ -15,16 +15,17 @@ viaggio, una lista. Niente account, niente categorie preimpostate, niente fronzo
 - **⌘K**: una sola casella che cerca prima tra i *tuoi* posti — per nome, categoria, gruppo o
   note — e poi tra gli indirizzi di OpenStreetMap. Frecce per muoverti, Invio per aprire. Da un
   indirizzo nasce un posto nuovo col form già compilato.
-- **Gruppi**: filtro a parte dalle categorie. Scegli "Padova" e la mappa ci vola, i conteggi
-  delle categorie si ricalcolano su quel gruppo: *pizzeria a Padova* è due clic.
+- **Gruppi**: filtro a parte dalle categorie, e un posto ne porta quanti ne vuoi — la stessa
+  pizzeria può stare in "Padova" e in "Da rifare". Scegli un gruppo e la mappa ci vola, i
+  conteggi delle categorie si ricalcolano dentro quel gruppo: *pizzeria a Padova* è due clic.
 - **L'indice nel pannello**: i posti inquadrati in quel momento, dal più vicino al centro
   mappa. Passi sopra una riga e il suo pin si solleva; ci clicchi e la mappa ci vola aprendo
   la scheda.
 - **Cluster**: quando i pin si accavallano diventano un disco che porta i colori delle
   categorie che contiene, e si apre allo zoom.
 - **Categorie**: le crei tu, con emoji scelta da un picker completo e un colore. Eliminare una
-  categoria elimina anche i suoi posti; eliminare un gruppo invece li lascia dove sono, senza
-  etichetta.
+  categoria elimina anche i suoi posti; eliminare un gruppo invece li lascia dove sono, meno
+  quell'etichetta.
 - **Niente finestre di conferma**: quel che elimini sparisce subito, con sei secondi di
   "Annulla" nel toast. Solo allo scadere la cancellazione parte davvero.
 - I dati stanno sul server in un unico `places.json`: chiunque apra la pagina vede lo stesso
@@ -71,8 +72,10 @@ Express in TypeScript, a livelli, ognuno con un mestiere solo:
   disco solo se arriva in fondo — un'eccezione a metà è un rollback. Le transazioni sono
   serializzate, quindi due richieste non si sovrascrivono. La scrittura passa per un file
   vicino e una `rename`, così un crash non lascia mezzo file.
-- **Invarianti di dominio** (una categoria si porta via i suoi posti, un gruppo li libera, un
-  posto non può puntare a id inesistenti) stanno nei manager, dentro la stessa transazione.
+- **Invarianti di dominio** (una categoria si porta via i suoi posti, un gruppo cancellato si
+  limita a sfilarsi dai posti che lo portavano, un posto non può puntare a id inesistenti)
+  stanno nei manager, dentro la stessa transazione. I record scritti quando un posto poteva
+  stare in un solo gruppo vengono convertiti alla lettura, e riscritti alla prima modifica.
 
 ## Pubblicare con Docker
 
@@ -146,8 +149,8 @@ Ogni file si porta dietro le proprie regole per lo schermo stretto: non c'è un 
 | `GET` `POST` | `/api/categories` | `{ name, emoji?, color? }` |
 | `PUT` `DELETE` | `/api/categories/:id` | la cancellazione porta via anche i posti della categoria |
 | `GET` `POST` | `/api/groups` | `{ name }` |
-| `PUT` `DELETE` | `/api/groups/:id` | la cancellazione libera i posti, non li elimina |
-| `GET` `POST` | `/api/places` | `{ name, categoryId, groupId?, lat, lng, note? }` |
+| `PUT` `DELETE` | `/api/groups/:id` | la cancellazione sfila l'etichetta dai posti, non li elimina |
+| `GET` `POST` | `/api/places` | `{ name, categoryId, groupIds?, lat, lng, note? }` |
 | `PUT` `DELETE` | `/api/places/:id` | il `PUT` è parziale: manda solo i campi che cambiano |
 
 Gli errori arrivano come `{ error, details? }`: `400` per un DTO non valido o un riferimento

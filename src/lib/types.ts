@@ -14,7 +14,8 @@ export interface Place {
   id: string;
   name: string;
   categoryId: string;
-  groupId: string;
+  /** A place can sit in several groups at once, or in none. */
+  groupIds: string[];
   lat: number;
   lng: number;
   note: string;
@@ -43,7 +44,7 @@ export interface Draft {
   name?: string;
   note?: string;
   categoryId?: string;
-  groupId?: string;
+  groupIds?: string[];
   lat: number;
   lng: number;
 }

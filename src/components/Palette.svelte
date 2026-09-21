@@ -41,7 +41,7 @@
       else if (name.startsWith(needle)) rank = 0;
       else if (name.includes(needle)) rank = 1;
       else if (normalise(store.categoryOf(place.categoryId)?.name ?? '').includes(needle)) rank = 2;
-      else if (normalise(store.groupOf(place.groupId)?.name ?? '').includes(needle)) rank = 3;
+      else if (place.groupIds.some((id) => normalise(store.groupOf(id)?.name ?? '').includes(needle))) rank = 3;
       else if (normalise(place.note ?? '').includes(needle)) rank = 4;
       if (rank === Number.POSITIVE_INFINITY) continue;
       scored.push({ place, rank, distance: mapBridge.distanceFromCentre(place.lat, place.lng) });
@@ -53,12 +53,12 @@
   const placeRows = $derived<Row[]>(
     matches.map(({ place, distance }) => {
       const category = store.categoryOf(place.categoryId);
-      const group = store.groupOf(place.groupId);
+      const groups = place.groupIds.map((id) => store.groupOf(id)?.name).filter(Boolean);
       return {
         color: category?.color,
         emoji: category?.emoji ?? '📍',
         name: place.name,
-        note: [group?.name, place.note || category?.name].filter(Boolean).join(' · '),
+        note: [groups.join(', '), place.note || category?.name].filter(Boolean).join(' · '),
         meta: formatDistance(distance),
         pick: () => {
           ui.paletteOpen = false;
@@ -81,7 +81,13 @@
           const lat = Number(hit.lat);
           const lng = Number(hit.lon);
           mapBridge.goTo(lat, lng, 16);
-          ui.openPlace({ lat, lng, name: label, note: hit.display_name, groupId: store.activeGroup ?? '' });
+          ui.openPlace({
+            lat,
+            lng,
+            name: label,
+            note: hit.display_name,
+            groupIds: store.activeGroup ? [store.activeGroup] : [],
+          });
         },
       };
     }),

@@ -145,7 +145,11 @@
     map.on('moveend', publishView);
     map.on('click', (event: L.LeafletMouseEvent) => {
       if (!ui.picking) return;
-      ui.openPlace({ lat: event.latlng.lat, lng: event.latlng.lng, groupId: store.activeGroup ?? '' });
+      ui.openPlace({
+        lat: event.latlng.lat,
+        lng: event.latlng.lng,
+        groupIds: store.activeGroup ? [store.activeGroup] : [],
+      });
     });
     map.on('popupopen', (event: L.PopupEvent) => {
       mapBridge.activeKey = (event.popup.options as { key?: string }).key ?? null;

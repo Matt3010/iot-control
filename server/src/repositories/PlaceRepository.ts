@@ -18,7 +18,7 @@ export class PlaceRepository {
   }
 
   findByGroup(groupId: string): Place[] {
-    return this.tx.data.places.filter((place) => place.groupId === groupId);
+    return this.tx.data.places.filter((place) => place.groupIds.includes(groupId));
   }
 
   insert(data: Omit<Place, 'id' | 'createdAt'>): Place {
@@ -53,10 +53,10 @@ export class PlaceRepository {
     return removed;
   }
 
-  /** A group is a label: detaching leaves the places where they are. */
+  /** A group is a label: detaching leaves the places, minus that one label. */
   detachFromGroup(groupId: string): number {
     const members = this.findByGroup(groupId);
-    for (const place of members) place.groupId = '';
+    for (const place of members) place.groupIds = place.groupIds.filter((id) => id !== groupId);
     if (members.length) this.tx.markDirty();
     return members.length;
   }

@@ -11,7 +11,7 @@ const placePayload = (draft: Required<Pick<Draft, 'lat' | 'lng'>> & Partial<Draf
   name: draft.name ?? '',
   note: draft.note ?? '',
   categoryId: draft.categoryId ?? '',
-  groupId: draft.groupId ?? '',
+  groupIds: draft.groupIds ?? [],
   lat: draft.lat,
   lng: draft.lng,
 });
@@ -60,7 +60,7 @@ class Store {
   }
 
   inScope(place: Place): boolean {
-    return !this.activeGroup || place.groupId === this.activeGroup;
+    return !this.activeGroup || place.groupIds.includes(this.activeGroup);
   }
 
   /** Two filters, one question: is this place on the map right now? */
@@ -73,7 +73,7 @@ class Store {
   }
 
   countGroup(groupId: string): number {
-    return this.places.filter((place) => place.groupId === groupId).length;
+    return this.places.filter((place) => place.groupIds.includes(groupId)).length;
   }
 
   async load(): Promise<void> {
@@ -104,7 +104,7 @@ class Store {
   /** Whatever is hiding this place, stop hiding it. */
   reveal(place: Place): void {
     if (this.hiddenCategories.includes(place.categoryId)) this.toggleCategory(place.categoryId);
-    if (this.activeGroup && place.groupId !== this.activeGroup) this.setGroup(null);
+    if (this.activeGroup && !place.groupIds.includes(this.activeGroup)) this.setGroup(null);
   }
 
   /* ----------------------------------------------- deletes, with a way back */
@@ -192,12 +192,12 @@ class Store {
     }
   }
 
-  /** A group is a label: deleting it leaves its places behind, unlabelled. */
+  /** A group is a label: deleting it leaves its places, minus that one label. */
   deleteGroup(group: Group): void {
     const index = this.groups.indexOf(group);
-    const members = this.places.filter((place) => place.groupId === group.id);
+    const members = this.places.filter((place) => place.groupIds.includes(group.id));
     this.groups.splice(index, 1);
-    for (const place of members) place.groupId = '';
+    for (const place of members) place.groupIds = place.groupIds.filter((id) => id !== group.id);
     if (this.activeGroup === group.id) this.setGroup(null);
 
     const cancel = this.#defer((options) =>
@@ -211,7 +211,7 @@ class Store {
         run: () => {
           cancel();
           this.groups.splice(index, 0, group);
-          for (const place of members) place.groupId = group.id;
+          for (const place of members) place.groupIds = [...place.groupIds, group.id];
         },
       },
     );

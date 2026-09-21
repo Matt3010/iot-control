@@ -17,7 +17,7 @@ export interface PlaceView {
   id: string;
   name: string;
   categoryId: string;
-  groupId: string;
+  groupIds: string[];
   lat: number;
   lng: number;
   note: string;
@@ -34,12 +34,12 @@ export const toCategoryView = ({ id, name, emoji, color }: Category): CategoryVi
 
 export const toGroupView = ({ id, name }: Group): GroupView => ({ id, name });
 
-/** groupId and note default here, which also carries records written before groups. */
+/** The defaults here also carry records written before groups existed. */
 export const toPlaceView = (place: Place): PlaceView => ({
   id: place.id,
   name: place.name,
   categoryId: place.categoryId,
-  groupId: place.groupId ?? '',
+  groupIds: place.groupIds ?? [],
   lat: place.lat,
   lng: place.lng,
   note: place.note ?? '',

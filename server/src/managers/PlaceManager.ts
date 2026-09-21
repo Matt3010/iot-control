@@ -7,6 +7,8 @@ import { GroupRepository } from '../repositories/GroupRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import type { Place } from '../types.js';
 
+const unique = (ids: string[]): string[] => [...new Set(ids.filter(Boolean))];
+
 export class PlaceManager {
   list(): Promise<Place[]> {
     return store.transaction((tx) => new PlaceRepository(tx).findAll());
@@ -14,12 +16,12 @@ export class PlaceManager {
 
   create(dto: CreatePlaceDto): Promise<Place> {
     return store.transaction((tx) => {
-      const groupId = dto.groupId ?? '';
-      this.assertRefs(tx, dto.categoryId, groupId);
+      const groupIds = unique(dto.groupIds ?? []);
+      this.assertRefs(tx, dto.categoryId, groupIds);
       return new PlaceRepository(tx).insert({
         name: dto.name,
         categoryId: dto.categoryId,
-        groupId,
+        groupIds,
         lat: dto.lat,
         lng: dto.lng,
         note: dto.note ?? '',
@@ -33,8 +35,9 @@ export class PlaceManager {
       const current = places.findById(id);
       if (!current) throw notFound('posto inesistente');
 
-      this.assertRefs(tx, dto.categoryId ?? current.categoryId, dto.groupId ?? current.groupId);
-      return places.update(id, dto) as Place;
+      const groupIds = dto.groupIds ? unique(dto.groupIds) : current.groupIds;
+      this.assertRefs(tx, dto.categoryId ?? current.categoryId, groupIds);
+      return places.update(id, { ...dto, groupIds }) as Place;
     });
   }
 
@@ -44,10 +47,11 @@ export class PlaceManager {
     });
   }
 
-  /** A place may only point at a category and a group that exist. */
-  private assertRefs(tx: Transaction, categoryId: string, groupId: string): void {
+  /** A place may only point at a category and at groups that exist. */
+  private assertRefs(tx: Transaction, categoryId: string, groupIds: string[]): void {
     if (!new CategoryRepository(tx).exists(categoryId)) throw badRequest('categoria inesistente');
-    if (groupId && !new GroupRepository(tx).exists(groupId)) throw badRequest('gruppo inesistente');
+    const groups = new GroupRepository(tx);
+    if (groupIds.some((id) => !groups.exists(id))) throw badRequest('gruppo inesistente');
   }
 }
 

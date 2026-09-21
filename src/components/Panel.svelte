@@ -22,7 +22,10 @@
     store.setGroup(id === store.activeGroup ? null : id);
     if (!store.activeGroup) return;
     const points = store.places
-      .filter((place) => place.groupId === store.activeGroup && !store.hiddenCategories.includes(place.categoryId))
+      .filter(
+        (place) =>
+          place.groupIds.includes(store.activeGroup!) && !store.hiddenCategories.includes(place.categoryId),
+      )
       .map((place) => [place.lat, place.lng] as [number, number]);
     mapBridge.flyToPoints(points);
   }

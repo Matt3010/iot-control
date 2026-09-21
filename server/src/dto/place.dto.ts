@@ -1,5 +1,14 @@
 import { Transform, Type } from 'class-transformer';
-import { IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsLatitude,
+  IsLongitude,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 const trim = () => Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
 
@@ -15,11 +24,13 @@ export class CreatePlaceDto {
   @MaxLength(80)
   categoryId!: string;
 
-  /** Empty string means "no group", which is why it is not simply optional. */
+  /** None, one, or several: a place can be in "Padova" and in "Da rifare". */
   @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  groupId?: string;
+  @IsArray()
+  @ArrayMaxSize(24)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  groupIds?: string[];
 
   @Type(() => Number)
   @IsLatitude({ message: 'latitudine non valida' })
@@ -51,9 +62,11 @@ export class UpdatePlaceDto {
   categoryId?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  groupId?: string;
+  @IsArray()
+  @ArrayMaxSize(24)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  groupIds?: string[];
 
   @IsOptional()
   @Type(() => Number)

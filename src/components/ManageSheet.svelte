@@ -35,7 +35,7 @@
     try {
       const created = await store.createGroup(name);
       newGroupName = '';
-      if (ui.draft) ui.draft.groupId = created.id;
+      if (ui.draft) ui.draft.groupIds = [...(ui.draft.groupIds ?? []), created.id];
       toast.show(`Gruppo "${created.name}" creato`);
     } catch (error) {
       toast.show((error as Error).message);

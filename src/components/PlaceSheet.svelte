@@ -28,9 +28,16 @@
     store.savePlace({ ...draft, name });
     // Saving something the filters would hide makes it vanish; show it instead.
     if (store.hiddenCategories.includes(draft.categoryId)) store.toggleCategory(draft.categoryId);
-    if (store.activeGroup && draft.groupId !== store.activeGroup) store.setGroup(null);
+    if (store.activeGroup && !(draft.groupIds ?? []).includes(store.activeGroup)) store.setGroup(null);
     ui.closePlace();
     toast.show(editing ? `"${name}" aggiornato` : `"${name}" salvato`);
+  }
+
+  /** Groups are labels: a place wears as many as you like. */
+  function toggleGroup(id: string) {
+    if (!draft) return;
+    const current = draft.groupIds ?? [];
+    draft.groupIds = current.includes(id) ? current.filter((held) => held !== id) : [...current, id];
   }
 
   function remove() {
@@ -83,14 +90,14 @@
         <div id="group-choice" class="chips">
           <Chip
             label="Nessuno"
-            look={draft.groupId ? 'off' : 'sel'}
-            onclick={() => (draft.groupId = '')}
+            look={draft.groupIds?.length ? 'off' : 'sel'}
+            onclick={() => (draft.groupIds = [])}
           />
           {#each store.groups as group (group.id)}
             <Chip
               label={group.name}
-              look={draft.groupId === group.id ? 'sel' : 'off'}
-              onclick={() => (draft.groupId = group.id)}
+              look={draft.groupIds?.includes(group.id) ? 'sel' : 'off'}
+              onclick={() => toggleGroup(group.id)}
             />
           {/each}
         </div>

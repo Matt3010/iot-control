@@ -1,6 +1,13 @@
 import fs from 'node:fs/promises';
 import { config, dataFile } from '../config.js';
-import type { Database } from '../types.js';
+import type { Database, Place } from '../types.js';
+
+/** Records written when a place could only belong to one group. */
+function migrate(place: Place & { groupId?: string }): Place {
+  if (Array.isArray(place.groupIds)) return place;
+  const { groupId, ...rest } = place;
+  return { ...rest, groupIds: groupId ? [groupId] : [] };
+}
 
 const empty = (): Database => ({ categories: [], groups: [], places: [] });
 
@@ -44,7 +51,7 @@ export class JsonStore {
       return {
         categories: Array.isArray(parsed.categories) ? parsed.categories : [],
         groups: Array.isArray(parsed.groups) ? parsed.groups : [],
-        places: Array.isArray(parsed.places) ? parsed.places : [],
+        places: Array.isArray(parsed.places) ? parsed.places.map(migrate) : [],
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
