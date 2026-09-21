@@ -1,3 +1,4 @@
+import '@fontsource-variable/inter/wght.css';
 import 'leaflet/dist/leaflet.css';
 import 'emoji-picker-element';
 // Emoji data is bundled and served locally: no CDN call at runtime.
@@ -9,13 +10,14 @@ const $ = (sel) => document.querySelector(sel);
 
 const el = {
   map: $('#map'),
-  panel: $('#panel'),
   search: $('#search'),
   searchInput: $('#search-input'),
   searchResults: $('#search-results'),
   filters: $('#filters'),
+  placeCount: $('#place-count'),
   manageBtn: $('#manage-btn'),
   addBtn: $('#add-btn'),
+  addLabel: $('#add-btn .add-label'),
   hint: $('#hint'),
   placeSheet: $('#place-sheet'),
   placeTitle: $('#place-title'),
@@ -40,6 +42,15 @@ let draft = null;
 let draftMarker = null;
 let picking = false;
 const markers = new Map();
+
+const icon = (paths, size = 16) =>
+  `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style="width:${size}px;height:${size}px">${paths}</svg>`;
+
+const ICONS = {
+  edit: icon('<path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="M13.5 7.5 16.5 10.5"/>'),
+  directions: icon('<path d="M3 11.5 21 4l-7.5 17-2-7-8.5-2.5Z"/>'),
+  trash: icon('<path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13M10 11v6M14 11v6"/>'),
+};
 
 /* ---------------------------------------------------------------- storage */
 
@@ -79,6 +90,10 @@ let toastTimer;
 function toast(message) {
   el.toast.textContent = message;
   el.toast.hidden = false;
+  // restart the entrance animation on a repeated toast
+  el.toast.style.animation = 'none';
+  void el.toast.offsetWidth;
+  el.toast.style.animation = '';
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     el.toast.hidden = true;
@@ -93,14 +108,23 @@ const map = L.map(el.map, { zoomControl: false, attributionControl: false }).set
   saved.zoom,
 );
 
+// Plain OSM tiles (no key, no third party): the muted look and the dark
+// variant are CSS filters on the tile pane, see .leaflet-tile-pane.
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 }).addTo(map);
 
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+const syncPickerTheme = () => {
+  el.emojiPicker.className = darkQuery.matches ? 'dark' : 'light';
+};
+syncPickerTheme();
+darkQuery.addEventListener('change', syncPickerTheme);
+
 // Both controls live bottom-left so the add button owns the bottom-right corner.
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
-L.control.attribution({ position: 'bottomleft' }).addTo(map);
+L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
 
 map.on('moveend', () => {
   const c = map.getCenter();
@@ -120,10 +144,10 @@ function pinIcon(category, extraClass = '') {
   const emoji = category?.emoji || '📍';
   return L.divIcon({
     className: '',
-    html: `<div class="pin ${extraClass}" style="background:${color}"><span>${emoji}</span></div>`,
-    iconSize: [34, 34],
-    iconAnchor: [17, 34],
-    popupAnchor: [0, -32],
+    html: `<div class="pin ${extraClass}" style="--c:${color}"><span>${emoji}</span></div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+    popupAnchor: [0, -34],
   });
 }
 
@@ -139,14 +163,14 @@ function renderMarkers() {
     const category = categoryOf(place.categoryId);
     let marker = markers.get(place.id);
     if (!marker) {
-      marker = L.marker([place.lat, place.lng], { icon: pinIcon(category) });
+      marker = L.marker([place.lat, place.lng], { icon: pinIcon(category), riseOnHover: true });
       markers.set(place.id, marker);
     } else {
       marker.setLatLng([place.lat, place.lng]);
       marker.setIcon(pinIcon(category));
     }
     // Rebind every render: the closure must see the freshly loaded place.
-    marker.bindPopup(() => popupFor(place));
+    marker.bindPopup(() => popupFor(place), { closeButton: false, offset: [0, 2] });
 
     const visible = !hidden.has(place.categoryId);
     if (visible && !map.hasLayer(marker)) marker.addTo(map);
@@ -158,16 +182,21 @@ function popupFor(place) {
   const category = categoryOf(place.categoryId);
   const node = document.createElement('div');
   node.innerHTML = `
-    <h3></h3>
-    <div class="cat"></div>
-    <p></p>
-    <div class="row">
-      <button type="button" data-edit>Modifica</button>
-      <a target="_blank" rel="noreferrer">Indicazioni</a>
+    <span class="pop-cat"><span class="emo"></span><span class="cat-name"></span></span>
+    <h3 class="pop-name"></h3>
+    <p class="pop-note"></p>
+    <div class="pop-actions">
+      <button type="button" data-edit>${ICONS.edit}<span>Modifica</span></button>
+      <a target="_blank" rel="noreferrer">${ICONS.directions}<span>Indicazioni</span></a>
     </div>`;
-  node.querySelector('h3').textContent = place.name;
-  node.querySelector('.cat').textContent = category ? `${category.emoji} ${category.name}` : '—';
-  const note = node.querySelector('p');
+
+  const badge = node.querySelector('.pop-cat');
+  badge.style.setProperty('--c', category?.color || '#6b7280');
+  badge.querySelector('.emo').textContent = category?.emoji || '📍';
+  badge.querySelector('.cat-name').textContent = category?.name || 'Senza categoria';
+
+  node.querySelector('.pop-name').textContent = place.name;
+  const note = node.querySelector('.pop-note');
   note.textContent = place.note || '';
   note.hidden = !place.note;
   node.querySelector('a').href = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
@@ -180,17 +209,28 @@ function popupFor(place) {
 
 /* ----------------------------------------------------------------- panels */
 
+function chipFor(category, { on, count }) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = `chip ${on ? 'on' : 'off'}`;
+  chip.style.setProperty('--c', category.color);
+  chip.dataset.id = category.id;
+  chip.innerHTML = `<span class="emo"></span><span class="name"></span>${
+    count === undefined ? '' : '<span class="count"></span>'
+  }`;
+  chip.querySelector('.emo').textContent = category.emoji;
+  chip.querySelector('.name').textContent = category.name;
+  if (count !== undefined) chip.querySelector('.count').textContent = count;
+  return chip;
+}
+
+const countIn = (categoryId) => state.places.filter((p) => p.categoryId === categoryId).length;
+
 function renderFilters() {
   el.filters.textContent = '';
+  el.placeCount.textContent = state.places.length;
   for (const category of state.categories) {
-    const count = state.places.filter((p) => p.categoryId === category.id).length;
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = `chip ${hidden.has(category.id) ? 'off' : 'on'}`;
-    chip.style.color = category.color;
-    chip.innerHTML = `<span>${category.emoji}</span><span class="name"></span><span class="count">${count}</span>`;
-    chip.querySelector('.name').textContent = category.name;
-    chip.querySelector('.name').style.color = 'var(--fg)';
+    const chip = chipFor(category, { on: !hidden.has(category.id), count: countIn(category.id) });
     chip.addEventListener('click', () => {
       if (hidden.has(category.id)) hidden.delete(category.id);
       else hidden.add(category.id);
@@ -207,22 +247,15 @@ function renderCategoryChoice(selectedId) {
   if (!state.categories.length) {
     const link = document.createElement('button');
     link.type = 'button';
-    link.className = 'link-btn';
-    link.textContent = 'Nessuna categoria: creane una';
+    link.className = 'ghost';
+    link.textContent = 'Crea la prima categoria';
     link.addEventListener('click', () => openCategorySheet());
     el.categoryChoice.append(link);
     return;
   }
 
   for (const category of state.categories) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = `chip ${category.id === selectedId ? 'on' : 'off'}`;
-    chip.style.color = category.color;
-    chip.dataset.id = category.id;
-    chip.innerHTML = `<span>${category.emoji}</span><span class="name"></span>`;
-    chip.querySelector('.name').textContent = category.name;
-    chip.querySelector('.name').style.color = 'var(--fg)';
+    const chip = chipFor(category, { on: category.id === selectedId });
     chip.addEventListener('click', () => renderCategoryChoice(category.id));
     el.categoryChoice.append(chip);
   }
@@ -233,7 +266,7 @@ const selectedCategoryId = () => el.categoryChoice.querySelector('.chip.on')?.da
 function renderCategoryList() {
   el.categoryList.textContent = '';
   for (const category of state.categories) {
-    const count = state.places.filter((p) => p.categoryId === category.id).length;
+    const count = countIn(category.id);
     const li = document.createElement('li');
 
     const emojiBtn = document.createElement('button');
@@ -249,23 +282,28 @@ function renderCategoryList() {
     });
 
     const name = document.createElement('input');
+    name.type = 'text';
     name.value = category.name;
     name.maxLength = 40;
     name.addEventListener('change', () => saveCategory(category.id, { name: name.value }));
 
+    const swatch = document.createElement('label');
+    swatch.className = 'swatch';
+    swatch.title = 'Colore';
     const color = document.createElement('input');
     color.type = 'color';
     color.value = category.color;
     color.addEventListener('change', () => saveCategory(category.id, { color: color.value }));
+    swatch.append(color);
 
-    const count_ = document.createElement('span');
-    count_.className = 'count';
-    count_.textContent = count ? `${count}` : '';
+    const tally = document.createElement('span');
+    tally.className = 'count';
+    tally.textContent = count || '';
 
     const del = document.createElement('button');
     del.type = 'button';
-    del.className = 'del';
-    del.textContent = '🗑';
+    del.className = 'ghost-icon';
+    del.innerHTML = ICONS.trash;
     del.title = 'Elimina categoria';
     del.addEventListener('click', async () => {
       const warning = count
@@ -281,7 +319,7 @@ function renderCategoryList() {
       }
     });
 
-    li.append(emojiBtn, name, color, count_, del);
+    li.append(emojiBtn, name, swatch, tally, del);
     el.categoryList.append(li);
   }
 }
@@ -302,7 +340,7 @@ function setPicking(on) {
   document.body.classList.toggle('picking', on);
   el.hint.hidden = !on;
   el.addBtn.classList.toggle('active', on);
-  el.addBtn.textContent = on ? '× Annulla' : '＋ Aggiungi posto';
+  el.addLabel.textContent = on ? 'Annulla' : 'Aggiungi posto';
 }
 
 function clearDraftMarker() {
@@ -373,6 +411,8 @@ el.placeForm.addEventListener('submit', async (event) => {
     if (draft.id) await api(`/places/${draft.id}`, { method: 'PUT', body });
     else await api('/places', { method: 'POST', body });
     closePlaceSheet();
+    // A place saved into a filtered-out category would otherwise vanish.
+    if (hidden.delete(categoryId)) writeJSON('pi.hidden', [...hidden]);
     await load();
     toast(body.name ? `"${body.name}" salvato` : 'Salvato');
   } catch (err) {
@@ -394,7 +434,7 @@ el.deleteBtn.addEventListener('click', async () => {
 
 // Keep the draft pin in sync with the category picked in the form.
 el.categoryChoice.addEventListener('click', () => {
-  if (draftMarker) draftMarker.setIcon(pinIcon(categoryOf(selectedCategoryId()), 'draft'));
+  if (draftMarker) draftMarker.setIcon(pinIcon(categoryOf(selectedCategoryId())));
 });
 
 for (const button of document.querySelectorAll('[data-close]')) {
@@ -459,15 +499,51 @@ el.categoryForm.addEventListener('submit', async (event) => {
 
 let emojiTarget = null;
 el.emojiPicker.dataSource = emojiDataUrl;
+el.emojiPicker.i18n = {
+  categoriesLabel: 'Categorie',
+  emojiUnsupportedMessage: 'Il browser non supporta le emoji a colori.',
+  favoritesLabel: 'Usate di recente',
+  loadingMessage: 'Carico…',
+  networkErrorMessage: 'Impossibile caricare le emoji.',
+  regionLabel: 'Scelta emoji',
+  searchDescription: 'Usa le frecce per scorrere i risultati, Invio per scegliere.',
+  searchLabel: 'Cerca',
+  searchResultsLabel: 'Risultati',
+  skinToneDescription: 'Usa le frecce per scegliere, Invio per confermare.',
+  skinToneLabel: 'Tonalità della pelle (ora: {skinTone})',
+  skinTonesLabel: 'Tonalità della pelle',
+  skinTones: ['Neutra', 'Chiara', 'Medio-chiara', 'Media', 'Medio-scura', 'Scura'],
+  categories: {
+    custom: 'Personalizzate',
+    'smileys-emotion': 'Faccine ed emozioni',
+    'people-body': 'Persone',
+    'animals-nature': 'Animali e natura',
+    'food-drink': 'Cibo e bevande',
+    'travel-places': 'Viaggi e luoghi',
+    activities: 'Attività',
+    objects: 'Oggetti',
+    symbols: 'Simboli',
+    flags: 'Bandiere',
+  },
+};
+
+const POPOVER = { w: 304, h: 322, gap: 10 };
 
 function openEmojiPicker(anchor, onPick) {
   emojiTarget = onPick;
   const rect = anchor.getBoundingClientRect();
+  const sheet = anchor.closest('aside')?.getBoundingClientRect();
   el.emojiPopover.hidden = false;
-  const width = 300;
-  const height = 320;
-  const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
-  const top = rect.bottom + height + 8 < window.innerHeight ? rect.bottom + 6 : Math.max(8, rect.top - height - 6);
+
+  // Beside the sheet when there is room, so the form stays readable while picking.
+  const beside = sheet && sheet.left - POPOVER.w - POPOVER.gap > 8 ? sheet.left - POPOVER.w - POPOVER.gap : null;
+  const left =
+    beside ?? Math.min(Math.max(8, rect.left), window.innerWidth - POPOVER.w - 8);
+  const below = rect.bottom + POPOVER.h + POPOVER.gap < window.innerHeight;
+  const top = Math.min(
+    Math.max(8, beside ? rect.top - 8 : below ? rect.bottom + POPOVER.gap : rect.top - POPOVER.h - POPOVER.gap),
+    window.innerHeight - POPOVER.h - 8,
+  );
   el.emojiPopover.style.left = `${left}px`;
   el.emojiPopover.style.top = `${top}px`;
 }
@@ -484,7 +560,7 @@ el.emojiPicker.addEventListener('emoji-click', (event) => {
 
 document.addEventListener('pointerdown', (event) => {
   if (el.emojiPopover.hidden) return;
-  if (el.emojiPopover.contains(event.target) || event.target.classList.contains('emoji-btn')) return;
+  if (el.emojiPopover.contains(event.target) || event.target.closest('.emoji-btn')) return;
   closeEmojiPicker();
 });
 

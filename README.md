@@ -4,6 +4,8 @@ Mappa a schermo intero dove segni i posti che ti interessano. Ogni posto apparti
 categoria, e ogni categoria ha una sua emoji e un suo colore: il marker sulla mappa è quello.
 Niente account, niente categorie preimpostate, niente fronzoli.
 
+![Place Index](docs/preview.png)
+
 ## Cosa fa
 
 - **Mappa full-screen** (Leaflet + tile OpenStreetMap, nessuna API key).
@@ -18,6 +20,14 @@ Niente account, niente categorie preimpostate, niente fronzoli.
 - **Filtri**: i chip in alto a sinistra accendono/spengono le categorie sulla mappa (preferenza
   locale del browser).
 - I dati stanno sul server in un unico `places.json`: chiunque apra la pagina vede lo stesso indice.
+
+## L'interfaccia
+
+Tutta la UI è un solo strato di pannelli in vetro sopra la mappa: un'unica scala tipografica
+(Inter, servito in locale), una scala di ombre, una di raggi. La mappa è desaturata via CSS
+così l'unico colore acceso sullo schermo è un marker. Tema chiaro e scuro seguono il sistema
+(`prefers-color-scheme`), incluse le tile, e le animazioni si spengono con
+`prefers-reduced-motion`. Niente font, icone o dati emoji presi da una CDN: tutto è nel bundle.
 
 ## Pubblicare con Docker
 
