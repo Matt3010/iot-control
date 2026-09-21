@@ -4,6 +4,7 @@
   import { publicApi, type PublicMapPayload } from '../lib/publicApi';
   import { mapPath, profileUrl } from '../lib/routing';
   import Icon from './Icon.svelte';
+  import Button from './Button.svelte';
 
   let { handle, slug }: { handle?: string; slug: string } = $props();
 
@@ -113,7 +114,7 @@
   <div class="notice surface">
     <h1>Questa mappa non c'è</h1>
     <p>Forse chi l'ha fatta non l'ha ancora pubblicata, o l'indirizzo è cambiato.</p>
-    <a class="primary" href="/">Fai la tua</a>
+    <Button look="primary" href="/" extra="start">Fai la tua</Button>
   </div>
 {:else if data}
   <div id="map" bind:this={container}></div>
@@ -157,9 +158,9 @@
     {/if}
   </div>
 
-  <a class="made primary" href="/">
+  <Button look="primary" href="/" extra="made">
     <Icon name="pin" /> Fai la tua
-  </a>
+  </Button>
 {/if}
 
 <style>
@@ -266,7 +267,7 @@
 
   .other:hover { color: var(--ink); text-decoration: underline; }
 
-  .made {
+  :global(.made) {
     position: absolute;
     right: 18px;
     bottom: calc(22px + env(safe-area-inset-bottom));
@@ -282,7 +283,7 @@
     box-shadow: var(--shadow-3), inset 0 1px 0 rgb(255 255 255 / 0.16);
   }
 
-  .made :global(.ico) { width: 16px; height: 16px; }
+  :global(.made .ico) { width: 16px; height: 16px; }
 
   .notice {
     position: absolute;
@@ -303,15 +304,14 @@
     line-height: 1.5;
   }
 
-  .notice .primary {
+  .notice :global(.start) {
     justify-self: center;
     margin-top: 6px;
-    text-decoration: none;
   }
 
   @media (max-width: 600px) {
     /* sotto resta il posto per il tasto: la lista si ferma prima */
     .side { left: 12px; right: 12px; top: 12px; width: auto; max-height: calc(100% - 92px); }
-    .made { left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); justify-content: center; }
+    :global(.made) { left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); justify-content: center; }
   }
 </style>

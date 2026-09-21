@@ -9,17 +9,27 @@
     label,
     note,
     title,
+    disabled = false,
+    ...rest
   }: {
     checked: boolean;
     onchange: (value: boolean) => void;
     label: string;
     note?: string;
     title?: string;
+    disabled?: boolean;
+    [key: string]: unknown;
   } = $props();
 </script>
 
-<label class="switch" class:is-on={checked} class:has-note={!!note} {title}>
-  <input type="checkbox" {checked} onchange={(event) => onchange(event.currentTarget.checked)} />
+<label class="switch" class:is-on={checked} class:has-note={!!note} class:is-off={disabled} {title}>
+  <input
+    type="checkbox"
+    {checked}
+    {disabled}
+    onchange={(event) => onchange(event.currentTarget.checked)}
+    {...rest}
+  />
   <span class="switch-track"><span class="switch-dot"></span></span>
   <span class="switch-text">
     <span class="switch-name">{label}</span>
@@ -28,6 +38,9 @@
 </label>
 
 <style>
+  /* spento: si vede e non si tocca */
+  .switch.is-off { opacity: 0.5; cursor: default; pointer-events: none; }
+
   .switch {
     display: flex;
     align-items: center;

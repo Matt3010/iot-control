@@ -7,24 +7,32 @@
     label,
     count,
     look = 'on',
+    disabled = false,
     onclick,
+    ...rest
   }: {
     color?: string;
     emoji?: string;
     label: string;
     count?: number;
     look?: Look;
+    disabled?: boolean;
     onclick?: () => void;
+    /* quello che non sappiamo ancora di dover passare: title, aria, dati */
+    [key: string]: unknown;
   } = $props();
 </script>
 
-<button type="button" class="chip {look}" style:--c={color} {onclick}>
+<button type="button" class="chip {look}" style:--c={color} {disabled} {onclick} {...rest}>
   {#if emoji}<span class="emo">{emoji}</span>{/if}
   <span class="name">{label}</span>
   {#if count !== undefined}<span class="count">{count}</span>{/if}
 </button>
 
 <style>
+/* spento vuol dire spento: niente clic e niente passaggio col tasto tab */
+.chip:disabled { opacity: 0.45; pointer-events: none; }
+
 /* chips ------------------------------------------------------------------- */
 
 .chip {

@@ -12,6 +12,7 @@
   import Icon from './Icon.svelte';
   import LinkRow from './LinkRow.svelte';
   import Switch from './Switch.svelte';
+  import Button from './Button.svelte';
 
   let newEmoji = $state(DEFAULT_EMOJI);
   let newColor = $state<string>(SUGGESTED[0]!);
@@ -86,9 +87,9 @@
     <h2>
       {ui.manageTab === 'maps' ? 'Mappe e link' : ui.manageTab === 'groups' ? 'Gruppi' : 'Categorie'}
     </h2>
-    <button class="ghost-icon" type="button" title="Chiudi" onclick={() => ui.closeManage()}>
+    <Button look="icon" title="Chiudi" onclick={() => ui.closeManage()}>
       <Icon name="close" />
-    </button>
+    </Button>
   </header>
 
   <div class="tabs" role="tablist">
@@ -156,14 +157,9 @@
                 )}
             ></button>
             <span class="count">{store.countIn(category.id) || ''}</span>
-            <button
-              type="button"
-              class="ghost-icon"
-              title="Elimina categoria"
-              onclick={() => store.deleteCategory(category)}
-            >
+            <Button look="icon" title="Elimina categoria" onclick={() => store.deleteCategory(category)}>
               <Icon name="trash" />
-            </button>
+            </Button>
           </li>
         {/each}
         {#if store.categories.length && !visibleCategories.length}
@@ -226,10 +222,9 @@
                 value={map.name}
                 onchange={(event) => store.patchMap(map, { name: event.currentTarget.value })}
               />
-              <button
-                type="button"
-                class="ghost-icon map-eye"
-                class:is-shown={store.shows(map.id)}
+              <Button
+                look="icon"
+                extra={'map-eye' + (store.shows(map.id) ? ' is-shown' : '')}
                 disabled={open}
                 title={open
                   ? 'La mappa selezionata si vede sempre'
@@ -239,16 +234,15 @@
                 onclick={() => store.toggleShown(map.id)}
               >
                 <Icon name={store.shows(map.id) ? 'eye' : 'eyeOff'} />
-              </button>
-              <button
-                type="button"
-                class="ghost-icon"
+              </Button>
+              <Button
+                look="icon"
                 title="Elimina mappa"
                 disabled={store.maps.length <= 1}
                 onclick={() => store.deleteMap(map)}
               >
                 <Icon name="trash" />
-              </button>
+              </Button>
             </div>
 
             <div class="map-foot">
@@ -323,14 +317,9 @@
               onchange={(event) => store.patchGroup(group, { name: event.currentTarget.value })}
             />
             <span class="count">{store.countGroup(group.id) || ''}</span>
-            <button
-              type="button"
-              class="ghost-icon"
-              title="Elimina gruppo"
-              onclick={() => store.deleteGroup(group)}
-            >
+            <Button look="icon" title="Elimina gruppo" onclick={() => store.deleteGroup(group)}>
               <Icon name="trash" />
-            </button>
+            </Button>
           </li>
         {/each}
         {#if mapGroups.length && !visibleGroups.length}
@@ -525,11 +514,9 @@
   text-overflow: ellipsis;
 }
 
-#map-list .ghost-icon:disabled { opacity: 0.3; cursor: default; }
-
 /* l'occhio resta smorto finché la mappa non è accesa accanto */
-.map-eye { color: var(--ink-3); }
-.map-eye.is-shown { color: var(--ink); }
+#map-list :global(.map-eye) { color: var(--ink-3); }
+#map-list :global(.map-eye.is-shown) { color: var(--ink); }
 
 .profile-link {
   display: grid;

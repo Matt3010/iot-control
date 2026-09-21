@@ -62,9 +62,13 @@ Lo stato vive in classi con le rune (`$state`), quindi le stesse regole valgono
 ovunque: un posto salvato compare subito perché la lista, i marker e i conteggi
 leggono tutti la stessa cosa.
 
-Il foglio di stile è rimasto globale invece di finire dentro i componenti: è un
-sistema di design unico per tutta l'app, e tenerlo in un posto solo rende
-evidente quando due cose dovrebbero somigliarsi.
+Globali restano solo le fondamenta — i token, il reset con la superficie in
+vetro, i campi, i keyframe e la pelle di Leaflet (`styles/map.css`, perché pin,
+grappoli e popup nascono fuori da Svelte). Tutto il resto sta nel componente che
+lo disegna, e quello che ricorre è diventato un pezzo solo: `Button` (con le sue
+varianti: primary, ghost, icon, link, danger), `Switch`, `Chip`, `AddRow`,
+`LinkRow`, `Stop`, `Alert`. Chi li usa passa dei dati — `look="primary"`,
+`disabled` — invece di ricordarsi una classe.
 
 ## Chi entra
 

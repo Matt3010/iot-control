@@ -6,6 +6,7 @@
   import Chip from './Chip.svelte';
   import Icon from './Icon.svelte';
   import Switch from './Switch.svelte';
+  import Button from './Button.svelte';
 
   // Closing the sheet clears the draft a beat before this component goes away,
   // so every read of it has to survive the gap.
@@ -62,9 +63,9 @@
           <span class="head-where">in {store.maps.find((m) => m.id === (draft.mapId ?? store.activeMap?.id))?.name}</span>
         {/if}
       </span>
-      <button class="ghost-icon" type="button" title="Chiudi" onclick={() => ui.closePlace()}>
+      <Button look="icon" title="Chiudi" onclick={() => ui.closePlace()}>
         <Icon name="close" />
-      </button>
+      </Button>
     </header>
 
     <form id="place-form" onsubmit={save}>
@@ -87,9 +88,9 @@
         <span class="eyebrow">Categoria</span>
         <div id="category-choice" class="chips">
           {#if store.categories.length === 0}
-            <button type="button" class="ghost" onclick={() => ui.openManage('categories', 'add')}>
+            <Button look="ghost" onclick={() => ui.openManage('categories', 'add')}>
               Crea la prima categoria
-            </button>
+            </Button>
           {:else}
             {#each store.categories as category (category.id)}
               <Chip
@@ -146,12 +147,12 @@
 
     <div class="actions">
       {#if editing}
-        <button type="button" class="danger-link" onclick={remove}>
+        <Button look="danger" onclick={remove}>
           <Icon name="trash" /> Elimina
-        </button>
+        </Button>
       {/if}
-      <button type="button" class="ghost" onclick={() => ui.closePlace()}>Annulla</button>
-      <button type="submit" class="primary">Salva</button>
+      <Button look="ghost" onclick={() => ui.closePlace()}>Annulla</Button>
+      <Button look="primary" type="submit">Salva</Button>
     </div>
   </form>
   </aside>

@@ -3,6 +3,7 @@
   import { mapPath } from '../lib/routing';
   import Icon from './Icon.svelte';
   import MapBackdrop from './MapBackdrop.svelte';
+  import Button from './Button.svelte';
 
   let { handle }: { handle: string } = $props();
 
@@ -72,7 +73,7 @@
 
     <footer class="foot">
       <span>Anche tu hai dei posti da tenere insieme?</span>
-      <a class="primary" href="/">Fai la tua</a>
+      <Button look="primary" href="/">Fai la tua</Button>
     </footer>
   </div>
 </div>
@@ -205,5 +206,4 @@
     color: var(--ink-3);
   }
 
-  .primary { text-decoration: none; }
 </style>

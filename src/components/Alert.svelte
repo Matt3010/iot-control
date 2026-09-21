@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Button from './Button.svelte';
   import Icon from './Icon.svelte';
 
   /** Un guaio detto per intero: cos'è successo e, se c'è, come uscirne. */
@@ -15,7 +16,7 @@
   <Icon name="alert" />
   <span>{message}</span>
   {#if action}
-    <button type="button" class="alert-fix" onclick={action.run}>{action.label}</button>
+    <Button look="link" extra="alert-fix" onclick={action.run}>{action.label}</Button>
   {/if}
 </p>
 
@@ -39,7 +40,7 @@
 
   .alert span { flex: 1; min-width: 0; }
 
-  .alert-fix {
+  .alert :global(.btn.alert-fix) {
     flex: none;
     padding: 4px 10px;
     border: 0;
@@ -52,5 +53,5 @@
     transition: background 0.14s;
   }
 
-  .alert-fix:hover { background: var(--sunken); }
+  .alert :global(.btn.alert-fix:hover) { background: var(--sunken); }
 </style>

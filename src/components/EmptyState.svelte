@@ -1,6 +1,7 @@
 <script lang="ts">
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
+  import Button from './Button.svelte';
 
   const isMac = /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
   const noCategories = $derived(store.categories.length === 0);
@@ -12,9 +13,9 @@
     <p class="empty-line">
       Le dai un'emoji e un colore: sarà il marker dei posti che ci metti dentro.
     </p>
-    <button type="button" class="ghost" onclick={() => ui.openManage('categories', 'add')}>
+    <Button look="ghost" onclick={() => ui.openManage('categories', 'add')}>
       Crea una categoria
-    </button>
+    </Button>
   {:else}
     <p class="empty-title">Nessun posto, per ora.</p>
     <ol class="empty-steps">
@@ -66,5 +67,5 @@
     box-shadow: inset 0 0 0 1px var(--hairline);
   }
 
-  .empty .ghost { justify-self: start; margin-top: 2px; }
+  .empty :global(.btn) { justify-self: start; margin-top: 2px; }
 </style>

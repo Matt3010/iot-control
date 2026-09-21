@@ -12,6 +12,7 @@
   import PanelSkeleton from './PanelSkeleton.svelte';
   import PlaceList from './PlaceList.svelte';
   import SearchTrigger from './SearchTrigger.svelte';
+  import Button from './Button.svelte';
 
   /**
    * Su uno schermo stretto il pannello e una sheet non ci stanno insieme:
@@ -76,35 +77,34 @@
           {store.currentPlaces.length === 1 ? 'posto' : 'posti'}
         </span>
       {/if}
-      <button
-        class="ghost-icon share-btn"
-        class:is-public={store.activeMap?.published}
-        type="button"
+      <Button
+        look="icon"
+        extra={'share-btn' + (store.activeMap?.published ? ' is-public' : '')}
         title={store.activeMap?.published
           ? 'Questa mappa è pubblica: copia o cambia il link'
           : 'Pubblica questa mappa e prendi il link'}
         onclick={() => ui.toggleManage('maps')}
       >
         <Icon name="link" />
-      </button>
-      <button
-        class="ghost-icon"
-        type="button"
+      </Button>
+      <Button
+        look="icon"
+        extra="leave-btn"
         title={'Esci da ' + (auth.account?.email ?? '')}
         onclick={() => auth.leave()}
       >
         <Icon name="logout" />
-      </button>
+      </Button>
       {#if viewport.narrow}
-        <button
-          class="ghost-icon panel-toggle"
-          type="button"
+        <Button
+          look="icon"
+          extra="panel-toggle"
           aria-expanded={!collapsed}
           title={collapsed ? 'Mostra filtri ed elenco' : 'Riduci il pannello'}
           onclick={() => (ui.panelWish = collapsed ? 'open' : 'closed')}
         >
           <Icon name={collapsed ? 'expand' : 'collapse'} />
-        </button>
+        </Button>
       {/if}
     </span>
   </div>
@@ -115,15 +115,14 @@
     {#if store.categories.length && !store.loading}
       <div class="panel-row" id="group-head">
         <span class="eyebrow">Gruppi</span>
-        <button
+        <Button
+          look="icon"
           id="add-group"
-          class="ghost-icon"
-          type="button"
           title="Aggiungi un gruppo"
           onclick={() => ui.toggleManage('groups', 'add')}
         >
           <Icon name="plus" />
-        </button>
+        </Button>
       </div>
       <div id="group-filters">
         {#if store.currentGroups.length}
@@ -160,9 +159,8 @@
           <span class="eyebrow">Categorie</span>
           <span class="row-actions">
             {#if store.categories.length > 1}
-              <button
-                class="link-btn"
-                type="button"
+              <Button
+                look="link"
                 title={everythingVisible
                   ? 'Togli dalla mappa tutte le categorie'
                   : 'Rimetti sulla mappa tutte le categorie'}
@@ -171,17 +169,16 @@
               >
                 <!-- prima diceva "nessuna"/"tutte": sembrava uno stato, invece e' un comando -->
                 {everythingVisible ? 'nascondi tutte' : 'mostra tutte'}
-              </button>
+              </Button>
             {/if}
-            <button
+            <Button
+              look="icon"
               id="add-category"
-              class="ghost-icon"
-              type="button"
               title="Aggiungi una categoria"
               onclick={() => ui.toggleManage('categories', 'add')}
             >
               <Icon name="plus" />
-            </button>
+            </Button>
           </span>
         </div>
 
@@ -270,10 +267,19 @@
   flex: none;
 }
 
-.panel-toggle { margin-right: -4px; }
+/* i bottoni sono di <Button>: le decorazioni li raggiungono con :global */
+.panel-head :global(.panel-toggle) { margin-right: -4px; }
+
+/* uscire è l'unica cosa qui dentro che ti porta fuori: si veste di conseguenza */
+.panel-head :global(.leave-btn) { color: color-mix(in srgb, var(--danger) 80%, transparent); }
+
+.panel-head :global(.leave-btn:hover) {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
 
 /* quando la mappa è pubblica il link si accende: lo stato si vede da lì */
-.share-btn.is-public { color: var(--ink); background: var(--sunken-hover); }
+.panel-head :global(.share-btn.is-public) { color: var(--ink); background: var(--sunken-hover); }
 
 .tally {
   font-size: 11.5px;
@@ -307,20 +313,6 @@
   align-items: center;
   gap: 4px;
 }
-
-.link-btn {
-  border: 0;
-  border-radius: 99px;
-  padding: 3px 8px;
-  background: none;
-  color: var(--ink-3);
-  font-size: 11px;
-  font-weight: 560;
-  letter-spacing: 0.02em;
-  transition: background 0.15s, color 0.15s;
-}
-
-.link-btn:hover { background: var(--sunken-hover); color: var(--ink); }
 
 .section-hint {
   margin: 0;

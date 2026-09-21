@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
+  import Button from './Button.svelte';
 
   /**
    * La riga in fondo a ogni lista: si scrive un nome e si aggiunge. Il bordo
@@ -40,9 +41,9 @@
   {@render before?.()}
   <input name="name" required maxlength="40" {placeholder} bind:this={field} bind:value />
   {@render after?.()}
-  <button type="submit" class="ghost-icon add-go" {title}>
+  <Button look="icon" type="submit" extra="add-go" {title}>
     <Icon name="plus" />
-  </button>
+  </Button>
 </form>
 
 <style>
@@ -76,9 +77,10 @@
     box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--accent) 10%, transparent);
   }
 
-  .add-go { color: var(--ink-3); }
+  /* il bottone è di <Button>: da qui lo si raggiunge con :global */
+  .add-row :global(.add-go) { color: var(--ink-3); }
 
-  .add-row.is-ready .add-go {
+  .add-row.is-ready :global(.add-go) {
     background: var(--accent);
     color: var(--on-accent);
   }

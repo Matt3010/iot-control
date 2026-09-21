@@ -37,14 +37,40 @@ export function createMap(
   options: L.MapOptions = {},
   onLocate?: () => void,
 ): L.Map {
-  const map = L.map(container, { zoomControl: false, attributionControl: false, ...options });
-  L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map);
+  const map = L.map(container, {
+    zoomControl: false,
+    attributionControl: false,
+    // un mondo solo: niente copie affiancate, e niente vuoto oltre i poli
+    maxBounds: WORLD,
+    maxBoundsViscosity: 1,
+    ...options,
+  });
+  L.tileLayer(TILES, { maxZoom: 19, noWrap: true, bounds: WORLD, attribution: ATTRIBUTION }).addTo(map);
+  fillTheWindow(map, container);
   // l'angolo impila dal basso nell'ordine in cui si aggiungono: prima lo zoom,
   // poi il tasto, che così gli sta sopra
   L.control.zoom({ position: 'bottomleft' }).addTo(map);
   if (onLocate) locateControl(onLocate).addTo(map);
   L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
   return map;
+}
+
+/** Il mondo intero, senza le calotte che la proiezione non sa disegnare. */
+const WORLD = L.latLngBounds(L.latLng(-85, -180), L.latLng(85, 180));
+
+/**
+ * Sotto un certo zoom il mondo diventa più piccolo della finestra e intorno
+ * resta il nero. Lo zoom minimo non è un numero fisso: è quello che serve a
+ * coprire il lato più lungo di questa finestra, e cambia se la finestra cambia.
+ */
+function fillTheWindow(map: L.Map, container: HTMLElement): void {
+  const fit = () => {
+    const side = Math.max(container.clientWidth, container.clientHeight);
+    const enough = Math.ceil(Math.log2(Math.max(side, 1) / 256));
+    map.setMinZoom(Math.max(enough, 0));
+  };
+  fit();
+  map.on('resize', fit);
 }
 
 /** Un tasto in mezzo ai controlli di Leaflet, con il loro stesso vestito. */

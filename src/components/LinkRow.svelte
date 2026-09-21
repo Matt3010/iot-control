@@ -1,6 +1,7 @@
 <script lang="ts">
   import { toast } from '../lib/toast.svelte';
   import Icon from './Icon.svelte';
+  import Button from './Button.svelte';
 
   /**
    * Un indirizzo pubblico da leggere e da portarsi via. La parte fissa resta
@@ -49,9 +50,9 @@
   {:else}
     <span class="link-value">{value}</span>
   {/if}
-  <button type="button" class="ghost-icon" {title} onclick={copy}>
+  <Button look="icon" {title} onclick={copy}>
     <Icon name={copied ? 'check' : 'link'} />
-  </button>
+  </Button>
 </div>
 
 <style>
