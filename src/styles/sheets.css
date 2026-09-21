@@ -55,7 +55,8 @@ aside header {
 }
 
 .tab {
-  flex: 1;
+  flex: 1 1 50%;
+  min-width: 0;
   padding: 7px 12px;
   border: 0;
   border-radius: 99px;
@@ -92,6 +93,14 @@ aside header {
   padding: 6px 8px;
 }
 
+/* the row shows the focus for the whole group; the field must not add a second */
+.add-row input[name="name"]:hover,
+.add-row input[name="name"]:focus {
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .add-row:focus-within {
   border-style: solid;
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
@@ -106,7 +115,7 @@ aside header {
 }
 
 .add-row .emoji-btn { width: 32px; height: 32px; font-size: 16px; }
-.add-row .swatch { width: 26px; height: 26px; border-radius: var(--r-sm); }
+.add-row .swatch { width: 24px; height: 24px; margin: 0 2px; }
 
 .sheet-note {
   margin: 12px 2px 0;
@@ -193,7 +202,19 @@ aside header {
 
 /* the list is a dense row of controls; the form below is the roomy one */
 #category-list .emoji-btn { width: 32px; height: 32px; font-size: 16px; }
-#category-list .swatch { width: 26px; height: 26px; border-radius: var(--r-sm); }
+#category-list .swatch { width: 24px; height: 24px; margin: 0 2px; }
+
+/* colour picker ------------------------------------------------------------ */
+
+#color-popover {
+  position: absolute;
+  z-index: var(--z-popover);
+  padding: 0;
+  border-radius: var(--r-lg);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-3), inset 0 1px 0 var(--highlight);
+  animation: rise 0.18s var(--ease);
+}
 
 /* -------------------------------------------------------------- emoji picker */
 

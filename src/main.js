@@ -57,6 +57,9 @@ const el = {
   categoryList: $('#category-list'),
   categoryForm: $('#category-form'),
   newEmoji: $('#new-emoji'),
+  newColor: $('#new-color'),
+  colorPopover: $('#color-popover'),
+  swatches: $('#swatches'),
   emojiPopover: $('#emoji-popover'),
   emojiPicker: $('#emoji-popover emoji-picker'),
   toast: $('#toast'),
@@ -103,6 +106,18 @@ function drawIcons(root = document) {
 }
 
 drawIcons();
+
+/* ------------------------------------------------------------------ colour */
+
+/** Sixteen colours that stay apart from each other on a map, light or dark. */
+const COLORS = [
+  '#e4572e', '#f3a712', '#d7263d', '#f26d85',
+  '#b5179e', '#6a4c93', '#3a86ff', '#2274a5',
+  '#00a6a6', '#2a9d8f', '#43aa8b', '#7cb518',
+  '#8d6a4f', '#e07a5f', '#5c6672', '#264653',
+];
+
+const paintSwatch = (node, color) => node.style.setProperty('--c', color);
 
 /* ---------------------------------------------------------------- storage */
 
@@ -166,7 +181,9 @@ function toast(message, action) {
   void el.toast.offsetWidth;
   el.toast.style.animation = '';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(hideToast, action ? UNDO_MS : 2600);
+  // The button leaves the screen before the delete goes out, so a late click
+  // cannot "undo" something the server has already been told to forget.
+  toastTimer = setTimeout(hideToast, action ? UNDO_MS - 400 : 2600);
 }
 
 function hideToast() {
@@ -642,14 +659,17 @@ function renderCategoryList() {
     name.maxLength = 40;
     name.addEventListener('change', () => patchCategory(category, { name: name.value }));
 
-    const swatch = document.createElement('label');
+    const swatch = document.createElement('button');
+    swatch.type = 'button';
     swatch.className = 'swatch';
     swatch.title = 'Colore';
-    const color = document.createElement('input');
-    color.type = 'color';
-    color.value = category.color;
-    color.addEventListener('change', () => patchCategory(category, { color: color.value }));
-    swatch.append(color);
+    paintSwatch(swatch, category.color);
+    swatch.addEventListener('click', () => {
+      openColorPicker(swatch, category.color, (color) => {
+        paintSwatch(swatch, color);
+        patchCategory(category, { color });
+      });
+    });
 
     const tally = document.createElement('span');
     tally.className = 'count';
@@ -888,13 +908,23 @@ function openPlaceSheet(place) {
 
 function closePlaceSheet() {
   el.placeSheet.hidden = true;
+  placeSheetPaused = false;
   draft = null;
   clearDraftMarker();
   renderMarkers();
   syncSheetState();
 }
 
+/** True while the place sheet is only stepping aside for the manage sheet. */
+let placeSheetPaused = false;
+
 function openManageSheet(tab = 'categories') {
+  // One sheet at a time, but a draft in progress survives: you open this very
+  // panel to create the category the place you are adding still needs.
+  if (!el.placeSheet.hidden) {
+    el.placeSheet.hidden = true;
+    placeSheetPaused = true;
+  }
   el.manageSheet.hidden = false;
   showTab(tab);
   renderCategoryList();
@@ -922,6 +952,15 @@ for (const form of [el.categoryForm, el.groupForm]) {
 function closeManageSheet() {
   el.manageSheet.hidden = true;
   closeEmojiPicker();
+  closeColorPicker();
+  if (placeSheetPaused && draft) {
+    placeSheetPaused = false;
+    el.placeSheet.hidden = false;
+    renderCategoryChoice(selectedCategoryId() || state.categories[state.categories.length - 1]?.id);
+    renderGroupChoice(selectedGroupId());
+  } else {
+    placeSheetPaused = false;
+  }
   syncSheetState();
 }
 
@@ -987,6 +1026,7 @@ document.addEventListener('keydown', (event) => {
   }
   if (event.key !== 'Escape') return;
   if (!el.palette.hidden) return closePalette();
+  if (!el.colorPopover.hidden) return closeColorPicker();
   if (!el.emojiPopover.hidden) return closeEmojiPicker();
   if (picking) return setPicking(false);
   if (!el.placeSheet.hidden) return closePlaceSheet();
@@ -996,6 +1036,15 @@ document.addEventListener('keydown', (event) => {
 /* --------------------------------------------------------- category form */
 
 let newCategoryEmoji = '📍';
+let newCategoryColor = COLORS[0];
+paintSwatch(el.newColor, newCategoryColor);
+
+el.newColor.addEventListener('click', () => {
+  openColorPicker(el.newColor, newCategoryColor, (color) => {
+    newCategoryColor = color;
+    paintSwatch(el.newColor, color);
+  });
+});
 
 el.newEmoji.addEventListener('click', () => {
   openEmojiPicker(el.newEmoji, (emoji) => {
@@ -1009,7 +1058,7 @@ el.categoryForm.addEventListener('submit', async (event) => {
   const body = {
     name: el.categoryForm.elements.name.value.trim(),
     emoji: newCategoryEmoji,
-    color: el.categoryForm.elements.color.value,
+    color: newCategoryColor,
   };
   if (!body.name) return;
   try {
@@ -1021,6 +1070,8 @@ el.categoryForm.addEventListener('submit', async (event) => {
     el.categoryForm.classList.remove('is-ready');
     newCategoryEmoji = '📍';
     el.newEmoji.textContent = '📍';
+    newCategoryColor = COLORS[(COLORS.indexOf(newCategoryColor) + 1) % COLORS.length];
+    paintSwatch(el.newColor, newCategoryColor);
     renderAll();
     if (!el.placeSheet.hidden) renderCategoryChoice(created.id);
     toast(`Categoria "${created.name}" creata`);
@@ -1079,24 +1130,32 @@ el.emojiPicker.i18n = {
   },
 };
 
-const POPOVER = { w: 304, h: 322, gap: 10 };
+const GAP = 10;
 
-function openEmojiPicker(anchor, onPick) {
-  emojiTarget = onPick;
+/**
+ * Popovers open beside their sheet when there is room, so the form underneath
+ * stays readable, and fall back to above/below the button when there is not.
+ */
+function placePopover(popover, anchor, width, height) {
   const rect = anchor.getBoundingClientRect();
   const sheet = anchor.closest('aside')?.getBoundingClientRect();
-  el.emojiPopover.hidden = false;
+  popover.hidden = false;
 
-  // Beside the sheet when there is room, so the form stays readable while picking.
-  const beside = sheet && sheet.left - POPOVER.w - POPOVER.gap > 8 ? sheet.left - POPOVER.w - POPOVER.gap : null;
-  const left = beside ?? Math.min(Math.max(8, rect.left), window.innerWidth - POPOVER.w - 8);
-  const below = rect.bottom + POPOVER.h + POPOVER.gap < window.innerHeight;
+  const beside = sheet && sheet.left - width - GAP > 8 ? sheet.left - width - GAP : null;
+  const left = beside ?? Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+  const below = rect.bottom + height + GAP < window.innerHeight;
   const top = Math.min(
-    Math.max(8, beside ? rect.top - 8 : below ? rect.bottom + POPOVER.gap : rect.top - POPOVER.h - POPOVER.gap),
-    window.innerHeight - POPOVER.h - 8,
+    Math.max(8, beside ? rect.top - 8 : below ? rect.bottom + GAP : rect.top - height - GAP),
+    window.innerHeight - height - 8,
   );
-  el.emojiPopover.style.left = `${left}px`;
-  el.emojiPopover.style.top = `${top}px`;
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+}
+
+function openEmojiPicker(anchor, onPick) {
+  closeColorPicker();
+  emojiTarget = onPick;
+  placePopover(el.emojiPopover, anchor, 304, 322);
 }
 
 function closeEmojiPicker() {
@@ -1113,6 +1172,46 @@ document.addEventListener('pointerdown', (event) => {
   if (el.emojiPopover.hidden) return;
   if (el.emojiPopover.contains(event.target) || event.target.closest('.emoji-btn')) return;
   closeEmojiPicker();
+});
+
+/* ----------------------------------------------------------- colour picker */
+
+let colorTarget = null;
+
+/** Built once; opening it only moves the ring to the colour in use. */
+for (const color of COLORS) {
+  const swatch = document.createElement('button');
+  swatch.type = 'button';
+  swatch.className = 'swatch-dot';
+  swatch.dataset.color = color;
+  swatch.title = color;
+  paintSwatch(swatch, color);
+  swatch.addEventListener('click', () => {
+    const pick = colorTarget;
+    closeColorPicker();
+    pick?.(color);
+  });
+  el.swatches.append(swatch);
+}
+
+function openColorPicker(anchor, current, onPick) {
+  closeEmojiPicker();
+  colorTarget = onPick;
+  for (const swatch of el.swatches.children) {
+    swatch.classList.toggle('is-on', swatch.dataset.color === current);
+  }
+  placePopover(el.colorPopover, anchor, 208, 208);
+}
+
+function closeColorPicker() {
+  el.colorPopover.hidden = true;
+  colorTarget = null;
+}
+
+document.addEventListener('pointerdown', (event) => {
+  if (el.colorPopover.hidden) return;
+  if (el.colorPopover.contains(event.target) || event.target.closest('.swatch')) return;
+  closeColorPicker();
 });
 
 /* --------------------------------------------------------------- palette */

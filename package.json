@@ -6,7 +6,7 @@
   "description": "Indice personale di posti su mappa: marker per categoria con emoji",
   "scripts": {
     "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev:api\" \"vite\"",
-    "dev:api": "tsx watch server/src/index.ts",
+    "dev:api": "tsx watch --tsconfig server/tsconfig.json server/src/index.ts",
     "build": "npm run build:web && npm run build:api",
     "build:web": "vite build",
     "build:api": "tsc -p server/tsconfig.json",

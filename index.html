@@ -104,7 +104,7 @@
         <form id="category-form" class="add-row">
           <button type="button" id="new-emoji" class="emoji-btn" title="Scegli emoji">📍</button>
           <input name="name" required maxlength="40" placeholder="Nuova categoria" />
-          <label class="swatch" title="Colore"><input name="color" type="color" value="#e4572e" /></label>
+          <button type="button" id="new-color" class="swatch" title="Colore"></button>
           <button type="submit" class="ghost-icon add-go" title="Aggiungi categoria"><i data-icon="plus"></i></button>
         </form>
       </div>
@@ -138,6 +138,10 @@
     </div>
 
     <div id="emoji-popover" class="surface" hidden><emoji-picker></emoji-picker></div>
+
+    <div id="color-popover" class="surface" hidden>
+      <div id="swatches" class="swatches"></div>
+    </div>
 
     <div id="toast" hidden></div>
 
