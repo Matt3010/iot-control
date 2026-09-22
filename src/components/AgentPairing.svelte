@@ -273,6 +273,25 @@
 
   const submit = () => go('submit', cleaned());
 
+  /**
+   * Se c'è abbastanza per mandare qualcosa.
+   *
+   * Un campo obbligatorio vuoto fa rifiutare la richiesta dall'altra parte, e
+   * il rifiuto torna indietro dopo qualche secondo per dire una cosa che si
+   * sapeva già prima di partire. Tanto vale non far premere.
+   *
+   * Una levetta obbligatoria è il caso che conta: «l'immagine è quella
+   * giusta» spenta vuol dire che non hai confermato, e un tasto che si lascia
+   * premere lo stesso fa credere di aver risposto.
+   */
+  const ready = $derived(
+    (step?.fields ?? []).every((field) => {
+      if (!field.required) return true;
+      const value = answers[field.name];
+      return field.yesno ? value === true : typeof value === 'string' && value.trim() !== '';
+    }),
+  );
+
   async function detach(account: LinkedAccount, label: string) {
     busy = true;
     try {
@@ -458,7 +477,15 @@
       {/each}
 
       <div class="acts">
-        <Button look="primary" size="sm" disabled={busy} onclick={submit}>Continua</Button>
+        <Button
+          look="primary"
+          size="sm"
+          disabled={busy || !ready}
+          title={ready ? '' : 'Manca ancora qualcosa'}
+          onclick={submit}
+        >
+          Continua
+        </Button>
         <Button look="link" disabled={busy} onclick={() => go('cancel')}>Annulla</Button>
       </div>
     {:else}
