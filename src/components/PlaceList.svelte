@@ -26,7 +26,7 @@
 <ul id="place-list" data-fade="none" use:fadeEdges>
   {#if rows.length === 0}
     <li class="row-empty">
-      {near
+      {near || viewport.narrow
         ? 'Nessun luogo: i filtri qui sopra li stanno escludendo tutti.'
         : 'Nessun luogo in questa parte di mappa.'}
     </li>
@@ -45,9 +45,15 @@
           onfocus={() => mapBridge.highlight(place, true)}
           onblur={() => mapBridge.highlight(place, false)}
           onclick={() => {
-            // la scheda del posto si apre dove c'è il pannello: fagli spazio
-            if (viewport.narrow) ui.panelWish = 'closed';
-            mapBridge.focus(place);
+            /*
+             * Sul telefono non c'è nessuna mappa a cui volare: si apre quello
+             * che di un posto si voleva vedere, cioè la sua scheda. Sul
+             * grande, invece, la riga e il pin sono la stessa cosa vista da
+             * due parti, e toccare la riga porta lì.
+             */
+            if (!viewport.narrow) return mapBridge.focus(place);
+            ui.panelWish = 'closed';
+            ui.openPlace(place);
           }}
         >
           <span class="row-dot">{category?.emoji ?? '📍'}</span>
@@ -63,12 +69,18 @@
               <Icon name="lock" />
             </span>
           {/if}
-          <span
-            class="row-dist"
-            title={formatDistance(distance) + (near ? ' da dove sei' : ' dal centro della mappa')}
-          >
-            {formatDistance(distance)}
-          </span>
+          <!-- La distanza si scrive solo quando si sa da dove si misura: da
+               te, o dal centro di quello che stai guardando. Sul telefono
+               senza mappa e senza posizione non si misura da niente, e uno
+               zero sarebbe una bugia precisa. -->
+          {#if near || !viewport.narrow}
+            <span
+              class="row-dist"
+              title={formatDistance(distance) + (near ? ' da dove sei' : ' dal centro della mappa')}
+            >
+              {formatDistance(distance)}
+            </span>
+          {/if}
         </button>
       </li>
     {/each}

@@ -6,6 +6,7 @@
   import { store } from './lib/store.svelte';
   import { toast } from './lib/toast.svelte';
   import { ui } from './lib/ui.svelte';
+  import { viewport } from './lib/viewport.svelte';
   import AddButton from './components/AddButton.svelte';
   import ColorPopover from './components/ColorPopover.svelte';
   import EmojiPopover from './components/EmojiPopover.svelte';
@@ -128,10 +129,22 @@
   <MapsPage />
 {:else}
   <GuestBar />
-  <MapCanvas />
+  <!--
+    Su un telefono la mappa non c'è.
+    Non è una mappa rimpicciolita: è un francobollo con sopra un pannello che
+    ne copre metà, dove i pin sono grandi come un'unghia e si prende sempre
+    quello sbagliato. Quello che si fa davvero da fermi in strada è leggere un
+    elenco — questo posto, quanto dista, aprilo — e l'elenco c'era già: qui
+    smette di essere l'inquilino di mezzo pannello e prende tutto lo schermo.
+  -->
+  {#if !viewport.narrow}
+    <MapCanvas />
+  {/if}
   <Panel />
-<AddButton />
-<Hint />
+  <AddButton />
+  {#if !viewport.narrow}
+    <Hint />
+  {/if}
 
   {#if ui.sheet === 'place' && ui.draft}
     <PlaceSheet />

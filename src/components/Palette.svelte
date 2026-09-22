@@ -67,11 +67,15 @@
         emoji: category?.emoji ?? '📍',
         name: place.name,
         note: [groups.join(', '), place.note || category?.name].filter(Boolean).join(' · '),
-        meta: formatDistance(distance),
+        // Una distanza si scrive solo se si sa da dove: senza mappa e senza
+        // posizione, «0 m» sarebbe una bugia precisa.
+        meta: origin() || !viewport.narrow ? formatDistance(distance) : '',
         pick: () => {
           ui.paletteOpen = false;
           if (viewport.narrow) ui.panelWish = 'closed';
           store.reveal(place);
+          // sul telefono non c'è nessuna mappa a cui volare: si apre la scheda
+          if (viewport.narrow) return ui.openPlace(place);
           mapBridge.focus(place);
         },
       };
@@ -200,7 +204,9 @@
       {#if placeRows.length}
         <div class="palette-section">
           <span class="eyebrow">I tuoi luoghi</span>
-          {#if !query.trim()}<span class="palette-meta">i più vicini</span>{/if}
+          {#if !query.trim() && (origin() || !viewport.narrow)}
+            <span class="palette-meta">i più vicini</span>
+          {/if}
         </div>
       {/if}
 

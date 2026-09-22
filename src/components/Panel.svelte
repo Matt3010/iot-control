@@ -49,15 +49,25 @@
    */
   const rows = $derived.by(() => {
     mapBridge.view.moves; // re-read whenever the map settles somewhere new
-    return store.currentPlaces
-      .filter((place) => store.visible(place) && (near || mapBridge.contains(place.lat, place.lng)))
-      // in vista si misura dal centro del riquadro, vicino a me da te: così
-      // l'origine è sempre quella che si vede sulla mappa
-      .map((place) => ({
-        place,
-        distance: mapBridge.distanceFrom(place.lat, place.lng, near ? here.spot : null),
-      }))
-      .sort((a, b) => a.distance - b.distance);
+
+    /*
+     * Senza mappa non c'è nessun riquadro da cui scegliere, e nemmeno un
+     * centro da cui misurare: sul telefono ci sono tutti, in ordine
+     * alfabetico. Diventano «i più vicini» solo quando sai dove sei, che è
+     * l'unica origine che resta quando la mappa non c'è.
+     */
+    const all = store.currentPlaces.filter(
+      (place) => store.visible(place) && (near || viewport.narrow || mapBridge.contains(place.lat, place.lng)),
+    );
+
+    const misurati = all.map((place) => ({
+      place,
+      distance: mapBridge.distanceFrom(place.lat, place.lng, near ? here.spot : null),
+    }));
+
+    return viewport.narrow && !near
+      ? misurati.sort((a, b) => a.place.name.localeCompare(b.place.name, 'it'))
+      : misurati.sort((a, b) => a.distance - b.distance);
   });
 
   /** Chiedere "vicino a me" senza aver mai detto dove sei attiva la domanda. */
@@ -236,7 +246,9 @@
             onpick={(id) => (id === 'near' ? goNear() : store.setListMode('view'))}
             label="Quali luoghi elencare"
             options={[
-              { id: 'view', label: 'In vista', title: 'I luoghi inquadrati adesso' },
+              viewport.narrow
+                ? { id: 'view', label: 'Tutti', title: 'Tutti i luoghi di questa mappa' }
+                : { id: 'view', label: 'In vista', title: 'I luoghi inquadrati adesso' },
               {
                 id: 'near',
                 label: here.asking ? 'Rilevo la posizione…' : 'Vicino a me',
@@ -248,9 +260,11 @@
             <!-- i chilometri partono da qualcosa: qui si dice da cosa, e
                  passandoci sopra quel qualcosa si illumina sulla mappa -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <!-- «dal centro» è il centro della mappa: dove la mappa non c'è
+                 non vuol dire niente, e non si scrive -->
             <span
               class="list-hint"
-              hidden={near}
+              hidden={near || viewport.narrow}
               title="Misurate dal centro della mappa"
               onpointerenter={() => document.body.classList.add('centre-hint')}
               onpointerleave={() => document.body.classList.remove('centre-hint')}
@@ -373,12 +387,15 @@
 #filters, #group-filters { display: flex; flex-wrap: wrap; gap: 6px; }
 
 @media (max-width: 600px) {
+  /* Senza la mappa dietro non c'è niente da lasciar vedere: l'elenco prende
+     tutto lo schermo, meno il posto del tasto in fondo. Un pannello alto
+     mezzo schermo davanti a uno sfondo vuoto era metà spazio buttato. */
   #panel {
-    left: 12px;
-    right: 12px;
-    top: 12px;
+    left: 10px;
+    right: 10px;
+    top: 10px;
     width: auto;
-    max-height: 48vh;
+    max-height: calc(100dvh - 96px - env(safe-area-inset-bottom));
   }
 }
 </style>

@@ -1,14 +1,21 @@
 <script lang="ts">
   import { ui } from '../lib/ui.svelte';
+  import { viewport } from '../lib/viewport.svelte';
   import Icon from './Icon.svelte';
+
+  /**
+   * Un luogo si aggiunge indicando dove sta: sul grande si tocca la mappa,
+   * sul telefono — dove la mappa non c'è — si cerca l'indirizzo, che è poi
+   * quello che si fa da fermi in strada quando il posto ce l'hai davanti e
+   * il nome della via ce l'hai in testa.
+   */
+  const add = (): void => {
+    if (viewport.narrow) ui.paletteOpen = true;
+    else ui.setPicking(!ui.picking);
+  };
 </script>
 
-<button
-  id="add-btn"
-  type="button"
-  class:active={ui.picking}
-  onclick={() => ui.setPicking(!ui.picking)}
->
+<button id="add-btn" type="button" class:active={ui.picking} onclick={add}>
   <Icon name="plus" />
   <span class="add-label">{ui.picking ? 'Annulla' : 'Aggiungi luogo'}</span>
 </button>
