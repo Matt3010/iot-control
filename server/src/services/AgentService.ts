@@ -6,6 +6,7 @@ import { toAgentView } from '../dto/views.js';
 import { badGateway, notFound } from '../errors/HttpError.js';
 import type { LinkedAccount, PairingStep } from '../../../shared/protocol.js';
 import { hub } from '../iot/hub.js';
+import { toPlaceView } from '../dto/views.js';
 import { agentManager } from '../managers/AgentManager.js';
 import { logManager } from '../managers/LogManager.js';
 import { deviceManager } from '../managers/DeviceManager.js';
@@ -51,6 +52,7 @@ export class AgentService {
 
   async create(ownerId: string, name: string, origin: string): Promise<NewAgentView> {
     const { agent, token } = await agentManager.create(ownerId, name);
+    hub.changed(ownerId, { kind: 'agents' });
     return {
       agent: toAgentView(agent, false, 0),
       token,
@@ -61,11 +63,13 @@ export class AgentService {
   async rename(ownerId: string, id: string, name: string): Promise<AgentView> {
     const agent = await agentManager.rename(ownerId, id, name);
     const devices = await deviceManager.list(ownerId);
+    hub.changed(ownerId, { kind: 'agents' });
     return toAgentView(agent, hub.isOnline(agent.id), devices.filter((device) => device.agentId === agent.id).length);
   }
 
   async rotate(ownerId: string, id: string, origin: string): Promise<NewAgentView> {
     const { agent, token } = await agentManager.rotate(ownerId, id);
+    hub.changed(ownerId, { kind: 'agents' });
     return {
       agent: toAgentView(agent, hub.isOnline(agent.id), 0),
       token,
@@ -73,8 +77,20 @@ export class AgentService {
     };
   }
 
-  remove(ownerId: string, id: string): Promise<void> {
-    return agentManager.remove(ownerId, id);
+  /**
+   * Un agente che se ne va porta via i suoi dispositivi e si stacca dai luoghi
+   * che lo tenevano. Sono tre cose diverse da raccontare, e chi guarda da
+   * un'altra scheda deve vederle tutte e tre — se no gli resta sulla mappa un
+   * pin con un pallino che non risponderà mai più.
+   */
+  async remove(ownerId: string, id: string): Promise<void> {
+    const places = await agentManager.remove(ownerId, id);
+    hub.changed(ownerId, { kind: 'agents' });
+    hub.changed(ownerId, { kind: 'devices' });
+    for (const place of places) {
+      const view = toPlaceView(place);
+      hub.changed(ownerId, { kind: 'place', id: view.id, value: view });
+    }
   }
 
   /**

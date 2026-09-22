@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Capability } from '../../../shared/protocol.js';
 import type { Transaction } from '../persistence/JsonStore.js';
-import type { Device } from '../types.js';
+import type { Device, Place } from '../types.js';
 
 export class DeviceRepository {
   constructor(private readonly tx: Transaction) {}
@@ -65,16 +65,20 @@ export class DeviceRepository {
    * resta dov'è, e torna a essere un luogo: era un indirizzo prima di avere
    * un agente.
    */
-  deleteByAgent(agentId: string): string[] {
+  deleteByAgent(agentId: string): { devices: string[]; places: Place[] } {
     const going = this.tx.data.devices.filter((device) => device.agentId === agentId).map((device) => device.id);
     this.tx.data.devices = this.tx.data.devices.filter((device) => device.agentId !== agentId);
 
+    // i luoghi che lo tenevano cambiano: chi li sta guardando da un'altra
+    // scheda deve vederselo staccare, non ritrovarselo staccato ricaricando
+    const touched: Place[] = [];
     for (const place of this.tx.data.places) {
       if (place.agentIds?.includes(agentId)) {
         place.agentIds = place.agentIds.filter((id) => id !== agentId);
+        touched.push(place);
       }
     }
     this.tx.markDirty();
-    return going;
+    return { devices: going, places: touched };
   }
 }

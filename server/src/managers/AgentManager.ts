@@ -5,7 +5,7 @@ import { hub } from '../iot/hub.js';
 import { store } from '../persistence/JsonStore.js';
 import { AgentRepository } from '../repositories/AgentRepository.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
-import type { Agent } from '../types.js';
+import type { Agent, Place } from '../types.js';
 
 /**
  * Il token di un agente: `pia_<id>.<segreto>`. L'id sta dentro perché così, a
@@ -70,14 +70,16 @@ export class AgentManager {
    * Un agente che se ne va porta via i suoi dispositivi. I luoghi che lo
    * tenevano restano dove sono: erano luoghi prima di essere interruttori.
    */
-  async remove(ownerId: string, id: string): Promise<void> {
-    await store.transaction((tx) => {
+  async remove(ownerId: string, id: string): Promise<Place[]> {
+    const { places } = await store.transaction((tx) => {
       const agents = new AgentRepository(tx);
       if (!agents.owns(ownerId, id)) throw notFound('agente inesistente');
-      new DeviceRepository(tx).deleteByAgent(id);
+      const gone = new DeviceRepository(tx).deleteByAgent(id);
       agents.delete(id);
+      return gone;
     });
     hub.forget(id);
+    return places;
   }
 
   /** Alla stretta di mano: chi è questo, e ha davvero questo token? */

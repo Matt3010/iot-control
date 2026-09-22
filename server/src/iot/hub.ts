@@ -21,6 +21,8 @@ export type LiveEvent =
   | { kind: 'agent'; agentId: string; online: boolean }
   /** L'elenco dei dispositivi è cambiato: rileggilo, invece di indovinare cosa. */
   | { kind: 'devices' }
+  /** E quello degli agenti: uno nuovo, uno rinominato, uno che se n'è andato. */
+  | { kind: 'agents' }
   | { kind: 'place'; id: string; value: PlaceView | null }
   | { kind: 'map'; id: string; value: MapView | null }
   | { kind: 'category'; id: string; value: CategoryView | null }

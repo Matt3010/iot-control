@@ -81,6 +81,10 @@ Niente categorie preimpostate, niente fronzoli.
   solo, e si puo' dire diverso a persone diverse. Gli altri luoghi si vedono — stanno sulla
   mappa, sarebbe strano sparissero — ma non si toccano, e chi e' limitato non ne aggiunge di
   nuovi: nascerebbero fuori dal suo elenco.
+- **Tutto quello che cambia scende dal filo aperto**, non solo i luoghi: mappe, categorie,
+  gruppi, scene, agenti, dispositivi, il registro. E le regole di una mappa — se te le cambiano
+  mentre ci stai lavorando dentro, la pagina rilegge il proprio raggio invece di offrirti tasti
+  che il server rifiuterebbe; se te le tolgono, torna a casa tua dicendotelo.
 
 ## Il front-end
 

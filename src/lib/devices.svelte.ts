@@ -303,10 +303,12 @@ class Devices {
    * l'app, e sta in `live`. Qui si applica soltanto la parte che riguarda
    * quello che si accende.
    */
-  apply(event: { kind: 'device' | 'agent' | 'devices' | 'scene' | 'log' } & Record<string, unknown>): void {
+  apply(
+    event: { kind: 'device' | 'agent' | 'devices' | 'agents' | 'scene' | 'log' } & Record<string, unknown>,
+  ): void {
     // L'elenco è cambiato — uno nuovo, o uno sparito — e non vale la pena
     // raccontarlo pezzo per pezzo: si rilegge, che è corto e sempre vero.
-    if (event.kind === 'devices') {
+    if (event.kind === 'devices' || event.kind === 'agents') {
       void this.load();
       return;
     }

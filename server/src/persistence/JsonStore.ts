@@ -75,8 +75,11 @@ function migrateSlugs(maps: PlaceMap[]): PlaceMap[] {
  * Un luogo scritto quando poteva stare in un gruppo solo, o quando di agenti
  * ne teneva uno solo. Le due cose sono indipendenti: si sistemano entrambe.
  */
-function migratePlace(place: Place & { groupId?: string; agentId?: string }): Place {
-  const { groupId, agentId, ...rest } = place;
+function migratePlace(place: Place & { groupId?: string; agentId?: string; locked?: boolean }): Place {
+  // `locked` era l'interruttore per pin: adesso le regole stanno sulla persona,
+  // e quel campo non lo legge più nessuno. Si toglie, invece di restare lì a
+  // far credere a chi apre il file che significhi ancora qualcosa.
+  const { groupId, agentId, locked, ...rest } = place;
   return {
     ...rest,
     groupIds: Array.isArray(place.groupIds) ? place.groupIds : groupId ? [groupId] : [],
