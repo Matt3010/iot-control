@@ -8,6 +8,22 @@ export interface HaEntity {
   attributes: Record<string, unknown>;
 }
 
+/** Una riga dell'anagrafe: dice da dove viene un'entità e a cosa serve. */
+interface RegistryEntity {
+  entity_id: string;
+  device_id: string | null;
+  /** `config` o `diagnostic`: impostazioni e spie, non cose da accendere. */
+  entity_category: string | null;
+  disabled_by: string | null;
+  hidden_by: string | null;
+}
+
+interface RegistryDevice {
+  id: string;
+  /** `service` è un dispositivo finto: il sole, i backup, HA stessa. */
+  entry_type: string | null;
+}
+
 interface Pending {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
@@ -37,6 +53,8 @@ export class HomeAssistant {
     /** Chiamato a ogni (ri)connessione riuscita: è lì che si rifà il pieno. */
     private readonly onReady: () => void,
     private readonly onStateChanged: (entity: HaEntity) => void,
+    /** L'anagrafe è cambiata: è arrivato o sparito un dispositivo. */
+    private readonly onRegistryChanged: () => void,
     private readonly onLost: () => void,
   ) {}
 
@@ -58,6 +76,33 @@ export class HomeAssistant {
 
   async states(): Promise<HaEntity[]> {
     return (await this.#call({ type: 'get_states' })) as HaEntity[];
+  }
+
+  /**
+   * Quali entità sono davvero dei dispositivi. Home Assistant ne tiene tante
+   * che dispositivi non sono: l'ora dell'alba, lo stato dei backup, la
+   * versione del firmware di qualcos'altro. Su una mappa non significano
+   * niente, e mescolate alle luci vere sono solo rumore.
+   *
+   * La distinzione la fa HA stessa: i suoi servizi si registrano come
+   * dispositivi di tipo `service`, e le impostazioni e le spie di un
+   * dispositivo vero portano una `entity_category`. Resta quello che si
+   * accende, si apre o si misura.
+   */
+  async devices(): Promise<Set<string>> {
+    const [entities, devices] = (await Promise.all([
+      this.#call({ type: 'config/entity_registry/list' }),
+      this.#call({ type: 'config/device_registry/list' }),
+    ])) as [RegistryEntity[], RegistryDevice[]];
+
+    const finti = new Set(devices.filter((device) => device.entry_type === 'service').map((device) => device.id));
+
+    return new Set(
+      entities
+        .filter((entity) => entity.device_id && !finti.has(entity.device_id))
+        .filter((entity) => !entity.entity_category && !entity.disabled_by && !entity.hidden_by)
+        .map((entity) => entity.entity_id),
+    );
   }
 
   /**
@@ -127,7 +172,17 @@ export class HomeAssistant {
       }
 
       case 'event': {
-        const event = message.event as { data?: { new_state?: HaEntity | null } } | undefined;
+        const event = message.event as
+          | { event_type?: string; data?: { new_state?: HaEntity | null } }
+          | undefined;
+
+        // L'anagrafe è cambiata: qualcuno ha aggiunto un'integrazione, o
+        // tolto un dispositivo. È così che Tuya compare senza riavviare.
+        if (event?.event_type === 'entity_registry_updated') {
+          this.onRegistryChanged();
+          return;
+        }
+
         const entity = event?.data?.new_state;
         // Un'entità cancellata arriva con new_state nullo: non c'è niente da dire.
         if (entity) this.onStateChanged(entity);
@@ -139,8 +194,10 @@ export class HomeAssistant {
     }
   }
 
-  #subscribe(): Promise<unknown> {
-    return this.#call({ type: 'subscribe_events', event_type: 'state_changed' });
+  /** Due orecchie: quello che cambia stato, e quello che entra o esce di casa. */
+  async #subscribe(): Promise<void> {
+    await this.#call({ type: 'subscribe_events', event_type: 'state_changed' });
+    await this.#call({ type: 'subscribe_events', event_type: 'entity_registry_updated' });
   }
 
   #call(payload: Record<string, unknown>): Promise<unknown> {

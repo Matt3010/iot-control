@@ -18,6 +18,12 @@ async function main(): Promise<void> {
   config.haToken = await ensureToken(config);
   /** La fotografia di adesso. Al riavvio la si rifà chiedendola ad HA, che la sa. */
   const devices = new Map<string, DeviceSnapshot>();
+  /**
+   * Quali entità sono davvero dei dispositivi. Si rilegge a ogni connessione e
+   * ogni volta che l'anagrafe di HA cambia — è così che i dispositivi Tuya
+   * compaiono appena aggiungi l'integrazione, senza riavviare niente.
+   */
+  let real = new Set<string>();
 
   const hello = (): HelloMessage => ({
     type: 'hello',
@@ -29,6 +35,7 @@ async function main(): Promise<void> {
 
   const link = new Link(config, hello, (command) => void obey(command));
   let pending: NodeJS.Timeout | null = null;
+  let rereading: NodeJS.Timeout | null = null;
 
   /** Un cambio d'inventario alla volta non si manda: se ne aspettano altri e si manda la lista. */
   const announceAll = (): void => {
@@ -40,20 +47,31 @@ async function main(): Promise<void> {
     pending.unref?.();
   };
 
+  /**
+   * Si rifà il pieno: chi è un dispositivo vero, e com'è messo adesso. Si
+   * chiama a ogni riconnessione — HA è la verità, noi ne teniamo una copia —
+   * e ogni volta che l'anagrafe cambia, cioè quando aggiungi un'integrazione.
+   */
+  async function refill(): Promise<void> {
+    real = await ha.devices();
+    const entities = await ha.states();
+
+    devices.clear();
+    for (const entity of entities) {
+      if (!real.has(entity.entity_id)) continue;
+      const device = translate(entity);
+      if (device) devices.set(device.externalId, device);
+    }
+
+    console.log(`${devices.size} dispositivi da home assistant`);
+    announceAll();
+  }
+
   const ha = new HomeAssistant(
     config,
-    async () => {
-      // Ogni riconnessione rifà il pieno: HA è la verità, noi ne teniamo una copia.
-      const entities = await ha.states();
-      devices.clear();
-      for (const entity of entities) {
-        const device = translate(entity);
-        if (device) devices.set(device.externalId, device);
-      }
-      console.log(`${devices.size} dispositivi da home assistant`);
-      announceAll();
-    },
+    () => void refill().catch((error: unknown) => console.warn(`non riesco a leggere home assistant: ${(error as Error).message}`)),
     (entity) => {
+      if (!real.has(entity.entity_id)) return;
       const device = translate(entity);
       if (!device) return;
 
@@ -65,6 +83,13 @@ async function main(): Promise<void> {
       const shape = !known || known.name !== device.name || JSON.stringify(known.capabilities) !== JSON.stringify(device.capabilities);
       if (shape) announceAll();
       else link.send({ type: 'state', externalId: device.externalId, online: device.online, state: device.state, at: new Date().toISOString() });
+    },
+    () => {
+      // L'anagrafe è cambiata: qualcuno ha aggiunto Tuya, o staccato una presa.
+      // Arriva una raffica di eventi, uno per entità: si aspetta che finisca.
+      if (rereading) clearTimeout(rereading);
+      rereading = setTimeout(() => void refill().catch(() => undefined), COALESCE_MS);
+      rereading.unref?.();
     },
     () => {
       // HA è caduto: i dispositivi non sono spenti, sono irraggiungibili. Dirlo
