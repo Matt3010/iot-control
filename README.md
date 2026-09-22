@@ -76,6 +76,10 @@ Niente categorie preimpostate, niente fronzoli.
   finisce ogni cambiamento di stato — una sonda che manda un grado ogni dieci secondi
   coprirebbe tutto il resto: ci finisce quello che e' successo *una volta*. Le righe piu'
   vecchie di un giorno se ne vanno da sole, alla prima che si scrive.
+- **Le mappe hanno la loro pagina** (`/maps`), come gli agenti: una mappa non e' una voce
+  d'elenco come una categoria — ha un indirizzo pubblico, dei conteggi, e sotto ognuna chi la puo'
+  modificare con le sue regole. In una colonna da trecento pixel diventava una cosa che scorreva.
+  Ci si arriva dal menu delle mappe, «Condividi e gestisci».
 - **Le regole stanno sulla persona, non sul pin.** Ogni indirizzo nell'elenco di una mappa puo'
   averla tutta, oppure solo certi luoghi: «questi tre a lui, tutti a lei» si decide in un posto
   solo, e si puo' dire diverso a persone diverse. Gli altri luoghi si vedono — stanno sulla

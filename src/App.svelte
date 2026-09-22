@@ -14,6 +14,7 @@
   import PublicMap from './components/PublicMap.svelte';
   import PublicProfile from './components/PublicProfile.svelte';
   import AgentsPage from './components/AgentsPage.svelte';
+  import MapsPage from './components/MapsPage.svelte';
   import ManageSheet from './components/ManageSheet.svelte';
   import MapCanvas from './components/MapCanvas.svelte';
   import Palette from './components/Palette.svelte';
@@ -27,7 +28,7 @@
   const route = readRoute();
 
   /** Le pagine che sono l'app: vogliono sapere chi sei prima di disegnare. */
-  const mine = route.kind === 'app' || route.kind === 'agents';
+  const mine = route.kind === 'app' || route.kind === 'agents' || route.kind === 'maps';
 
   // Prima si vede chi c'è: l'indice si carica solo per chi è entrato, e si
   // ricarica se rientra con un altro account. Senza questo la pagina degli
@@ -122,6 +123,9 @@
 {:else if route.kind === 'agents'}
   <GuestBar />
   <AgentsPage />
+{:else if route.kind === 'maps'}
+  <GuestBar />
+  <MapsPage />
 {:else}
   <GuestBar />
   <MapCanvas />

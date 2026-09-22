@@ -4,7 +4,9 @@ export type Route =
   | { kind: 'map'; handle?: string; slug: string }
   | { kind: 'profile'; handle: string }
   /** La stanza degli agenti: installarli e collegarli vuole spazio. */
-  | { kind: 'agents' };
+  | { kind: 'agents' }
+  /** E quella delle mappe: indirizzi pubblici, conteggi, e chi può modificarle. */
+  | { kind: 'maps' };
 
 /** Nessun router: le mappe stanno sotto chi le ha fatte, il resto è l'app. */
 export function readRoute(path = window.location.pathname): Route {
@@ -22,10 +24,14 @@ export function readRoute(path = window.location.pathname): Route {
 
   if (/^\/agents\/?$/i.test(path)) return { kind: 'agents' };
 
+  if (/^\/maps\/?$/i.test(path)) return { kind: 'maps' };
+
   return { kind: 'app' };
 }
 
 export const AGENTS_PATH = '/agents';
+
+export const MAPS_PATH = '/maps';
 
 export const mapPath = (handle: string, slug: string): string => `/u/${handle}/${slug}`;
 

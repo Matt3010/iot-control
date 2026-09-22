@@ -39,16 +39,6 @@
   let newMapName = $state('');
 
   /**
-   * Le visite arrivano mentre guardi altro: aprendo questa scheda si rileggono,
-   * altrimenti resteresti al numero di quando sei entrato.
-   */
-  $effect(() => {
-    if (ui.manageTab !== 'maps') return;
-    void auth.refresh();
-    void store.refreshMaps();
-  });
-
-  /**
    * Due numeri, due domande: quante volte il link è stato usato, e quanta
    * gente diversa l'ha usato. La frase si costruisce qui perché è la stessa
    * per le mappe e per il profilo, a parte l'ultimo pezzo.
@@ -170,13 +160,7 @@
 
 <aside id="manage-sheet" class="surface" use:swipeToClose={() => ui.closeManage()}>
   <header>
-    <h2>
-      {ui.manageTab === 'maps'
-        ? 'Mappe e condivisione'
-        : ui.manageTab === 'groups'
-          ? 'Gruppi'
-          : 'Categorie'}
-    </h2>
+    <h2>{ui.manageTab === 'groups' ? 'Gruppi' : 'Categorie'}</h2>
     <Button look="icon" title="Chiudi" onclick={() => ui.closeManage()}>
       <Icon name="close" />
     </Button>
@@ -188,7 +172,6 @@
     options={[
       { id: 'categories', label: 'Categorie' },
       { id: 'groups', label: 'Gruppi' },
-      { id: 'maps', label: 'Mappe' },
     ]}
     label="Cosa stai gestendo"
   />
@@ -292,180 +275,6 @@
           <span class="count" aria-hidden="true"></span>
         {/snippet}
       </AddRow>
-    </div>
-  {:else if ui.manageTab === 'maps'}
-    <div class="tab-panel">
-      <ul id="map-list" data-fade="none" use:fadeEdges>
-        {#each store.maps as map (map.id)}
-          {@const open = map.id === store.activeMap?.id}
-          {@const places = store.places.filter((place) => place.mapId === map.id).length}
-          {@const url = mapUrl(handle, map.slug)}
-          <li>
-            <Row active={open} class={map.published ? 'is-public' : ''}>
-              {#snippet lead()}
-                <button
-                  type="button"
-                  class="map-open"
-                  title={open ? 'Mappa selezionata' : 'Seleziona mappa'}
-                  aria-pressed={open}
-                  onclick={() => store.openMap(map.id)}
-                >
-                  <Icon name="pin" />
-                </button>
-              {/snippet}
-
-              <input
-                type="text"
-                maxlength="40"
-                value={map.name}
-                onchange={(event) => store.patchMap(map, { name: event.currentTarget.value })}
-              />
-
-              {#snippet trail()}
-                <Button
-                  look="icon"
-                  extra={'map-eye' + (store.shows(map.id) ? ' is-shown' : '')}
-                  disabled={open}
-                  title={open
-                    ? 'Sempre in vista'
-                    : store.shows(map.id)
-                      ? 'Togli dalla vista'
-                      : 'Mostra anche questa'}
-                  onclick={() => store.toggleShown(map.id)}
-                >
-                  <Icon name={store.shows(map.id) ? 'eye' : 'eyeOff'} />
-                </Button>
-                <Button
-                  look="icon"
-                  tone="danger"
-                  extra="kill"
-                  title="Elimina mappa"
-                  disabled={store.maps.length <= 1}
-                  onclick={(event: MouseEvent) =>
-                    ui.askSure(event.currentTarget as HTMLElement, {
-                      title: `Eliminare “${map.name}”?`,
-                      detail: portaVia(map.id) ?? 'È vuota: non porta via niente.',
-                      verb: 'Elimina',
-                      onYes: () => store.deleteMap(map),
-                    })}
-                >
-                  <Icon name="trash" />
-                </Button>
-              {/snippet}
-
-              {#snippet under()}
-              <div class="map-foot">
-                <span class="map-meta">
-                  {places}
-                  {places === 1 ? 'luogo' : 'luoghi'}{open
-                    ? ' · selezionata'
-                    : store.shows(map.id)
-                      ? ' · in vista'
-                      : ''}
-                </span>
-                <Switch
-                  checked={map.published}
-                  onchange={(published) => store.patchMap(map, { published })}
-                  label={map.published ? 'Mappa pubblica' : 'Mappa privata'}
-                  title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}
-                  side="end"
-                />
-              </div>
-
-              {#if map.published}
-                <LinkRow
-                  prefix={'/u/' + handle + '/'}
-                  value={map.slug}
-                  {url}
-                  onchange={(slug) => store.patchMap(map, { slug })}
-                />
-                <p class="visits" title={COUNT_NOTE}>{visitsOfMap(map)}</p>
-              {/if}
-
-              <!-- Le chiavi stanno sotto la mappa che aprono. Non e' un
-                   permesso a meta': chi ce l'ha entra e lavora qui dentro
-                   come chi la mappa l'ha fatta. Un ospite non le passa
-                   avanti, quindi da ospite il riquadro non c'e'. -->
-              {#if atHome}
-                <div class="map-keys">
-                  <ShareField
-                    mapId={map.id}
-                    editors={map.editors ?? []}
-                    onchange={(editors) => store.patchMap(map, { editors })}
-                  />
-                </div>
-              {/if}
-              {/snippet}
-            </Row>
-          </li>
-        {/each}
-      </ul>
-
-      <AddRow
-        id="map-form"
-        placeholder="Nome mappa — es. Islanda"
-        title="Crea mappa"
-        bind:value={newMapName}
-        onadd={addMap}
-      />
-
-      {#if store.maps.some((map) => map.published)}
-        <div class="profile-link">
-          <span class="eyebrow">Link del profilo</span>
-          <p>Raccoglie tutte le mappe che hai pubblicato. È l'indirizzo da mettere in bio.</p>
-          <LinkRow
-            prefix="/u/"
-            value={handle}
-            url={profileUrl(handle)}
-            title="Copia link"
-          />
-          {#if atHome}
-            <p class="visits" title={COUNT_NOTE}>{visitsOfProfile()}</p>
-          {/if}
-        </div>
-      {/if}
-
-      {#if auth.account?.actingAs}
-        <div class="share">
-          <span class="eyebrow">Non sei a casa tua</span>
-          <p>
-            Stai lavorando nelle mappe di <b>{auth.account.actingAs.handle}</b>: quello che cambi
-            qui è suo. Le chiavi delle <i>tue</i> mappe le dai dal tuo.
-          </p>
-        </div>
-      {/if}
-
-      {#if (auth.account?.keys ?? []).length}
-        <div class="share">
-          <span class="eyebrow">Mappe aperte a te</span>
-          <p>Ci entri e ci lavori come se fossero tue. Con la fascia in alto sai sempre dove sei.</p>
-          <ul class="theirs">
-            {#each auth.account?.keys ?? [] as key (key.mapId)}
-              <li>
-                <Row active={auth.account?.actingAs?.ownerId === key.ownerId}>
-                  {#snippet lead()}
-                    <span class="keys-mark" aria-hidden="true"><Icon name="key" /></span>
-                  {/snippet}
-                  <span class="theirs-name">{key.mapName}<em>di {key.handle}</em></span>
-                  {#snippet trail()}
-                    {#if auth.account?.actingAs?.ownerId === key.ownerId}
-                      <span class="here">ci sei</span>
-                    {:else}
-                      <Button size="sm" onclick={() => void goInto(key.handle)}>Apri</Button>
-                    {/if}
-                  {/snippet}
-                </Row>
-              </li>
-            {/each}
-          </ul>
-        </div>
-      {/if}
-
-      <p class="sheet-note">
-        Ogni mappa tiene i suoi luoghi. Categorie e gruppi invece sono tuoi e valgono su tutte le
-        mappe, quindi eliminare una mappa porta via soltanto i luoghi che ci stavano dentro. La
-        mappa che pubblichi la vede chi ha il link, tranne i luoghi segnati come privati.
-      </p>
     </div>
   {:else}
     <div class="tab-panel">
@@ -589,7 +398,7 @@
 
 /* category manager -------------------------------------------------------- */
 
-#group-list, #map-list {
+#group-list {
   list-style: none;
   margin: 0 0 8px;
   padding: 0;
@@ -597,138 +406,10 @@
   gap: 6px;
 }
 
-#map-list { gap: 8px; }
-
-.map-open {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  /* zero, se no resta il padding dei bottoni: lo spazio dentro scenderebbe a
-     dodici e il pin, che ne misura quindici, invece di centrarsi si
-     appoggerebbe a sinistra di un pixel e mezzo */
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--ink-3);
-  transition: background 0.14s, color 0.14s;
-}
-
-.map-open:hover { background: var(--glass-strong); color: var(--ink-2); }
-
-:global(.row.is-on) .map-open { color: var(--ink); }
-.map-open :global(.ico) { width: 15px; height: 15px; }
-
-/* la riga sotto vive nella stessa colonna del resto: niente rientro. I due
-   pezzi poggiano in basso: il conto dei luoghi sta sul fondo dell'interruttore,
-   non a mezz'aria in mezzo alla sua pista. */
-.map-foot {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 0;
-}
-
-.map-meta {
-  font-size: 11.5px;
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* l'occhio resta smorto finché la mappa non è accesa accanto */
-#map-list :global(.map-eye) { color: var(--ink-3); }
-#map-list :global(.map-eye.is-shown) { color: var(--ink); }
-
-.profile-link {
-  display: grid;
-  gap: 6px;
-  margin-top: 4px;
-  padding-top: 12px;
-  border-top: 1px solid var(--hairline-soft);
-}
-
-.profile-link p { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
-
-/* i due blocchi della condivisione: stessa aria del link del profilo */
-.share {
-  display: grid;
-  gap: 8px;
-  margin-top: 4px;
-  padding-top: 12px;
-  border-top: 1px solid var(--hairline-soft);
-}
-
-.share p { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
-
-.share p b { font-weight: 600; color: var(--ink-2); }
-
-.theirs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-
-.theirs-name {
-  flex: 1;
-  min-width: 0;
-  padding-left: 4px;
-  font-size: 13.5px;
-  font-weight: 560;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* di chi e' quella mappa: serve, perche' due persone la chiamano uguale */
-.theirs-name em {
-  font-style: normal;
-  font-weight: 460;
-  font-size: 11.5px;
-  color: var(--ink-3);
-}
-
-.theirs-name em::before { content: ' '; }
-
-/* le chiavi di una mappa stanno dentro la sua card, staccate da una riga */
-.map-keys {
-  margin-top: 4px;
-  padding-top: 10px;
-  border-top: 1px solid var(--hairline-soft);
-}
-
-.keys-mark {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: color-mix(in srgb, #b06c0c 16%, transparent);
-  color: #b06c0c;
-}
-
-.keys-mark :global(.ico) { width: 13px; height: 13px; }
-
-.here { padding: 0 8px; font-size: 11.5px; color: var(--ink-3); }
-
-/* il conto sta sotto al link, smorzato: è una nota, non un titolo */
-.visits {
-  margin: 0;
-  padding: 0;
-  font-size: 11.5px;
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-}
-
-
-
-/* lì dentro la riga sta su una scheda, non su una card: si smorza */
-.profile-link :global(.link-row) { background: var(--sunken); box-shadow: none; }
-
 #group-list:empty { display: none; }
 
 /* la lista scorre dentro di sé: la riga che aggiunge resta sempre sotto gli occhi */
-#category-list, #group-list, #map-list {
+#category-list, #group-list {
   max-height: min(46vh, 340px);
   overflow-y: auto;
   overscroll-behavior: contain;

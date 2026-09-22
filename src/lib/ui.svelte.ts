@@ -2,7 +2,7 @@ import { readJSON, writeJSON } from './storage';
 import type { Draft } from './types';
 
 export type Sheet = 'none' | 'place' | 'manage';
-export type ManageTab = 'categories' | 'groups' | 'maps';
+export type ManageTab = 'categories' | 'groups';
 
 export interface EmojiRequest {
   anchor: HTMLElement;

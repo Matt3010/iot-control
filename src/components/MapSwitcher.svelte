@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MAPS_PATH } from '../lib/routing';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui } from '../lib/ui.svelte';
@@ -128,16 +129,9 @@
         {/each}
       </ul>
 
-      <button
-        type="button"
-        class="new"
-        onclick={() => {
-          open = false;
-          ui.openManage('maps');
-        }}
-      >
+      <a class="new" href={MAPS_PATH} onclick={() => (open = false)}>
         <Icon name="link" /> Condividi e gestisci
-      </button>
+      </a>
 
       {#if creating}
         <AddRow
