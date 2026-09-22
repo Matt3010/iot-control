@@ -432,7 +432,10 @@ export async function listLinked(config: ConnectorConfig): Promise<LinkedAccount
   if (!response.ok) return [];
 
   const entries = (await response.json()) as { entry_id: string; domain: string; title: string }[];
-  const ours = new Set(['tuya', ...Object.keys(EXTRAS)]);
+  // «generic» sono le telecamere: una per canale, e ognuna si stacca per conto
+  // suo. Senza di loro nell'elenco, una telecamera si poteva collegare e non
+  // scollegare piu' — e sbagliare canale capita al primo tentativo.
+  const ours = new Set(['tuya', 'generic', ...Object.keys(EXTRAS)]);
 
   return entries
     .filter((entry) => ours.has(entry.domain))

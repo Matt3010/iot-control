@@ -37,17 +37,29 @@
     {
       handler: 'tuya',
       label: 'Tuya',
+      /** Di account ce n'e' uno: quello con cui sei entrato. */
+      many: false,
+      more: '',
       warns: "Ti verrà chiesto il codice che sta nell'app Smart Life, e poi un QR da inquadrare.",
     },
     {
       handler: 'sonoff',
       label: 'eWeLink',
+      many: false,
+      more: '',
       warns:
         "La prima volta l'agente aggiunge il supporto eWeLink e si riavvia: ci vuole un minuto. Poi ti chiederà le credenziali dell'app.",
     },
     {
       handler: 'generic',
       label: 'Telecamera',
+      /**
+       * Di telecamere invece ce ne sono quante ne ha il registratore, una per
+       * canale, e ognuna e' un collegamento a se': si stacca da sola, senza
+       * portarsi via le altre.
+       */
+      many: true,
+      more: 'Un’altra telecamera',
       warns:
         "Ti chiederà l'indirizzo del flusso — di solito una riga che comincia per rtsp:// — e come raggiungerlo. Una telecamera per volta: se il registratore ne ha quattro, si fa quattro volte.",
     },
@@ -117,7 +129,7 @@
 
   /** Cosa è già collegato: si chiede una volta, e si riaggiorna quando cambia. */
   let linked = $state<LinkedAccount[]>([]);
-  const joined = (handler: string) => linked.find((one) => one.handler === handler);
+  const joined = (handler: string) => linked.filter((one) => one.handler === handler);
 
   $effect(() => {
     if (!agent.online) return;
@@ -277,15 +289,18 @@
 {#if closed}
   <div class="accounts">
     {#each ACCOUNTS as account (account.handler)}
-      {@const joint = joined(account.handler)}
-      <div class="account" class:is-joined={!!joint}>
-        <span class="mark" aria-hidden="true"></span>
-        <span class="who">
-          <b>{account.label}</b>
-          {#if joint}<span class="as">{joint.title}</span>{/if}
-        </span>
+      {@const mine = joined(account.handler)}
 
-        {#if joint}
+      <!-- Una riga per ogni cosa collegata, non per marca: di telecamere ce
+           n'e' una per canale, e staccarne una non deve staccare le altre. -->
+      {#each mine as joint (joint.entryId)}
+        <div class="account is-joined">
+          <span class="mark" aria-hidden="true"></span>
+          <span class="who">
+            <b>{account.label}</b>
+            <span class="as">{joint.title}</span>
+          </span>
+
           <Button
             look="link"
             tone="danger"
@@ -293,15 +308,23 @@
             disabled={busy}
             onclick={(event: MouseEvent) =>
               ui.askSure(event.currentTarget as HTMLElement, {
-                title: `Scollegare ${account.label}?`,
+                title: account.many ? `Scollegare «${joint.title}»?` : `Scollegare ${account.label}?`,
                 detail: "L'agente si porta via i suoi dispositivi. Il collegamento si rifà quando vuoi.",
                 verb: 'Scollega',
-                onYes: () => void detach(joint, account.label),
+                onYes: () => void detach(joint, account.many ? joint.title : account.label),
               })}
           >
             Scollega
           </Button>
-        {:else}
+        </div>
+      {/each}
+
+      <!-- E la riga per aggiungerne: sempre, dove se ne puo' avere piu' d'una. -->
+      {#if !mine.length || account.many}
+        <div class="account">
+          <span class="mark" aria-hidden="true"></span>
+          <span class="who"><b>{mine.length ? account.more : account.label}</b></span>
+
           <!-- stessa misura di «Scollega»: in questo elenco ogni azione è un
                comando scritto piccolo, e due misure diverse sulla stessa
                colonna si vedono -->
@@ -313,8 +336,8 @@
           >
             Collega
           </Button>
-        {/if}
-      </div>
+        </div>
+      {/if}
     {/each}
   </div>
 {:else if step}
