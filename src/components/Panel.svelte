@@ -137,13 +137,15 @@
     {#if store.categories.length && !store.loading}
       <div class="panel-row" id="group-head">
         <span class="eyebrow">Gruppi</span>
+        <!-- apre la scheda dei gruppi: lì dentro se ne creano, si rinominano
+             e si sciolgono. Un "+" prometteva una cosa sola delle tre. -->
         <Button
           look="icon"
           id="add-group"
-          title="Nuovo gruppo"
+          title="Gestisci i gruppi"
           onclick={() => ui.toggleManage('groups', 'add')}
         >
-          <Icon name="plus" />
+          <Icon name="edit" />
         </Button>
       </div>
       <div id="group-filters">
@@ -201,10 +203,10 @@
             <Button
               look="icon"
               id="add-category"
-              title="Nuova categoria"
+              title="Gestisci le categorie"
               onclick={() => ui.toggleManage('categories', 'add')}
             >
-              <Icon name="plus" />
+              <Icon name="edit" />
             </Button>
           </span>
         </div>
