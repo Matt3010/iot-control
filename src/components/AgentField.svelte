@@ -2,6 +2,7 @@
   import { devices, type Agent } from '../lib/devices.svelte';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
+  import { AGENTS_PATH } from '../lib/routing';
   import { ui } from '../lib/ui.svelte';
   import AddRow from './AddRow.svelte';
   import AgentControls from './AgentControls.svelte';
@@ -272,6 +273,8 @@
     </div>
   {/if}
 
+  <a class="all" href={AGENTS_PATH}>Gestisci tutti gli agenti</a>
+
   {#if !mine.length}
     <p class="hint">
       Un agente è il servizio che installi su una macchina in quel posto: trova i dispositivi
@@ -348,6 +351,20 @@
   }
 
   .hint { margin: 2px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
+
+  /* installare, collegare un account, rigenerare un token: cose che si fanno
+     una volta e vogliono spazio. Non in una colonna da trecento pixel. */
+  .all {
+    justify-self: start;
+    font-size: 11.5px;
+    color: var(--ink-3);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--hairline);
+    transition: color 0.16s;
+  }
+
+  .all:hover { color: var(--ink-2); }
 
 
   /* il comando da incollare: si legge come un terminale perché è un terminale.

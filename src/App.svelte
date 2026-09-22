@@ -13,6 +13,7 @@
   import LoginScreen from './components/LoginScreen.svelte';
   import PublicMap from './components/PublicMap.svelte';
   import PublicProfile from './components/PublicProfile.svelte';
+  import AgentsPage from './components/AgentsPage.svelte';
   import ManageSheet from './components/ManageSheet.svelte';
   import MapCanvas from './components/MapCanvas.svelte';
   import Palette from './components/Palette.svelte';
@@ -110,6 +111,8 @@
   <!-- un istante di niente: meglio del lampo della porta a chi è già dentro -->
 {:else if !auth.account}
   <LoginScreen />
+{:else if route.kind === 'agents'}
+  <AgentsPage />
 {:else}
   <MapCanvas />
   <Panel />
@@ -125,7 +128,11 @@
   {#if ui.paletteOpen}<Palette />{/if}
   {#if emojiEverOpened}<EmojiPopover />{/if}
   {#if ui.color}<ColorPopover />{/if}
-  {#if ui.sure}<SurePopover />{/if}
 {/if}
+
+<!-- La domanda prima di una cosa: è di tutta l'app, non della sola mappa.
+     Stava dentro al ramo della mappa, e nella pagina degli agenti i tasti
+     avrebbero chiesto conferma a nessuno. -->
+{#if ui.sure}<SurePopover />{/if}
 
 <Toast />
