@@ -107,7 +107,49 @@
   }
 </script>
 
-{#snippet kill(agent: Agent)}
+<!--
+  I tre comandi di un agente stanno tutti nella testata della sua card, come
+  in tutte le altre righe dell'app: il cestino in fondo, e prima i due che
+  non portano via niente. Ognuno chiede conferma, perché due su tre fanno
+  smettere di funzionare qualcosa finché non rimedi.
+-->
+{#snippet controls(agent: Agent, attached: boolean)}
+  <Button
+    look="icon"
+    title="Rigenera il token"
+    onclick={(event: MouseEvent) =>
+      ui.askSure(event.currentTarget as HTMLElement, {
+        title: 'Rigenerare il token?',
+        detail:
+          'Quello di adesso smette di funzionare subito, e quella macchina resta scollegata finché non la reinstalli con il comando nuovo.',
+        verb: 'Rigenera',
+        tone: 'plain',
+        no: 'Lascia stare',
+        onYes: () => void rotate(agent),
+      })}
+  >
+    <Icon name="refresh" />
+  </Button>
+
+  {#if attached}
+    <Button
+      look="icon"
+      title="Stacca dal luogo"
+      onclick={(event: MouseEvent) =>
+        ui.askSure(event.currentTarget as HTMLElement, {
+          title: 'Staccarlo da questo luogo?',
+          detail:
+            "L'agente resta e continua a funzionare: questo luogo smette solo di mostrarlo, e lo puoi rimettere qui o altrove.",
+          verb: 'Stacca',
+          tone: 'plain',
+          no: 'Lascia stare',
+          onYes: () => detach(agent.id),
+        })}
+    >
+      <Icon name="logout" />
+    </Button>
+  {/if}
+
   <Button
     look="icon"
     tone="danger"
@@ -148,7 +190,7 @@
   <!-- quelli che stanno qui: uno sotto l'altro, ognuno con i suoi comandi -->
   {#each mine as agent (agent.id)}
     <AgentControls {agent}>
-      {#snippet trail()}{@render kill(agent)}{/snippet}
+      {#snippet trail()}{@render controls(agent, true)}{/snippet}
 
       {#snippet foot()}
         {#if fresh?.id === agent.id}{@render command()}{/if}
@@ -157,12 +199,6 @@
              che manca a un agente appena installato, e chiederla altrove
              vorrebbe dire mandare via chi sta guardando -->
         <AgentPairing {agent} />
-
-        <div class="acts">
-          <Button look="link" onclick={() => rotate(agent)}>Rigenera token</Button>
-          <span class="sep" aria-hidden="true">·</span>
-          <Button look="link" onclick={() => detach(agent.id)}>Stacca dal luogo</Button>
-        </div>
       {/snippet}
     </AgentControls>
   {/each}
@@ -172,7 +208,7 @@
   {#if !mine.length && free.length === 1 && free[0]}
     {@const only = free[0]}
     <AgentControls agent={only}>
-      {#snippet trail()}{@render kill(only)}{/snippet}
+      {#snippet trail()}{@render controls(only, false)}{/snippet}
       {#snippet foot()}
         <!-- collegare un account è cosa dell'agente, non del luogo: si può
              fare anche prima di deciderne la casa -->
@@ -356,5 +392,4 @@
     font-size: 11.5px;
   }
 
-  .sep { color: var(--ink-3); }
 </style>
