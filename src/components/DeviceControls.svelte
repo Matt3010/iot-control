@@ -17,9 +17,6 @@
    */
   let { device }: { device: Device } = $props();
 
-  /** A cosa si attacca la domanda, per ogni controllo che ne fa una. */
-  const anchors: Record<string, HTMLElement | undefined> = $state({});
-
   const lit = $derived(devices.isOn(device));
 
   const numberOf = (value: DeviceValue | undefined): number => (typeof value === 'number' ? value : 0);
@@ -58,14 +55,18 @@
   }
 
   /**
-   * L'interruttore si muove sotto il dito prima che qualcuno dica di sì: lo
-   * si rimette com'era subito, e se la risposta è sì ci penserà lo stato vero
-   * a spostarlo.
+   * Un interruttore si muoverebbe sotto il dito prima che qualcuno dica di sì.
+   * Rimetterlo a posto dopo vorrebbe dire riscrivere lo stato, e la lista si
+   * ricalcolerebbe sotto la domanda appena aperta — che è come si spostava lo
+   * scorrimento. Quindi non si muove affatto: si ferma il clic prima che il
+   * quadratino si accorga di essere stato premuto.
    */
-  function askSwitch(anchor: HTMLElement, capability: Capability, wanted: boolean): void {
-    device.state = { ...device.state };
+  function askSwitch(event: MouseEvent, capability: Capability, current: boolean): void {
+    event.preventDefault();
+    const wanted = !current;
+
     confirm(
-      anchor,
+      event.currentTarget as HTMLElement,
       `${wanted ? 'Accendere' : 'Spegnere'} «${device.name}»?`,
       wanted ? 'Accendi' : 'Spegni',
       () => void devices.command(device, capability.code, wanted),
@@ -92,18 +93,21 @@
   <div class="dev-body">
     {#each device.capabilities as capability (capability.code)}
       {#if capability.kind === 'switch'}
-        <!-- l'ancora della domanda: lo Switch disegna il suo markup, e a
-             qualcosa la domanda si deve attaccare -->
+        <!-- Il clic si ferma qui: lo Switch non arriva a cambiare, e questo
+             riquadro è anche l'ancora a cui si attacca la domanda. -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           class="line"
           class:is-busy={devices.isBusy(device.id, capability.code)}
-          bind:this={anchors[capability.code]}
+          onclick={(event: MouseEvent) =>
+            device.online && askSwitch(event, capability, device.state[capability.code] === true)}
         >
           <Switch
             checked={device.state[capability.code] === true}
             disabled={!device.online}
             label={capability.label}
-            onchange={(value) => askSwitch(anchors[capability.code]!, capability, value)}
+            onchange={() => undefined}
           />
         </div>
       {:else if capability.kind === 'range'}

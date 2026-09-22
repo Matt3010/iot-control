@@ -12,7 +12,38 @@
    * o pubblico?» — e lì il rosso direbbe che una delle due strade fa male.
    */
   const request = $derived(ui.sure!);
-  const at = $derived(placeAnchored(request.anchor, 264, request.detail ? 132 : 108));
+
+  /**
+   * La posizione si ricalcolava una volta sola. Ma quello a cui la domanda è
+   * attaccata può scorrere via — dentro un elenco che scorre, o con la pagina
+   * — e la domanda restava sospesa a mezz'aria, staccata dal tasto che
+   * l'aveva fatta nascere. Adesso lo segue; e se quel tasto esce di vista, la
+   * domanda si chiude, perché una domanda senza il suo oggetto non si capisce.
+   */
+  let follows = $state(0);
+  const at = $derived.by(() => {
+    follows;
+    return placeAnchored(request.anchor, 264, request.detail ? 132 : 108);
+  });
+
+  $effect(() => {
+    const anchor = request.anchor;
+
+    const follow = (): void => {
+      const box = anchor.getBoundingClientRect();
+      const gone = !anchor.isConnected || box.bottom < 0 || box.top > window.innerHeight;
+      if (gone) ui.sure = null;
+      else follows += 1;
+    };
+
+    // in cattura, se no gli scorrimenti dentro a un elenco non si sentono
+    window.addEventListener('scroll', follow, true);
+    window.addEventListener('resize', follow);
+    return () => {
+      window.removeEventListener('scroll', follow, true);
+      window.removeEventListener('resize', follow);
+    };
+  });
 
   function yes() {
     const run = request.onYes;
