@@ -16,9 +16,15 @@ export class DeviceService {
    * noi e lui. Il 502 lo dice, e l'interfaccia può scrivere "non risponde"
    * invece di fingere che la luce si sia accesa.
    */
-  async command(ownerId: string, id: string, code: string, value: DeviceValue): Promise<void> {
+  async command(
+    ownerId: string,
+    id: string,
+    code: string,
+    value: DeviceValue,
+    who?: string,
+  ): Promise<void> {
     try {
-      await deviceManager.command(ownerId, id, code, value);
+      await deviceManager.command(ownerId, id, code, value, who);
     } catch (error) {
       if (error instanceof Error && !('status' in error)) throw badGateway(error.message);
       throw error;

@@ -11,7 +11,7 @@ export interface PlaceMap {
   slug: string;
   published: boolean;
   /**
-   * Chi puo' modificarla oltre a te: email. Non e' un permesso a meta' - e'
+   * Chi può modificarla oltre a te: email. Non è un permesso a metà - e'
    * tutta la mappa o niente.
    */
   editors: string[];

@@ -4,6 +4,8 @@ import { hub } from '../iot/hub.js';
 import { store } from '../persistence/JsonStore.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
+import { logManager } from './LogManager.js';
+import { says } from './says.js';
 import type { Device } from '../types.js';
 
 export class DeviceManager {
@@ -26,8 +28,9 @@ export class DeviceManager {
    * viene toccato.
    */
   async sync(ownerId: string, agentId: string, snapshots: DeviceSnapshot[]): Promise<Device[]> {
-    const { devices, gone, scenes } = await store.transaction((tx) => {
+    const { devices, gone, scenes, before } = await store.transaction((tx) => {
       const repository = new DeviceRepository(tx);
+      const was = repository.findAllOfAgent(agentId).length;
       const kept = snapshots.map((snapshot) =>
         repository.upsert(ownerId, agentId, snapshot.externalId, snapshot.name, snapshot.capabilities),
       );
@@ -38,6 +41,7 @@ export class DeviceManager {
         // chi sparisce esce anche dagli insiemi che lo tenevano: un insieme
         // che prova a comandare un fantasma non si capisce perché non va
         scenes: lost.length ? new SceneRepository(tx).pruneDevices(new Set(lost)) : 0,
+        before: was,
       };
     });
 
@@ -48,6 +52,22 @@ export class DeviceManager {
 
     // L'inventario è cambiato: chi guarda deve rileggerlo, se no si tiene i
     // fantasmi di quelli spariti o non vede quelli nuovi.
+    // Nel registro ci finisce solo se è cambiato qualcosa: un agente che si
+    // ricollega e racconta le stesse cose non è una notizia.
+    if (gone.length || devices.length !== before) {
+      logManager.note({
+        ownerId,
+        agentId,
+        kind: 'inventory',
+        detail: [
+          devices.length > before ? `${devices.length - before} in più` : '',
+          gone.length ? `${gone.length} spariti` : '',
+        ]
+          .filter(Boolean)
+          .join(', '),
+      });
+    }
+
     if (gone.length || devices.length) hub.changed(ownerId, { kind: 'devices' });
     // gli insiemi cambiati si rileggono insieme ai dispositivi: è la stessa lista
     if (scenes) hub.changed(ownerId, { kind: 'devices' });
@@ -55,7 +75,13 @@ export class DeviceManager {
   }
 
   /** Premere un interruttore: si aspetta che l'agente dica di sì. */
-  async command(ownerId: string, id: string, code: string, value: string | number | boolean): Promise<void> {
+  async command(
+    ownerId: string,
+    id: string,
+    code: string,
+    value: string | number | boolean,
+    who?: string,
+  ): Promise<void> {
     const device = await this.find(ownerId, id);
     const capability = device.capabilities.find((entry) => entry.code === code);
     if (!capability) throw badRequest('questo dispositivo non sa fare questa cosa');
@@ -64,7 +90,29 @@ export class DeviceManager {
     const kind = typeof value;
     if (kind !== 'string' && kind !== 'number' && kind !== 'boolean') throw badRequest('valore non valido');
 
-    await hub.command(device.agentId, device.externalId, code, value);
+    /*
+     * Nel registro ci va comunque, riuscito o no. Anzi: quello che non è
+     * riuscito è proprio quello che si va a cercare, perché è la sera in cui
+     * la tapparella non è scesa.
+     */
+    const note = (ok: boolean): void =>
+      logManager.note({
+        ownerId,
+        agentId: device.agentId,
+        kind: 'command',
+        subject: device.name,
+        detail: says(capability, value),
+        ok,
+        ...(who ? { who } : {}),
+      });
+
+    try {
+      await hub.command(device.agentId, device.externalId, code, value);
+    } catch (error) {
+      note(false);
+      throw error;
+    }
+    note(true);
   }
 }
 

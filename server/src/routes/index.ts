@@ -112,6 +112,12 @@ apiRouter
   .put(validateBody(AgentDto), agentController.rename)
   .delete(agentController.remove);
 
+/**
+ * Le ultime ventiquattr'ore di un agente: quando si è collegato, cosa ha
+ * mosso, chi ha premuto, e cosa ha smesso di rispondere.
+ */
+apiRouter.get('/agents/:id/log', agentController.log);
+
 /** Rigenera il token: quello di prima smette di funzionare all'istante. */
 apiRouter.post('/agents/:id/token', agentController.rotate);
 

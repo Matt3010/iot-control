@@ -147,12 +147,12 @@ export interface SceneStep {
 /**
  * Piu' cose che partono insieme.
  *
- * Non e' un gruppo di dispositivi che fanno la stessa cosa: ogni riga ha la
+ * Non è un gruppo di dispositivi che fanno la stessa cosa: ogni riga ha la
  * sua. «Sera» chiude le tende e accende l'abat-jour — due azioni diverse su
  * due cose diverse, premute una volta. E premerle a mano una per volta si
  * vede: partono a mezzo secondo di distanza.
  *
- * Non e' nemmeno un dispositivo finto: non ha uno stato. Due tende possono
+ * Non è nemmeno un dispositivo finto: non ha uno stato. Due tende possono
  * stare una aperta e una chiusa, e per quello non c'e' una parola sola.
  */
 export interface Scene {
@@ -160,6 +160,42 @@ export interface Scene {
   ownerId: string;
   name: string;
   steps: SceneStep[];
+}
+
+/**
+ * Una riga del registro di un agente.
+ *
+ * Non è un log di sistema: è quello che è successo in casa, scritto perché lo
+ * legga una persona. «La tenda 1 ha smesso di rispondere alle 3 di notte» è
+ * la frase che serve quando la mattina la trovi mezza aperta.
+ *
+ * Non ci finisce ogni cambiamento di stato: una sonda che manda un grado ogni
+ * dieci secondi riempirebbe le ventiquattr'ore di sé e coprirebbe tutto il
+ * resto. Ci finisce quello che è successo *una volta*.
+ */
+export interface LogEntry {
+  id: string;
+  ownerId: string;
+  agentId: string;
+  /** Quando, in ISO. */
+  at: string;
+  kind:
+    | 'up'
+    | 'down'
+    | 'inventory'
+    | 'device-up'
+    | 'device-down'
+    | 'command'
+    | 'scene'
+    | 'account';
+  /** Di chi si parla: il dispositivo, la scena, l'account. Come si chiamava allora. */
+  subject?: string;
+  /** Cosa gli è successo, in poche parole: «Chiudi», «2 spariti», «Tuya». */
+  detail?: string;
+  /** Per quello che poteva non riuscire. */
+  ok?: boolean;
+  /** Chi l'ha premuto, quando è stata una persona e non la casa. */
+  who?: string;
 }
 
 /** Everything the store holds, and the unit a transaction works on. */
@@ -172,4 +208,5 @@ export interface Database {
   agents: Agent[];
   devices: Device[];
   scenes: Scene[];
+  log: LogEntry[];
 }

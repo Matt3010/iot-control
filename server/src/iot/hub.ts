@@ -25,7 +25,17 @@ export type LiveEvent =
   | { kind: 'map'; id: string; value: MapView | null }
   | { kind: 'category'; id: string; value: CategoryView | null }
   | { kind: 'group'; id: string; value: GroupView | null }
-  | { kind: 'scene'; id: string; value: SceneView | null };
+  | { kind: 'scene'; id: string; value: SceneView | null }
+  /** Il registro di un agente ha una riga in più: chi lo sta leggendo lo rilegga. */
+  | { kind: 'log'; agentId: string };
+
+/** Quel poco che il hub sa dire al registro: chi, cosa, e di chi è. */
+export interface LiveNote {
+  ownerId: string;
+  agentId: string;
+  kind: 'device-up' | 'device-down';
+  subject: string;
+}
 
 interface Connection {
   ownerId: string;
@@ -98,12 +108,19 @@ export class Hub {
    */
   index(agentId: string, devices: Device[]): void {
     this.forget(agentId);
-    for (const device of devices) this.#ids.set(this.#key(agentId, device.externalId), device.id);
+    for (const device of devices) {
+      const key = this.#key(agentId, device.externalId);
+      this.#ids.set(key, device.id);
+      this.#names.set(key, device.name);
+    }
   }
 
   forget(agentId: string): void {
     for (const key of [...this.#ids.keys()]) {
       if (key.startsWith(`${agentId}:`)) this.#ids.delete(key);
+    }
+    for (const key of [...this.#names.keys()]) {
+      if (key.startsWith(`${agentId}:`)) this.#names.delete(key);
     }
     for (const key of [...this.#live.keys()]) {
       if (key.startsWith(`${agentId}:`)) this.#live.delete(key);
@@ -112,10 +129,42 @@ export class Hub {
 
   publish(ownerId: string, agentId: string, externalId: string, live: Live): void {
     const key = this.#key(agentId, externalId);
+    const before = this.#live.get(key);
     this.#live.set(key, live);
 
     const deviceId = this.#ids.get(key);
     if (deviceId) this.#tell(ownerId, { kind: 'device', deviceId, online: live.online, state: live.state });
+
+    /*
+     * Nel registro finisce il passaggio, non lo stato: una sonda che manda un
+     * grado ogni dieci secondi scriverebbe ottomila righe al giorno e
+     * coprirebbe tutto il resto. «Ha smesso di rispondere» invece succede una
+     * volta, ed è la riga che serve la mattina dopo.
+     */
+    if (before && before.online !== live.online && this.#names.has(key)) {
+      this.#noteLive?.({
+        ownerId,
+        agentId,
+        kind: live.online ? 'device-up' : 'device-down',
+        subject: this.#names.get(key) as string,
+      });
+    }
+  }
+
+  /**
+   * Come si chiamano i dispositivi che conosciamo, per poterli nominare nel
+   * registro senza tornare sul disco a ogni messaggio di stato.
+   */
+  #names = new Map<string, string>();
+
+  /**
+   * Chi prende nota. Lo mette il manager del registro quando si accende: il
+   * hub non deve sapere che esiste un registro, gli basta che qualcuno ascolti.
+   */
+  #noteLive: ((entry: LiveNote) => void) | undefined;
+
+  takesNote(write: (entry: LiveNote) => void): void {
+    this.#noteLive = write;
   }
 
   liveOf(agentId: string, externalId: string): Live | undefined {

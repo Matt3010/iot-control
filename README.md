@@ -71,6 +71,11 @@ Niente categorie preimpostate, niente fronzoli.
   dispositivo finto e non ha uno stato: due tende possono stare una aperta e una chiusa, e per
   quello non c'e' una parola sola. Le righe partono in parallelo, e chi non risponde si dice con
   il suo nome.
+- **Il registro di un agente**: le ultime ventiquattr'ore di quella casa, in italiano. Si e'
+  collegato, cosa ha mosso e chi ha premuto, cosa ha smesso di rispondere e quando. Non ci
+  finisce ogni cambiamento di stato — una sonda che manda un grado ogni dieci secondi
+  coprirebbe tutto il resto: ci finisce quello che e' successo *una volta*. Le righe piu'
+  vecchie di un giorno se ne vanno da sole, alla prima che si scrive.
 - **E un singolo pin puo' restare tuo.** Dentro una mappa condivisa, un luogo segnato `locked`
   gli ospiti lo vedono e non lo toccano: niente modifica, niente eliminazione, e il tasto non
   compare nemmeno. Chi la mappa ce l'ha lo modifica lo stesso — chiude gli altri, non se'.

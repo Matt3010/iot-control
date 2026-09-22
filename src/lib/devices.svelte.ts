@@ -23,6 +23,18 @@ export interface Device {
   lastSeenAt: string;
 }
 
+/** Una riga del registro di un agente: cosa è successo, e quando. */
+export interface LogEntry {
+  id: string;
+  agentId: string;
+  at: string;
+  kind: 'up' | 'down' | 'inventory' | 'device-up' | 'device-down' | 'command' | 'scene' | 'account';
+  subject?: string;
+  detail?: string;
+  ok?: boolean;
+  who?: string;
+}
+
 /** Una riga di una scena: a chi, cosa, e con che valore. */
 export interface SceneStep {
   deviceId: string;
@@ -83,6 +95,13 @@ class Devices {
 
   /** Le scene: più cose che partono a un colpo solo. */
   scenes = $state<Scene[]>([]);
+
+  /**
+   * I registri aperti, per agente. Ce n'è uno solo per volta di solito, ma la
+   * chiave è l'agente: così una riga nuova sa a quale registro appartiene, e
+   * quelli chiusi non si ricaricano per niente.
+   */
+  logs = $state<Record<string, LogEntry[]>>({});
 
   byId(id: string | undefined): Device | undefined {
     return id ? this.list.find((device) => device.id === id) : undefined;
@@ -166,6 +185,22 @@ class Devices {
     } finally {
       this.loading = false;
     }
+  }
+
+  /* -------------------------------------------------------------- registro */
+
+  /** Aprire il registro di un agente: si legge adesso e si tiene aggiornato. */
+  async openLog(agentId: string): Promise<void> {
+    try {
+      this.logs = { ...this.logs, [agentId]: await api.get<LogEntry[]>(`/agents/${agentId}/log`) };
+    } catch (error) {
+      toast.show((error as Error).message);
+    }
+  }
+
+  closeLog(agentId: string): void {
+    const { [agentId]: _via, ...rest } = this.logs;
+    this.logs = rest;
   }
 
   /* ----------------------------------------------------------------- scene */
@@ -268,11 +303,18 @@ class Devices {
    * l'app, e sta in `live`. Qui si applica soltanto la parte che riguarda
    * quello che si accende.
    */
-  apply(event: { kind: 'device' | 'agent' | 'devices' | 'scene' } & Record<string, unknown>): void {
+  apply(event: { kind: 'device' | 'agent' | 'devices' | 'scene' | 'log' } & Record<string, unknown>): void {
     // L'elenco è cambiato — uno nuovo, o uno sparito — e non vale la pena
     // raccontarlo pezzo per pezzo: si rilegge, che è corto e sempre vero.
     if (event.kind === 'devices') {
       void this.load();
+      return;
+    }
+
+    // una riga nuova nel registro di qualcuno: se lo stiamo leggendo, si rilegge
+    if (event.kind === 'log') {
+      const agentId = event.agentId as string;
+      if (this.logs[agentId]) void this.openLog(agentId);
       return;
     }
 

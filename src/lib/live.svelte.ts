@@ -20,7 +20,9 @@ export type LiveEvent =
   | { kind: 'map'; id: string; value: PlaceMap | null }
   | { kind: 'category'; id: string; value: Category | null }
   | { kind: 'group'; id: string; value: Group | null }
-  | { kind: 'scene'; id: string; value: Scene | null };
+  | { kind: 'scene'; id: string; value: Scene | null }
+  /** Il registro di un agente ha una riga in più: chi lo legge lo rilegga. */
+  | { kind: 'log'; agentId: string };
 
 class Live {
   #stream: EventSource | null = null;
@@ -65,7 +67,8 @@ class Live {
       event.kind === 'device' ||
       event.kind === 'agent' ||
       event.kind === 'devices' ||
-      event.kind === 'scene'
+      event.kind === 'scene' ||
+      event.kind === 'log'
     ) {
       devices.apply(event);
     } else {

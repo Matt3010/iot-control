@@ -3,6 +3,7 @@ import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { AgentMessage } from '../../../shared/protocol.js';
 import { agentManager } from '../managers/AgentManager.js';
+import { logManager } from '../managers/LogManager.js';
 import { deviceManager } from '../managers/DeviceManager.js';
 import type { Agent } from '../types.js';
 import { hub } from './hub.js';
@@ -48,6 +49,7 @@ function serve(socket: WebSocket, agent: Agent): void {
 
   hub.attach(agent.id, connection);
   void agentManager.touch(agent.id);
+  logManager.note({ ownerId: agent.ownerId, agentId: agent.id, kind: 'up' });
   console.log(`agente collegato: ${agent.name}`);
 
   // Una connessione può restare aperta e morta: il ping è l'unico modo per
@@ -104,6 +106,7 @@ function serve(socket: WebSocket, agent: Agent): void {
   socket.on('close', () => {
     clearInterval(beat);
     hub.detach(agent.id, connection);
+    logManager.note({ ownerId: agent.ownerId, agentId: agent.id, kind: 'down' });
     console.log(`agente scollegato: ${agent.name}`);
   });
 

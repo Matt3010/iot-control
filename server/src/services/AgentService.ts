@@ -7,6 +7,7 @@ import { badGateway, notFound } from '../errors/HttpError.js';
 import type { LinkedAccount, PairingStep } from '../../../shared/protocol.js';
 import { hub } from '../iot/hub.js';
 import { agentManager } from '../managers/AgentManager.js';
+import { logManager } from '../managers/LogManager.js';
 import { deviceManager } from '../managers/DeviceManager.js';
 
 export interface NewAgentView {
@@ -86,12 +87,33 @@ export class AgentService {
     id: string,
     action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink',
     options: { handler?: string; flowId?: string; input?: Record<string, string>; entryId?: string },
+    who?: string,
   ): Promise<PairingStep | LinkedAccount[] | null> {
     // che sia tuo lo si controlla prima di bussare a casa sua
     await agentManager.find(ownerId, id);
 
     try {
       const step = (await hub.pair(id, action, options)) as PairingStep | LinkedAccount[] | undefined;
+
+      /*
+       * Un account collegato o staccato è una di quelle cose che succedono
+       * una volta e che poi ti chiedi quando: «da quando non vede più le
+       * prese?» ha una risposta solo se quel giorno qualcuno l'ha scritta.
+       * L'elenco no: guardare non è successo niente.
+       */
+      if (action === 'unlink') {
+        logManager.note({ ownerId, agentId: id, kind: 'account', detail: 'scollegato', who });
+      } else if (step && !Array.isArray(step) && step.kind === 'done') {
+        logManager.note({
+          ownerId,
+          agentId: id,
+          kind: 'account',
+          subject: options.handler,
+          detail: 'collegato',
+          who,
+        });
+      }
+
       return step ?? null;
     } catch (error) {
       throw badGateway((error as Error).message);

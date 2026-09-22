@@ -5,6 +5,7 @@
   import { ui } from '../lib/ui.svelte';
   import AddRow from './AddRow.svelte';
   import AgentControls from './AgentControls.svelte';
+  import AgentLog from './AgentLog.svelte';
   import AgentPairing from './AgentPairing.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
@@ -146,6 +147,8 @@
             {/if}
 
             <AgentPairing {agent} />
+
+            <AgentLog {agent} />
           {/snippet}
         </AgentControls>
       </section>

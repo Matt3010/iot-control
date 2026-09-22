@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ownerOf } from '../auth/owner.js';
+import { ownerOf, whoIs } from '../auth/owner.js';
 import type { CommandDto } from '../dto/device.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import { deviceService } from '../services/DeviceService.js';
@@ -16,7 +16,9 @@ export class DeviceController {
   command = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { code, value } = dtoOf<CommandDto>(req);
-      await deviceService.command(ownerOf(req), req.params.id as string, code, value);
+      // chi ha premuto finisce nel registro: su una mappa tenuta in due è
+      // la differenza fra «si è aperta da sola» e «l'ha aperta lui»
+      await deviceService.command(ownerOf(req), req.params.id as string, code, value, whoIs(req).email);
       res.status(204).end();
     } catch (error) {
       next(error);

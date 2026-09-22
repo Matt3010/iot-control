@@ -31,9 +31,9 @@ export class SceneService {
    * Come per un dispositivo solo: un agente che non risponde è un guasto fra
    * noi e lui, non una richiesta sbagliata.
    */
-  async run(ownerId: string, id: string): Promise<void> {
+  async run(ownerId: string, id: string, who?: string): Promise<void> {
     try {
-      await sceneManager.run(ownerId, id);
+      await sceneManager.run(ownerId, id, who);
     } catch (error) {
       if (error instanceof Error && !('status' in error)) throw badGateway(error.message);
       throw error;

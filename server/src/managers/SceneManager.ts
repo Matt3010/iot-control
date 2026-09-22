@@ -6,6 +6,7 @@ import type { Transaction } from '../persistence/JsonStore.js';
 import { store } from '../persistence/JsonStore.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
+import { logManager } from './LogManager.js';
 import type { Device, Scene, SceneStep } from '../types.js';
 
 /**
@@ -79,7 +80,7 @@ export class SceneManager {
    * ha risposto nessuno è un guasto; se è partita a metà, la scena non si
    * riavvolge — quello che si è mosso resta mosso, e si dice cosa manca.
    */
-  async run(ownerId: string, id: string): Promise<void> {
+  async run(ownerId: string, id: string, who?: string): Promise<void> {
     const { scene, steps } = await store.transaction((tx) => {
       const found = new SceneRepository(tx).findById(id);
       if (!found || found.ownerId !== ownerId) throw notFound('scena inesistente');
@@ -100,6 +101,28 @@ export class SceneManager {
     );
 
     const mute = steps.filter((_pair, at) => results[at]?.status === 'rejected');
+
+    /*
+     * Una riga per agente, non una per passo: «Sera» è una cosa sola anche se
+     * ne muove sei, e sei righe uguali nel registro sono rumore. Ma se la
+     * scena tocca due case, ognuna deve poter leggere che è passata di lì.
+     */
+    for (const agentId of new Set(steps.map(({ device }) => device.agentId))) {
+      const suoi = steps.filter(({ device }) => device.agentId === agentId);
+      const zitti = mute.filter(({ device }) => device.agentId === agentId).length;
+      logManager.note({
+        ownerId,
+        agentId,
+        kind: 'scene',
+        subject: scene.name,
+        detail: zitti
+          ? `${suoi.length - zitti} di ${suoi.length}`
+          : `${suoi.length} ${suoi.length === 1 ? 'cosa' : 'cose'}`,
+        ok: zitti === 0,
+        ...(who ? { who } : {}),
+      });
+    }
+
     if (!mute.length) return;
 
     const names = [...new Set(mute.map(({ device }) => `«${device.name}»`))].join(', ');

@@ -99,6 +99,7 @@ function migrateToMaps(data: Database): Database {
     agents: data.agents,
     devices: data.devices,
     scenes: data.scenes,
+    log: data.log,
     maps: data.maps.length ? data.maps : [first],
     categories: data.categories.map((category: Category) => ({ ...category, ownerId: category.ownerId ?? owner })),
     groups: data.groups.map((group: Group & { mapId?: string }) => {
@@ -119,6 +120,7 @@ const empty = (): Database => ({
   agents: [],
   devices: [],
   scenes: [],
+  log: [],
 });
 
 /**
@@ -165,6 +167,8 @@ export class JsonStore {
         groups: Array.isArray(parsed.groups) ? parsed.groups : [],
         // le scene sono arrivate dopo: chi non le ha non ne ha
         scenes: Array.isArray(parsed.scenes) ? parsed.scenes.map(migrateScene) : [],
+        // e il registro pure: si riempie da solo, da adesso in avanti
+        log: Array.isArray(parsed.log) ? parsed.log : [],
         places: Array.isArray(parsed.places) ? parsed.places.map(migratePlace) : [],
         // Chi aveva l'indice prima che gli agenti esistessero: niente agenti, niente dispositivi.
         agents: Array.isArray(parsed.agents) ? parsed.agents : [],

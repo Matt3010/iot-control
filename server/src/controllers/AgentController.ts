@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ownerOf } from '../auth/owner.js';
+import { ownerOf, whoIs } from '../auth/owner.js';
+import { logManager } from '../managers/LogManager.js';
 import type { AgentDto } from '../dto/agent.dto.js';
 import type { PairDto } from '../dto/agent.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
@@ -13,6 +14,15 @@ const tokenOf = (req: Request): string | undefined =>
 
 
 export class AgentController {
+  /** Le ultime ventiquattr'ore di quell'agente, dalla più recente. */
+  log = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      res.json(await logManager.ofAgent(ownerOf(req), req.params.id as string));
+    } catch (error) {
+      next(error);
+    }
+  };
+
   list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       res.json(await agentService.list(ownerOf(req)));
@@ -67,7 +77,7 @@ export class AgentController {
         flowId: dto.flowId,
         input: dto.input,
         entryId: dto.entryId,
-      });
+      }, whoIs(req).email);
       res.json(step);
     } catch (error) {
       next(error);

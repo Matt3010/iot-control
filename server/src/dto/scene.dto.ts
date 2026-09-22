@@ -36,8 +36,8 @@ export class SceneStepDto {
 /**
  * Una scena: un nome e le righe che parte insieme.
  *
- * Non e' un gruppo di dispositivi che fanno la stessa cosa: ogni riga ha la
- * sua. «Sera» puo' chiudere le tende e accendere l'abat-jour, che sono due
+ * Non è un gruppo di dispositivi che fanno la stessa cosa: ogni riga ha la
+ * sua. «Sera» può chiudere le tende e accendere l'abat-jour, che sono due
  * azioni diverse su due cose diverse, premute insieme.
  */
 export class SceneDto {
