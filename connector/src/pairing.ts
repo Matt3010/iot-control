@@ -31,6 +31,44 @@ const FLOWS = '/api/config/config_entries/flow';
  */
 const SCHEMAS = new Map<string, unknown[]>();
 
+/**
+ * Com'e' fatto il passo in corso: prima da quello che ricordiamo, se no si
+ * chiede.
+ *
+ * La memoria di questo processo non sopravvive a un riavvio, e un modulo
+ * aperto nel browser si'. Ridomandarlo costa una domanda sola, e toglie di
+ * mezzo un intero modo di sbagliare.
+ */
+async function schemaOf(config: ConnectorConfig, flowId: string): Promise<unknown[] | undefined> {
+  const known = SCHEMAS.get(flowId);
+  if (known) return known;
+
+  const flow = await ask(config, `${FLOWS}/${flowId}`).catch(() => undefined);
+  if (!flow || !Array.isArray(flow.data_schema)) return undefined;
+
+  SCHEMAS.set(flowId, flow.data_schema);
+  return flow.data_schema;
+}
+
+/**
+ * Quello che il passo propone per un campo.
+ *
+ * Sta in due posti diversi, e la differenza non e' un capriccio: `default` e'
+ * quello che vale se non rispondi, `suggested_value` e' quello che ti si
+ * scrive gia' nella casella perche' tu lo confermi. Per chi guarda sono la
+ * stessa cosa — c'e' scritto due, e due va bene — ma un campo obbligatorio
+ * con solo un suggerimento va rimandato indietro lo stesso, se no viene
+ * rifiutato per non aver risposto a una domanda che aveva gia' la risposta
+ * scritta dentro.
+ */
+function proposed(entry: Record<string, unknown>): unknown {
+  if (entry.default !== undefined && entry.default !== null) return entry.default;
+
+  const described = entry.description as Record<string, unknown> | undefined;
+  const suggested = described?.suggested_value;
+  return suggested === null ? undefined : suggested;
+}
+
 /** Quello che non e' stato chiesto torna com'era proposto. */
 function withDefaults(
   schema: unknown[] | undefined,
@@ -44,8 +82,9 @@ function withDefaults(
     const field = entry as Record<string, unknown>;
     const name = String(field.name ?? '');
     if (!name || name in full) continue;
-    if (field.default === undefined || field.default === null) continue;
-    full[name] = field.default;
+
+    const value = proposed(field);
+    if (value !== undefined) full[name] = value;
   }
   return full;
 }
@@ -181,7 +220,7 @@ function fieldsOf(schema: unknown[] | undefined): PairingStep['fields'] {
     )
     .map((entry) => {
       const options = optionsOf(entry);
-      const preset = entry.default;
+      const preset = proposed(entry);
       return {
         name: String(entry.name),
         required: entry.required === true,
@@ -253,6 +292,24 @@ function translate(flow: HaFlow, going?: { flowId: string; schema?: unknown[] })
   return step;
 }
 
+/** Uno schema detto in una riga: i nomi, e cosa propongono. */
+function listed(schema: unknown[] | undefined): string {
+  if (!Array.isArray(schema)) return 'nessuno schema';
+
+  return schema
+    .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
+    .map((entry) => {
+      const bits = [String(entry.name)];
+      if (entry.required === true) bits.push('obbligatorio');
+
+      const value = proposed(entry);
+      if (value !== undefined) bits.push(`propone ${JSON.stringify(value)}`);
+      if (entry.type !== undefined) bits.push(`tipo ${String(entry.type)}`);
+      return bits.join(' ');
+    })
+    .join(' | ');
+}
+
 /** Quali account Home Assistant sa collegare, adesso. */
 async function handlers(config: ConnectorConfig): Promise<string[]> {
   const response = await fetch(`${config.haUrl}/api/config/config_entries/flow_handlers`, {
@@ -288,9 +345,15 @@ export async function submitPairing(
   flowId: string,
   input: Record<string, string | boolean>,
 ): Promise<PairingStep> {
-  const schema = SCHEMAS.get(flowId);
+  const schema = await schemaOf(config, flowId);
   const body = JSON.stringify(withDefaults(schema, input));
-  return translate(await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body }), { flowId, schema });
+  const step = translate(await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body }), { flowId, schema });
+
+  // Se si e' lamentato, nel registro finisce anche di cosa era fatto il
+  // passo: un rifiuto su un campo che non si vede si capisce solo vedendo
+  // quali campi c'erano e cosa proponevano.
+  if (step.error) console.warn(`passo ${flowId}: ${listed(schema)}`);
+  return step;
 }
 
 /**
