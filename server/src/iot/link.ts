@@ -17,9 +17,20 @@ export const PROTOCOL = 1;
 const PATH = '/api/agent/link';
 const HEARTBEAT_MS = 30_000;
 
-/** Un rifiuto prima della stretta di mano è HTTP normale: la WebSocket non è ancora nata. */
+/**
+ * Un rifiuto prima della stretta di mano è HTTP normale: la WebSocket non è
+ * ancora nata.
+ *
+ * `Content-Length: 0` non è pignoleria: senza, la risposta non dice dove
+ * finisce, e un proxy in mezzo — un tunnel Cloudflare, per dire — non riesce a
+ * incorniciarla e la trasforma in un 502. Chi si collega col token sbagliato
+ * leggerebbe «il backend rifiuta: 502» e andrebbe a cercare il guasto dalla
+ * parte sbagliata.
+ */
 function refuse(socket: Duplex, status: number, reason: string): void {
-  socket.write(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\n\r\n`);
+  socket.write(
+    `HTTP/1.1 ${status} ${reason}\r\n` + 'Connection: close\r\n' + 'Content-Length: 0\r\n' + '\r\n',
+  );
   socket.destroy();
 }
 
