@@ -3,6 +3,7 @@
   import { auth } from '../lib/auth.svelte';
   import { devices } from '../lib/devices.svelte';
   import { here } from '../lib/here.svelte';
+  import { clearOf } from '../lib/clearance';
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { clusterGroup, createMap, DEFAULT_COLOR, glyph, meIcon, pinIcon } from '../lib/mapkit';
   import { AGENTS_PATH } from '../lib/routing';
@@ -145,11 +146,14 @@
     map.on('popupopen', (event: L.PopupEvent) => {
       mapBridge.activeKey = (event.popup.options as { key?: string }).key ?? null;
     });
+    // e che non finisca sotto al pannello, che la mappa non sa di avere addosso
+    const clear = clearOf(map, () => document.getElementById('panel'));
     map.on('popupclose', () => {
       mapBridge.activeKey = null;
     });
 
     return () => {
+      clear();
       mapBridge.detach(map);
       map.remove();
       markers.clear();
