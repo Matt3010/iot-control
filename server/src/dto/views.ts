@@ -127,7 +127,7 @@ export const toPublicMapView = (map: PlaceMap): PublicMapView => {
 
 export const toGroupView = ({ id, name }: Group): GroupView => ({ id, name });
 
-export const toSceneView = ({ id, name, steps }: Scene): SceneView => ({ id, name, steps });
+export const toSceneView = ({ id, name, steps }: Scene): SceneView => ({ id, name, steps: steps ?? [] });
 
 /** The defaults here also carry records written before groups existed. */
 export const toPlaceView = (place: Place): PlaceView => ({

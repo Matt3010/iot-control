@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import { config, dataFile } from '../config.js';
 import { randomUUID } from 'node:crypto';
 import { slugify, uniqueSlug } from '../auth/slug.js';
-import type { Agent, Category, Database, Device, Group, Place, PlaceMap, User } from '../types.js';
+import type { Agent, Category, Database, Device, Group, Place, PlaceMap, Scene, User } from '../types.js';
 
 /** Chi si era registrato prima che esistessero i link pubblici. */
 function migrateHandles(users: User[]): User[] {
@@ -19,6 +19,18 @@ function migrateHandles(users: User[]): User[] {
     taken.add(handle);
     return { ...counted, handle };
   });
+}
+
+/**
+ * Le prime scene tenevano un elenco di dispositivi e le azioni che avevano in
+ * comune. Adesso tengono delle righe, e ogni riga ha la sua azione: da un
+ * elenco di nomi non si ricava quale — «Tende» non dice se apre o chiude.
+ * Quindi la scena resta, con il suo nome, e vuota: si riscrive in due clic, e
+ * indovinare avrebbe voluto dire far partire qualcosa che nessuno ha chiesto.
+ */
+function migrateScene(scene: Scene & { deviceIds?: string[] }): Scene {
+  const { deviceIds: _vecchi, ...rest } = scene;
+  return { ...rest, steps: Array.isArray(scene.steps) ? scene.steps : [] };
 }
 
 /** Mappe nate prima che si potessero pubblicare. Lo slug basta sia tuo. */
@@ -151,8 +163,8 @@ export class JsonStore {
         maps: migrateSlugs(Array.isArray(parsed.maps) ? parsed.maps : []),
         categories: Array.isArray(parsed.categories) ? parsed.categories : [],
         groups: Array.isArray(parsed.groups) ? parsed.groups : [],
-        // gli insiemi sono arrivati dopo: chi non li ha non ne ha
-        scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
+        // le scene sono arrivate dopo: chi non le ha non ne ha
+        scenes: Array.isArray(parsed.scenes) ? parsed.scenes.map(migrateScene) : [],
         places: Array.isArray(parsed.places) ? parsed.places.map(migratePlace) : [],
         // Chi aveva l'indice prima che gli agenti esistessero: niente agenti, niente dispositivi.
         agents: Array.isArray(parsed.agents) ? parsed.agents : [],
