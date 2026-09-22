@@ -30,12 +30,19 @@
   }
 
   /** Il pin di un posto: colore ed emoji della sua categoria. */
-  const lookOf = (category: Category | undefined, extra = '', locked = false, count = 0) => ({
+  const lookOf = (
+    category: Category | undefined,
+    extra = '',
+    locked = false,
+    count = 0,
+    health: string | null = null,
+  ) => ({
     color: category?.color,
     emoji: category?.emoji,
     extra,
     locked,
     count,
+    ...(health ? { health } : {}),
   });
 
   /** The popup stays imperative: Leaflet owns its lifecycle, not Svelte. */
@@ -170,17 +177,18 @@
       // Sono loro e non i dispositivi, perché un agente appena creato non ne
       // ha ancora nessuno, e un bollino che compare due giorni dopo non serve.
       const count = place.agentIds?.length ?? 0;
+      const health = devices.health(place.agentIds);
 
       if (!marker) {
         marker = L.marker([place.lat, place.lng], {
-          icon: pinIcon(lookOf(category, lit, place.private, count)),
+          icon: pinIcon(lookOf(category, lit, place.private, count, health)),
           riseOnHover: true,
           colour,
         } as L.MarkerOptions);
         markers.set(place.key, marker);
       } else {
         marker.setLatLng([place.lat, place.lng]);
-        marker.setIcon(pinIcon(lookOf(category, lit, place.private, count)));
+        marker.setIcon(pinIcon(lookOf(category, lit, place.private, count, health)));
         // il grappolo legge il colore da qui: se cambia categoria deve saperlo
         (marker.options as { colour?: string }).colour = colour;
       }
@@ -248,6 +256,7 @@
       [draft.id ? '' : 'draft', devices.anyOn(draft.agentIds) ? 'lit' : ''].filter(Boolean).join(' '),
       draft.private ?? false,
       draft.agentIds?.length ?? 0,
+      devices.health(draft.agentIds),
     );
 
     if (!draftMarker) {

@@ -33,58 +33,53 @@
 }
 
 /* il lucchetto è una toppa sul pin: gira al contrario per restare dritto */
-.pin-lock {
-  position: absolute;
-  top: 50%;
-  right: -12px;
-  display: grid;
-  place-items: center;
-  width: 17px;
-  height: 17px;
-  margin-top: -8.5px;
-  border-radius: 50%;
-  transform: rotate(45deg);
-  background: var(--glass-strong);
-  color: var(--ink);
-  box-shadow: 0 2px 5px rgb(10 13 18 / 0.45), inset 0 0 0 1px var(--hairline);
-}
+/* L'etichetta sopra al pin: come sta, quanti agenti tiene, se e' privato.
+   Sta fuori dal pin e non dentro, perche' il pin e' ruotato di 45 gradi e
+   tutto quello che ci metti va controruotato uno per uno — con tre cose in
+   fila diventa un rebus. */
+.pin-wrap { position: relative; width: 36px; height: 36px; }
 
-.pin-lock .ico { width: 10px; height: 10px; stroke-width: 2.4; }
-
-/* Quante cose comanda questo pin. Sta in cima nel sistema del pin, che
-   ruotato di 45 gradi vuol dire l'angolo in alto a sinistra sullo schermo:
-   il lucchetto tiene quello a destra, e non si pestano i piedi. */
-.pin-count {
+.pin-tag {
   position: absolute;
   left: 50%;
-  top: -10px;
-  display: grid;
-  place-items: center;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  margin-left: -8.5px;
+  top: -11px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
   border-radius: 99px;
-  transform: rotate(45deg);
   background: var(--glass-strong);
   color: var(--ink-2);
   font-size: 10.5px;
   font-weight: 640;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  box-shadow: 0 2px 5px rgb(10 13 18 / 0.45), inset 0 0 0 1px var(--hairline);
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgb(10 13 18 / 0.5), inset 0 0 0 1px var(--hairline);
 }
 
-/* con qualcosa di acceso il numero si scalda: il pin ha gia' l'alone, questo
-   dice quante cose ci sono sotto */
-.pin.lit .pin-count { color: #d98613; }
+.pin-tag em { font-style: normal; }
 
-@media (prefers-color-scheme: dark) {
-  .pin.lit .pin-count { color: #f0b357; }
+.pin-tag .ico { width: 10px; height: 10px; stroke-width: 2.6; opacity: 0.75; }
+
+/* Come sta, in un pallino: verde tutto a posto, arancione qualcosa la' dentro
+   non risponde, rosso un agente e' caduto, grigio non si e' mai collegato. */
+.pin-health {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-3);
 }
 
-/* Un luogo acceso adesso. L'alone e' caldo e non blu, perche' il blu qui
-   dentro vuol dire una cosa sola: dove sei tu. */
+.pin-health.is-live { background: #2f9e5e; }
+.pin-health.is-degraded { background: #d98613; }
+.pin-health.is-lost { background: var(--danger); }
+.pin-health.is-new { background: var(--ink-3); }
+
+/* Un luogo dove adesso è acceso qualcosa. L'alone è caldo e non blu, perché
+   il blu qui dentro vuol dire una cosa sola: dove sei tu. */
 .pin.lit {
   border-color: rgb(255 255 255 / 0.96);
   box-shadow:

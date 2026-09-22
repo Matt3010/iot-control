@@ -83,6 +83,28 @@ class Devices {
   }
 
 
+  /**
+   * Come stanno gli agenti di un luogo, in una parola sola — quella che il
+   * pin porta sulla mappa:
+   *
+   * - `live`     tutto collegato e tutto risponde
+   * - `degraded` collegato, ma qualcosa là dentro non risponde
+   * - `lost`     un agente che si era collegato adesso non c'è più
+   * - `new`      mai collegato: non è un guasto, è da installare
+   */
+  health(agentIds: string[] | undefined): 'live' | 'degraded' | 'lost' | 'new' | null {
+    const mine = (agentIds ?? []).map((id) => this.agents.find((agent) => agent.id === id)).filter((a) => !!a);
+    if (!mine.length) return null;
+
+    // uno caduto è la cosa più grave: vince su tutto il resto
+    if (mine.some((agent) => !agent.online && agent.lastSeenAt)) return 'lost';
+    if (mine.every((agent) => !agent.online)) return 'new';
+    if (mine.some((agent) => !agent.online)) return 'lost';
+
+    const theirs = this.list.filter((device) => agentIds!.includes(device.agentId));
+    return theirs.some((device) => !device.online) ? 'degraded' : 'live';
+  }
+
   /** Quanti ne sono accesi su quanti se ne possono accendere. */
   tally(agentId: string): { on: number; total: number } {
     const theirs = this.ofAgent(agentId).filter((device) =>

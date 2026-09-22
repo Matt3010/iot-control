@@ -133,21 +133,44 @@ export interface PinLook {
   locked?: boolean;
   /** Quante cose si accendono qui. Zero non si scrive. */
   count?: number;
+  /** Come stanno gli agenti: 'live', 'degraded', 'lost', 'new'. */
+  health?: string;
 }
 
-export function pinIcon({ color, emoji, extra = '', locked = false, count = 0 }: PinLook): L.DivIcon {
-  const lock = locked ? `<i class="pin-lock">${glyph('lock').outerHTML}</i>` : '';
-  // il lucchetto sta a destra nel sistema del pin, il conto in cima: ruotato
-  // di 45 gradi vuol dire i due angoli alti dello schermo, e non si urtano
-  const tally = count > 0 ? `<i class="pin-count">${count}</i>` : '';
+/**
+ * Il pin, e sopra un'etichetta sola con quello che c'è da sapere: come sta,
+ * quanti agenti tiene, e se è privato.
+ *
+ * L'etichetta sta **fuori** dal pin e non dentro: il pin è ruotato di 45
+ * gradi, e tutto quello che ci metti dentro va controruotato uno per uno.
+ * Con tre cose in fila diventa un rebus — meglio una pastiglia dritta,
+ * appoggiata sopra.
+ */
+export function pinIcon({
+  color,
+  emoji,
+  extra = '',
+  locked = false,
+  count = 0,
+  health,
+}: PinLook): L.DivIcon {
+  const parts = [
+    health ? `<b class="pin-health is-${health}"></b>` : '',
+    count > 0 ? `<em>${count}</em>` : '',
+    locked ? glyph('lock').outerHTML : '',
+  ].join('');
+
+  const tag = parts ? `<i class="pin-tag">${parts}</i>` : '';
+
   return L.divIcon({
     className: '',
     html:
-      `<div class="pin ${extra}" style="--c:${color ?? DEFAULT_COLOR}">` +
-      `<span>${emoji ?? DEFAULT_EMOJI}</span>${lock}${tally}</div>`,
+      `<div class="pin-wrap">` +
+      `<div class="pin ${extra}" style="--c:${color ?? DEFAULT_COLOR}"><span>${emoji ?? DEFAULT_EMOJI}</span></div>` +
+      `${tag}</div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 36],
-    popupAnchor: [0, -34],
+    popupAnchor: [0, -40],
   });
 }
 
