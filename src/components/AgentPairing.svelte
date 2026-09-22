@@ -78,12 +78,19 @@
   /**
    * Un codice incollato si porta dietro gli spazi ai bordi, e certi codici
    * distinguono maiuscole e minuscole: si tolgono quelli, non il resto.
+   *
+   * E il prefisso: per eWeLink metterlo vuol dire «quello sopra è un numero
+   * di telefono». Con un'email diventa `+tuonome@…`, che non è un numero, e
+   * il rifiuto arriva da un pezzo di codice che parla di espressioni
+   * regolari. Se c'è una chiocciola, il prefisso non si manda.
    */
-  const submit = () =>
-    go(
-      'submit',
-      Object.fromEntries(Object.entries(answers).map(([name, value]) => [name, value.trim()])),
-    );
+  function cleaned(): Record<string, string> {
+    const out = Object.fromEntries(Object.entries(answers).map(([name, value]) => [name, value.trim()]));
+    if (out.username?.includes('@')) delete out.country_code;
+    return out;
+  }
+
+  const submit = () => go('submit', cleaned());
 </script>
 
 {#if closed}
@@ -139,6 +146,9 @@
         <p class="say careful">Copialo <b>esattamente</b> com'è: maiuscole e minuscole contano.</p>
       {:else}
         <p class="say">Entra con le stesse credenziali che usi nell'app <b>eWeLink</b>.</p>
+        <p class="say careful">
+          Il prefisso serve <b>solo</b> se entri col numero di telefono. Con l'email lascialo vuoto.
+        </p>
       {/if}
 
       {#each step.fields as field (field.name)}
@@ -146,6 +156,7 @@
           <span class="eyebrow">{named(field.name)}</span>
           {#if field.options}
             <select
+              disabled={field.name === 'country_code' && (answers.username ?? '').includes('@')}
               bind:value={
                 () => answers[field.name] ?? '',
                 (value) => (answers = { ...answers, [field.name]: value })
