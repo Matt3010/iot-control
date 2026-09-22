@@ -194,12 +194,22 @@
       }
       // con degli agenti dentro il popup si allarga: quella card ha
       // interruttori e cursori, e a 232px vivrebbe stretta
-      marker.bindPopup(() => popupFor(place), {
-        closeButton: false,
-        offset: [0, 2],
-        key: place.key,
-        className: (place.agentIds ?? []).length ? 'with-agents' : '',
-      } as L.PopupOptions);
+      // Il popup si lega una volta sola. Rilegarlo a ogni giro — e questo
+      // effetto gira a ogni interruttore premuto in casa — butta via quello
+      // aperto e lo rifà da capo: i comandi dentro tornavano in cima, e chi
+      // stava scorrendo si perdeva.
+      const wide = (place.agentIds ?? []).length > 0;
+      const bound = (marker.options as { wide?: boolean }).wide;
+
+      if (!marker.getPopup() || bound !== wide) {
+        (marker.options as { wide?: boolean }).wide = wide;
+        marker.bindPopup(() => popupFor(place), {
+          closeButton: false,
+          offset: [0, 2],
+          key: place.key,
+          className: wide ? 'with-agents' : '',
+        } as L.PopupOptions);
+      }
 
       // The pin being edited steps aside for the draggable draft standing in for it.
       const onMap = store.visible(place) && ui.draft?.key !== place.key;
