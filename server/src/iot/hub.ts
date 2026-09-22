@@ -33,7 +33,7 @@ interface Connection {
 }
 
 interface Waiting {
-  resolve: () => void;
+  resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   timer: NodeJS.Timeout;
 }
@@ -124,15 +124,15 @@ export class Hub {
   /* -------------------------------------------------------------- comandi */
 
   /**
-   * Scende il comando e si aspetta la risposta. Non si finge che sia andata
-   * bene: se l'agente non risponde, chi ha premuto lo deve sapere.
+   * Si chiede qualcosa e si aspetta la risposta. Non si finge che sia andata
+   * bene: se l'agente non risponde, chi ha chiesto lo deve sapere.
    */
-  command(agentId: string, externalId: string, code: string, value: DeviceValue): Promise<void> {
+  #ask(agentId: string, make: (reqId: string) => BackendMessage): Promise<unknown> {
     const connection = this.#agents.get(agentId);
     if (!connection) return Promise.reject(new Error('questo agente non è collegato'));
 
     const reqId = randomUUID();
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#waiting.delete(reqId);
         reject(new Error("l'agente non ha risposto"));
@@ -140,16 +140,33 @@ export class Hub {
       timer.unref?.();
 
       this.#waiting.set(reqId, { resolve, reject, timer });
-      connection.send({ type: 'command', reqId, externalId, code, value });
+      connection.send(make(reqId));
     });
   }
 
-  settle(reqId: string, ok: boolean, error?: string): void {
+  /** Premere un interruttore: non torna niente, o torna un errore. */
+  async command(agentId: string, externalId: string, code: string, value: DeviceValue): Promise<void> {
+    await this.#ask(agentId, (reqId) => ({ type: 'command', reqId, externalId, code, value }));
+  }
+
+  /**
+   * Una battuta della conversazione per collegare un account. Torna il passo
+   * successivo: cosa chiedere, e il QR da disegnare quando c'è.
+   */
+  pair(
+    agentId: string,
+    action: 'start' | 'submit' | 'cancel',
+    options: { handler?: string; flowId?: string; input?: Record<string, string> } = {},
+  ): Promise<unknown> {
+    return this.#ask(agentId, (reqId) => ({ type: 'pair', reqId, action, ...options }));
+  }
+
+  settle(reqId: string, ok: boolean, error?: string, data?: unknown): void {
     const waiting = this.#waiting.get(reqId);
     if (!waiting) return;
     this.#waiting.delete(reqId);
     clearTimeout(waiting.timer);
-    if (ok) waiting.resolve();
+    if (ok) waiting.resolve(data);
     else waiting.reject(new Error(error ?? "rifiutato dall'agente"));
   }
 

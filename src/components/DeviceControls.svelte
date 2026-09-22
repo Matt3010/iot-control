@@ -90,6 +90,7 @@
               <Chip
                 label={value}
                 look={device.state[capability.code] === value ? 'sel' : 'off'}
+                size="sm"
                 disabled={!device.online}
                 onclick={() => devices.command(device, capability.code, value)}
               />
@@ -199,7 +200,6 @@
 
   .choices { display: flex; flex-wrap: wrap; gap: 5px; }
 
-  .choices :global(.chip) { height: 26px; padding: 0 10px; font-size: 11.5px; }
 
   /* un sensore si legge e basta: il numero è la cosa grossa, l'unità gli sta
      accanto piccola, come su un quadrante */

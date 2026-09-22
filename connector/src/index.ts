@@ -1,9 +1,10 @@
-import type { CommandMessage, DeviceSnapshot, HelloMessage } from '../../shared/protocol.js';
+import type { BackendMessage, CommandMessage, DeviceSnapshot, HelloMessage, PairMessage } from '../../shared/protocol.js';
 import { ConfigError, loadConfig } from './config.js';
 import { toServiceCall, translate } from './entities.js';
 import { HomeAssistant } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
 import { ensureToken } from './onboarding.js';
+import { cancelPairing, startPairing, submitPairing } from './pairing.js';
 
 const VERSION = '1.0.0';
 /** All'avvio le entità arrivano a centinaia: si aspetta un attimo e si manda una lista sola. */
@@ -33,7 +34,7 @@ async function main(): Promise<void> {
     devices: [...devices.values()],
   });
 
-  const link = new Link(config, hello, (command) => void obey(command));
+  const link = new Link(config, hello, (message) => void listen(message));
   let pending: NodeJS.Timeout | null = null;
   let rereading: NodeJS.Timeout | null = null;
 
@@ -98,6 +99,36 @@ async function main(): Promise<void> {
       link.send({ type: 'devices', devices: [...devices.values()] });
     },
   );
+
+  /**
+   * Collegare un account: una conversazione a più battute, e ogni battuta
+   * torna indietro con la risposta attaccata all'`ack`. Gli errori non si
+   * nascondono — chi sta guardando il QR deve sapere se è scaduto.
+   */
+  const pair = async (message: PairMessage): Promise<void> => {
+    try {
+      if (message.action === 'cancel') {
+        if (message.flowId) await cancelPairing(config, message.flowId);
+        link.send({ type: 'ack', reqId: message.reqId, ok: true });
+        return;
+      }
+
+      const step =
+        message.action === 'start'
+          ? await startPairing(config, message.handler ?? 'tuya')
+          : await submitPairing(config, message.flowId ?? '', message.input ?? {});
+
+      link.send({ type: 'ack', reqId: message.reqId, ok: true, data: step });
+    } catch (error) {
+      link.send({ type: 'ack', reqId: message.reqId, ok: false, error: (error as Error).message });
+    }
+  };
+
+  /** Quello che scende dal filo: un comando, o una battuta di accoppiamento. */
+  const listen = (message: BackendMessage): void => {
+    if (message.type === 'pair') void pair(message);
+    else if (message.type === 'command') void obey(message);
+  };
 
   const obey = async (command: CommandMessage): Promise<void> => {
     const fail = (error: string): void => void link.send({ type: 'ack', reqId: command.reqId, ok: false, error });

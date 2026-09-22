@@ -1,5 +1,5 @@
 import { WebSocket } from 'ws';
-import type { AgentMessage, BackendMessage, CommandMessage, HelloMessage } from '../../shared/protocol.js';
+import type { AgentMessage, BackendMessage, HelloMessage } from '../../shared/protocol.js';
 import type { ConnectorConfig } from './config.js';
 
 /**
@@ -32,7 +32,7 @@ export class Link {
   constructor(
     private readonly config: ConnectorConfig,
     private readonly hello: () => HelloMessage,
-    private readonly onCommand: (command: CommandMessage) => void,
+    private readonly onMessage: (message: BackendMessage) => void,
   ) {}
 
   get connected(): boolean {
@@ -105,8 +105,8 @@ export class Link {
       return;
     }
 
-    if (message.type === 'command') this.onCommand(message);
-    else if (message.type === 'resync') this.send(this.hello());
+    if (message.type === 'resync') this.send(this.hello());
+    else this.onMessage(message);
   }
 
   #schedule(after?: number): void {

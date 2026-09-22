@@ -1,6 +1,6 @@
 import { api } from './api';
 import { toast } from './toast.svelte';
-import type { Capability, DeviceValue } from './types';
+import type { Capability, DeviceValue, PairingStep } from './types';
 
 /** Un agente, per come lo vede il sito: il servizio installato in quel posto. */
 export interface Agent {
@@ -176,6 +176,19 @@ class Devices {
       agent.name = before;
       toast.show((error as Error).message);
     }
+  }
+
+  /**
+   * Una battuta della conversazione per collegare un account a quell'agente.
+   * Torna il passo successivo: cosa chiedere, e la stringa da disegnare come
+   * QR quando c'è. Di Tuya, qui dentro, non si sa niente.
+   */
+  pair(
+    agent: Agent,
+    action: 'start' | 'submit' | 'cancel',
+    options: { handler?: string; flowId?: string; input?: Record<string, string> } = {},
+  ): Promise<PairingStep | null> {
+    return api.post<PairingStep | null>(`/agents/${agent.id}/pair`, { action, ...options });
   }
 
   /** Il token di prima smette di funzionare all'istante: l'agente va reinstallato. */

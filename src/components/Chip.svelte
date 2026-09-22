@@ -7,6 +7,7 @@
     label,
     count,
     look = 'on',
+    size,
     disabled = false,
     onclick,
     ...rest
@@ -16,6 +17,8 @@
     label: string;
     count?: number;
     look?: Look;
+    /** Più piccola del normale: dentro a una card, in mezzo ad altri controlli. */
+    size?: 'sm';
     disabled?: boolean;
     onclick?: () => void;
     /* quello che non sappiamo ancora di dover passare: title, aria, dati */
@@ -23,7 +26,14 @@
   } = $props();
 </script>
 
-<button type="button" class="chip {look}" style:--c={color} {disabled} {onclick} {...rest}>
+<button
+  type="button"
+  class="chip {look} {size === 'sm' ? 'is-sm' : ''}"
+  style:--c={color}
+  {disabled}
+  {onclick}
+  {...rest}
+>
   {#if emoji}<span class="emo">{emoji}</span>{/if}
   <span class="name">{label}</span>
   {#if count !== undefined}<span class="count">{count}</span>{/if}
@@ -54,6 +64,10 @@
 }
 
 .chip:hover { transform: translateY(-1px); }
+
+/* La misura piccola. Sta qui e non in chi la ospita, se no ogni schermata si
+   inventa la sua e poi divergono di un pixel per volta. */
+.chip.is-sm { height: 26px; padding: 0 10px 0 9px; font-size: 11.5px; }
 
 .chip .emo { font-family: var(--emoji); font-size: 13.5px; line-height: 1; }
 

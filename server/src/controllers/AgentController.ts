@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ownerOf } from '../auth/owner.js';
 import type { AgentDto } from '../dto/agent.dto.js';
+import type { PairDto } from '../dto/agent.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import { agentService } from '../services/AgentService.js';
 
@@ -49,6 +50,24 @@ export class AgentController {
     try {
       await agentService.remove(ownerOf(req), req.params.id as string);
       res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Collegare un account su quell'agente: una battuta per volta, e torna il
+   * passo successivo — cosa chiedere, e il QR da disegnare quando c'è.
+   */
+  pair = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const dto = dtoOf<PairDto>(req);
+      const step = await agentService.pair(ownerOf(req), req.params.id as string, dto.action, {
+        handler: dto.handler,
+        flowId: dto.flowId,
+        input: dto.input,
+      });
+      res.json(step);
     } catch (error) {
       next(error);
     }

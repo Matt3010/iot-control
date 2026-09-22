@@ -88,7 +88,7 @@ function serve(socket: WebSocket, agent: Agent): void {
         return;
 
       case 'ack':
-        hub.settle(message.reqId, message.ok, message.error);
+        hub.settle(message.reqId, message.ok, message.error, message.data);
         return;
 
       default:

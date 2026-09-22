@@ -9,7 +9,7 @@ import { categoryController } from '../controllers/CategoryController.js';
 import { groupController } from '../controllers/GroupController.js';
 import { placeController } from '../controllers/PlaceController.js';
 import { stateController } from '../controllers/StateController.js';
-import { AgentDto } from '../dto/agent.dto.js';
+import { AgentDto, PairDto } from '../dto/agent.dto.js';
 import { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { CommandDto } from '../dto/device.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
@@ -98,6 +98,12 @@ apiRouter
 
 /** Rigenera il token: quello di prima smette di funzionare all'istante. */
 apiRouter.post('/agents/:id/token', agentController.rotate);
+
+/**
+ * Collegare un account a quell'agente, una battuta per volta. Il QR non lo
+ * disegna il server: manda la stringa, e i pixel li fa chi ha buon gusto.
+ */
+apiRouter.post('/agents/:id/pair', validateBody(PairDto), agentController.pair);
 
 apiRouter.get('/devices', deviceController.list);
 apiRouter.post('/devices/:id/command', validateBody(CommandDto), deviceController.command);

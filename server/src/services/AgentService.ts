@@ -3,7 +3,8 @@ import path from 'node:path';
 import { config } from '../config.js';
 import type { AgentView } from '../dto/views.js';
 import { toAgentView } from '../dto/views.js';
-import { notFound } from '../errors/HttpError.js';
+import { badGateway, notFound } from '../errors/HttpError.js';
+import type { PairingStep } from '../../../shared/protocol.js';
 import { hub } from '../iot/hub.js';
 import { agentManager } from '../managers/AgentManager.js';
 import { deviceManager } from '../managers/DeviceManager.js';
@@ -73,6 +74,28 @@ export class AgentService {
 
   remove(ownerId: string, id: string): Promise<void> {
     return agentManager.remove(ownerId, id);
+  }
+
+  /**
+   * Collegare un account a quell'agente, una battuta per volta. Noi non
+   * sappiamo cosa sia Tuya: passiamo la domanda e riportiamo indietro il
+   * passo successivo, QR compreso.
+   */
+  async pair(
+    ownerId: string,
+    id: string,
+    action: 'start' | 'submit' | 'cancel',
+    options: { handler?: string; flowId?: string; input?: Record<string, string> },
+  ): Promise<PairingStep | null> {
+    // che sia tuo lo si controlla prima di bussare a casa sua
+    await agentManager.find(ownerId, id);
+
+    try {
+      const step = (await hub.pair(id, action, options)) as PairingStep | undefined;
+      return step ?? null;
+    } catch (error) {
+      throw badGateway((error as Error).message);
+    }
   }
 
   /**

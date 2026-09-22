@@ -5,6 +5,7 @@
   import { ui } from '../lib/ui.svelte';
   import AddRow from './AddRow.svelte';
   import AgentControls from './AgentControls.svelte';
+  import AgentPairing from './AgentPairing.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
 
@@ -151,6 +152,12 @@
 
       {#snippet foot()}
         {#if fresh?.id === agent.id}{@render command()}{/if}
+
+        <!-- collegare l'account sta qui e non in Home Assistant: è la cosa
+             che manca a un agente appena installato, e chiederla altrove
+             vorrebbe dire mandare via chi sta guardando -->
+        <AgentPairing {agent} />
+
         <div class="acts">
           <Button look="link" onclick={() => rotate(agent)}>Rigenera token</Button>
           <span class="sep" aria-hidden="true">·</span>

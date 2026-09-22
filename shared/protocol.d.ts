@@ -33,6 +33,28 @@ export interface DeviceSnapshot {
   state: Record<string, DeviceValue>;
 }
 
+/**
+ * Un passo dell'accoppiamento, come lo vede chi lo deve mostrare.
+ *
+ * Collegare un account — Tuya, e domani un altro — è una conversazione a più
+ * battute: chiedi un codice, ti danno un QR, lo scansioni, hai finito. Qui
+ * dentro non c'è niente di Tuya: c'è un passo con dei campi e, se serve, una
+ * stringa da disegnare come QR. Chi la disegna è l'interfaccia, e la disegna
+ * come vuole lei.
+ */
+export interface PairingStep {
+  /** La conversazione in corso: torna indietro al passo dopo. */
+  flowId: string;
+  /** `form` chiede qualcosa, `done` è finita bene, `failed` male. */
+  kind: 'form' | 'done' | 'failed';
+  /** Cosa chiedere, se c'è da chiedere. */
+  fields: { name: string; required: boolean }[];
+  /** La stringa da disegnare come QR. Non è un'immagine: i pixel li fai tu. */
+  qr?: string;
+  /** Cos'è andato storto in questo passo, detto da chi lo sa. */
+  error?: string;
+}
+
 /** Sale l'inventario intero: alla connessione, e ogni volta che cambia. */
 export interface HelloMessage {
   type: 'hello';
@@ -63,6 +85,8 @@ export interface AckMessage {
   reqId: string;
   ok: boolean;
   error?: string;
+  /** Quello che la domanda ha prodotto, quando non era un comando ma una domanda. */
+  data?: unknown;
 }
 
 export interface CommandMessage {
@@ -78,5 +102,20 @@ export interface ResyncMessage {
   type: 'resync';
 }
 
+/**
+ * Una battuta della conversazione per collegare un account. Scende con lo
+ * stesso meccanismo dei comandi — un `reqId`, e la risposta torna in un `ack`
+ * — perché è la stessa cosa: si chiede, si aspetta, e se non torna lo si dice.
+ */
+export interface PairMessage {
+  type: 'pair';
+  reqId: string;
+  action: 'start' | 'submit' | 'cancel';
+  /** Quale account si sta collegando: `tuya`, e domani altri. */
+  handler?: string;
+  flowId?: string;
+  input?: Record<string, string>;
+}
+
 export type AgentMessage = HelloMessage | DevicesMessage | StateMessage | AckMessage;
-export type BackendMessage = CommandMessage | ResyncMessage;
+export type BackendMessage = CommandMessage | ResyncMessage | PairMessage;
