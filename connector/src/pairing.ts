@@ -1,5 +1,6 @@
 import type { PairingStep } from '../../shared/protocol.js';
 import type { ConnectorConfig } from './config.js';
+import { EXTRAS, install, installed } from './extras.js';
 
 /**
  * Collegare un account a Home Assistant, pilotato da fuori.
@@ -79,13 +80,30 @@ function findQr(value: unknown, depth = 0): string | undefined {
   return undefined;
 }
 
+/**
+ * Un campo da non scrivere in chiaro. HA lo dice nel suo selettore, ma non
+ * tutte le integrazioni lo fanno — e una password mostrata a schermo mentre
+ * la digiti in un locale è una password letta da qualcun altro. Nel dubbio,
+ * si guarda anche il nome.
+ */
+function isSecret(entry: Record<string, unknown>): boolean {
+  if (/password|secret|token|api_?key/i.test(String(entry.name))) return true;
+  const selector = entry.selector as Record<string, Record<string, unknown>> | undefined;
+  return selector?.text?.type === 'password';
+}
+
 /** I campi da riempire: solo quelli che sono davvero caselle, non i selettori. */
 function fieldsOf(schema: unknown[] | undefined): PairingStep['fields'] {
   if (!Array.isArray(schema)) return [];
   return schema
     .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
-    .filter((entry) => entry.type === 'string' || entry.type === 'integer')
-    .map((entry) => ({ name: String(entry.name), required: entry.required === true }));
+    .filter((entry) => entry.type === 'string' || entry.type === 'integer' || entry.selector)
+    .filter((entry) => !!entry.name)
+    .map((entry) => ({
+      name: String(entry.name),
+      required: entry.required === true,
+      ...(isSecret(entry) ? { secret: true } : {}),
+    }));
 }
 
 /** Il primo errore che HA segnala, detto in modo leggibile. */
@@ -129,7 +147,28 @@ function translate(flow: HaFlow): PairingStep {
   return step;
 }
 
+/** Quali account Home Assistant sa collegare, adesso. */
+async function handlers(config: ConnectorConfig): Promise<string[]> {
+  const response = await fetch(`${config.haUrl}/api/config/config_entries/flow_handlers`, {
+    headers: { authorization: `Bearer ${config.haToken}` },
+  });
+  return response.ok ? ((await response.json()) as string[]) : [];
+}
+
 export async function startPairing(config: ConnectorConfig, handler: string): Promise<PairingStep> {
+  // Certe integrazioni HA non ce l'ha di serie: si installano al volo, la
+  // prima volta che qualcuno le chiede, e non prima.
+  const extra = EXTRAS[handler];
+  if (extra && !(await handlers(config)).includes(handler)) {
+    if (!(await installed(config, extra))) await install(config, extra);
+    return {
+      flowId: '',
+      kind: 'busy',
+      fields: [],
+      note: `Sto aggiungendo il supporto ${extra.label} a Home Assistant, che si sta riavviando. Ci vuole un minuto.`,
+    };
+  }
+
   return translate(
     await ask(config, FLOWS, {
       method: 'POST',

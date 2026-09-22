@@ -26,6 +26,11 @@ export interface ConnectorConfig {
   haPassword: string;
   /** Dove finisce la credenziale lunga, una volta scambiato il token d'ingresso. */
   stateDir: string;
+  /**
+   * La configurazione di Home Assistant, vista da qui. Serve per aggiungergli
+   * le integrazioni che non ha di serie — eWeLink, per dirne una.
+   */
+  haConfigDir: string;
 }
 
 const DEFAULT_CONFIG_FILE = '/etc/place-index/connector.json';
@@ -56,6 +61,7 @@ export function loadConfig(): ConnectorConfig {
     haUser: process.env.HA_USER ?? onDisk.haUser ?? 'place-index',
     haPassword: process.env.HA_PASSWORD ?? onDisk.haPassword ?? '',
     stateDir: process.env.STATE_DIR ?? onDisk.stateDir ?? DEFAULT_STATE_DIR,
+    haConfigDir: process.env.HA_CONFIG_DIR ?? onDisk.haConfigDir ?? '/ha-config',
   };
 
   const manca = (what: string, env: string): never => {

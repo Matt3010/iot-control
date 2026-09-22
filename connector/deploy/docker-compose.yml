@@ -29,6 +29,9 @@ services:
       # token che si è guadagnato, e gira come utente `node` — una cartella
       # creata da Docker sarebbe di root, e non potrebbe scriverci
       - connector-data:/data
+      # la configurazione di Home Assistant: serve per aggiungergli le
+      # integrazioni che non ha di serie, come eWeLink
+      - ./homeassistant:/ha-config
     depends_on:
       - homeassistant
     labels:

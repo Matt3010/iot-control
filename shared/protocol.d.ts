@@ -45,10 +45,15 @@ export interface DeviceSnapshot {
 export interface PairingStep {
   /** La conversazione in corso: torna indietro al passo dopo. */
   flowId: string;
-  /** `form` chiede qualcosa, `done` è finita bene, `failed` male. */
-  kind: 'form' | 'done' | 'failed';
-  /** Cosa chiedere, se c'è da chiedere. */
-  fields: { name: string; required: boolean }[];
+  /**
+   * `form` chiede qualcosa, `done` è finita bene, `failed` male, `busy` vuol
+   * dire che c'è qualcosa in corso e fra poco si potrà riprovare.
+   */
+  kind: 'form' | 'done' | 'failed' | 'busy';
+  /** Cosa chiedere, se c'è da chiedere. `secret` non si scrive in chiaro. */
+  fields: { name: string; required: boolean; secret?: boolean }[];
+  /** Cosa sta succedendo, quando non è un errore ma nemmeno una domanda. */
+  note?: string;
   /** La stringa da disegnare come QR. Non è un'immagine: i pixel li fai tu. */
   qr?: string;
   /** Cos'è andato storto in questo passo, detto da chi lo sa. */
