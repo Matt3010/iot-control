@@ -23,6 +23,8 @@ const placePayload = (mapId: string, draft: Required<Pick<Draft, 'lat' | 'lng'>>
   lat: draft.lat,
   lng: draft.lng,
   private: draft.private ?? false,
+  access: draft.access ?? 'view',
+  editors: draft.editors ?? [],
   agentIds: draft.agentIds ?? [],
 });
 

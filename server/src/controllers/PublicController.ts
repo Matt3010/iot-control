@@ -1,9 +1,24 @@
 import type { NextFunction, Request, Response } from 'express';
+import type { PublicPlaceDto } from '../dto/place.dto.js';
+import { dtoOf } from '../middleware/validateBody.js';
+import type { User } from '../types.js';
 import { markToday, seenToday, take, viewerId } from '../public/visits.js';
 import { publicService } from '../services/PublicService.js';
 
 /** L'unica parte dell'API che risponde a chi non è entrato. */
+/** Chi sta guardando, se è entrato. Su una pagina pubblica può non esserci. */
+const whoOf = (req: Request): string | undefined => (req.user as User | undefined)?.email;
+
 export class PublicController {
+  /** Correggere un luogo dal link pubblico, quando quel luogo lo permette. */
+  edit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      res.json(await publicService.edit(req.params.id as string, dtoOf<PublicPlaceDto>(req), whoOf(req)));
+    } catch (error) {
+      next(error);
+    }
+  };
+
   map = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const handle = req.params.handle as string | undefined;
@@ -19,13 +34,18 @@ export class PublicController {
       if (opened && firstAfterProfile) markToday(req, `seguito:${handle}`);
 
       res.json(
-        await publicService.map(handle, slug, {
-          opened,
-          newToday,
-          viewer: viewerId(req),
-          fromProfile,
-          firstAfterProfile: opened && firstAfterProfile,
-        }),
+        await publicService.map(
+          handle,
+          slug,
+          {
+            opened,
+            newToday,
+            viewer: viewerId(req),
+            fromProfile,
+            firstAfterProfile: opened && firstAfterProfile,
+          },
+          whoOf(req),
+        ),
       );
     } catch (error) {
       next(error);

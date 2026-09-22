@@ -3,6 +3,8 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsEmail,
+  IsIn,
   IsLatitude,
   IsLongitude,
   IsNotEmpty,
@@ -64,6 +66,46 @@ export class CreatePlaceDto {
   @IsString({ each: true })
   @MaxLength(80, { each: true })
   agentIds?: string[];
+
+  /** Cosa può fare chi arriva dal link pubblico. */
+  @IsOptional()
+  @IsIn(['view', 'edit'], { message: 'accesso sconosciuto' })
+  access?: 'view' | 'edit';
+
+  /**
+   * Chi può correggerlo. Vuoto: chiunque abbia il link. Con delle email:
+   * solo loro, e solo da entrate.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(24)
+  @Transform(({ value }: { value: unknown }) =>
+    Array.isArray(value) ? value.map((one) => String(one).trim().toLowerCase()) : value,
+  )
+  @IsEmail({}, { each: true, message: 'serve un indirizzo email valido' })
+  editors?: string[];
+
+}
+
+/**
+ * Quello che può cambiare chi arriva dal link pubblico. Due campi, e non è
+ * una restrizione arbitraria: chi ha il link non ha detto chi è, quindi può
+ * correggere una parola e non può spostare un pin, cambiargli categoria o
+ * portarselo su un'altra mappa.
+ */
+export class PublicPlaceDto {
+  @IsOptional()
+  @trim()
+  @IsString()
+  @IsNotEmpty({ message: 'il nome non può essere vuoto' })
+  @MaxLength(80)
+  name?: string;
+
+  @IsOptional()
+  @trim()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
 }
 
 export class UpdatePlaceDto {
@@ -114,4 +156,23 @@ export class UpdatePlaceDto {
   @IsString({ each: true })
   @MaxLength(80, { each: true })
   agentIds?: string[];
+
+  /** Cosa può fare chi arriva dal link pubblico. */
+  @IsOptional()
+  @IsIn(['view', 'edit'], { message: 'accesso sconosciuto' })
+  access?: 'view' | 'edit';
+
+  /**
+   * Chi può correggerlo. Vuoto: chiunque abbia il link. Con delle email:
+   * solo loro, e solo da entrate.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(24)
+  @Transform(({ value }: { value: unknown }) =>
+    Array.isArray(value) ? value.map((one) => String(one).trim().toLowerCase()) : value,
+  )
+  @IsEmail({}, { each: true, message: 'serve un indirizzo email valido' })
+  editors?: string[];
+
 }

@@ -8,7 +8,10 @@ export type Route =
 
 /** Nessun router: le mappe stanno sotto chi le ha fatte, il resto è l'app. */
 export function readRoute(path = window.location.pathname): Route {
-  const owned = /^\/u\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/i.exec(path);
+  // quello che segue lo slug si ignora: un link con un pezzo di troppo in fondo
+  // — un vecchio indirizzo, una condivisione tagliata male — porta comunque
+  // alla mappa, e la pagina si rimette l'indirizzo giusto
+  const owned = /^\/u\/([a-z0-9-]+)\/([a-z0-9-]+)(?:\/.*)?$/i.exec(path);
   if (owned) return { kind: 'map', handle: owned[1]!.toLowerCase(), slug: owned[2]!.toLowerCase() };
 
   const profile = /^\/u\/([a-z0-9-]+)\/?$/i.exec(path);
@@ -17,12 +20,12 @@ export function readRoute(path = window.location.pathname): Route {
   const legacy = /^\/m\/([a-z0-9-]+)\/?$/i.exec(path);
   if (legacy) return { kind: 'map', slug: legacy[1]!.toLowerCase() };
 
-  if (/^\/agenti\/?$/i.test(path)) return { kind: 'agents' };
+  if (/^\/agents\/?$/i.test(path)) return { kind: 'agents' };
 
   return { kind: 'app' };
 }
 
-export const AGENTS_PATH = '/agenti';
+export const AGENTS_PATH = '/agents';
 
 export const mapPath = (handle: string, slug: string): string => `/u/${handle}/${slug}`;
 

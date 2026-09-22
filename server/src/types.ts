@@ -67,6 +67,20 @@ export interface Place {
   /** Un posto privato resta fuori da quello che si pubblica. */
   private: boolean;
   /**
+   * Cosa può fare chi arriva dal link pubblico. `view` guarda e basta — ed è
+   * quello che succede se non c'è scritto niente. `edit` può anche correggere
+   * il nome e le note: serve a una lista che si tiene in due, e vuol dire
+   * chiunque abbia quell'indirizzo, perché un link non chiede chi sei.
+   */
+  access?: 'view' | 'edit';
+  /**
+   * Chi può correggerlo, quando `access` è `edit`. Vuoto vuol dire chiunque
+   * abbia il link — che è comodo e va detto chiaro. Con delle email dentro,
+   * solo quelle persone, e devono essere **entrate**: un link non dice chi
+   * sei, un accesso sì.
+   */
+  editors?: string[];
+  /**
    * Gli agenti appesi a questo luogo. Più d'uno quando le reti sono separate —
    * la sala e la cucina, due edifici — e ognuno porta i suoi dispositivi. Un
    * indirizzo resta un pin solo, anche con quindici interruttori sotto.

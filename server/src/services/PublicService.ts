@@ -1,5 +1,7 @@
 import type { CategoryView, GroupView, PublicMapView, PublicPlaceView } from '../dto/views.js';
 import { toCategoryView, toGroupView, toPublicMapView, toPublicPlaceView } from '../dto/views.js';
+import { toPlaceView } from '../dto/views.js';
+import { hub } from '../iot/hub.js';
 import type { Visit } from '../managers/PublicManager.js';
 import { publicManager } from '../managers/PublicManager.js';
 
@@ -17,14 +19,25 @@ export interface PublicProfileView {
 }
 
 export class PublicService {
-  async map(handle: string | undefined, slug: string, visit?: Visit): Promise<PublicMapPage> {
+  /**
+   * Una correzione arrivata da fuori. Chi la mappa ce l'ha la vede comparire
+   * mentre guarda, senza ricaricare: è la stessa strada delle modifiche sue.
+   */
+  async edit(id: string, patch: { name?: string; note?: string }, who?: string): Promise<PublicPlaceView> {
+    const { place, ownerId } = await publicManager.edit(id, patch, who);
+    const view = toPlaceView(place);
+    hub.changed(ownerId, { kind: 'place', id: view.id, value: view });
+    return toPublicPlaceView(place, who);
+  }
+
+  async map(handle: string | undefined, slug: string, visit?: Visit, who?: string): Promise<PublicMapPage> {
     const found = await publicManager.map(handle, slug, visit);
     return {
       handle: found.handle,
       map: toPublicMapView(found.map),
       categories: found.categories.map(toCategoryView),
       groups: found.groups.map(toGroupView),
-      places: found.places.map(toPublicPlaceView),
+      places: found.places.map((place) => toPublicPlaceView(place, who)),
     };
   }
 

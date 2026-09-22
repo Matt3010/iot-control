@@ -186,7 +186,12 @@
 {/snippet}
 
 <div class="field">
-  <span class="eyebrow">{mine.length > 1 ? 'Agenti' : 'Agente'}</span>
+  <!-- il titolo del campo e la via d'uscita verso la pagina intera: la
+       seconda non è una nota in fondo, è dove si va quando qui è stretto -->
+  <span class="head">
+    <span class="eyebrow">{mine.length > 1 ? 'Agenti' : 'Agente'}</span>
+    <a class="all" href={AGENTS_PATH}>Gestisci tutti gli agenti</a>
+  </span>
 
   <!-- quelli che stanno qui: uno sotto l'altro, ognuno con i suoi comandi -->
   {#each mine as agent (agent.id)}
@@ -273,8 +278,6 @@
     </div>
   {/if}
 
-  <a class="all" href={AGENTS_PATH}>Gestisci tutti gli agenti</a>
-
   {#if !mine.length}
     <p class="hint">
       Un agente è il servizio che installi su una macchina in quel posto: trova i dispositivi
@@ -286,6 +289,8 @@
 
 <style>
   .field { display: grid; gap: 8px; min-width: 0; }
+
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -355,8 +360,8 @@
   /* installare, collegare un account, rigenerare un token: cose che si fanno
      una volta e vogliono spazio. Non in una colonna da trecento pixel. */
   .all {
-    justify-self: start;
-    font-size: 11.5px;
+    flex: none;
+    font-size: 11px;
     color: var(--ink-3);
     text-decoration: underline;
     text-underline-offset: 3px;

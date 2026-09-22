@@ -48,6 +48,9 @@ function migratePlace(place: Place & { groupId?: string; agentId?: string }): Pl
   const { groupId, agentId, ...rest } = place;
   return {
     ...rest,
+    // chi è nato prima che si potesse scrivere da fuori: si guarda e basta
+    access: place.access === 'edit' ? 'edit' : 'view',
+    editors: Array.isArray(place.editors) ? place.editors : [],
     groupIds: Array.isArray(place.groupIds) ? place.groupIds : groupId ? [groupId] : [],
     agentIds: Array.isArray(place.agentIds) ? place.agentIds : agentId ? [agentId] : [],
   };

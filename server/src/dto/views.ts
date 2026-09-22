@@ -42,17 +42,25 @@ export interface PlaceView {
   lng: number;
   note: string;
   private: boolean;
+  /** Cosa può fare chi arriva dal link pubblico: guardare, o anche correggere. */
+  access: 'view' | 'edit';
+  /** Chi può correggerlo: vuoto vuol dire chiunque abbia il link. */
+  editors: string[];
   /** Gli agenti appesi a questo luogo: nessuno, uno, o più se le reti sono separate. */
   agentIds: string[];
   createdAt: string;
 }
 
 /**
- * Quello che di un posto può vedere un estraneo. Il legame con l'agente non
- * esce mai: da fuori una mappa si guarda, e le luci di casa d'altri non si
- * toccano nemmeno per sbaglio.
+ * Quello che di un posto può vedere un estraneo.
+ *
+ * Il legame con l'agente non esce mai: da fuori una mappa si guarda, e le
+ * luci di casa d'altri non si toccano nemmeno per sbaglio. E nemmeno esce
+ * l'elenco di chi può correggerlo — sono indirizzi di altre persone, e chi
+ * guarda una mappa non ha motivo di conoscerli. Esce solo la risposta alla
+ * domanda che gli serve: *io*, posso?
  */
-export type PublicPlaceView = Omit<PlaceView, 'agentIds'>;
+export type PublicPlaceView = Omit<PlaceView, 'agentIds' | 'editors'> & { canEdit: boolean };
 
 export interface AgentView {
   id: string;
@@ -114,13 +122,17 @@ export const toPlaceView = (place: Place): PlaceView => ({
   lng: place.lng,
   note: place.note ?? '',
   private: place.private ?? false,
+  access: place.access === 'edit' ? 'edit' : 'view',
+  editors: place.editors ?? [],
   agentIds: place.agentIds ?? [],
   createdAt: place.createdAt,
 });
 
-export const toPublicPlaceView = (place: Place): PublicPlaceView => {
-  const { agentIds: _agenti, ...outside } = toPlaceView(place);
-  return outside;
+/** `who` è l'email di chi sta guardando, se è entrato. */
+export const toPublicPlaceView = (place: Place, who?: string): PublicPlaceView => {
+  const { agentIds: _agenti, editors, ...outside } = toPlaceView(place);
+  const allowed = editors.length === 0 || (!!who && editors.includes(who));
+  return { ...outside, canEdit: outside.access === 'edit' && allowed };
 };
 
 export const toAgentView = (agent: Agent, online: boolean, devices: number): AgentView => ({

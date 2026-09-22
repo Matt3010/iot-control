@@ -25,9 +25,13 @@
   /** /m/<slug> e /u/<handle> sono pubblici: non chiedono nulla a nessuno. */
   const route = readRoute();
 
+  /** Le pagine che sono l'app: vogliono sapere chi sei prima di disegnare. */
+  const mine = route.kind === 'app' || route.kind === 'agents';
+
   // Prima si vede chi c'è: l'indice si carica solo per chi è entrato, e si
-  // ricarica se rientra con un altro account.
-  if (route.kind === 'app') auth.load();
+  // ricarica se rientra con un altro account. Senza questo la pagina degli
+  // agenti restava bianca: nessuno aveva chiesto chi fosse.
+  if (mine) auth.load();
 
   $effect(() => {
     if (!auth.account) return;

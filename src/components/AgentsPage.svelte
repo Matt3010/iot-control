@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { devices, type Agent, type Os } from '../lib/devices.svelte';
+  import { devices, type Agent } from '../lib/devices.svelte';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui } from '../lib/ui.svelte';

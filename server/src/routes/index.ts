@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireUser } from '../auth/strategy.js';
+import { maybeUser, requireUser } from '../auth/strategy.js';
 import { agentController } from '../controllers/AgentController.js';
 import { authController } from '../controllers/AuthController.js';
 import { deviceController } from '../controllers/DeviceController.js';
@@ -15,7 +15,7 @@ import { CommandDto } from '../dto/device.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/group.dto.js';
 import { MapDto } from '../dto/map.dto.js';
-import { CreatePlaceDto, UpdatePlaceDto } from '../dto/place.dto.js';
+import { CreatePlaceDto, PublicPlaceDto, UpdatePlaceDto } from '../dto/place.dto.js';
 import { validateBody } from '../middleware/validateBody.js';
 
 export const apiRouter = Router();
@@ -27,10 +27,21 @@ apiRouter.post('/auth/login', validateBody(CredentialsDto), authController.login
 apiRouter.post('/auth/logout', authController.logout);
 
 // quello che si può guardare senza entrare: solo mappe pubblicate
+// Su queste si prova a capire chi sta guardando, senza pretenderlo: serve a
+// dire a chi è entrato quali luoghi può correggere, e agli altri niente.
+apiRouter.use('/public', maybeUser);
+
 apiRouter.get('/public/u/:handle', publicController.profile);
 apiRouter.get('/public/u/:handle/:slug', publicController.map);
 // l'indirizzo di prima, senza handle: vive per non rompere i link già in giro
 apiRouter.get('/public/m/:slug', publicController.map);
+
+/**
+ * Correggere un luogo senza essere entrati. Passa solo se quel luogo dice di
+ * sì: mappa pubblicata, luogo non privato, e accesso «edit». E arrivano solo
+ * due campi — il nome e le note.
+ */
+apiRouter.put('/public/places/:id', validateBody(PublicPlaceDto), publicController.edit);
 
 // quello che scarica una macchina appena accesa: non è entrata da
 // nessuna parte, e l'unica prova che porta è il token nell'indirizzo — lo
