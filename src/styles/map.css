@@ -331,6 +331,10 @@
 
 .leaflet-control-attribution a { color: var(--ink-2) !important; }
 
+/* il fumetto di un luogo sta sopra a quello che galleggia sulla mappa: e'
+   quello che stai leggendo */
+.leaflet-popup-pane { z-index: var(--z-pop); }
+
 .leaflet-popup-content-wrapper {
   padding: 0;
   border-radius: var(--r-lg) !important;

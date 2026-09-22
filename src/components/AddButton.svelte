@@ -24,7 +24,7 @@
   position: absolute;
   right: 18px;
   bottom: calc(22px + env(safe-area-inset-bottom));
-  z-index: var(--z-panel);
+  z-index: var(--z-hud);
   display: inline-flex;
   align-items: center;
   gap: 9px;

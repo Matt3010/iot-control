@@ -34,7 +34,17 @@
   --shadow-2: 0 2px 6px rgb(10 13 18 / 0.06), 0 14px 32px -10px rgb(10 13 18 / 0.22);
   --shadow-3: 0 4px 10px rgb(10 13 18 / 0.08), 0 28px 60px -16px rgb(10 13 18 / 0.34);
 
-  /* stacking: Leaflet's control corners sit at 1000, the overlay goes above */
+  /*
+   * stacking: Leaflet's control corners sit at 1000, the overlay goes above.
+   *
+   * Fra i comandi della mappa e i pannelli ci stanno due cose che galleggiano
+   * sopra la mappa: quello che si preme sempre — il tasto per aggiungere — e
+   * quello che si apre su un pin. Il secondo sta sopra il primo: un fumetto
+   * aperto e' quello che stai leggendo adesso, e un tasto che ci passa davanti
+   * ne taglia via l'ultima riga.
+   */
+  --z-hud: 1060;
+  --z-pop: 1080;
   --z-panel: 1100;
   --z-hint: 1200;
   --z-sheet: 1300;
