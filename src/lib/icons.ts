@@ -4,6 +4,7 @@ import {
   AtSign,
   Check,
   Eye,
+  KeyRound,
   Layers,
   EyeOff,
   LogOut,
@@ -50,6 +51,7 @@ export const ICONS = {
   locate: LocateFixed,
   eyeOff: EyeOff,
   check: Check,
+  key: KeyRound,
 } as const;
 
 export type IconName = keyof typeof ICONS;

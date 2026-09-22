@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { resolveActing } from '../auth/acting.js';
 import { maybeUser, requireUser } from '../auth/strategy.js';
 import { agentController } from '../controllers/AgentController.js';
 import { authController } from '../controllers/AuthController.js';
@@ -10,7 +11,7 @@ import { groupController } from '../controllers/GroupController.js';
 import { placeController } from '../controllers/PlaceController.js';
 import { stateController } from '../controllers/StateController.js';
 import { AgentDto, PairDto } from '../dto/agent.dto.js';
-import { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
+import { ActDto, CollaboratorsDto, CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { CommandDto } from '../dto/device.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/group.dto.js';
@@ -51,8 +52,23 @@ apiRouter.get('/agents/:id/compose.yml', agentController.compose);
 
 // --- da qui in poi serve essere entrati ------------------------------------
 apiRouter.use(requireUser);
+/**
+ * E si può essere entrati in casa d'altri: da qui in giù `ownerOf` dice di chi
+ * è l'indice su cui si sta lavorando, e nessun altro se ne accorge.
+ */
+apiRouter.use(resolveActing);
 
 apiRouter.get('/auth/me', authController.me);
+
+/**
+ * Le chiavi del mio indice. Vale sempre il mio, anche mentre sto dentro quello
+ * di un altro: le chiavi di casa d'altri non si danno.
+ */
+apiRouter.put('/auth/collaborators', validateBody(CollaboratorsDto), authController.share);
+
+/** Entrare nell'indice di qualcuno, e tornare a casa. */
+apiRouter.post('/auth/act', validateBody(ActDto), authController.enter);
+apiRouter.delete('/auth/act', authController.leave);
 apiRouter.get('/state', stateController.snapshot);
 /**
  * Il filo aperto: da qui scende tutto quello che cambia mentre guardi — gli

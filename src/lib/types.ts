@@ -40,12 +40,6 @@ export interface Place {
   private: boolean;
   /** Cosa può fare chi arriva dal link pubblico: guardare, o anche correggere. */
   access: 'view' | 'edit';
-  /**
-   * Chi può correggerlo, quando si può correggere. Vuoto vuol dire chiunque
-   * abbia il link; con degli indirizzi dentro, solo quelle persone, e devono
-   * essere entrate.
-   */
-  editors: string[];
   /** Gli agenti appesi a questo luogo: più d'uno quando le reti sono separate. */
   agentIds: string[];
   createdAt: string;
@@ -75,8 +69,6 @@ export interface Draft {
   mapId?: string;
   private?: boolean;
   access?: 'view' | 'edit';
-  /** Vuoto: chiunque abbia il link. Con degli indirizzi: solo quelli. */
-  editors?: string[];
   /** Un elenco vuoto li stacca tutti: il luogo resta, i fili si tagliano. */
   agentIds?: string[];
   name?: string;

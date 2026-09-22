@@ -57,8 +57,16 @@ Niente categorie preimpostate, niente fronzoli.
 - **Niente finestre di conferma**: quel che elimini sparisce subito, con sei secondi di
   "Annulla" nel toast. Solo allo scadere la cancellazione parte davvero.
 - **Si entra con email, password e nome utente** (quello del link pubblico: si propone da sé
-  dall'email), e un accesso se lo crea chiunque. I dati stanno sul server
-  in un unico `places.json`: chi entra vede lo stesso indice — l'accesso protegge, non divide.
+  dall'email), e un accesso se lo crea chiunque. Ognuno ha il suo indice: le sue mappe, le sue
+  categorie, i suoi agenti. I dati stanno tutti in un `places.json` sul server.
+- **Un indice si può tenere in due.** Nelle chiavi (`User.collaborators`) metti degli indirizzi
+  email: chi è in quell'elenco entra nel tuo indice e ci lavora *come te* — aggiunge luoghi,
+  cambia categorie, installa agenti, accende le luci. Servono degli indirizzi e non un link,
+  perché un link non dice chi sei. Mentre ci si trova dentro, una fascia in alto dice sempre di
+  chi è l'indice che si sta toccando.
+- **Correggere senza entrare** è un'altra cosa, più piccola: un luogo pubblico può dire che chi
+  ha il link ne corregge il nome e le note. Due campi, nient'altro — chi arriva da un link non
+  ha detto chi è.
 
 ## Il front-end
 
@@ -91,9 +99,13 @@ Passport con strategia JWT, e il token in un cookie `httpOnly`: nessuno script d
 può leggerlo, e il browser lo riporta da solo. La password non si conserva — si conserva una
 derivata `scrypt` col suo sale, e il confronto è a tempo costante.
 
-- **Le iscrizioni sono aperte**: chiunque si crea un accesso. L'indice però è uno solo, quindi
-  chi entra vede e modifica le stesse cose: se lo pubblichi su internet e vuoi restare in pochi,
-  chiudile con `ALLOW_SIGNUP=false` dopo esserti registrato.
+- **Le iscrizioni sono aperte**: chiunque si crea un accesso, e ognuno vede solo il proprio
+  indice. Se lo pubblichi su internet e vuoi restare in pochi, chiudile con
+  `ALLOW_SIGNUP=false` dopo esserti registrato.
+- **Le chiavi si controllano a ogni richiesta**, non quando si entra: il cookie dice soltanto
+  dentro quale indice sei, e se il permesso è stato tolto un minuto fa la richiesta dopo sei di
+  nuovo a casa tua. Tutto il resto del server non sa nemmeno che la cosa esista — la differenza
+  vive in una riga, `ownerOf`.
 - **Email sconosciuta e password sbagliata danno lo stesso errore**: chi prova non deve capire
   quale dei due ha indovinato.
 - **Tutto `/api` è protetto** tranne le quattro rotte d'ingresso, e un rifiuto arriva come

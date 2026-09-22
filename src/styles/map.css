@@ -344,14 +344,6 @@
 
 .leaflet-popup-content { margin: 0; padding: 14px 16px 12px; width: 232px !important; }
 
-/* Un popup con degli agenti dentro non è un popup di testo: ci stanno
-   interruttori e cursori, e a 232px si rimpicciolirebbe tutto per far
-   stare la larghezza. Meglio allargare la card. Il `min` è per il telefono,
-   dove lo schermo comanda lui. */
-.leaflet-popup.with-agents .leaflet-popup-content {
-  width: min(304px, calc(100vw - 52px)) !important;
-}
-
 .leaflet-popup-tip {
   background: var(--glass-strong);
   border: 1px solid var(--hairline);
@@ -401,12 +393,11 @@
   white-space: pre-wrap;
 }
 
-/* i controlli veri dentro al popup: la scheda e il popup mostrano lo stesso
-   pezzo, quindi non possono raccontare due cose diverse */
-.pop-live { margin-top: 10px; }
-
 .pop-actions {
   display: flex;
+  /* tre comandi a 232px non ci stanno in fila: l'ultimo va a capo invece di
+     uscire dal foglietto */
+  flex-wrap: wrap;
   gap: 4px;
   margin: 12px -6px -4px;
   padding-top: 10px;

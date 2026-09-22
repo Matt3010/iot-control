@@ -3,7 +3,6 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
-  IsEmail,
   IsIn,
   IsLatitude,
   IsLongitude,
@@ -71,19 +70,6 @@ export class CreatePlaceDto {
   @IsOptional()
   @IsIn(['view', 'edit'], { message: 'accesso sconosciuto' })
   access?: 'view' | 'edit';
-
-  /**
-   * Chi può correggerlo. Vuoto: chiunque abbia il link. Con delle email:
-   * solo loro, e solo da entrate.
-   */
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(24)
-  @Transform(({ value }: { value: unknown }) =>
-    Array.isArray(value) ? value.map((one) => String(one).trim().toLowerCase()) : value,
-  )
-  @IsEmail({}, { each: true, message: 'serve un indirizzo email valido' })
-  editors?: string[];
 
 }
 
@@ -161,18 +147,5 @@ export class UpdatePlaceDto {
   @IsOptional()
   @IsIn(['view', 'edit'], { message: 'accesso sconosciuto' })
   access?: 'view' | 'edit';
-
-  /**
-   * Chi può correggerlo. Vuoto: chiunque abbia il link. Con delle email:
-   * solo loro, e solo da entrate.
-   */
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(24)
-  @Transform(({ value }: { value: unknown }) =>
-    Array.isArray(value) ? value.map((one) => String(one).trim().toLowerCase()) : value,
-  )
-  @IsEmail({}, { each: true, message: 'serve un indirizzo email valido' })
-  editors?: string[];
 
 }

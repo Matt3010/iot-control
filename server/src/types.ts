@@ -9,6 +9,15 @@ export interface User {
   /** scrypt: sale e derivata, mai la password. */
   salt: string;
   hash: string;
+  /**
+   * Chi può modificare il tuo indice come te: email, minuscole.
+   *
+   * Non è «può correggere due campi»: è la tua stessa vista, con i tuoi
+   * luoghi, le tue categorie, i tuoi agenti. Per questo servono degli
+   * indirizzi e non un link — un link non dice chi sei, e queste sono le
+   * chiavi di casa.
+   */
+  collaborators?: string[];
   /** Quante volte è stato aperto /u/<handle>. Le tue visite non contano. */
   profileViews: number;
   /** Quante persone diverse: impronte distinte, contate una volta al giorno. */
@@ -71,15 +80,12 @@ export interface Place {
    * quello che succede se non c'è scritto niente. `edit` può anche correggere
    * il nome e le note: serve a una lista che si tiene in due, e vuol dire
    * chiunque abbia quell'indirizzo, perché un link non chiede chi sei.
+   *
+   * Tenere un indice **insieme** a qualcuno è un'altra cosa e sta altrove:
+   * `User.collaborators`. Lì si dà la propria vista intera, e per darla a
+   * qualcuno bisogna sapere chi è.
    */
   access?: 'view' | 'edit';
-  /**
-   * Chi può correggerlo, quando `access` è `edit`. Vuoto vuol dire chiunque
-   * abbia il link — che è comodo e va detto chiaro. Con delle email dentro,
-   * solo quelle persone, e devono essere **entrate**: un link non dice chi
-   * sei, un accesso sì.
-   */
-  editors?: string[];
   /**
    * Gli agenti appesi a questo luogo. Più d'uno quando le reti sono separate —
    * la sala e la cucina, due edifici — e ognuno porta i suoi dispositivi. Un

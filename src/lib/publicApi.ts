@@ -5,7 +5,7 @@ import type { Category, Group, Place, PlaceMap } from './types';
  * l'elenco di chi può correggerlo — sono indirizzi di altre persone. Esce solo
  * la risposta alla domanda che serve a chi guarda: *io*, posso?
  */
-export interface PublicPlace extends Omit<Place, 'agentIds' | 'editors'> {
+export interface PublicPlace extends Omit<Place, 'agentIds'> {
   canEdit: boolean;
 }
 
@@ -15,6 +15,11 @@ export interface PublicMapPayload {
   categories: Category[];
   groups: Group[];
   places: PublicPlace[];
+  /**
+   * Chi guarda ha le chiavi di questo indice: non «può correggere una riga»,
+   * ma può entrarci e lavorarci come chi ce l'ha.
+   */
+  canManage: boolean;
 }
 
 export interface PublicProfilePayload {

@@ -15,6 +15,7 @@
   import Row from './Row.svelte';
   import Switch from './Switch.svelte';
   import Tabs from './Tabs.svelte';
+  import ShareField from './ShareField.svelte';
   import Button from './Button.svelte';
 
   /** Una volta sola, perché le domande parlino tutte la stessa lingua. */
@@ -61,6 +62,16 @@
     if (map.viewsFromProfile) parts.push(`${map.viewsFromProfile} dal profilo`);
     return parts.join(' · ');
   };
+
+  /**
+   * Di chi è l'indirizzo pubblico di quello che si sta guardando. Dentro
+   * l'indice di un altro le mappe sono sue, quindi i link sono suoi: mettere
+   * il proprio handle davanti alle mappe di qualcun altro darebbe indirizzi
+   * che non esistono.
+   */
+  const handle = $derived(auth.account?.actingAs?.handle ?? auth.account?.handle ?? '');
+  /** I conti delle visite sono di chi possiede: in casa d'altri non li abbiamo. */
+  const atHome = $derived(!auth.account?.actingAs);
 
   const visitsOfProfile = () => {
     const me = auth.account;
@@ -132,6 +143,23 @@
       const created = await store.createMap(name);
       newMapName = '';
       toast.show(`"${created.name}" è la mappa selezionata`);
+    } catch (error) {
+      toast.show((error as Error).message);
+    }
+  }
+
+  /** Le chiavi del mio indice: si salvano subito, come tutto il resto qui. */
+  async function share(emails: string[]) {
+    try {
+      await auth.share(emails);
+    } catch (error) {
+      toast.show((error as Error).message);
+    }
+  }
+
+  async function goInto(handle: string) {
+    try {
+      await auth.goInto(handle);
     } catch (error) {
       toast.show((error as Error).message);
     }
@@ -280,7 +308,7 @@
         {#each store.maps as map (map.id)}
           {@const open = map.id === store.activeMap?.id}
           {@const places = store.places.filter((place) => place.mapId === map.id).length}
-          {@const url = mapUrl(auth.account?.handle ?? '', map.slug)}
+          {@const url = mapUrl(handle, map.slug)}
           <li>
             <Row active={open} class={map.published ? 'is-public' : ''}>
               {#snippet lead()}
@@ -355,7 +383,7 @@
 
               {#if map.published}
                 <LinkRow
-                  prefix={'/u/' + (auth.account?.handle ?? '') + '/'}
+                  prefix={'/u/' + handle + '/'}
                   value={map.slug}
                   {url}
                   onchange={(slug) => store.patchMap(map, { slug })}
@@ -382,11 +410,57 @@
           <p>Raccoglie tutte le mappe che hai pubblicato. È l'indirizzo da mettere in bio.</p>
           <LinkRow
             prefix="/u/"
-            value={auth.account?.handle ?? ''}
-            url={profileUrl(auth.account?.handle ?? '')}
+            value={handle}
+            url={profileUrl(handle)}
             title="Copia link"
           />
-          <p class="visits" title={COUNT_NOTE}>{visitsOfProfile()}</p>
+          {#if atHome}
+            <p class="visits" title={COUNT_NOTE}>{visitsOfProfile()}</p>
+          {/if}
+        </div>
+      {/if}
+
+      <!-- Tenere l'indice in due. Sta qui e non nella scheda di un luogo
+           perché non è un permesso su una riga: è la tua vista intera, e si dà
+           a delle persone, non a un link. -->
+      <div class="share">
+        {#if auth.account?.actingAs}
+          <span class="eyebrow">Non sei a casa tua</span>
+          <p>
+            Stai lavorando nell’indice di <b>{auth.account.actingAs.handle}</b>: quello che cambi
+            qui è suo. Chi può modificare il <i>tuo</i> lo decidi dal tuo.
+          </p>
+        {:else}
+          <ShareField
+            emails={auth.account?.collaborators ?? []}
+            onchange={(emails) => void share(emails)}
+          />
+        {/if}
+      </div>
+
+      {#if (auth.account?.shared ?? []).length}
+        <div class="share">
+          <span class="eyebrow">Indici aperti a te</span>
+          <p>Ci entri e ci lavori come se fossero tuoi. Con la fascia in alto sai sempre dove sei.</p>
+          <ul class="theirs">
+            {#each auth.account?.shared ?? [] as index (index.ownerId)}
+              <li>
+                <Row active={auth.account?.actingAs?.ownerId === index.ownerId}>
+                  {#snippet lead()}
+                    <span class="keys-mark" aria-hidden="true"><Icon name="key" /></span>
+                  {/snippet}
+                  <span class="theirs-name">{index.handle}</span>
+                  {#snippet trail()}
+                    {#if auth.account?.actingAs?.ownerId === index.ownerId}
+                      <span class="here">ci sei</span>
+                    {:else}
+                      <Button size="sm" onclick={() => void goInto(index.handle)}>Apri</Button>
+                    {/if}
+                  {/snippet}
+                </Row>
+              </li>
+            {/each}
+          </ul>
         </div>
       {/if}
 
@@ -582,6 +656,37 @@
 }
 
 .profile-link p { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
+
+/* i due blocchi della condivisione: stessa aria del link del profilo */
+.share {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline-soft);
+}
+
+.share p { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
+
+.share p b { font-weight: 600; color: var(--ink-2); }
+
+.theirs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+
+.theirs-name { flex: 1; min-width: 0; padding-left: 4px; font-size: 13.5px; font-weight: 560; }
+
+.keys-mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, #b06c0c 16%, transparent);
+  color: #b06c0c;
+}
+
+.keys-mark :global(.ico) { width: 13px; height: 13px; }
+
+.here { padding: 0 8px; font-size: 11.5px; color: var(--ink-3); }
 
 /* il conto sta sotto al link, smorzato: è una nota, non un titolo */
 .visits {

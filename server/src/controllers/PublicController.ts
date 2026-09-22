@@ -13,7 +13,7 @@ export class PublicController {
   /** Correggere un luogo dal link pubblico, quando quel luogo lo permette. */
   edit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await publicService.edit(req.params.id as string, dtoOf<PublicPlaceDto>(req), whoOf(req)));
+      res.json(await publicService.edit(req.params.id as string, dtoOf<PublicPlaceDto>(req)));
     } catch (error) {
       next(error);
     }

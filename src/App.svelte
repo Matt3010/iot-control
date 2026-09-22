@@ -20,6 +20,7 @@
   import Panel from './components/Panel.svelte';
   import PlaceSheet from './components/PlaceSheet.svelte';
   import SurePopover from './components/SurePopover.svelte';
+  import GuestBar from './components/GuestBar.svelte';
   import Toast from './components/Toast.svelte';
 
   /** /m/<slug> e /u/<handle> sono pubblici: non chiedono nulla a nessuno. */
@@ -116,8 +117,10 @@
 {:else if !auth.account}
   <LoginScreen />
 {:else if route.kind === 'agents'}
+  <GuestBar />
   <AgentsPage />
 {:else}
+  <GuestBar />
   <MapCanvas />
   <Panel />
 <AddButton />

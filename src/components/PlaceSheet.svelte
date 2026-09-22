@@ -5,7 +5,6 @@
   import { ui } from '../lib/ui.svelte';
   import Chip from './Chip.svelte';
   import AgentField from './AgentField.svelte';
-  import EditorField from './EditorField.svelte';
   import Icon from './Icon.svelte';
   import Switch from './Switch.svelte';
   import Tabs from './Tabs.svelte';
@@ -213,8 +212,10 @@
     />
 
     <!-- Solo se è pubblico: su un luogo privato non c'è nessuno da autorizzare.
-         E «correggere» qui vuol dire chiunque abbia il link, perché un link non
-         chiede chi sei: lo si dice, invece di farlo scoprire. -->
+         «Correggere» qui vuol dire chiunque abbia il link, perché un link non
+         chiede chi sei: lo si dice, invece di farlo scoprire. Tenere l'indice
+         in due è un'altra cosa e sta nella scheda delle mappe: lì si danno le
+         chiavi, e per darle bisogna sapere a chi. -->
     {#if !draft.private}
       <Switch
         checked={(draft.access ?? 'view') === 'edit'}
@@ -226,13 +227,6 @@
           ? 'Nome e note si cambiano da fuori. Il resto no.'
           : 'Dal link si legge e basta.'}
       />
-
-      {#if (draft.access ?? 'view') === 'edit'}
-        <EditorField
-          editors={draft.editors ?? []}
-          onchange={(emails) => draft && (draft.editors = emails)}
-        />
-      {/if}
     {/if}
 
     <label class="field">

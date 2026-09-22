@@ -19,6 +19,8 @@ export const config = {
     /** Quanti giorni dura una sessione prima di dover rientrare. */
     ttlDays: Number(process.env.JWT_TTL_DAYS ?? 30),
     cookie: 'pi_token',
+    /** Dentro quale indice stai lavorando, quando non è il tuo. */
+    actCookie: 'pi_act',
     /**
      * Aperte: chiunque può crearsi un accesso. L'indice però resta uno solo,
      * quindi chi entra vede e modifica le stesse cose. Si chiude con

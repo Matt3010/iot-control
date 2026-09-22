@@ -3,7 +3,9 @@
   import { formatDistance } from '../lib/format';
   import { here } from '../lib/here.svelte';
   import { clusterGroup, createMap, DEFAULT_COLOR, meIcon, metersBetween, pinIcon } from '../lib/mapkit';
+  import { auth } from '../lib/auth.svelte';
   import { publicApi, type PublicMapPayload, type PublicPlace } from '../lib/publicApi';
+  import { toast } from '../lib/toast.svelte';
   import { mapPath, profileUrl } from '../lib/routing';
   import Icon from './Icon.svelte';
   import Button from './Button.svelte';
@@ -55,6 +57,23 @@
    * solo per loro, e solo quando sono entrate.
    */
   let editing = $state<PublicPlace | null>(null);
+  /** Sta entrando: il tasto lo dice, se no sembra che non abbia funzionato. */
+  let entering = $state(false);
+
+  /**
+   * A chi ha le chiavi non si offre di correggere un campo per volta: si offre
+   * di entrare. Dentro trova l'indice intero, come lo vede chi ce l'ha.
+   */
+  async function goIn(): Promise<void> {
+    if (!data || entering) return;
+    entering = true;
+    try {
+      await auth.goInto(data.handle);
+    } catch (error) {
+      entering = false;
+      toast.show((error as Error).message);
+    }
+  }
   /** Se su questa mappa c'è qualcosa che posso correggere: si dice una volta sola. */
   const canFix = $derived((data?.places ?? []).some((place) => place.canEdit));
   let form = $state({ name: '', note: '' });
@@ -239,7 +258,13 @@
           {data.categories.length === 1 ? 'categoria' : 'categorie'}
         {/if}
       </p>
-      {#if canFix}
+      {#if data.canManage}
+        <!-- le chiavi ce le hai: correggere due campi sarebbe il modo lungo -->
+        <button type="button" class="keys" onclick={goIn} disabled={entering}>
+          <Icon name="key" />
+          {entering ? 'Apro…' : 'Apri e modifica tutto'}
+        </button>
+      {:else if canFix}
         <!-- dirlo qui: il tasto sta dentro ai fumetti, e un fumetto lo apri
              solo se hai già un motivo per aprirlo -->
         <p class="fixable">
@@ -318,6 +343,33 @@
 {/if}
 
 <style>
+  /* chi ha le chiavi entra da qui: è la cosa da fare in questa pagina, per
+     lui, quindi ha la forma di un tasto e non di una nota */
+  .keys {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: #b06c0c;
+    color: white;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 560;
+    cursor: pointer;
+    transition: filter 0.16s;
+  }
+
+  .keys:hover { filter: brightness(1.08); }
+
+  .keys:disabled { opacity: 0.6; cursor: default; }
+
+  .keys :global(.ico) { width: 15px; height: 15px; }
+
   /* la riga che dice che qui si può correggere: una nota, non un allarme */
   .fixable {
     display: flex;

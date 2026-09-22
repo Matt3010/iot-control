@@ -14,6 +14,33 @@ export class UserManager {
     return store.transaction((tx) => new UserRepository(tx).count());
   }
 
+  /** Gli indici aperti a questo indirizzo: quelli in cui posso entrare. */
+  sharedWith(email: string): Promise<User[]> {
+    return store.transaction((tx) => new UserRepository(tx).findSharedWith(email));
+  }
+
+  /** Chi è `who`, se ha davvero aperto il suo indice a quell'indirizzo. */
+  granting(who: string, email: string): Promise<User | undefined> {
+    return store.transaction((tx) => new UserRepository(tx).findGranting(who, email));
+  }
+
+  /**
+   * Chi può modificare il mio indice. Gli indirizzi si ripuliscono e si
+   * sgonfiano dai doppioni; il mio non ci entra, che sarebbe come darsi le
+   * chiavi di casa da soli.
+   */
+  setCollaborators(id: string, emails: string[]): Promise<User> {
+    return store.transaction((tx) => {
+      const users = new UserRepository(tx);
+      const me = users.findById(id);
+      if (!me) throw badRequest('utente inesistente');
+      const clean = [...new Set(emails.map((one) => one.trim().toLowerCase()))].filter(
+        (one) => one && one !== me.email,
+      );
+      return users.setCollaborators(id, clean) as User;
+    });
+  }
+
   /**
    * Il primo che arriva prende l'indice. Dopo, altri account si aprono solo
    * se chi ospita l'app lo consente.

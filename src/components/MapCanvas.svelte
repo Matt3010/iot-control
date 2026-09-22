@@ -1,33 +1,20 @@
 <script lang="ts">
   import L, { type Marker } from 'leaflet';
-  import { mount, unmount } from 'svelte';
   import { devices } from '../lib/devices.svelte';
   import { here } from '../lib/here.svelte';
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { clusterGroup, createMap, DEFAULT_COLOR, glyph, meIcon, pinIcon } from '../lib/mapkit';
+  import { AGENTS_PATH } from '../lib/routing';
   import { readJSON, writeJSON } from '../lib/storage';
   import { store } from '../lib/store.svelte';
   import type { Category, LocalPlace } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
-  import AgentStack from './AgentStack.svelte';
 
   let container: HTMLDivElement;
   let map: L.Map;
   let clusters: L.MarkerClusterGroup;
   const markers = new Map<string, Marker>();
   let draftMarker: Marker | null = null;
-  /**
-   * I controlli dentro un popup sono un componente vero, montato a mano:
-   * Leaflet possiede quel DOM, ma da lì in giù torna a comandare Svelte — e
-   * così il cursore della luce è lo stesso della scheda, non una copia.
-   */
-  let popupControls: Record<string, unknown> | null = null;
-
-  function closeControls(): void {
-    if (!popupControls) return;
-    void unmount(popupControls);
-    popupControls = null;
-  }
 
   /** Il pin di un posto: colore ed emoji della sua categoria. */
   const lookOf = (
@@ -77,14 +64,7 @@
     note.textContent = place.note || '';
     note.hidden = !place.note;
 
-    // quello che si accende sta sopra ai comandi: è la cosa per cui hai aperto
     const agentIds = place.agentIds ?? [];
-    const live = document.createElement('div');
-    if (agentIds.length) {
-      live.className = 'pop-live';
-      closeControls();
-      popupControls = mount(AgentStack, { target: live, props: { agentIds } });
-    }
 
     const actions = document.createElement('div');
     actions.className = 'pop-actions';
@@ -104,9 +84,18 @@
     directions.append(glyph('directions'), document.createTextNode('Indicazioni'));
 
     actions.append(edit, directions);
-    node.append(badge, name, note);
-    if (agentIds.length) node.append(live);
-    node.append(actions);
+
+    // Gli interruttori non stanno qui. Un fumetto sopra a un pin è largo due
+    // dita: dentro ci stava un elenco che scorreva, e per accendere una luce
+    // bisognava prima ritrovarla. Di qui si va dove c'è posto.
+    if (agentIds.length) {
+      const room = document.createElement('a');
+      room.href = AGENTS_PATH;
+      room.append(glyph('layers'), document.createTextNode('Agenti'));
+      actions.append(room);
+    }
+
+    node.append(badge, name, note, actions);
     return node;
   }
 
@@ -143,12 +132,10 @@
     });
     map.on('popupclose', () => {
       mapBridge.activeKey = null;
-      closeControls();
     });
 
     return () => {
       mapBridge.detach(map);
-      closeControls();
       map.remove();
       markers.clear();
     };
@@ -192,22 +179,13 @@
         // il grappolo legge il colore da qui: se cambia categoria deve saperlo
         (marker.options as { colour?: string }).colour = colour;
       }
-      // con degli agenti dentro il popup si allarga: quella card ha
-      // interruttori e cursori, e a 232px vivrebbe stretta
-      // Il popup si lega una volta sola. Rilegarlo a ogni giro — e questo
-      // effetto gira a ogni interruttore premuto in casa — butta via quello
-      // aperto e lo rifà da capo: i comandi dentro tornavano in cima, e chi
-      // stava scorrendo si perdeva.
-      const wide = (place.agentIds ?? []).length > 0;
-      const bound = (marker.options as { wide?: boolean }).wide;
-
-      if (!marker.getPopup() || bound !== wide) {
-        (marker.options as { wide?: boolean }).wide = wide;
+      // Il popup si lega una volta sola: il contenuto lo fa la funzione, ogni
+      // volta che si apre. Rilegarlo a ogni giro butterebbe via quello aperto.
+      if (!marker.getPopup()) {
         marker.bindPopup(() => popupFor(place), {
           closeButton: false,
           offset: [0, 2],
           key: place.key,
-          className: wide ? 'with-agents' : '',
         } as L.PopupOptions);
       }
 

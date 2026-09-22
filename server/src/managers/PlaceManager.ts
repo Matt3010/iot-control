@@ -35,7 +35,6 @@ export class PlaceManager {
         note: dto.note ?? '',
         private: dto.private ?? false,
         access: dto.access ?? 'view',
-        editors: dto.editors ?? [],
         agentIds,
       });
     });

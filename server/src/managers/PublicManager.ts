@@ -51,11 +51,7 @@ export class PublicManager {
    * chi chiede quel luogo semplicemente non esiste — non «non ti è
    * permesso», che sarebbe già dire qualcosa di troppo.
    */
-  edit(
-    id: string,
-    patch: { name?: string; note?: string },
-    who?: string,
-  ): Promise<{ place: Place; ownerId: string }> {
+  edit(id: string, patch: { name?: string; note?: string }): Promise<{ place: Place; ownerId: string }> {
     return store.transaction((tx) => {
       const places = new PlaceRepository(tx);
       const place = places.findById(id);
@@ -63,11 +59,6 @@ export class PublicManager {
 
       const map = new MapRepository(tx).findById(place.mapId);
       if (!map?.published) throw notFound('luogo inesistente');
-
-      // con un elenco di email, solo loro — e solo da entrate: un link non
-      // dice chi sei, un accesso sì
-      const editors = place.editors ?? [];
-      if (editors.length && (!who || !editors.includes(who))) throw notFound('luogo inesistente');
 
       const updated = places.update(id, patch) as Place;
       return { place: updated, ownerId: map.ownerId };
