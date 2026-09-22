@@ -211,23 +211,6 @@
       note="Non compare nella mappa pubblica."
     />
 
-    <!-- Solo se è pubblico: su un luogo privato non c'è nessuno da autorizzare.
-         «Correggere» qui vuol dire chiunque abbia il link, perché un link non
-         chiede chi sei: lo si dice, invece di farlo scoprire. Tenere l'indice
-         in due è un'altra cosa e sta nella scheda delle mappe: lì si danno le
-         chiavi, e per darle bisogna sapere a chi. -->
-    {#if !draft.private}
-      <Switch
-        checked={(draft.access ?? 'view') === 'edit'}
-        onchange={(value) => draft && (draft.access = value ? 'edit' : 'view')}
-        label={(draft.access ?? 'view') === 'edit'
-          ? 'Chi ha il link può correggere'
-          : 'Chi ha il link può solo guardare'}
-        note={(draft.access ?? 'view') === 'edit'
-          ? 'Nome e note si cambiano da fuori. Il resto no.'
-          : 'Dal link si legge e basta.'}
-      />
-    {/if}
 
     <label class="field">
       <span class="eyebrow">Note</span>

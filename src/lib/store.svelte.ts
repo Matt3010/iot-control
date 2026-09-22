@@ -1,6 +1,6 @@
 import { api } from './api';
 import { DEFAULT_EMOJI, SUGGESTED } from './format';
-import { readJSON, writeJSON } from './storage';
+import { forgetJSON, readJSON, writeJSON } from './storage';
 import { toast, UNDO_MS } from './toast.svelte';
 import type { Category, Draft, Group, LocalPlace, Place, PlaceMap, Snapshot } from './types';
 
@@ -13,6 +13,23 @@ type LiveChange =
 
 const withKey = (place: Place): LocalPlace => ({ ...place, key: crypto.randomUUID() });
 
+/**
+ * Mettere nell'elenco una cosa che il server ha confermato, senza farne due.
+ *
+ * Il filo aperto porta anche le modifiche nostre: se l'evento arriva prima
+ * della risposta — e succede, sono due strade diverse per la stessa rete — la
+ * cosa è già dentro. Chi arriva secondo non aggiunge: sovrascrive.
+ */
+function absorb<T extends { id: string }>(list: T[], fresh: T): T {
+  const at = list.findIndex((one) => one.id === fresh.id);
+  if (at >= 0) {
+    Object.assign(list[at]!, fresh);
+    return list[at]!;
+  }
+  list.push(fresh);
+  return fresh;
+}
+
 /** What the server is allowed to see of a place. */
 const placePayload = (mapId: string, draft: Required<Pick<Draft, 'lat' | 'lng'>> & Partial<Draft>) => ({
   mapId,
@@ -23,7 +40,6 @@ const placePayload = (mapId: string, draft: Required<Pick<Draft, 'lat' | 'lng'>>
   lat: draft.lat,
   lng: draft.lng,
   private: draft.private ?? false,
-  access: draft.access ?? 'view',
   agentIds: draft.agentIds ?? [],
 });
 
@@ -125,13 +141,15 @@ class Store {
   }
 
   async createMap(name: string): Promise<PlaceMap> {
-    const created = await api.post<PlaceMap>('/maps', { name });
-    this.maps.push(created);
+    const created = absorb(this.maps, await api.post<PlaceMap>('/maps', { name }));
     this.openMap(created.id);
     return created;
   }
 
-  async patchMap(map: PlaceMap, patch: { name?: string; slug?: string; published?: boolean }): Promise<void> {
+  async patchMap(
+    map: PlaceMap,
+    patch: { name?: string; slug?: string; published?: boolean; editors?: string[] },
+  ): Promise<void> {
     const before = { ...map };
     Object.assign(map, patch);
     try {
@@ -287,6 +305,28 @@ class Store {
     }
   }
 
+  /**
+   * Di quale indice è la roba che questo browser si ricorda: quale mappa
+   * guardavi, quali categorie avevi spento, dov'era la vista.
+   *
+   * Sono scelte che hanno senso dentro un indice e nessuno fuori. Cambiando
+   * persona — un altro accesso dallo stesso browser, o l'ingresso in casa di
+   * qualcuno — restavano lì e raccontavano di gente che non c'è più. Quando
+   * l'indice cambia, si dimentica.
+   */
+  settle(where: string): void {
+    if (readJSON<string | null>('pi.where', null) === where) return;
+    writeJSON('pi.where', where);
+
+    this.activeMapId = null;
+    this.extraMapIds = [];
+    this.hiddenCategories = [];
+    this.activeGroup = null;
+    // si tolgono, non si azzerano: chi le rilegge ha il suo valore di partenza
+    // e non un `null` scritto apposta, che e' un'altra cosa
+    for (const key of ['pi.map', 'pi.maps', 'pi.hidden', 'pi.group', 'pi.view']) forgetJSON(key);
+  }
+
   async load(): Promise<void> {
     try {
       const snapshot = await api.get<Snapshot>('/state');
@@ -368,8 +408,7 @@ class Store {
       emoji: emoji || DEFAULT_EMOJI,
       color: color || SUGGESTED[0]!,
     });
-    this.categories.push(created);
-    return created;
+    return absorb(this.categories, created);
   }
 
   /** Category edits are safe to apply first: the id never changes. */
@@ -411,9 +450,7 @@ class Store {
   /* ----------------------------------------------------------------- groups */
 
   async createGroup(name: string): Promise<Group> {
-    const created = await api.post<Group>('/groups', { name });
-    this.groups.push(created);
-    return created;
+    return absorb(this.groups, await api.post<Group>('/groups', { name }));
   }
 
   async patchGroup(group: Group, patch: Partial<Group>): Promise<void> {
@@ -481,11 +518,29 @@ class Store {
     };
     this.places.push(optimistic);
 
+    // Da qui in poi si cerca per `key` e mai per identita': quello che sta
+    // nell'elenco e' una copia osservata, non questo stesso oggetto, e
+    // `indexOf` con l'originale non lo troverebbe.
+    const key = optimistic.key;
+    const mine = () => this.places.findIndex((one) => one.key === key);
+
     try {
-      Object.assign(optimistic, await api.post<Place>('/places', payload));
+      const saved = await api.post<Place>('/places', payload);
+      // Fino a un attimo fa l'ottimistico aveva un id inventato, quindi il
+      // filo aperto non poteva riconoscerlo: se l'evento e' arrivato prima
+      // della risposta, nell'elenco c'e' gia' un gemello vero. Si tiene
+      // quello e si butta il nostro, se no restano due pin per un posto solo.
+      const twin = this.places.find((one) => one.key !== key && one.id === saved.id);
+      const at = mine();
+      if (twin) {
+        if (at >= 0) this.places.splice(at, 1);
+        Object.assign(twin, saved);
+        return;
+      }
+      if (at >= 0) Object.assign(this.places[at]!, saved);
     } catch (error) {
-      const index = this.places.indexOf(optimistic);
-      if (index >= 0) this.places.splice(index, 1);
+      const at = mine();
+      if (at >= 0) this.places.splice(at, 1);
       toast.show((error as Error).message);
     }
   }

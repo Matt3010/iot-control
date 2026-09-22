@@ -22,27 +22,9 @@ export class UserRepository {
     return this.tx.data.users.find((user) => user.handle === handle);
   }
 
-  /** Gli indici che qualcuno ha aperto a questo indirizzo. */
-  findSharedWith(email: string): User[] {
-    return this.tx.data.users.filter((user) => (user.collaborators ?? []).includes(email));
-  }
-
-  /**
-   * L'indice di `who` — il suo id o il suo handle — ma solo se quell'indirizzo
-   * ci può mettere le mani. Altrimenti niente: non esiste, per chi chiede.
-   */
-  findGranting(who: string, email: string): User | undefined {
-    const owner = this.findById(who) ?? this.findByHandle(who);
-    if (!owner || owner.email === email) return undefined;
-    return (owner.collaborators ?? []).includes(email) ? owner : undefined;
-  }
-
-  setCollaborators(id: string, emails: string[]): User | undefined {
-    const user = this.findById(id);
-    if (!user) return undefined;
-    user.collaborators = emails;
-    this.tx.markDirty();
-    return user;
+  /** Chi è `who`: il suo id o il suo handle, come capita di averlo sottomano. */
+  findByIdOrHandle(who: string): User | undefined {
+    return this.findById(who) ?? this.findByHandle(who);
   }
 
   freeHandle(wanted: string, except?: string): string {

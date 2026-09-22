@@ -49,20 +49,12 @@
 
   const categoryOf = (id: string) => data?.categories.find((category) => category.id === id);
 
-  /* ------------------------------------------------------------- correggere
-   * Su certe mappe chi ha il link può anche correggere — una lista che si
-   * tiene in due, un indirizzo sbagliato che si sistema mentre lo si scopre.
-   * Chi può, e su quale luogo, lo dice il server: qui non si indovina niente,
-   * si legge `canEdit`. Se la mappa nomina delle persone, quel campo è vero
-   * solo per loro, e solo quando sono entrate.
-   */
-  let editing = $state<PublicPlace | null>(null);
   /** Sta entrando: il tasto lo dice, se no sembra che non abbia funzionato. */
   let entering = $state(false);
 
   /**
-   * A chi ha le chiavi non si offre di correggere un campo per volta: si offre
-   * di entrare. Dentro trova l'indice intero, come lo vede chi ce l'ha.
+   * A chi ha la chiave non si offre di correggere un campo per volta: si offre
+   * di entrare. Dentro trova la mappa intera, come la vede chi ce l'ha.
    */
   async function goIn(): Promise<void> {
     if (!data || entering) return;
@@ -74,43 +66,6 @@
       toast.show((error as Error).message);
     }
   }
-  /** Se su questa mappa c'è qualcosa che posso correggere: si dice una volta sola. */
-  const canFix = $derived((data?.places ?? []).some((place) => place.canEdit));
-  let form = $state({ name: '', note: '' });
-  let saving = $state(false);
-  let problem = $state('');
-
-  function startEdit(place: PublicPlace): void {
-    editing = place;
-    form = { name: place.name, note: place.note ?? '' };
-    problem = '';
-  }
-
-  const stopEdit = () => (editing = null);
-
-  async function save(): Promise<void> {
-    const place = editing;
-    const name = form.name.trim();
-    if (!place || !name || saving) return;
-
-    saving = true;
-    problem = '';
-    try {
-      const fixed = await publicApi.edit(place.id, { name, note: form.note.trim() });
-      // si scrive dentro allo stesso oggetto: l'elenco e il fumetto guardano
-      // lì, e il fumetto aperto non sa rifarsi da solo
-      place.name = fixed.name;
-      place.note = fixed.note;
-      const pin = live?.pins.get(place.id);
-      if (pin?.isPopupOpen()) pin.setPopupContent(popupFor(place));
-      editing = null;
-    } catch (error) {
-      problem = (error as Error).message;
-    } finally {
-      saving = false;
-    }
-  }
-
   publicApi
     .map(handle, slug)
     .then((payload) => {
@@ -122,11 +77,7 @@
     })
     .catch((error: Error) => (failed = error.message));
 
-  /**
-   * Il posto e le indicazioni. Niente eliminazione, e la correzione solo dove
-   * quel luogo la permette a chi sta guardando: un tasto che non porta a
-   * niente è peggio di un tasto che non c'è.
-   */
+  /** Sola lettura: il posto e le indicazioni, niente altro. */
   function popupFor(place: PublicPlace): HTMLElement {
     const category = categoryOf(place.categoryId);
     const node = document.createElement('div');
@@ -158,15 +109,6 @@
     directions.href = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
     directions.textContent = 'Indicazioni';
     actions.append(directions);
-
-    if (place.canEdit) {
-      const fix = document.createElement('button');
-      fix.type = 'button';
-      fix.className = 'pop-fix';
-      fix.textContent = 'Correggi';
-      fix.onclick = () => startEdit(place);
-      actions.append(fix);
-    }
 
     node.append(badge, name, note, actions);
     return node;
@@ -259,18 +201,11 @@
         {/if}
       </p>
       {#if data.canManage}
-        <!-- le chiavi ce le hai: correggere due campi sarebbe il modo lungo -->
+        <!-- la chiave ce l'hai: di qui si entra, e dentro c'è tutto -->
         <button type="button" class="keys" onclick={goIn} disabled={entering}>
           <Icon name="key" />
           {entering ? 'Apro…' : 'Apri e modifica tutto'}
         </button>
-      {:else if canFix}
-        <!-- dirlo qui: il tasto sta dentro ai fumetti, e un fumetto lo apri
-             solo se hai già un motivo per aprirlo -->
-        <p class="fixable">
-          <Icon name="edit" />
-          Puoi correggere nomi e note di questa mappa.
-        </p>
       {/if}
       <a class="other" href={profileUrl(data.handle)}>Le altre mappe di {data.handle} →</a>
     </div>
@@ -306,40 +241,6 @@
     <Icon name="pin" /> Fai la tua
   </Button>
 
-  {#if editing}
-    <!-- una finestrella, non una scheda laterale: correggere è una cosa sola e
-         breve, e la mappa sotto deve restare dov'è -->
-    <div
-      class="veil"
-      role="presentation"
-      onclick={stopEdit}
-      onkeydown={(event: KeyboardEvent) => event.key === 'Escape' && stopEdit()}
-    ></div>
-    <div class="fix surface" role="dialog" aria-modal="true" aria-label="Correggi il luogo">
-      <span class="eyebrow">Correggi</span>
-
-      <label class="field">
-        <span>Nome</span>
-        <!-- svelte-ignore a11y_autofocus -->
-        <input maxlength="80" autofocus bind:value={form.name} />
-      </label>
-
-      <label class="field">
-        <span>Note</span>
-        <textarea rows="3" maxlength="500" bind:value={form.note}></textarea>
-      </label>
-
-      <p class="mind">Quello che scrivi lo vede chiunque apra questa mappa.</p>
-      {#if problem}<p class="bad">{problem}</p>{/if}
-
-      <div class="fix-actions">
-        <Button size="sm" onclick={stopEdit}>Annulla</Button>
-        <Button look="primary" size="sm" disabled={saving || !form.name.trim()} onclick={save}>
-          {saving ? 'Salvo…' : 'Salva'}
-        </Button>
-      </div>
-    </div>
-  {/if}
 {/if}
 
 <style>
@@ -369,56 +270,6 @@
   .keys:disabled { opacity: 0.6; cursor: default; }
 
   .keys :global(.ico) { width: 15px; height: 15px; }
-
-  /* la riga che dice che qui si può correggere: una nota, non un allarme */
-  .fixable {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 6px 0 0;
-    font-size: 11.5px;
-    line-height: 1.4;
-    color: var(--ink-3);
-  }
-
-  .fixable :global(.ico) { width: 13px; height: 13px; flex: none; }
-
-  .veil {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-sheet);
-    background: color-mix(in srgb, var(--ink) 22%, transparent);
-    animation: fade 0.18s var(--ease);
-  }
-
-  .fix {
-    position: fixed;
-    z-index: var(--z-sheet);
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(340px, calc(100vw - 28px));
-    padding: var(--card-pad);
-    display: grid;
-    gap: 10px;
-    animation: rise 0.22s var(--ease);
-  }
-
-  .field { display: grid; gap: 5px; }
-
-  .field span {
-    font-size: 10.5px;
-    font-weight: 620;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--ink-3);
-  }
-
-  .mind { margin: 0; font-size: 11px; line-height: 1.4; color: var(--ink-3); }
-
-  .bad { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--danger); }
-
-  .fix-actions { display: flex; justify-content: flex-end; gap: 6px; }
 
   /* la colonna di sinistra: chi l'ha fatta, e cosa c'è dentro */
   .side {

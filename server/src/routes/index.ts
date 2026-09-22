@@ -11,12 +11,12 @@ import { groupController } from '../controllers/GroupController.js';
 import { placeController } from '../controllers/PlaceController.js';
 import { stateController } from '../controllers/StateController.js';
 import { AgentDto, PairDto } from '../dto/agent.dto.js';
-import { ActDto, CollaboratorsDto, CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
+import { ActDto, CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { CommandDto } from '../dto/device.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/group.dto.js';
 import { MapDto } from '../dto/map.dto.js';
-import { CreatePlaceDto, PublicPlaceDto, UpdatePlaceDto } from '../dto/place.dto.js';
+import { CreatePlaceDto, UpdatePlaceDto } from '../dto/place.dto.js';
 import { validateBody } from '../middleware/validateBody.js';
 
 export const apiRouter = Router();
@@ -37,13 +37,6 @@ apiRouter.get('/public/u/:handle/:slug', publicController.map);
 // l'indirizzo di prima, senza handle: vive per non rompere i link già in giro
 apiRouter.get('/public/m/:slug', publicController.map);
 
-/**
- * Correggere un luogo senza essere entrati. Passa solo se quel luogo dice di
- * sì: mappa pubblicata, luogo non privato, e accesso «edit». E arrivano solo
- * due campi — il nome e le note.
- */
-apiRouter.put('/public/places/:id', validateBody(PublicPlaceDto), publicController.edit);
-
 // quello che scarica una macchina appena accesa: non è entrata da
 // nessuna parte, e l'unica prova che porta è il token nell'indirizzo — lo
 // stesso con cui poi si collegherà.
@@ -60,13 +53,7 @@ apiRouter.use(resolveActing);
 
 apiRouter.get('/auth/me', authController.me);
 
-/**
- * Le chiavi del mio indice. Vale sempre il mio, anche mentre sto dentro quello
- * di un altro: le chiavi di casa d'altri non si danno.
- */
-apiRouter.put('/auth/collaborators', validateBody(CollaboratorsDto), authController.share);
-
-/** Entrare nell'indice di qualcuno, e tornare a casa. */
+/** Entrare in casa di qualcuno, e tornarsene a casa propria. */
 apiRouter.post('/auth/act', validateBody(ActDto), authController.enter);
 apiRouter.delete('/auth/act', authController.leave);
 apiRouter.get('/state', stateController.snapshot);

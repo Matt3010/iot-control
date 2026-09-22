@@ -148,15 +148,6 @@
     }
   }
 
-  /** Le chiavi del mio indice: si salvano subito, come tutto il resto qui. */
-  async function share(emails: string[]) {
-    try {
-      await auth.share(emails);
-    } catch (error) {
-      toast.show((error as Error).message);
-    }
-  }
-
   async function goInto(handle: string) {
     try {
       await auth.goInto(handle);
@@ -390,6 +381,19 @@
                 />
                 <p class="visits" title={COUNT_NOTE}>{visitsOfMap(map)}</p>
               {/if}
+
+              <!-- Le chiavi stanno sotto la mappa che aprono. Non e' un
+                   permesso a meta': chi ce l'ha entra e lavora qui dentro
+                   come chi la mappa l'ha fatta. Un ospite non le passa
+                   avanti, quindi da ospite il riquadro non c'e'. -->
+              {#if atHome}
+                <div class="map-keys">
+                  <ShareField
+                    emails={map.editors ?? []}
+                    onchange={(editors) => store.patchMap(map, { editors })}
+                  />
+                </div>
+              {/if}
               {/snippet}
             </Row>
           </li>
@@ -420,41 +424,33 @@
         </div>
       {/if}
 
-      <!-- Tenere l'indice in due. Sta qui e non nella scheda di un luogo
-           perché non è un permesso su una riga: è la tua vista intera, e si dà
-           a delle persone, non a un link. -->
-      <div class="share">
-        {#if auth.account?.actingAs}
+      {#if auth.account?.actingAs}
+        <div class="share">
           <span class="eyebrow">Non sei a casa tua</span>
           <p>
-            Stai lavorando nell’indice di <b>{auth.account.actingAs.handle}</b>: quello che cambi
-            qui è suo. Chi può modificare il <i>tuo</i> lo decidi dal tuo.
+            Stai lavorando nelle mappe di <b>{auth.account.actingAs.handle}</b>: quello che cambi
+            qui è suo. Le chiavi delle <i>tue</i> mappe le dai dal tuo.
           </p>
-        {:else}
-          <ShareField
-            emails={auth.account?.collaborators ?? []}
-            onchange={(emails) => void share(emails)}
-          />
-        {/if}
-      </div>
+        </div>
+      {/if}
 
-      {#if (auth.account?.shared ?? []).length}
+      {#if (auth.account?.keys ?? []).length}
         <div class="share">
-          <span class="eyebrow">Indici aperti a te</span>
-          <p>Ci entri e ci lavori come se fossero tuoi. Con la fascia in alto sai sempre dove sei.</p>
+          <span class="eyebrow">Mappe aperte a te</span>
+          <p>Ci entri e ci lavori come se fossero tue. Con la fascia in alto sai sempre dove sei.</p>
           <ul class="theirs">
-            {#each auth.account?.shared ?? [] as index (index.ownerId)}
+            {#each auth.account?.keys ?? [] as key (key.mapId)}
               <li>
-                <Row active={auth.account?.actingAs?.ownerId === index.ownerId}>
+                <Row active={auth.account?.actingAs?.ownerId === key.ownerId}>
                   {#snippet lead()}
                     <span class="keys-mark" aria-hidden="true"><Icon name="key" /></span>
                   {/snippet}
-                  <span class="theirs-name">{index.handle}</span>
+                  <span class="theirs-name">{key.mapName}<em>di {key.handle}</em></span>
                   {#snippet trail()}
-                    {#if auth.account?.actingAs?.ownerId === index.ownerId}
+                    {#if auth.account?.actingAs?.ownerId === key.ownerId}
                       <span class="here">ci sei</span>
                     {:else}
-                      <Button size="sm" onclick={() => void goInto(index.handle)}>Apri</Button>
+                      <Button size="sm" onclick={() => void goInto(key.handle)}>Apri</Button>
                     {/if}
                   {/snippet}
                 </Row>
@@ -672,7 +668,33 @@
 
 .theirs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 
-.theirs-name { flex: 1; min-width: 0; padding-left: 4px; font-size: 13.5px; font-weight: 560; }
+.theirs-name {
+  flex: 1;
+  min-width: 0;
+  padding-left: 4px;
+  font-size: 13.5px;
+  font-weight: 560;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* di chi e' quella mappa: serve, perche' due persone la chiamano uguale */
+.theirs-name em {
+  font-style: normal;
+  font-weight: 460;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.theirs-name em::before { content: ' '; }
+
+/* le chiavi di una mappa stanno dentro la sua card, staccate da una riga */
+.map-keys {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline-soft);
+}
 
 .keys-mark {
   display: grid;

@@ -1,10 +1,12 @@
 import { api, onUnauthorized } from './api';
 
-/** Un indice, come lo si nomina da fuori: quello di qualcuno. */
-export interface IndexRef {
+/** Una mappa di qualcun altro che posso modificare, e chi la tiene. */
+export interface KeyRef {
   ownerId: string;
   handle: string;
-  email: string;
+  mapId: string;
+  mapName: string;
+  slug: string;
 }
 
 export interface Account {
@@ -17,12 +19,10 @@ export interface Account {
   profileViewers: number;
   profileFollowed: number;
   createdAt: string;
-  /** Chi può modificare il mio indice come me. */
-  collaborators: string[];
-  /** Gli indici di altri in cui posso entrare: chi mi ha dato le chiavi. */
-  shared: IndexRef[];
-  /** Dentro quale sto lavorando adesso, se non è il mio. */
-  actingAs: IndexRef | null;
+  /** Le mappe di altri che posso modificare: chi mi ha dato la chiave. */
+  keys: KeyRef[];
+  /** In casa di chi sto lavorando adesso, se non è la mia. */
+  actingAs: { ownerId: string; handle: string } | null;
 }
 
 interface Gate {
@@ -78,11 +78,6 @@ class Auth {
   async refresh(): Promise<void> {
     const fresh = await api.get<Account>('/auth/me').catch(() => null);
     if (fresh) this.account = fresh;
-  }
-
-  /** Chi può modificare il mio indice come me. Sempre il mio, mai quello in cui sono. */
-  async share(emails: string[]): Promise<void> {
-    this.account = await api.put<Account>('/auth/collaborators', { emails });
   }
 
   /**

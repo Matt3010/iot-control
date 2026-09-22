@@ -1,6 +1,4 @@
 import type { NextFunction, Request, Response } from 'express';
-import type { PublicPlaceDto } from '../dto/place.dto.js';
-import { dtoOf } from '../middleware/validateBody.js';
 import type { User } from '../types.js';
 import { markToday, seenToday, take, viewerId } from '../public/visits.js';
 import { publicService } from '../services/PublicService.js';
@@ -10,15 +8,6 @@ import { publicService } from '../services/PublicService.js';
 const whoOf = (req: Request): string | undefined => (req.user as User | undefined)?.email;
 
 export class PublicController {
-  /** Correggere un luogo dal link pubblico, quando quel luogo lo permette. */
-  edit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      res.json(await publicService.edit(req.params.id as string, dtoOf<PublicPlaceDto>(req)));
-    } catch (error) {
-      next(error);
-    }
-  };
-
   map = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const handle = req.params.handle as string | undefined;

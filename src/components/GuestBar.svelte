@@ -4,7 +4,7 @@
   import Icon from './Icon.svelte';
 
   /**
-   * La fascia che dice di chi è l'indice che stai guardando.
+   * La fascia che dice di chi sono le mappe che stai guardando.
    *
    * Quando entri in casa d'altri non cambia niente: stesse mappe, stessi
    * tasti, stesso cestino. È proprio per quello che ci vuole — senza, sposti
@@ -31,7 +31,7 @@
   <div class="bar">
     <Icon name="key" />
     <span class="what">
-      Stai lavorando nell’indice di <b>{acting.handle}</b>
+      Stai lavorando nelle mappe di <b>{acting.handle}</b>
     </span>
     <button type="button" onclick={comeBack} disabled={leaving}>
       {leaving ? 'Torno…' : 'Torna al tuo'}

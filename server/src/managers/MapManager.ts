@@ -3,11 +3,12 @@ import { badRequest, notFound } from '../errors/HttpError.js';
 import { store } from '../persistence/JsonStore.js';
 import { MapRepository } from '../repositories/MapRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
-import type { PlaceMap } from '../types.js';
+import { UserRepository } from '../repositories/UserRepository.js';
+import type { PlaceMap, Scope } from '../types.js';
 
 export class MapManager {
-  list(ownerId: string): Promise<PlaceMap[]> {
-    return store.transaction((tx) => new MapRepository(tx).findAllOf(ownerId));
+  list(scope: Scope): Promise<PlaceMap[]> {
+    return store.transaction((tx) => new MapRepository(tx).findAllIn(scope));
   }
 
   /** Un account senza mappe non esiste: la prima nasce da sola. */
@@ -18,28 +19,37 @@ export class MapManager {
     });
   }
 
-  create(ownerId: string, dto: MapDto): Promise<PlaceMap> {
-    return store.transaction((tx) => new MapRepository(tx).insert(ownerId, dto.name));
+  /** Una mappa nuova la fa solo chi l'indice ce l'ha: un ospite e' ospite. */
+  create(scope: Scope, dto: MapDto): Promise<PlaceMap> {
+    if (scope.maps !== null) throw notFound('mappa inesistente');
+    return store.transaction((tx) => new MapRepository(tx).insert(scope.ownerId, dto.name));
   }
 
-  update(ownerId: string, id: string, dto: MapDto): Promise<PlaceMap> {
+  update(scope: Scope, id: string, dto: MapDto): Promise<PlaceMap> {
     return store.transaction((tx) => {
       const maps = new MapRepository(tx);
-      if (!maps.owns(ownerId, id)) throw notFound('mappa inesistente');
+      if (!maps.within(scope, id)) throw notFound('mappa inesistente');
 
       const patch: Partial<PlaceMap> = {};
       if (dto.name !== undefined) patch.name = dto.name;
       if (dto.published !== undefined) patch.published = dto.published;
       // l'indirizzo pubblico lo scegli tu, ma unico resta
-      if (dto.slug !== undefined) patch.slug = maps.freeSlug(ownerId, dto.slug, id);
+      if (dto.slug !== undefined) patch.slug = maps.freeSlug(scope.ownerId, dto.slug, id);
+      // le chiavi le da' chi la mappa ce l'ha: un ospite non ne fa altri
+      if (dto.editors !== undefined && scope.maps === null) {
+        const owner = new UserRepository(tx).findById(scope.ownerId);
+        patch.editors = [...new Set(dto.editors)].filter((one) => one && one !== owner?.email);
+      }
       return maps.update(id, patch) as PlaceMap;
     });
   }
 
-  /** Cancellarla porta via i suoi gruppi e i suoi posti, ma non l ultima. */
-  remove(ownerId: string, id: string): Promise<{ removedPlaces: number }> {
+  /** Cancellarla porta via i suoi posti, ma non l'ultima, e non da ospite. */
+  remove(scope: Scope, id: string): Promise<{ removedPlaces: number }> {
+    if (scope.maps !== null) throw notFound('mappa inesistente');
     return store.transaction((tx) => {
       const maps = new MapRepository(tx);
+      const ownerId = scope.ownerId;
       if (!maps.owns(ownerId, id)) throw notFound('mappa inesistente');
       if (maps.findAllOf(ownerId).length <= 1) throw badRequest('una mappa deve restare');
 

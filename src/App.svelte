@@ -36,6 +36,9 @@
 
   $effect(() => {
     if (!auth.account) return;
+    // di chi è l'indice che stiamo per caricare: se non è quello di prima,
+    // questo browser dimentica cosa guardava
+    store.settle(auth.account.actingAs?.ownerId ?? auth.account.id);
     store.load().catch((error: Error) => toast.show(`Caricamento fallito: ${error.message}`));
 
     // Si chiede una volta com'è messo il mondo, e da lì in poi arriva tutto

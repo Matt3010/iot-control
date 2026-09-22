@@ -8,6 +8,15 @@ export function readJSON<T>(key: string, fallback: T): T {
   }
 }
 
+/** Dimenticare del tutto: non «scriverci dentro niente», proprio toglierla. */
+export function forgetJSON(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* private mode: non c'era niente da togliere */
+  }
+}
+
 export function writeJSON(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));

@@ -10,8 +10,6 @@ function migrateHandles(users: User[]): User[] {
   return users.map((user) => {
     const counted = {
       ...user,
-      // chi c'era prima che si potesse essere in due: nessuno ha le sue chiavi
-      collaborators: Array.isArray(user.collaborators) ? user.collaborators : [],
       profileViews: user.profileViews ?? 0,
       profileViewers: user.profileViewers ?? 0,
       profileFollowed: user.profileFollowed ?? 0,
@@ -34,6 +32,8 @@ function migrateSlugs(maps: PlaceMap[]): PlaceMap[] {
       views: map.views ?? 0,
       viewers: map.viewers ?? 0,
       viewsFromProfile: map.viewsFromProfile ?? 0,
+      // mappe nate prima che si potessero tenere in due: nessuno ha la chiave
+      editors: Array.isArray(map.editors) ? map.editors : [],
     };
     if (counted.slug) return counted;
     const slug = uniqueSlug(slugify(map.name), (candidate) => taken.has(key(map.ownerId, candidate)));
@@ -50,8 +50,6 @@ function migratePlace(place: Place & { groupId?: string; agentId?: string }): Pl
   const { groupId, agentId, ...rest } = place;
   return {
     ...rest,
-    // chi è nato prima che si potesse scrivere da fuori: si guarda e basta
-    access: place.access === 'edit' ? 'edit' : 'view',
     groupIds: Array.isArray(place.groupIds) ? place.groupIds : groupId ? [groupId] : [],
     agentIds: Array.isArray(place.agentIds) ? place.agentIds : agentId ? [agentId] : [],
   };

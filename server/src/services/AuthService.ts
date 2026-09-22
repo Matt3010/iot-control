@@ -6,23 +6,23 @@ import { mapManager } from '../managers/MapManager.js';
 import { userManager } from '../managers/UserManager.js';
 import type { User } from '../types.js';
 
-/** Un indice di qualcun altro, come lo si nomina da fuori. */
-export interface IndexRef {
+/** Una mappa di qualcun altro che posso modificare: la porta e chi la tiene. */
+export interface KeyRef {
   ownerId: string;
   handle: string;
-  email: string;
+  mapId: string;
+  mapName: string;
+  slug: string;
 }
 
 export interface UserView {
   id: string;
   email: string;
   handle: string;
-  /** Chi può modificare il mio indice come me. */
-  collaborators: string[];
-  /** Gli indici di altri in cui posso entrare: chi mi ha dato le chiavi. */
-  shared: IndexRef[];
-  /** Dentro quale ci sono adesso, se non sono a casa mia. */
-  actingAs: IndexRef | null;
+  /** Le mappe di altri che posso modificare: chi mi ha dato la chiave. */
+  keys: KeyRef[];
+  /** In casa di chi mi trovo adesso, se non sono a casa mia. */
+  actingAs: { ownerId: string; handle: string } | null;
   /** Quante volte hanno aperto il tuo /u/<handle>. */
   profileViews: number;
   /** Quante persone diverse, contate una volta al giorno. */
@@ -37,18 +37,11 @@ export interface Session {
   token: string;
 }
 
-const refOf = (user: User): IndexRef => ({
-  ownerId: user.id,
-  handle: user.handle,
-  email: user.email,
-});
-
 const toUserView = (user: User): UserView => ({
   id: user.id,
   email: user.email,
   handle: user.handle,
-  collaborators: user.collaborators ?? [],
-  shared: [],
+  keys: [],
   actingAs: null,
   profileViews: user.profileViews ?? 0,
   profileViewers: user.profileViewers ?? 0,
@@ -81,22 +74,24 @@ export class AuthService {
   }
 
   /**
-   * Chi sei, cosa hai aperto agli altri, e cosa gli altri hanno aperto a te.
-   * `actingOwnerId` è dove ti trovi adesso: si ricontrolla contro l'elenco
-   * vero, così un cookie vecchio non racconta un permesso che non c'è più.
+   * Chi sei, e quali mappe di altri ti hanno aperto. `actingOwnerId` è in casa
+   * di chi ti trovi: si ricontrolla contro le chiavi vere, così un cookie
+   * vecchio non racconta un permesso che non c'è più.
    */
   async me(user: User, actingOwnerId?: string): Promise<UserView> {
-    const shared = (await userManager.sharedWith(user.email)).map(refOf);
+    const keys: KeyRef[] = (await userManager.keysOf(user.email)).map(({ owner, map }) => ({
+      ownerId: owner.id,
+      handle: owner.handle,
+      mapId: map.id,
+      mapName: map.name,
+      slug: map.slug,
+    }));
+    const here = keys.find((key) => key.ownerId === actingOwnerId);
     return {
       ...toUserView(user),
-      shared,
-      actingAs: shared.find((one) => one.ownerId === actingOwnerId) ?? null,
+      keys,
+      actingAs: here ? { ownerId: here.ownerId, handle: here.handle } : null,
     };
-  }
-
-  /** Aggiornare chi ha le chiavi del mio: le mie, non quelle di dove mi trovo. */
-  async share(user: User, emails: string[]): Promise<UserView> {
-    return this.me(await userManager.setCollaborators(user.id, emails));
   }
 }
 

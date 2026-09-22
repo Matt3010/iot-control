@@ -9,15 +9,6 @@ export interface User {
   /** scrypt: sale e derivata, mai la password. */
   salt: string;
   hash: string;
-  /**
-   * Chi può modificare il tuo indice come te: email, minuscole.
-   *
-   * Non è «può correggere due campi»: è la tua stessa vista, con i tuoi
-   * luoghi, le tue categorie, i tuoi agenti. Per questo servono degli
-   * indirizzi e non un link — un link non dice chi sei, e queste sono le
-   * chiavi di casa.
-   */
-  collaborators?: string[];
   /** Quante volte è stato aperto /u/<handle>. Le tue visite non contano. */
   profileViews: number;
   /** Quante persone diverse: impronte distinte, contate una volta al giorno. */
@@ -46,7 +37,26 @@ export interface PlaceMap {
   viewers: number;
   /** Di quelle, quante venivano dal profilo: la stessa persona, poco prima. */
   viewsFromProfile: number;
+  /**
+   * Chi può modificarla oltre a chi ce l'ha: email, minuscole.
+   *
+   * Non è un permesso a metà — è tutta la mappa o niente: chi è in questo
+   * elenco entra e ci lavora come chi l'ha fatta, e vede anche le categorie,
+   * i gruppi e gli agenti che quella mappa usa, perché senza non si può
+   * toccare un luogo. Servono degli indirizzi e non un link: un link non dice
+   * chi sei, e questa è la chiave.
+   */
+  editors?: string[];
   createdAt: string;
+}
+
+/**
+ * Di chi è l'indice su cui sta lavorando una richiesta, e quali delle sue
+ * mappe può toccare. `maps: null` vuol dire tutte — è casa sua.
+ */
+export interface Scope {
+  ownerId: string;
+  maps: string[] | null;
 }
 
 export interface Category {
@@ -75,17 +85,6 @@ export interface Place {
   note: string;
   /** Un posto privato resta fuori da quello che si pubblica. */
   private: boolean;
-  /**
-   * Cosa può fare chi arriva dal link pubblico. `view` guarda e basta — ed è
-   * quello che succede se non c'è scritto niente. `edit` può anche correggere
-   * il nome e le note: serve a una lista che si tiene in due, e vuol dire
-   * chiunque abbia quell'indirizzo, perché un link non chiede chi sei.
-   *
-   * Tenere un indice **insieme** a qualcuno è un'altra cosa e sta altrove:
-   * `User.collaborators`. Lì si dà la propria vista intera, e per darla a
-   * qualcuno bisogna sapere chi è.
-   */
-  access?: 'view' | 'edit';
   /**
    * Gli agenti appesi a questo luogo. Più d'uno quando le reti sono separate —
    * la sala e la cucina, due edifici — e ognuno porta i suoi dispositivi. Un

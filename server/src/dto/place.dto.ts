@@ -73,27 +73,6 @@ export class CreatePlaceDto {
 
 }
 
-/**
- * Quello che può cambiare chi arriva dal link pubblico. Due campi, e non è
- * una restrizione arbitraria: chi ha il link non ha detto chi è, quindi può
- * correggere una parola e non può spostare un pin, cambiargli categoria o
- * portarselo su un'altra mappa.
- */
-export class PublicPlaceDto {
-  @IsOptional()
-  @trim()
-  @IsString()
-  @IsNotEmpty({ message: 'il nome non può essere vuoto' })
-  @MaxLength(80)
-  name?: string;
-
-  @IsOptional()
-  @trim()
-  @IsString()
-  @MaxLength(500)
-  note?: string;
-}
-
 export class UpdatePlaceDto {
   @IsOptional()
   @trim()

@@ -21,11 +21,16 @@ export interface MapView {
   viewers: number;
   /** Di quelle aperture, quante arrivavano dal profilo. */
   viewsFromProfile: number;
+  /** Chi la può modificare oltre a chi ce l'ha: tutta, o niente. */
+  editors: string[];
   createdAt: string;
 }
 
-/** Quello che di una mappa può vedere un estraneo: i conteggi non sono suoi. */
-export type PublicMapView = Omit<MapView, 'views' | 'viewers' | 'viewsFromProfile'>;
+/**
+ * Quello che di una mappa può vedere un estraneo: i conteggi non sono suoi, e
+ * nemmeno l'elenco di chi la può modificare — sono indirizzi di altre persone.
+ */
+export type PublicMapView = Omit<MapView, 'views' | 'viewers' | 'viewsFromProfile' | 'editors'>;
 
 export interface GroupView {
   id: string;
@@ -42,8 +47,6 @@ export interface PlaceView {
   lng: number;
   note: string;
   private: boolean;
-  /** Cosa può fare chi arriva dal link pubblico: guardare, o anche correggere. */
-  access: 'view' | 'edit';
   /** Gli agenti appesi a questo luogo: nessuno, uno, o più se le reti sono separate. */
   agentIds: string[];
   createdAt: string;
@@ -53,10 +56,9 @@ export interface PlaceView {
  * Quello che di un posto può vedere un estraneo.
  *
  * Il legame con l'agente non esce mai: da fuori una mappa si guarda, e le
- * luci di casa d'altri non si toccano nemmeno per sbaglio. Esce invece la
- * risposta alla domanda che serve a chi guarda: questo, posso correggerlo?
+ * luci di casa d'altri non si toccano nemmeno per sbaglio.
  */
-export type PublicPlaceView = Omit<PlaceView, 'agentIds'> & { canEdit: boolean };
+export type PublicPlaceView = Omit<PlaceView, 'agentIds'>;
 
 export interface AgentView {
   id: string;
@@ -97,11 +99,18 @@ export const toMapView = (map: PlaceMap): MapView => ({
   views: map.views ?? 0,
   viewers: map.viewers ?? 0,
   viewsFromProfile: map.viewsFromProfile ?? 0,
+  editors: map.editors ?? [],
   createdAt: map.createdAt,
 });
 
 export const toPublicMapView = (map: PlaceMap): PublicMapView => {
-  const { views: _quante, viewers: _quanti, viewsFromProfile: _daDove, ...outside } = toMapView(map);
+  const {
+    views: _quante,
+    viewers: _quanti,
+    viewsFromProfile: _daDove,
+    editors: _chiavi,
+    ...outside
+  } = toMapView(map);
   return outside;
 };
 
@@ -118,14 +127,13 @@ export const toPlaceView = (place: Place): PlaceView => ({
   lng: place.lng,
   note: place.note ?? '',
   private: place.private ?? false,
-  access: place.access === 'edit' ? 'edit' : 'view',
   agentIds: place.agentIds ?? [],
   createdAt: place.createdAt,
 });
 
 export const toPublicPlaceView = (place: Place): PublicPlaceView => {
   const { agentIds: _agenti, ...outside } = toPlaceView(place);
-  return { ...outside, canEdit: outside.access === 'edit' };
+  return outside;
 };
 
 export const toAgentView = (agent: Agent, online: boolean, devices: number): AgentView => ({

@@ -1,9 +1,9 @@
 import type { CookieOptions, NextFunction, Request, Response } from 'express';
-import { whoIs } from '../auth/owner.js';
+import { scopeOf, whoIs } from '../auth/owner.js';
 import { config } from '../config.js';
 import { badRequest } from '../errors/HttpError.js';
 import { userManager } from '../managers/UserManager.js';
-import type { ActDto, CollaboratorsDto, CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
+import type { ActDto, CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import type { Session } from '../services/AuthService.js';
 import { authService } from '../services/AuthService.js';
@@ -54,16 +54,7 @@ export class AuthController {
 
   me = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await authService.me(whoIs(req), req.actingOwnerId));
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  /** Chi può modificare il mio indice come me. Sempre il mio, mai quello dove sono. */
-  share = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      res.json(await authService.share(whoIs(req), dtoOf<CollaboratorsDto>(req).emails));
+      res.json(await authService.me(whoIs(req), scopeOf(req).ownerId));
     } catch (error) {
       next(error);
     }
@@ -76,10 +67,10 @@ export class AuthController {
   enter = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const me = whoIs(req);
-      const owner = await userManager.granting(dtoOf<ActDto>(req).handle, me.email);
-      if (!owner) throw badRequest('quell’indice non è aperto a te');
-      res.cookie(config.auth.actCookie, owner.id, cookieOptions(req));
-      res.json(await authService.me(me, owner.id));
+      const reach = await userManager.reachOf(dtoOf<ActDto>(req).handle, me.email);
+      if (!reach) throw badRequest('quelle mappe non sono aperte a te');
+      res.cookie(config.auth.actCookie, reach.ownerId, cookieOptions(req));
+      res.json(await authService.me(me, reach.ownerId));
     } catch (error) {
       next(error);
     }
@@ -97,6 +88,11 @@ export class AuthController {
 
   #open(req: Request, res: Response, session: Session, status: number): void {
     res.cookie(config.auth.cookie, session.token, cookieOptions(req));
+    // Chi entra entra a casa sua. Il cookie che dice «sto lavorando da un
+    // altro» e' del browser, non della persona: senza toglierlo, il secondo
+    // che entra da questo computer si ritrovava dentro l'indice aperto al
+    // primo, o davanti a un permesso che non e' mai stato suo.
+    res.clearCookie(config.auth.actCookie, { ...cookieOptions(req), maxAge: undefined });
     res.status(status).json(session.user);
   }
 }

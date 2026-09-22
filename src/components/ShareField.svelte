@@ -4,12 +4,11 @@
   import Icon from './Icon.svelte';
 
   /**
-   * Chi può modificare il tuo indice come te.
+   * Chi può modificare una mappa oltre a chi ce l'ha.
    *
-   * Non è «può correggere due campi»: è la tua stessa vista — i tuoi luoghi,
-   * le tue categorie, i tuoi agenti, gli interruttori di casa. Per questo
-   * servono degli indirizzi e non un link: un link non dice chi sei, e queste
-   * sono le chiavi di casa.
+   * Non è «può correggere due campi»: dentro quella mappa fa quello che fai
+   * tu. Per questo servono degli indirizzi e non un link: un link non dice chi
+   * sei, e questa è una chiave.
    */
   let {
     emails = [],
@@ -37,10 +36,10 @@
 </script>
 
 <div class="field">
-  <span class="eyebrow">Chi può modificare con te</span>
+  <span class="eyebrow">Chi può modificare questa mappa</span>
   <p class="sub">
-    Vedono e cambiano tutto quello che vedi e cambi tu: luoghi, categorie, gruppi, agenti. Devono
-    entrare con quell’indirizzo — un link non dice chi sei, un accesso sì.
+    Ci entrano e ci lavorano come te: luoghi, categorie, gruppi, agenti. Le tue altre mappe non le
+    vedono. Devono entrare con quell’indirizzo — un link non dice chi sei, un accesso sì.
   </p>
 
   {#if emails.length}
@@ -53,8 +52,8 @@
           <button
             type="button"
             class="drop"
-            title="Togli le chiavi"
-            aria-label={`Togli le chiavi a ${email}`}
+            title="Togli la chiave"
+            aria-label={`Togli la chiave a ${email}`}
             onclick={() => drop(email)}
           >
             <Icon name="close" />
@@ -81,7 +80,7 @@
     <Button
       look="icon"
       extra="add-go"
-      title="Dai le chiavi"
+      title="Dai la chiave"
       disabled={!fresh.trim()}
       onclick={add}
     >

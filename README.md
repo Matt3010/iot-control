@@ -59,14 +59,12 @@ Niente categorie preimpostate, niente fronzoli.
 - **Si entra con email, password e nome utente** (quello del link pubblico: si propone da sé
   dall'email), e un accesso se lo crea chiunque. Ognuno ha il suo indice: le sue mappe, le sue
   categorie, i suoi agenti. I dati stanno tutti in un `places.json` sul server.
-- **Un indice si può tenere in due.** Nelle chiavi (`User.collaborators`) metti degli indirizzi
-  email: chi è in quell'elenco entra nel tuo indice e ci lavora *come te* — aggiunge luoghi,
-  cambia categorie, installa agenti, accende le luci. Servono degli indirizzi e non un link,
-  perché un link non dice chi sei. Mentre ci si trova dentro, una fascia in alto dice sempre di
-  chi è l'indice che si sta toccando.
-- **Correggere senza entrare** è un'altra cosa, più piccola: un luogo pubblico può dire che chi
-  ha il link ne corregge il nome e le note. Due campi, nient'altro — chi arriva da un link non
-  ha detto chi è.
+- **Una mappa si può tenere in due.** Nelle sue chiavi (`PlaceMap.editors`) metti degli
+  indirizzi email: chi e' in quell'elenco entra in quella mappa e ci lavora *come te* — aggiunge
+  luoghi, cambia categorie, installa agenti, accende le luci. Non e' un permesso a meta': o tutta
+  la mappa, o niente. Le tue altre mappe non le vede. Servono degli indirizzi e non un link,
+  perche' un link non dice chi sei. Mentre ci si trova dentro, una fascia in alto dice sempre di
+  chi sono le mappe che si stanno toccando.
 
 ## Il front-end
 
@@ -102,10 +100,10 @@ derivata `scrypt` col suo sale, e il confronto è a tempo costante.
 - **Le iscrizioni sono aperte**: chiunque si crea un accesso, e ognuno vede solo il proprio
   indice. Se lo pubblichi su internet e vuoi restare in pochi, chiudile con
   `ALLOW_SIGNUP=false` dopo esserti registrato.
-- **Le chiavi si controllano a ogni richiesta**, non quando si entra: il cookie dice soltanto
-  dentro quale indice sei, e se il permesso è stato tolto un minuto fa la richiesta dopo sei di
-  nuovo a casa tua. Tutto il resto del server non sa nemmeno che la cosa esista — la differenza
-  vive in una riga, `ownerOf`.
+- **Le chiavi si controllano a ogni richiesta**, non quando si entra: il cookie dice soltanto in
+  casa di chi sei, e se la chiave e' stata tolta un minuto fa la richiesta dopo sei di nuovo a
+  casa tua. Quasi tutto il server non sa nemmeno che la cosa esista: la differenza vive in
+  `scopeOf`, che dice di chi e' l'indice e quali delle sue mappe questa richiesta puo' toccare.
 - **Email sconosciuta e password sbagliata danno lo stesso errore**: chi prova non deve capire
   quale dei due ha indovinato.
 - **Tutto `/api` è protetto** tranne le quattro rotte d'ingresso, e un rifiuto arriva come

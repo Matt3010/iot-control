@@ -1,18 +1,18 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { config } from '../config.js';
 import { userManager } from '../managers/UserManager.js';
-import type { User } from '../types.js';
+import type { Scope, User } from '../types.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       /**
-       * Messo da `resolveActing`: l'indice di qualcun altro, dentro cui questa
-       * richiesta sta lavorando. Da qui in giù non lo sa nessuno — tutto passa
-       * per `ownerOf`, che è l'unico posto dove la differenza esiste.
+       * Messo da `resolveActing`: l'indice di qualcun altro e le sue mappe
+       * aperte a me. Da qui in giù non lo sa quasi nessuno — tutto passa per
+       * `scopeOf`, che è l'unico posto dove la differenza esiste.
        */
-      actingOwnerId?: string;
+      acting?: Scope;
     }
   }
 }
@@ -43,9 +43,9 @@ export const resolveActing: RequestHandler = (
   }
 
   void userManager
-    .granting(wanted, me.email)
-    .then((owner) => {
-      if (owner) req.actingOwnerId = owner.id;
+    .reachOf(wanted, me.email)
+    .then((reach) => {
+      if (reach) req.acting = reach;
     })
     .catch(() => undefined)
     .finally(() => next());

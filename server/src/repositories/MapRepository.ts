@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { uniqueSlug } from '../auth/slug.js';
 import type { Transaction } from '../persistence/JsonStore.js';
-import type { PlaceMap } from '../types.js';
+import type { PlaceMap, Scope } from '../types.js';
 
 export class MapRepository {
   constructor(private readonly tx: Transaction) {}
@@ -17,6 +17,31 @@ export class MapRepository {
   /** Una mappa di qualcun altro, per chi chiede, semplicemente non esiste. */
   owns(ownerId: string, id: string): boolean {
     return this.findById(id)?.ownerId === ownerId;
+  }
+
+  /** Quelle su cui questa richiesta può lavorare: tutte, o solo le sue. */
+  findAllIn(scope: Scope): PlaceMap[] {
+    const mine = this.findAllOf(scope.ownerId);
+    return scope.maps === null ? mine : mine.filter((map) => scope.maps?.includes(map.id));
+  }
+
+  /**
+   * Questa mappa, questa richiesta, può toccarla? Per chi non può, la mappa
+   * non esiste — e non esiste nemmeno una mappa di un altro indice.
+   */
+  within(scope: Scope, id: string): boolean {
+    if (!this.owns(scope.ownerId, id)) return false;
+    return scope.maps === null || scope.maps.includes(id);
+  }
+
+  /** Le mappe che qualcuno ha aperto a questo indirizzo. */
+  findEditableBy(email: string): PlaceMap[] {
+    return this.tx.data.maps.filter((map) => (map.editors ?? []).includes(email));
+  }
+
+  /** Di quel padrone, quelle aperte a me: è il raggio di chi entra da ospite. */
+  findEditableOf(ownerId: string, email: string): PlaceMap[] {
+    return this.findEditableBy(email).filter((map) => map.ownerId === ownerId);
   }
 
   findBySlug(ownerId: string, slug: string): PlaceMap | undefined {
@@ -51,6 +76,7 @@ export class MapRepository {
       name,
       slug: this.freeSlug(ownerId, name),
       published: false,
+      editors: [],
       views: 0,
       viewers: 0,
       viewsFromProfile: 0,
@@ -61,7 +87,10 @@ export class MapRepository {
     return map;
   }
 
-  update(id: string, patch: Partial<Pick<PlaceMap, 'name' | 'slug' | 'published'>>): PlaceMap | undefined {
+  update(
+    id: string,
+    patch: Partial<Pick<PlaceMap, 'name' | 'slug' | 'published' | 'editors'>>,
+  ): PlaceMap | undefined {
     const current = this.findById(id);
     if (!current) return undefined;
     Object.assign(current, patch);

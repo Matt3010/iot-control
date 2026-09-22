@@ -2,8 +2,9 @@ import { hashPassword, verifyPassword } from '../auth/password.js';
 import type { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { badRequest } from '../errors/HttpError.js';
 import { store } from '../persistence/JsonStore.js';
+import { MapRepository } from '../repositories/MapRepository.js';
 import { UserRepository } from '../repositories/UserRepository.js';
-import type { User } from '../types.js';
+import type { PlaceMap, Scope, User } from '../types.js';
 
 export class UserManager {
   findById(id: string): Promise<User | undefined> {
@@ -14,30 +15,30 @@ export class UserManager {
     return store.transaction((tx) => new UserRepository(tx).count());
   }
 
-  /** Gli indici aperti a questo indirizzo: quelli in cui posso entrare. */
-  sharedWith(email: string): Promise<User[]> {
-    return store.transaction((tx) => new UserRepository(tx).findSharedWith(email));
-  }
-
-  /** Chi è `who`, se ha davvero aperto il suo indice a quell'indirizzo. */
-  granting(who: string, email: string): Promise<User | undefined> {
-    return store.transaction((tx) => new UserRepository(tx).findGranting(who, email));
+  /**
+   * Le mappe aperte a questo indirizzo, con il nome di chi le tiene. È
+   * l'elenco delle porte che qualcuno mi ha lasciato aperte.
+   */
+  keysOf(email: string): Promise<{ owner: User; map: PlaceMap }[]> {
+    return store.transaction((tx) => {
+      const users = new UserRepository(tx);
+      return new MapRepository(tx)
+        .findEditableBy(email)
+        .map((map) => ({ owner: users.findById(map.ownerId), map }))
+        .filter((pair): pair is { owner: User; map: PlaceMap } => !!pair.owner);
+    });
   }
 
   /**
-   * Chi può modificare il mio indice. Gli indirizzi si ripuliscono e si
-   * sgonfiano dai doppioni; il mio non ci entra, che sarebbe come darsi le
-   * chiavi di casa da soli.
+   * Il raggio d'azione di chi entra in casa d'altri: il padrone, e le sue
+   * mappe aperte a me. Se non ce n'è nessuna, non c'è niente da aprire.
    */
-  setCollaborators(id: string, emails: string[]): Promise<User> {
+  reachOf(who: string, email: string): Promise<Scope | undefined> {
     return store.transaction((tx) => {
-      const users = new UserRepository(tx);
-      const me = users.findById(id);
-      if (!me) throw badRequest('utente inesistente');
-      const clean = [...new Set(emails.map((one) => one.trim().toLowerCase()))].filter(
-        (one) => one && one !== me.email,
-      );
-      return users.setCollaborators(id, clean) as User;
+      const owner = new UserRepository(tx).findByIdOrHandle(who);
+      if (!owner || owner.email === email) return undefined;
+      const maps = new MapRepository(tx).findEditableOf(owner.id, email);
+      return maps.length ? { ownerId: owner.id, maps: maps.map((map) => map.id) } : undefined;
     });
   }
 

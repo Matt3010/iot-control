@@ -1,5 +1,16 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 const trim = () =>
   Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
@@ -23,4 +34,18 @@ export class MapDto {
   @IsOptional()
   @IsBoolean()
   published?: boolean;
+
+  /**
+   * Chi puo' modificarla oltre a chi ce l'ha. Sono email perche' questa e' la
+   * chiave della mappa intera: un link non dice chi sei.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(24)
+  @Transform(({ value }: { value: unknown }) =>
+    Array.isArray(value) ? value.map((one) => String(one).trim().toLowerCase()) : value,
+  )
+  @IsEmail({}, { each: true, message: "serve un'email valida" })
+  @MaxLength(120, { each: true })
+  editors?: string[];
 }

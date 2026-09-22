@@ -3,21 +3,22 @@ import type { MapView } from '../dto/views.js';
 import { toMapView } from '../dto/views.js';
 import { hub } from '../iot/hub.js';
 import { mapManager } from '../managers/MapManager.js';
+import type { Scope } from '../types.js';
 
 export class MapService {
-  async list(ownerId: string): Promise<MapView[]> {
-    return (await mapManager.list(ownerId)).map(toMapView);
+  async list(scope: Scope): Promise<MapView[]> {
+    return (await mapManager.list(scope)).map(toMapView);
   }
 
-  async create(ownerId: string, dto: MapDto): Promise<MapView> {
-    const map = toMapView(await mapManager.create(ownerId, dto));
-    hub.changed(ownerId, { kind: 'map', id: map.id, value: map });
+  async create(scope: Scope, dto: MapDto): Promise<MapView> {
+    const map = toMapView(await mapManager.create(scope, dto));
+    hub.changed(scope.ownerId, { kind: 'map', id: map.id, value: map });
     return map;
   }
 
-  async update(ownerId: string, id: string, dto: MapDto): Promise<MapView> {
-    const map = toMapView(await mapManager.update(ownerId, id, dto));
-    hub.changed(ownerId, { kind: 'map', id: map.id, value: map });
+  async update(scope: Scope, id: string, dto: MapDto): Promise<MapView> {
+    const map = toMapView(await mapManager.update(scope, id, dto));
+    hub.changed(scope.ownerId, { kind: 'map', id: map.id, value: map });
     return map;
   }
 
@@ -26,9 +27,9 @@ export class MapService {
    * ciascuno: chi guarda sa già che una mappa che se ne va se li porta dietro,
    * ed è la stessa regola che applica quando è lui a eliminarla.
    */
-  async remove(ownerId: string, id: string): Promise<{ removedPlaces: number }> {
-    const done = await mapManager.remove(ownerId, id);
-    hub.changed(ownerId, { kind: 'map', id, value: null });
+  async remove(scope: Scope, id: string): Promise<{ removedPlaces: number }> {
+    const done = await mapManager.remove(scope, id);
+    hub.changed(scope.ownerId, { kind: 'map', id, value: null });
     return done;
   }
 }

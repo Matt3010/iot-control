@@ -10,6 +10,11 @@ export interface PlaceMap {
   /** L'indirizzo pubblico: /m/<slug>. */
   slug: string;
   published: boolean;
+  /**
+   * Chi puo' modificarla oltre a te: email. Non e' un permesso a meta' - e'
+   * tutta la mappa o niente.
+   */
+  editors: string[];
   createdAt: string;
 }
 
@@ -38,8 +43,6 @@ export interface Place {
   note: string;
   /** Un posto privato resta fuori da quello che si pubblica. */
   private: boolean;
-  /** Cosa può fare chi arriva dal link pubblico: guardare, o anche correggere. */
-  access: 'view' | 'edit';
   /** Gli agenti appesi a questo luogo: più d'uno quando le reti sono separate. */
   agentIds: string[];
   createdAt: string;
@@ -68,7 +71,6 @@ export interface Draft {
   /** Di quale mappa è: un posto che modifichi non cambia casa. */
   mapId?: string;
   private?: boolean;
-  access?: 'view' | 'edit';
   /** Un elenco vuoto li stacca tutti: il luogo resta, i fili si tagliano. */
   agentIds?: string[];
   name?: string;

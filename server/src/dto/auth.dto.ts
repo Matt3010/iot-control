@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 const clean = () =>
   Transform(({ value }: { value: unknown }) =>
@@ -31,22 +31,7 @@ export class RegisterDto extends CredentialsDto {
   handle!: string;
 }
 
-/**
- * Chi può modificare il tuo indice come te. Sono email perché queste sono le
- * chiavi di casa: un link non dice chi sei, un accesso sì.
- */
-export class CollaboratorsDto {
-  @Transform(({ value }: { value: unknown }) =>
-    Array.isArray(value) ? value.map((one) => String(one).trim().toLowerCase()) : value,
-  )
-  @IsArray()
-  @ArrayMaxSize(24)
-  @IsEmail({}, { each: true, message: "serve un'email valida" })
-  @MaxLength(120, { each: true })
-  emails!: string[];
-}
-
-/** In quale indice entrare: il nome di chi ce l'ha. */
+/** In casa di chi entrare: il nome di chi tiene le mappe. */
 export class ActDto {
   @clean()
   @IsString()
