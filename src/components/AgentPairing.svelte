@@ -55,6 +55,7 @@
 
   /** Come si chiamano i campi di HA, detto in italiano. */
   const LABELS: Record<string, string> = {
+    confirmed_ok: 'L’immagine è quella giusta',
     still_image_url: 'Indirizzo di un fermo immagine',
     stream_source: 'Indirizzo del flusso',
     rtsp_transport: 'Come raggiungerlo',
@@ -346,7 +347,13 @@
         <Button look="link" disabled={busy} onclick={() => go('cancel')}>Annulla</Button>
       </div>
     {:else if step.fields.length}
-      {#if handler === 'tuya'}
+      <!-- Le istruzioni servono a chi deve riempire il modulo. Al passo dove
+           si guarda e basta non c'entrano più niente: dire ancora dove trovare
+           l'indirizzo, davanti a un'immagine già arrivata, fa dubitare di
+           aver fatto la cosa giusta. -->
+      {#if step.preview}
+        <!-- niente: qui si guarda -->
+      {:else if handler === 'tuya'}
         <p class="say">
           Serve il tuo codice utente. Nell'app <b>Smart Life</b> (o Tuya Smart):
           <i>Impostazioni</i> → <i>Account e sicurezza</i>, alla voce <i>User Code</i>.
@@ -366,6 +373,16 @@
           Se l'immagine non arriva, scegli <b>TCP</b>: certi registratori dichiarano un indirizzo
           di ritorno che non esiste più, e solo il TCP lo ignora.
         </p>
+      {/if}
+
+      {#if step.preview}
+        <!-- Prima si guarda, poi si conferma: una levetta che dice «va bene»
+             sopra un'immagine che non si vede non vuol dire niente. -->
+        <p class="say">
+          Questo è quello che si vede adesso da quella telecamera. Se è la
+          ripresa giusta, conferma qui sotto.
+        </p>
+        <img class="shot" src={`data:image/jpeg;base64,${step.preview}`} alt="Prova della telecamera" />
       {/if}
 
       {#each step.fields as field (field.name)}
@@ -441,6 +458,17 @@
     text-transform: none;
     color: var(--ink-3);
     opacity: 0.8;
+  }
+
+  /* lo scatto di prova: largo come il modulo, e scuro sotto, perche' una
+     telecamera che non inquadra niente non sembri un'immagine che non arriva */
+  .shot {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--ink) 85%, transparent);
   }
 
   .accounts { display: grid; gap: 4px; }

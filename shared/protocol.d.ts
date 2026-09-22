@@ -74,6 +74,15 @@ export interface PairingStep {
   note?: string;
   /** La stringa da disegnare come QR. Non è un'immagine: i pixel li fai tu. */
   qr?: string;
+  /**
+   * Un fotogramma di prova, in base64.
+   *
+   * Certi passi chiedono di confermare che quello che si è visto è giusto:
+   * una telecamera, prima di collegarla, prova a scattare. Chiedere «va
+   * bene?» senza far vedere cosa non è chiedere niente — è far premere un
+   * tasto a occhi chiusi.
+   */
+  preview?: string;
   /** Cos'è andato storto in questo passo, detto da chi lo sa. */
   error?: string;
 }

@@ -292,6 +292,39 @@ function translate(flow: HaFlow, going?: { flowId: string; schema?: unknown[] })
   return step;
 }
 
+/** Quanto si aspetta un fotogramma di prova: come tutti, aspetta la telecamera. */
+const PREVIEW_TIMEOUT_MS = 20_000;
+
+/**
+ * Il fotogramma che il passo propone di guardare, se ce n'e' uno.
+ *
+ * Prima di creare una telecamera, il passo di conferma tiene da parte uno
+ * scatto e ne dice l'indirizzo. Quell'indirizzo da fuori non si puo' aprire —
+ * vuole il permesso di casa — quindi l'immagine la si prende qui e la si
+ * manda su insieme al passo: chi deve confermare la vede, e conferma qualcosa
+ * invece di confermare e basta.
+ */
+async function pictured(config: ConnectorConfig, flow: HaFlow, step: PairingStep): Promise<PairingStep> {
+  const where = flow.description_placeholders?.preview_url;
+  if (typeof where !== 'string' || !where) return step;
+
+  const shot = await fetch(`${config.haUrl}${where}`, {
+    headers: { authorization: `Bearer ${config.haToken}` },
+    signal: AbortSignal.timeout(PREVIEW_TIMEOUT_MS),
+  }).catch(() => undefined);
+
+  if (!shot?.ok) {
+    // Senza scatto si va avanti lo stesso: il passo resta, e chi guarda legge
+    // che l'immagine non e' arrivata. Meglio che non mostrare il passo.
+    console.warn(`fotogramma di prova: ${shot ? shot.status : 'non risponde'}`);
+    return step;
+  }
+
+  const bytes = Buffer.from(await shot.arrayBuffer());
+  if (!bytes.length) return step;
+  return { ...step, preview: bytes.toString('base64') };
+}
+
 /** Uno schema detto in una riga: i nomi, e cosa propongono. */
 function listed(schema: unknown[] | undefined): string {
   if (!Array.isArray(schema)) return 'nessuno schema';
@@ -332,12 +365,11 @@ export async function startPairing(config: ConnectorConfig, handler: string): Pr
     };
   }
 
-  return translate(
-    await ask(config, FLOWS, {
-      method: 'POST',
-      body: JSON.stringify({ handler, show_advanced_options: false }),
-    }),
-  );
+  const flow = await ask(config, FLOWS, {
+    method: 'POST',
+    body: JSON.stringify({ handler, show_advanced_options: false }),
+  });
+  return pictured(config, flow, translate(flow));
 }
 
 export async function submitPairing(
@@ -347,13 +379,14 @@ export async function submitPairing(
 ): Promise<PairingStep> {
   const schema = await schemaOf(config, flowId);
   const body = JSON.stringify(withDefaults(schema, input));
-  const step = translate(await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body }), { flowId, schema });
+  const flow = await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body });
+  const step = translate(flow, { flowId, schema });
 
   // Se si e' lamentato, nel registro finisce anche di cosa era fatto il
   // passo: un rifiuto su un campo che non si vede si capisce solo vedendo
   // quali campi c'erano e cosa proponevano.
   if (step.error) console.warn(`passo ${flowId}: ${listed(schema)}`);
-  return step;
+  return pictured(config, flow, step);
 }
 
 /**
