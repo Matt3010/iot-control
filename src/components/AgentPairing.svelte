@@ -163,6 +163,10 @@
     for (const field of next?.fields ?? []) {
       const was = kept[field.name];
       if (was !== undefined && was !== '') back[field.name] = was;
+      // Niente da riprendere: si parte da quello che propone la casa, che e'
+      // quasi sempre la risposta giusta — e cosi' la levetta mostra com'e'
+      // davvero, invece di fingersi spenta.
+      else if (field.preset !== undefined) back[field.name] = field.preset;
     }
     return back;
   }

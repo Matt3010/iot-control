@@ -17,6 +17,39 @@ import { EXTRAS, install, installed } from './extras.js';
 
 const FLOWS = '/api/config/config_entries/flow';
 
+/**
+ * Lo schema dell'ultimo passo, per conversazione.
+ *
+ * Certi campi sono obbligatori e hanno gia' la risposta giusta dentro: la
+ * telecamera generica vuole «framerate», e il valore buono e' quello che
+ * propone lei. Non si mostrano — chiedere a una persona quanti fotogrammi al
+ * secondo vuole, per poi suggerirle l'unica risposta sensata, e' farle
+ * perdere tempo — e certi non si saprebbe nemmeno come disegnarli, perche'
+ * arrivano senza tipo. Ma se non si rimandano indietro, la richiesta viene
+ * rifiutata per un campo che nessuno ha mai visto, e chi scrive resta a
+ * fissare un modulo che gli sembra pieno.
+ */
+const SCHEMAS = new Map<string, unknown[]>();
+
+/** Quello che non e' stato chiesto torna com'era proposto. */
+function withDefaults(
+  schema: unknown[] | undefined,
+  input: Record<string, string | boolean>,
+): Record<string, unknown> {
+  const full: Record<string, unknown> = { ...input };
+  if (!Array.isArray(schema)) return full;
+
+  for (const entry of schema) {
+    if (!entry || typeof entry !== 'object') continue;
+    const field = entry as Record<string, unknown>;
+    const name = String(field.name ?? '');
+    if (!name || name in full) continue;
+    if (field.default === undefined || field.default === null) continue;
+    full[name] = field.default;
+  }
+  return full;
+}
+
 interface HaFlow {
   type: string;
   flow_id?: string;
@@ -162,30 +195,49 @@ function fieldsOf(schema: unknown[] | undefined): PairingStep['fields'] {
 
 /** Il primo errore che HA segnala, detto in modo leggibile. */
 function errorOf(flow: HaFlow): string | undefined {
-  const first = Object.values(flow.errors ?? {})[0];
+  // Il nome del campo conta: «obbligatorio» senza dire quale non aiuta
+  // nessuno. «base» invece vuol dire «tutto il modulo», e non si nomina.
+  const [where, first] = Object.entries(flow.errors ?? {})[0] ?? [];
   if (!first) return undefined;
+  const which = where && where !== 'base' ? `${where}: ` : '';
 
   // HA dà una chiave ("login_error") e i dettagli a parte: si mettono insieme.
   const detail = Object.values(flow.description_placeholders ?? {})
     .filter((value) => typeof value === 'string' && value)
     .join(' · ');
-  return detail ? `${first}: ${detail}` : first;
+  return detail ? `${which}${first} · ${detail}` : `${which}${first}`;
 }
 
-function translate(flow: HaFlow): PairingStep {
-  // Senza `type` non è un passo: è HA che dice che la conversazione non c'è
-  // più — scaduta, o annullata da un'altra finestra. Dirlo è meglio che
-  // mostrare un modulo vuoto e lasciare chi guarda a fissarlo.
+function translate(flow: HaFlow, going?: { flowId: string; schema?: unknown[] }): PairingStep {
   if (!flow.type) {
+    /*
+     * Un rifiuto sui campi non e' la fine della conversazione: quella e'
+     * ancora aperta di la', e basta correggere. Si rimette lo stesso modulo
+     * con scritto cosa non andava, invece di far ricominciare da capo.
+     */
+    const wrong = errorOf(flow);
+    if (wrong && going?.flowId) {
+      return { flowId: going.flowId, kind: 'form', fields: fieldsOf(going.schema), error: wrong };
+    }
+
+    // Senza type e senza lamentele sui campi non e' un passo: e' la
+    // conversazione che non c'e' piu' — scaduta, o chiusa da un'altra
+    // finestra. Dirlo e' meglio che mostrare un modulo vuoto.
     return { flowId: '', kind: 'failed', fields: [], error: flow.message ?? 'la richiesta è scaduta' };
   }
 
   if (flow.type === 'create_entry') {
+    if (flow.flow_id) SCHEMAS.delete(flow.flow_id);
     return { flowId: flow.flow_id ?? '', kind: 'done', fields: [] };
   }
   if (flow.type === 'abort') {
+    if (flow.flow_id) SCHEMAS.delete(flow.flow_id);
     return { flowId: flow.flow_id ?? '', kind: 'failed', fields: [], error: flow.reason ?? 'interrotto' };
   }
+
+  // Si tiene com'era: al passo dopo serve per rispondere anche di quello che
+  // non e' stato chiesto.
+  if (flow.flow_id && Array.isArray(flow.data_schema)) SCHEMAS.set(flow.flow_id, flow.data_schema);
 
   const step: PairingStep = {
     flowId: flow.flow_id ?? '',
@@ -236,7 +288,9 @@ export async function submitPairing(
   flowId: string,
   input: Record<string, string | boolean>,
 ): Promise<PairingStep> {
-  return translate(await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body: JSON.stringify(input) }));
+  const schema = SCHEMAS.get(flowId);
+  const body = JSON.stringify(withDefaults(schema, input));
+  return translate(await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body }), { flowId, schema });
 }
 
 /**
@@ -273,6 +327,7 @@ export async function unlink(config: ConnectorConfig, entryId: string): Promise<
 
 /** Lasciare a metà una conversazione la lascia aperta in HA: meglio chiuderla. */
 export async function cancelPairing(config: ConnectorConfig, flowId: string): Promise<void> {
+  SCHEMAS.delete(flowId);
   await fetch(`${config.haUrl}${FLOWS}/${flowId}`, {
     method: 'DELETE',
     headers: { authorization: `Bearer ${config.haToken}` },
