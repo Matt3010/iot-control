@@ -59,13 +59,26 @@
     content_type: 'Tipo di contenuto',
     user_code: 'Codice utente',
     country_code: "Paese dell'account",
-    username: 'Email o numero di telefono',
     password: 'Password',
     email: 'Email',
     host: 'Indirizzo',
   };
 
-  const named = (name: string) => LABELS[name] ?? name.replace(/_/g, ' ');
+  /**
+   * Gli stessi nomi, detti diversamente a seconda di chi li chiede.
+   *
+   * `username` per eWeLink e' l'email con cui entri nell'app; per una
+   * telecamera e' l'utente che *quella telecamera* chiede, se lo chiede — e
+   * quasi sempre non lo chiede. Chiamarlo «email» davanti a una telecamera fa
+   * credere che serva la tua, e la tua li' dentro non c'entra niente.
+   */
+  const PER_MARCA: Record<string, Record<string, string>> = {
+    sonoff: { username: 'Email o numero di telefono' },
+    generic: { username: 'Utente della telecamera', password: 'Password della telecamera' },
+  };
+
+  const named = (name: string) =>
+    PER_MARCA[handler]?.[name] ?? LABELS[name] ?? name.replace(/_/g, ' ');
 
   /**
    * Il paese non dice «questo è un telefono»: dice **su quale server** sta il
@@ -112,11 +125,50 @@
   /** Quello che la persona sta scrivendo, per nome del campo. */
   let answers = $state<Record<string, string | boolean>>({});
 
+  /**
+   * Quali campi la persona ha davvero toccato.
+   *
+   * Finché non li tocca restano in sola lettura, e un campo in sola lettura il
+   * browser non lo riempie. Sembra un cavillo e non lo è: questo modulo chiede
+   * «utente» e «password» perché certe telecamere li vogliono, e il gestore
+   * password ci infilava dentro le credenziali del tuo account — che poi
+   * sarebbero partite verso Home Assistant e finite nella configurazione di
+   * una telecamera. Un campo che si riempie da solo con un segreto che non
+   * c'entra è peggio di un campo scomodo.
+   */
+  let touched = $state<Record<string, boolean>>({});
+
+  /**
+   * Quello che la persona aveva gia' scritto, che sopravvive al passo.
+   *
+   * Un accoppiamento puo' andare storto senza colpa di chi scrive: Home
+   * Assistant risponde che la conversazione e' scaduta, la telecamera non si
+   * fa raggiungere, l'agente ci mette troppo. Ricominciare da un modulo vuoto
+   * vuol dire ribattere a mano un indirizzo rtsp:// — cioe' proprio la parte
+   * scomoda — per colpa di qualcosa che e' successo altrove. Si tiene da
+   * parte, e se il passo dopo chiede le stesse cose si ritrova dov'era.
+   */
+  let kept: Record<string, string | boolean> = {};
+
+  /** Di quello tenuto da parte si rimette solo cio' che il passo nuovo chiede. */
+  function again(next: PairingStep | null): Record<string, string | boolean> {
+    const back: Record<string, string | boolean> = {};
+    for (const field of next?.fields ?? []) {
+      const was = kept[field.name];
+      if (was !== undefined && was !== '') back[field.name] = was;
+    }
+    return back;
+  }
+
   const closed = $derived(!step || step.kind === 'done');
   const which = $derived(ACCOUNTS.find((one) => one.handler === handler)?.label ?? handler);
 
   async function go(action: 'start' | 'submit' | 'cancel', input: Record<string, string | boolean> = {}) {
     busy = true;
+    // Prima di partire si mette da parte quello che c'e' scritto adesso: se si
+    // torna a chiedere le stesse cose — un errore, una conversazione scaduta,
+    // un «riprova» — deve ritrovarsi li'.
+    if (action !== 'cancel') kept = { ...kept, ...answers };
     try {
       const next = await devices.pair(agent, action, {
         handler,
@@ -125,14 +177,19 @@
       });
 
       if (action === 'cancel') {
+        // Annullare e' una scelta, non un incidente: qui si butta via davvero.
         step = null;
         answers = {};
+        touched = {};
+        kept = {};
         return;
       }
 
       step = next;
-      answers = {};
+      answers = again(next);
+      touched = {};
       if (next?.kind === 'done') {
+        kept = {};
         toast.show(`${which} collegato: i dispositivi stanno arrivando`);
         linked = await devices.linked(agent).catch(() => linked);
       }
@@ -144,6 +201,12 @@
   }
 
   function begin(chosen: string) {
+    // Marche diverse chiedono cose diverse: quello che avevi scritto per una
+    // non vuol dire niente per l'altra.
+    if (chosen !== handler) {
+      kept = {};
+      answers = {};
+    }
     handler = chosen;
     step = null;
     void go('start');
@@ -167,12 +230,21 @@
    * sì/no non si tocca: non ha bordi da pulire.
    */
   function cleaned(): Record<string, string | boolean> {
-    return Object.fromEntries(
-      Object.entries(answers).map(([name, value]) => [
-        name,
-        typeof value === 'string' ? value.trim() : value,
-      ]),
-    );
+    const out: Record<string, string | boolean> = {};
+    for (const field of step?.fields ?? []) {
+      const value = answers[field.name];
+      const clean = typeof value === 'string' ? value.trim() : value;
+      /*
+       * Un campo che si poteva lasciare vuoto, e che e' stato lasciato vuoto,
+       * non si manda: si tace. Per Home Assistant «» non vuol dire «niente»,
+       * vuol dire una stringa — e dove aspetta uno fra pochi valori possibili,
+       * la stringa vuota non e' fra quelli e la richiesta intera viene
+       * rifiutata per un campo che nessuno voleva riempire.
+       */
+      if (clean === undefined || (clean === '' && !field.required)) continue;
+      out[field.name] = clean;
+    }
+    return out;
   }
 
   const submit = () => go('submit', cleaned());
@@ -297,7 +369,9 @@
           />
         {:else}
         <label class="field">
-          <span class="eyebrow">{named(field.name)}</span>
+          <span class="eyebrow">
+            {named(field.name)}{#if !field.required}<i class="may">opzionale</i>{/if}
+          </span>
           {#if field.options}
             <select
               bind:value={
@@ -313,7 +387,11 @@
           {:else}
             <input
             type={field.secret ? 'password' : 'text'}
-            autocomplete={field.secret ? 'current-password' : 'off'}
+            readonly={!touched[field.name]}
+            onfocus={() => (touched = { ...touched, [field.name]: true })}
+            autocomplete={field.secret ? 'new-password' : 'off'}
+            data-lpignore="true"
+            data-1p-ignore
             spellcheck="false"
             autocapitalize="off"
             autocorrect="off"
@@ -342,6 +420,18 @@
 {/if}
 
 <style>
+  /* «opzionale» accanto al nome: piccolo e smorto, ma c'è — un campo che si
+     può lasciare vuoto e non lo dice è un campo che qualcuno riempirà */
+  .may {
+    margin-left: 6px;
+    font-style: normal;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-3);
+    opacity: 0.8;
+  }
+
   .accounts { display: grid; gap: 4px; }
 
   .account {

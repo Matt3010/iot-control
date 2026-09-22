@@ -44,7 +44,12 @@ async function ask(config: ConnectorConfig, path: string, options: RequestInit =
   if (!response.ok && !text.startsWith('{')) {
     throw new Error(`home assistant: ${response.status} ${text.slice(0, 120)}`);
   }
-  return JSON.parse(text) as HaFlow;
+
+  const flow = JSON.parse(text) as HaFlow;
+  // Un rifiuto senza spiegazione diventerebbe «la richiesta e' scaduta», che
+  // e' un'ipotesi. Il numero non spiega tutto, ma non inventa niente.
+  if (!response.ok && !flow.message) flow.message = `home assistant ha risposto ${response.status}`;
+  return flow;
 }
 
 /**

@@ -55,6 +55,16 @@ interface Waiting {
 const ACK_TIMEOUT_MS = 20_000;
 
 /**
+ * Collegare un account e' l'unica cosa che puo' durare parecchio: prima di
+ * rispondere, Home Assistant prova davvero a raggiungere quello che gli hai
+ * dato. Una telecamera la si raggiunge aspettando un fotogramma chiave, e su
+ * un registratore ne passa uno ogni pochi secondi — a volte parecchi. Scadere
+ * a venti secondi vuol dire dire «non ha risposto» a qualcosa che stava
+ * rispondendo, e far ricominciare da capo chi aveva gia' scritto tutto.
+ */
+const PAIR_TIMEOUT_MS = 90_000;
+
+/**
  * Chi è collegato adesso, cosa sta facendo, e chi sta guardando. Tutto in
  * memoria di proposito: al riavvio gli agenti si ricollegano e raccontano da capo
  * — non c'è niente qui dentro che valga la pena sopravvivere.
@@ -179,7 +189,7 @@ export class Hub {
    * Si chiede qualcosa e si aspetta la risposta. Non si finge che sia andata
    * bene: se l'agente non risponde, chi ha chiesto lo deve sapere.
    */
-  #ask(agentId: string, make: (reqId: string) => BackendMessage): Promise<unknown> {
+  #ask(agentId: string, make: (reqId: string) => BackendMessage, within = ACK_TIMEOUT_MS): Promise<unknown> {
     const connection = this.#agents.get(agentId);
     if (!connection) return Promise.reject(new Error('questo agente non è collegato'));
 
@@ -188,7 +198,7 @@ export class Hub {
       const timer = setTimeout(() => {
         this.#waiting.delete(reqId);
         reject(new Error("l'agente non ha risposto"));
-      }, ACK_TIMEOUT_MS);
+      }, within);
       timer.unref?.();
 
       this.#waiting.set(reqId, { resolve, reject, timer });
@@ -220,7 +230,7 @@ export class Hub {
     action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink',
     options: { handler?: string; flowId?: string; input?: Record<string, string | boolean>; entryId?: string } = {},
   ): Promise<unknown> {
-    return this.#ask(agentId, (reqId) => ({ type: 'pair', reqId, action, ...options }));
+    return this.#ask(agentId, (reqId) => ({ type: 'pair', reqId, action, ...options }), PAIR_TIMEOUT_MS);
   }
 
   settle(reqId: string, ok: boolean, error?: string, data?: unknown): void {
