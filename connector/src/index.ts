@@ -3,13 +3,19 @@ import { ConfigError, loadConfig } from './config.js';
 import { toServiceCall, translate } from './entities.js';
 import { HomeAssistant } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
+import { ensureToken } from './onboarding.js';
 
 const VERSION = '1.0.0';
 /** All'avvio le entità arrivano a centinaia: si aspetta un attimo e si manda una lista sola. */
 const COALESCE_MS = 500;
 
-function main(): void {
+async function main(): Promise<void> {
   const config = loadConfig();
+
+  // Se Home Assistant è appena installato non ha ancora un utente, quindi
+  // nemmeno un token: il primo avvio lo facciamo noi, e da lì in poi il token
+  // ce lo teniamo. È il pezzo che prima costringeva una persona al browser.
+  config.haToken = await ensureToken(config);
   /** La fotografia di adesso. Al riavvio la si rifà chiedendola ad HA, che la sa. */
   const devices = new Map<string, DeviceSnapshot>();
 
@@ -100,12 +106,13 @@ function main(): void {
   process.on('SIGTERM', shutdown);
 }
 
-try {
-  main();
-} catch (error) {
+main().catch((error: unknown) => {
   if (error instanceof ConfigError) {
     console.error(`configurazione: ${error.message}`);
     process.exit(78); // EX_CONFIG: non c'è motivo che systemd riprovi all'infinito
   }
-  throw error;
-}
+  // Tutto il resto — home assistant che non parte, il benvenuto che va storto —
+  // merita di riprovare: il container riparte da solo.
+  console.error((error as Error).message);
+  process.exit(1);
+});

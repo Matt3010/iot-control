@@ -16,8 +16,14 @@ export interface ConnectorConfig {
   name: string;
   /** Home Assistant, che sta qui accanto: http://localhost:8123. */
   haUrl: string;
-  /** Un token a lunga scadenza, creato una volta dal profilo di HA. */
+  /**
+   * Un token a lunga scadenza. Vuoto va bene: se Home Assistant è appena
+   * installato ce lo prendiamo da soli, facendo noi il primo avvio.
+   */
   haToken: string;
+  /** L'utente che creiamo in HA quando è nuovo, e con cui poi ci entri tu. */
+  haUser: string;
+  haPassword: string;
   /** Dove finisce la credenziale lunga, una volta scambiato il token d'ingresso. */
   stateDir: string;
 }
@@ -47,6 +53,8 @@ export function loadConfig(): ConnectorConfig {
     name: process.env.AGENT_NAME ?? onDisk.name ?? 'Agente',
     haUrl: (process.env.HA_URL ?? onDisk.haUrl ?? 'http://localhost:8123').replace(/\/+$/, ''),
     haToken: process.env.HA_TOKEN ?? onDisk.haToken ?? '',
+    haUser: process.env.HA_USER ?? onDisk.haUser ?? 'place-index',
+    haPassword: process.env.HA_PASSWORD ?? onDisk.haPassword ?? '',
     stateDir: process.env.STATE_DIR ?? onDisk.stateDir ?? DEFAULT_STATE_DIR,
   };
 
@@ -56,7 +64,9 @@ export function loadConfig(): ConnectorConfig {
 
   if (!config.backendUrl) manca('backendUrl', 'BACKEND_URL');
   if (!config.token) manca('token', 'AGENT_TOKEN');
-  if (!config.haToken) manca('haToken', 'HA_TOKEN');
+  // Senza token servono le credenziali con cui creare l'utente di HA: una
+  // delle due strade deve esserci, o non c'è modo di entrare.
+  if (!config.haToken && !config.haPassword) manca('haToken oppure haPassword', 'HA_TOKEN o HA_PASSWORD');
   if (!/^wss?:\/\//.test(config.backendUrl)) {
     throw new ConfigError(`backendUrl deve iniziare per ws:// o wss:// — è "${config.backendUrl}"`);
   }

@@ -25,7 +25,10 @@ services:
     network_mode: host
     env_file: .env
     volumes:
-      - ./connector:/data
+      # volume con nome e non cartella: qui dentro il connettore scrive il
+      # token che si è guadagnato, e gira come utente `node` — una cartella
+      # creata da Docker sarebbe di root, e non potrebbe scriverci
+      - connector-data:/data
     depends_on:
       - homeassistant
     labels:
@@ -45,3 +48,6 @@ services:
     labels:
       # Ce l'ha anche lui, così si tiene aggiornato da solo.
       com.centurylinklabs.watchtower.scope: place-index
+
+volumes:
+  connector-data:
