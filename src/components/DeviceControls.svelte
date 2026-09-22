@@ -3,6 +3,7 @@
   import type { Capability, DeviceValue } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Chip from './Chip.svelte';
+  import Icon from './Icon.svelte';
   import Switch from './Switch.svelte';
 
   /**
@@ -74,10 +75,17 @@
 
 <div class="dev" class:is-lit={lit} class:is-off={!device.online}>
   <div class="dev-head">
-    <span class="dev-dot" aria-hidden="true"></span>
+    <!-- verde o rosso: qui il pallino dice se la cosa risponde, non se è
+         accesa — quello lo dicono la riga che si scalda e il suo interruttore -->
+    <span
+      class="dev-dot"
+      role="img"
+      aria-label={device.online ? 'Raggiungibile' : 'Non raggiungibile'}
+      title={device.online ? 'Raggiungibile' : 'Non raggiungibile'}
+    ></span>
     <span class="dev-name">{device.name}</span>
     {#if !device.online}
-      <span class="dev-away">non raggiungibile</span>
+      <span class="dev-away" title="Non raggiungibile"><Icon name="alert" /></span>
     {/if}
   </div>
 
@@ -191,16 +199,13 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--ink-3);
+    background: #2f9e5e;
     transition: background 0.22s, box-shadow 0.22s;
   }
 
-  .dev.is-lit .dev-dot {
-    background: var(--lit);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lit) 22%, transparent);
-  }
-
-  .dev.is-off .dev-dot { background: var(--ink-3); box-shadow: none; }
+  /* non risponde: rosso, e accanto al nome ci finisce anche un'icona —
+     il colore da solo non basta a chi non lo distingue */
+  .dev.is-off .dev-dot { background: var(--danger); }
 
   .dev-name {
     font-size: 12.5px;
@@ -214,11 +219,13 @@
 
   .dev-away {
     margin-left: auto;
+    display: grid;
+    place-items: center;
     flex: none;
-    font-size: 11px;
-    color: var(--ink-3);
-    white-space: nowrap;
+    color: var(--danger);
   }
+
+  .dev-away :global(.ico) { width: 14px; height: 14px; }
 
   /* i controlli ------------------------------------------------------------ */
 
