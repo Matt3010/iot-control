@@ -216,17 +216,25 @@
     color: var(--ink-3);
   }
 
-  /* due colonne quando ci stanno: un agente per colonna, e nessuno stretto */
+  /* A colonne, non a griglia. Un agente collegato è alto — i suoi dispositivi,
+     i suoi account — e uno appena creato sono tre righe: in una griglia la
+     riga prende l'altezza del più alto e accanto a quello lungo resta un buco
+     grande come mezza pagina. Qui ogni card si accoda a quella sopra e il
+     buco non c'è. Sono schede indipendenti, quindi leggerle a colonne invece
+     che a righe non toglie niente. */
   .grid {
     max-width: 960px;
     margin: 0 auto;
-    display: grid;
-    gap: 14px;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
-    align-items: start;
+    columns: 380px;
+    column-gap: 14px;
   }
 
   .card {
+    /* una card non si spezza in fondo a una colonna per continuare in cima
+       all'altra: si sposta intera */
+    break-inside: avoid;
+    /* lo spazio verticale è suo, non della colonna: il gap qui non esiste */
+    margin-bottom: 14px;
     display: grid;
     gap: 10px;
     min-width: 0;
