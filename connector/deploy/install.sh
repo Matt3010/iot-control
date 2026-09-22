@@ -62,6 +62,13 @@ chmod 600 .env
 # se no un giorno qualcuno lo lancia e non capisce perche' non fa niente.
 rm -f finish.sh
 
+# Il connettore deve poter aggiungere a Home Assistant le integrazioni che non
+# ha di serie, e gira come utente non privilegiato (`node`, uid 1000) mentre
+# la configurazione di HA e' di root. Gli si apre solo questa cartella: HA
+# continua a leggerla, e il resto della sua configurazione resta intoccabile.
+mkdir -p "$DIR/homeassistant/custom_components"
+chown -R 1000:1000 "$DIR/homeassistant/custom_components"
+
 say 'avvio home assistant e il connettore…'
 docker compose up -d
 
