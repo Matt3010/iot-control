@@ -51,6 +51,80 @@ const CALL_TIMEOUT_MS = 15_000;
 const SNAPSHOT_TIMEOUT_MS = 20_000;
 
 /**
+ * Chi smista i flussi video, qui accanto sulla stessa macchina.
+ *
+ * Non e' un servizio nostro: e' quello che Home Assistant si porta dietro per
+ * i video, e risponde solo da dentro casa.
+ */
+const STREAMS = 'http://127.0.0.1:11984/api/streams';
+const FRAME = 'http://127.0.0.1:11984/api/frame.jpeg';
+
+/**
+ * Le telecamere per cui la via di casa si e' gia' vista che non porta niente.
+ * Si ricorda, se no si rifarebbe la stessa domanda inutile ogni cinque
+ * secondi, e ogni domanda inutile e' un'immagine che tarda.
+ */
+const dritte = new Set<string>();
+
+/** L'indirizzo vero di una telecamera, come lo conosce chi smista i flussi. */
+async function sourceOf(entityId: string): Promise<string | undefined> {
+  const known = await fetch(`${STREAMS}?src=${encodeURIComponent(entityId)}`, {
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => undefined);
+  if (!known?.ok) return undefined;
+
+  const info = (await known.json().catch(() => undefined)) as { producers?: { url?: string }[] } | undefined;
+  for (const one of info?.producers ?? []) {
+    const url = one.url ?? '';
+    const bare = url.startsWith('ffmpeg:') ? url.slice('ffmpeg:'.length) : url;
+    // via i parametri di ffmpeg: al client nativo non dicono niente
+    const clean = bare.split('#')[0] ?? '';
+    if (clean.startsWith('rtsp://')) return clean;
+  }
+  return undefined;
+}
+
+/**
+ * Un fotogramma preso per conto nostro, per la via dritta.
+ *
+ * Un flusso RTSP si puo' percorrere in due modi, e Home Assistant ne impone
+ * uno: passa da ffmpeg, che parte in UDP. In UDP la telecamera deve sapere
+ * dove rimandare le immagini, e lo dice lei quando ci si presenta — solo che
+ * certi registratori dichiarano un indirizzo che non e' piu' il loro. Le
+ * immagini partono verso un posto dove non c'e' nessuno: nessun errore,
+ * nessun rifiuto, il vuoto.
+ *
+ * Il client nativo invece se le fa mandare sulla stessa connessione che ha
+ * aperto lui, e non c'e' nessun indirizzo da sbagliare. Stessa telecamera,
+ * stesso flusso: cambia la strada.
+ *
+ * Non si corregge la configurazione di Home Assistant — lui la riscrive a
+ * ogni richiesta, e sarebbe una lotta persa a ogni giro. Si apre un flusso
+ * nostro, con un nome nostro, che lui non tocca; e da li' si guarda.
+ */
+async function ourselves(entityId: string): Promise<Buffer | undefined> {
+  const raw = await sourceOf(entityId);
+  if (!raw) return undefined;
+
+  // Si registra ogni volta: costa una richiesta locale, e se di la' hanno
+  // riavviato il flusso nostro c'e' lo stesso.
+  const name = `diretto-${entityId}`;
+  const set = await fetch(`${STREAMS}?name=${encodeURIComponent(name)}&src=${encodeURIComponent(raw)}`, {
+    method: 'PUT',
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => undefined);
+  if (!set?.ok) return undefined;
+
+  const shot = await fetch(`${FRAME}?src=${encodeURIComponent(name)}`, {
+    signal: AbortSignal.timeout(SNAPSHOT_TIMEOUT_MS),
+  }).catch(() => undefined);
+  if (!shot?.ok) return undefined;
+
+  const bytes = Buffer.from(await shot.arrayBuffer());
+  return bytes.length ? bytes : undefined;
+}
+
+/**
  * Il filo con Home Assistant, che sta qui accanto. Una WebSocket sola: da lì
  * si chiede lo stato, si ascoltano i cambiamenti e si chiamano i servizi.
  *
@@ -143,16 +217,34 @@ export class HomeAssistant {
    * Assistant deve aspettare un fotogramma chiave per poterlo decodificare.
    */
   async snapshot(entityId: string): Promise<Buffer> {
-    const url = `${this.config.haUrl}/api/camera_proxy/${encodeURIComponent(entityId)}`;
-    const response = await fetch(url, {
-      headers: { authorization: `Bearer ${this.config.haToken}` },
-      signal: AbortSignal.timeout(SNAPSHOT_TIMEOUT_MS),
-    });
+    const take = async (): Promise<Response> =>
+      fetch(`${this.config.haUrl}/api/camera_proxy/${encodeURIComponent(entityId)}`, {
+        headers: { authorization: `Bearer ${this.config.haToken}` },
+        signal: AbortSignal.timeout(SNAPSHOT_TIMEOUT_MS),
+      });
 
-    if (!response.ok) throw new Error(`la telecamera non ha risposto (${response.status})`);
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (!bytes.length) throw new Error('è tornata un’immagine vuota');
-    return bytes;
+    let said = 0;
+    if (!dritte.has(entityId)) {
+      const response = await take();
+      said = response.status;
+      if (response.ok) {
+        const bytes = Buffer.from(await response.arrayBuffer());
+        if (bytes.length) return bytes;
+      }
+    }
+
+    // Non ce l'ha fatta: ce lo si va a prendere da soli.
+    const alone = await ourselves(entityId);
+    if (alone) {
+      if (!dritte.has(entityId)) console.log(`${entityId}: la via di casa non porta niente, si va dritti`);
+      dritte.add(entityId);
+      return alone;
+    }
+
+    // Nemmeno cosi': al giro dopo si riprova anche quella di casa, che magari
+    // nel frattempo e' tornata a funzionare.
+    dritte.delete(entityId);
+    throw new Error(said ? `la telecamera non ha risposto (${said})` : 'la telecamera non ha mandato niente');
   }
 
   async callService(domain: string, service: string, entityId: string, data: Record<string, unknown> = {}): Promise<void> {
