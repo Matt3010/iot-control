@@ -1,4 +1,5 @@
-import type { Category, Group, Place, PlaceMap } from '../types.js';
+import type { Capability, DeviceValue } from '../../../shared/protocol.js';
+import type { Agent, Category, Device, Group, Place, PlaceMap } from '../types.js';
 import type { OwnerState } from '../managers/StateManager.js';
 
 /** The shapes that leave the API: entities never go out untouched. */
@@ -41,7 +42,38 @@ export interface PlaceView {
   lng: number;
   note: string;
   private: boolean;
+  /** Gli agenti appesi a questo luogo: nessuno, uno, o più se le reti sono separate. */
+  agentIds: string[];
   createdAt: string;
+}
+
+/**
+ * Quello che di un posto può vedere un estraneo. Il legame con l'agente non
+ * esce mai: da fuori una mappa si guarda, e le luci di casa d'altri non si
+ * toccano nemmeno per sbaglio.
+ */
+export type PublicPlaceView = Omit<PlaceView, 'agentIds'>;
+
+export interface AgentView {
+  id: string;
+  name: string;
+  /** Collegata adesso, non "l'ultima volta che". */
+  online: boolean;
+  lastSeenAt: string | null;
+  /** Quanti dispositivi racconta. */
+  devices: number;
+  createdAt: string;
+}
+
+export interface DeviceView {
+  id: string;
+  agentId: string;
+  name: string;
+  capabilities: Capability[];
+  /** Adesso: arriva dalla memoria, non dal disco. */
+  online: boolean;
+  state: Record<string, DeviceValue>;
+  lastSeenAt: string;
 }
 
 export interface StateView {
@@ -82,7 +114,32 @@ export const toPlaceView = (place: Place): PlaceView => ({
   lng: place.lng,
   note: place.note ?? '',
   private: place.private ?? false,
+  agentIds: place.agentIds ?? [],
   createdAt: place.createdAt,
+});
+
+export const toPublicPlaceView = (place: Place): PublicPlaceView => {
+  const { agentIds: _agenti, ...outside } = toPlaceView(place);
+  return outside;
+};
+
+export const toAgentView = (agent: Agent, online: boolean, devices: number): AgentView => ({
+  id: agent.id,
+  name: agent.name,
+  online,
+  lastSeenAt: agent.lastSeenAt,
+  devices,
+  createdAt: agent.createdAt,
+});
+
+export const toDeviceView = (device: Device, live: { online: boolean; state: Record<string, DeviceValue> } | undefined): DeviceView => ({
+  id: device.id,
+  agentId: device.agentId,
+  name: device.name,
+  capabilities: device.capabilities,
+  online: live?.online ?? false,
+  state: live?.state ?? {},
+  lastSeenAt: device.lastSeenAt,
 });
 
 export const toStateView = ({ maps, categories, groups, places }: OwnerState): StateView => ({

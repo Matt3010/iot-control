@@ -1,0 +1,47 @@
+# La scatola che sta in casa. Tre container, una rete sola: quella vera.
+name: place-index
+
+services:
+  # Lui parla ai dispositivi. Tutto il sapere su Tuya, eWeLink, Zigbee sta qui
+  # dentro, e non è roba nostra da mantenere.
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:@@HA_VERSION@@
+    container_name: place-index-ha
+    restart: unless-stopped
+    # Senza la rete dell'host non vede i broadcast, e senza broadcast non trova niente.
+    network_mode: host
+    volumes:
+      - ./homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      TZ: @@TZ@@
+
+  # Lui parla ad Home Assistant e alla tua istanza. Duecento righe che traducono.
+  connector:
+    image: ghcr.io/@@OWNER@@/place-index-connector:@@MAJOR@@
+    container_name: place-index-connector
+    restart: unless-stopped
+    # Anche lui sull'host: così raggiunge HA su localhost senza inventarsi ponti.
+    network_mode: host
+    env_file: .env
+    volumes:
+      - ./connector:/data
+    depends_on:
+      - homeassistant
+    labels:
+      # È questa etichetta a dire a watchtower che di lui può occuparsi.
+      com.centurylinklabs.watchtower.scope: place-index
+
+  # Aggiorna solo quello che porta la nostra etichetta. Home Assistant non ce
+  # l'ha, e non è una dimenticanza: la sua versione la cambi tu, quando hai
+  # letto cosa si rompe.
+  watchtower:
+    image: ghcr.io/nicholas-fedor/watchtower:latest
+    container_name: place-index-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --scope place-index --cleanup --interval 21600
+    labels:
+      # Ce l'ha anche lui, così si tiene aggiornato da solo.
+      com.centurylinklabs.watchtower.scope: place-index

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { auth } from './lib/auth.svelte';
+  import { devices } from './lib/devices.svelte';
   import { readRoute } from './lib/routing';
   import { store } from './lib/store.svelte';
   import { toast } from './lib/toast.svelte';
@@ -29,6 +30,12 @@
   $effect(() => {
     if (!auth.account) return;
     store.load().catch((error: Error) => toast.show(`Caricamento fallito: ${error.message}`));
+
+    // Le case si raccontano da sole: si chiede una volta com'e' messo il
+    // mondo, e da li in poi arriva tutto da un filo aperto.
+    void devices.load();
+    devices.watch();
+    return () => devices.stop();
   });
 
   // The map cursor and the bottom-of-screen rules read these off the body.

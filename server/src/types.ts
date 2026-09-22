@@ -1,3 +1,5 @@
+import type { Capability } from '../../shared/protocol.js';
+
 export interface User {
   id: string;
   /** Minuscola e ripulita: è la chiave con cui si entra. */
@@ -64,7 +66,47 @@ export interface Place {
   note: string;
   /** Un posto privato resta fuori da quello che si pubblica. */
   private: boolean;
+  /**
+   * Gli agenti appesi a questo luogo. Più d'uno quando le reti sono separate —
+   * la sala e la cucina, due edifici — e ognuno porta i suoi dispositivi. Un
+   * indirizzo resta un pin solo, anche con quindici interruttori sotto.
+   */
+  agentIds: string[];
   createdAt: string;
+}
+
+/**
+ * Un agente: il servizio installato in quel posto, che si collega da solo. Il token
+ * non si conserva — si conserva una derivata col suo sale, come per le
+ * password: se ti rubano il file, non ti rubano gli agenti.
+ */
+export interface Agent {
+  id: string;
+  ownerId: string;
+  /** Come lo chiami tu: "Padova". */
+  name: string;
+  salt: string;
+  hash: string;
+  /** L'ultima volta che si è fatto vivo. Nullo se non si è mai collegato. */
+  lastSeenAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * Un dispositivo, per come lo racconta il suo agente. Il nome e quello che sa
+ * fare restano scritti anche quando l'agente è muto: un luogo sulla mappa non
+ * deve sparire perché è saltata la corrente. Lo stato acceso/spento invece no
+ * — quello vale solo adesso, e vive in memoria.
+ */
+export interface Device {
+  id: string;
+  ownerId: string;
+  agentId: string;
+  /** L'id che gli dà il suo agente: unico lì dentro, non nel mondo. */
+  externalId: string;
+  name: string;
+  capabilities: Capability[];
+  lastSeenAt: string;
 }
 
 /** Everything the store holds, and the unit a transaction works on. */
@@ -74,4 +116,6 @@ export interface Database {
   categories: Category[];
   groups: Group[];
   places: Place[];
+  agents: Agent[];
+  devices: Device[];
 }

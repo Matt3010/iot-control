@@ -16,6 +16,7 @@ const placePayload = (mapId: string, draft: Required<Pick<Draft, 'lat' | 'lng'>>
   lat: draft.lat,
   lng: draft.lng,
   private: draft.private ?? false,
+  agentIds: draft.agentIds ?? [],
 });
 
 interface PendingDelete {

@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import { config, dataFile } from '../config.js';
 import { randomUUID } from 'node:crypto';
 import { slugify, uniqueSlug } from '../auth/slug.js';
-import type { Category, Database, Group, Place, PlaceMap, User } from '../types.js';
+import type { Agent, Category, Database, Device, Group, Place, PlaceMap, User } from '../types.js';
 
 /** Chi si era registrato prima che esistessero i link pubblici. */
 function migrateHandles(users: User[]): User[] {
@@ -40,11 +40,17 @@ function migrateSlugs(maps: PlaceMap[]): PlaceMap[] {
   });
 }
 
-/** Un posto scritto quando poteva stare in un gruppo solo. */
-function migratePlace(place: Place & { groupId?: string }): Place {
-  if (Array.isArray(place.groupIds)) return place;
-  const { groupId, ...rest } = place;
-  return { ...rest, groupIds: groupId ? [groupId] : [] };
+/**
+ * Un luogo scritto quando poteva stare in un gruppo solo, o quando di agenti
+ * ne teneva uno solo. Le due cose sono indipendenti: si sistemano entrambe.
+ */
+function migratePlace(place: Place & { groupId?: string; agentId?: string }): Place {
+  const { groupId, agentId, ...rest } = place;
+  return {
+    ...rest,
+    groupIds: Array.isArray(place.groupIds) ? place.groupIds : groupId ? [groupId] : [],
+    agentIds: Array.isArray(place.agentIds) ? place.agentIds : agentId ? [agentId] : [],
+  };
 }
 
 /**
@@ -74,6 +80,8 @@ function migrateToMaps(data: Database): Database {
 
   return {
     users: data.users,
+    agents: data.agents,
+    devices: data.devices,
     maps: data.maps.length ? data.maps : [first],
     categories: data.categories.map((category: Category) => ({ ...category, ownerId: category.ownerId ?? owner })),
     groups: data.groups.map((group: Group & { mapId?: string }) => {
@@ -85,7 +93,7 @@ function migrateToMaps(data: Database): Database {
   };
 }
 
-const empty = (): Database => ({ users: [], maps: [], categories: [], groups: [], places: [] });
+const empty = (): Database => ({ users: [], maps: [], categories: [], groups: [], places: [], agents: [], devices: [] });
 
 /**
  * The working copy a unit of work mutates. Nothing reaches the disk until the
@@ -130,6 +138,9 @@ export class JsonStore {
         categories: Array.isArray(parsed.categories) ? parsed.categories : [],
         groups: Array.isArray(parsed.groups) ? parsed.groups : [],
         places: Array.isArray(parsed.places) ? parsed.places.map(migratePlace) : [],
+        // Chi aveva l'indice prima che gli agenti esistessero: niente agenti, niente dispositivi.
+        agents: Array.isArray(parsed.agents) ? parsed.agents : [],
+        devices: Array.isArray(parsed.devices) ? parsed.devices : [],
       });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;

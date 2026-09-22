@@ -51,6 +51,49 @@
 
 .pin-lock .ico { width: 10px; height: 10px; stroke-width: 2.4; }
 
+/* Quante cose comanda questo pin. Sta in cima nel sistema del pin, che
+   ruotato di 45 gradi vuol dire l'angolo in alto a sinistra sullo schermo:
+   il lucchetto tiene quello a destra, e non si pestano i piedi. */
+.pin-count {
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  display: grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  margin-left: -8.5px;
+  border-radius: 99px;
+  transform: rotate(45deg);
+  background: var(--glass-strong);
+  color: var(--ink-2);
+  font-size: 10.5px;
+  font-weight: 640;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  box-shadow: 0 2px 5px rgb(10 13 18 / 0.45), inset 0 0 0 1px var(--hairline);
+}
+
+/* con qualcosa di acceso il numero si scalda: il pin ha gia' l'alone, questo
+   dice quante cose ci sono sotto */
+.pin.lit .pin-count { color: #d98613; }
+
+@media (prefers-color-scheme: dark) {
+  .pin.lit .pin-count { color: #f0b357; }
+}
+
+/* Un luogo acceso adesso. L'alone e' caldo e non blu, perche' il blu qui
+   dentro vuol dire una cosa sola: dove sei tu. */
+.pin.lit {
+  border-color: rgb(255 255 255 / 0.96);
+  box-shadow:
+    0 5px 14px -4px rgb(10 13 18 / 0.55),
+    inset 0 -2px 6px rgb(0 0 0 / 0.14),
+    0 0 0 3px rgb(217 134 19 / 0.3),
+    0 0 20px 2px rgb(217 134 19 / 0.45);
+}
+
 .leaflet-marker-icon:hover .pin, .pin.is-hover {
   transform: rotate(-45deg) scale(1.12);
   box-shadow: 0 10px 22px -5px rgb(10 13 18 / 0.6), inset 0 -2px 6px rgb(0 0 0 / 0.14);
@@ -306,6 +349,14 @@
 
 .leaflet-popup-content { margin: 0; padding: 14px 16px 12px; width: 232px !important; }
 
+/* Un popup con degli agenti dentro non è un popup di testo: ci stanno
+   interruttori e cursori, e a 232px si rimpicciolirebbe tutto per far
+   stare la larghezza. Meglio allargare la card. Il `min` è per il telefono,
+   dove lo schermo comanda lui. */
+.leaflet-popup.with-agents .leaflet-popup-content {
+  width: min(304px, calc(100vw - 52px)) !important;
+}
+
 .leaflet-popup-tip {
   background: var(--glass-strong);
   border: 1px solid var(--hairline);
@@ -354,6 +405,10 @@
   color: var(--ink-2);
   white-space: pre-wrap;
 }
+
+/* i controlli veri dentro al popup: la scheda e il popup mostrano lo stesso
+   pezzo, quindi non possono raccontare due cose diverse */
+.pop-live { margin-top: 10px; }
 
 .pop-actions {
   display: flex;

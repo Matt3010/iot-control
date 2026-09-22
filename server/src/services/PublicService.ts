@@ -1,5 +1,5 @@
-import type { CategoryView, GroupView, PlaceView, PublicMapView } from '../dto/views.js';
-import { toCategoryView, toGroupView, toPlaceView, toPublicMapView } from '../dto/views.js';
+import type { CategoryView, GroupView, PublicMapView, PublicPlaceView } from '../dto/views.js';
+import { toCategoryView, toGroupView, toPublicMapView, toPublicPlaceView } from '../dto/views.js';
 import type { Visit } from '../managers/PublicManager.js';
 import { publicManager } from '../managers/PublicManager.js';
 
@@ -8,7 +8,7 @@ export interface PublicMapPage {
   map: PublicMapView;
   categories: CategoryView[];
   groups: GroupView[];
-  places: PlaceView[];
+  places: PublicPlaceView[];
 }
 
 export interface PublicProfileView {
@@ -24,7 +24,7 @@ export class PublicService {
       map: toPublicMapView(found.map),
       categories: found.categories.map(toCategoryView),
       groups: found.groups.map(toGroupView),
-      places: found.places.map(toPlaceView),
+      places: found.places.map(toPublicPlaceView),
     };
   }
 

@@ -16,6 +16,10 @@
    * quest'app vuol dire una cosa sola, «questo porta via qualcosa», e lo dice
    * il componente, non un foglio di stile qui accanto.
    *
+   * `size="sm"` lo rimpicciolisce, per quando sta dentro a qualcosa di
+   * piccolo — il foglietto di una domanda, una fascia in fondo a una card.
+   * Vale per le forme che hanno del testo dentro; `icon` ha già la sua misura.
+   *
    * Con `href` diventa un link che si veste da bottone. `extra` serve a chi lo
    * ospita per decorarlo (la classe finisce sull'elemento, ma va raggiunta con
    * :global perché il markup è di questo componente).
@@ -25,6 +29,7 @@
   let {
     look = 'ghost',
     tone,
+    size,
     href,
     disabled = false,
     extra = '',
@@ -33,12 +38,20 @@
   }: {
     look?: Look;
     tone?: 'danger';
+    /** Più piccolo del normale: dentro un popover, in fondo a una card. */
+    size?: 'sm';
     href?: string;
     disabled?: boolean;
     extra?: string;
     children: Snippet;
     [key: string]: unknown;
   } = $props();
+
+  const classes = $derived(
+    ['btn', look, tone === 'danger' ? 'is-danger' : '', size === 'sm' ? 'is-sm' : '', extra]
+      .filter(Boolean)
+      .join(' '),
+  );
 </script>
 
 {#if href}
@@ -52,7 +65,7 @@
     aria-disabled={disabled ? 'true' : undefined}
     tabindex={disabled ? -1 : undefined}
     {...rest}
-    class="btn {look} {tone === 'danger' ? 'is-danger' : ''} {extra}"
+    class={classes}
   >
     {@render children()}
   </a>
@@ -61,7 +74,7 @@
     type="button"
     {disabled}
     {...rest}
-    class="btn {look} {tone === 'danger' ? 'is-danger' : ''} {extra}"
+    class={classes}
   >
     {@render children()}
   </button>
@@ -78,6 +91,16 @@
   .btn:disabled, .btn[aria-disabled='true'] {
     cursor: default;
     pointer-events: none;
+  }
+
+  /* La misura piccola. Sta qui e non in chi lo ospita, se no ogni schermata
+     si inventa la sua. Viene dopo le forme apposta: a parità di peso vince
+     l'ultima, e `icon` resta fuori perché la sua misura ce l'ha già.
+     `nowrap` perché il posto stretto è il motivo per cui esiste. */
+  .btn.is-sm:not(.icon) {
+    padding: 7px 12px;
+    font-size: 12.5px;
+    white-space: nowrap;
   }
 
   /* ------------------------------------------------------------- primary -- */

@@ -131,15 +131,20 @@ export interface PinLook {
   extra?: string;
   /** Un posto privato lo si riconosce dalla mappa, senza aprirlo. */
   locked?: boolean;
+  /** Quante cose si accendono qui. Zero non si scrive. */
+  count?: number;
 }
 
-export function pinIcon({ color, emoji, extra = '', locked = false }: PinLook): L.DivIcon {
+export function pinIcon({ color, emoji, extra = '', locked = false, count = 0 }: PinLook): L.DivIcon {
   const lock = locked ? `<i class="pin-lock">${glyph('lock').outerHTML}</i>` : '';
+  // il lucchetto sta a destra nel sistema del pin, il conto in cima: ruotato
+  // di 45 gradi vuol dire i due angoli alti dello schermo, e non si urtano
+  const tally = count > 0 ? `<i class="pin-count">${count}</i>` : '';
   return L.divIcon({
     className: '',
     html:
       `<div class="pin ${extra}" style="--c:${color ?? DEFAULT_COLOR}">` +
-      `<span>${emoji ?? DEFAULT_EMOJI}</span>${lock}</div>`,
+      `<span>${emoji ?? DEFAULT_EMOJI}</span>${lock}${tally}</div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 36],
     popupAnchor: [0, -34],

@@ -11,6 +11,7 @@
   import MapSwitcher from './MapSwitcher.svelte';
   import PanelSkeleton from './PanelSkeleton.svelte';
   import PlaceList from './PlaceList.svelte';
+  import Tabs from './Tabs.svelte';
   import SearchTrigger from './SearchTrigger.svelte';
   import Button from './Button.svelte';
 
@@ -234,30 +235,23 @@
 
       {#if store.currentPlaces.length}
         <div class="panel-row is-cut" id="list-head">
-          <!-- due modi di leggere lo stesso indice: il riquadro, o le gambe -->
-          <div class="modes" role="group" aria-label="Quali luoghi elencare">
-            <button
-              type="button"
-              class="mode"
-              class:is-on={!near}
-              aria-pressed={!near}
-              title="I luoghi inquadrati adesso"
-              onclick={() => store.setListMode('view')}
-            >
-              In vista
-            </button>
-            <span class="split" aria-hidden="true"></span>
-            <button
-              type="button"
-              class="mode"
-              class:is-on={near}
-              aria-pressed={near}
-              title={here.spot ? 'I luoghi più vicini a te' : 'Usa la tua posizione'}
-              onclick={goNear}
-            >
-              {here.asking ? 'Rilevo la posizione…' : 'Vicino a me'}
-            </button>
-          </div>
+          <!-- due modi di leggere lo stesso indice: il riquadro, o le gambe.
+               "Vicino a me" non è un interruttore: la prima volta chiede dove
+               sei, quindi passa da goNear e non dal solo cambio di modo -->
+          <Tabs
+            look="text"
+            value={near ? 'near' : 'view'}
+            onpick={(id) => (id === 'near' ? goNear() : store.setListMode('view'))}
+            label="Quali luoghi elencare"
+            options={[
+              { id: 'view', label: 'In vista', title: 'I luoghi inquadrati adesso' },
+              {
+                id: 'near',
+                label: here.asking ? 'Rilevo la posizione…' : 'Vicino a me',
+                title: here.spot ? 'I luoghi più vicini a te' : 'Usa la tua posizione',
+              },
+            ]}
+          />
           <span class="list-end">
             <!-- i chilometri partono da qualcosa: qui si dice da cosa, e
                  passandoci sopra quel qualcosa si illumina sulla mappa -->
@@ -340,43 +334,6 @@
 
 /* la testata appartiene alla lista che sta sotto, non allo spazio sopra */
 #list-head { margin-top: 10px; }
-
-/* Non un interruttore appoggiato sopra il pannello, ma la stessa etichetta
-   delle altre sezioni che sa stare in due modi: quella accesa è il titolo,
-   l'altra è lì pronta. */
-.modes {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mode {
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.085em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  opacity: 0.55;
-  transition: color 0.16s, opacity 0.16s;
-}
-
-.mode:hover { opacity: 1; }
-
-.mode.is-on {
-  color: var(--ink);
-  opacity: 1;
-}
-
-.modes .split {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--ink-3);
-  opacity: 0.35;
-}
 
 .list-hint {
   font-size: 10.5px;

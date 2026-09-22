@@ -3,6 +3,7 @@ import { badRequest, notFound } from '../errors/HttpError.js';
 import type { Transaction } from '../persistence/JsonStore.js';
 import { store } from '../persistence/JsonStore.js';
 import { CategoryRepository } from '../repositories/CategoryRepository.js';
+import { AgentRepository } from '../repositories/AgentRepository.js';
 import { GroupRepository } from '../repositories/GroupRepository.js';
 import { MapRepository } from '../repositories/MapRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
@@ -21,7 +22,8 @@ export class PlaceManager {
   create(ownerId: string, dto: CreatePlaceDto): Promise<Place> {
     return store.transaction((tx) => {
       const groupIds = unique(dto.groupIds ?? []);
-      this.#assertRefs(tx, ownerId, dto.mapId, dto.categoryId, groupIds);
+      const agentIds = unique(dto.agentIds ?? []);
+      this.#assertRefs(tx, ownerId, dto.mapId, dto.categoryId, groupIds, agentIds);
 
       return new PlaceRepository(tx).insert({
         mapId: dto.mapId,
@@ -32,6 +34,7 @@ export class PlaceManager {
         lng: dto.lng,
         note: dto.note ?? '',
         private: dto.private ?? false,
+        agentIds,
       });
     });
   }
@@ -43,8 +46,10 @@ export class PlaceManager {
       if (!current || !new MapRepository(tx).owns(ownerId, current.mapId)) throw notFound('posto inesistente');
 
       const groupIds = dto.groupIds ? unique(dto.groupIds) : current.groupIds;
-      this.#assertRefs(tx, ownerId, current.mapId, dto.categoryId ?? current.categoryId, groupIds);
-      return places.update(id, { ...dto, groupIds }) as Place;
+      const agentIds = dto.agentIds ? unique(dto.agentIds) : (current.agentIds ?? []);
+      this.#assertRefs(tx, ownerId, current.mapId, dto.categoryId ?? current.categoryId, groupIds, agentIds);
+
+      return places.update(id, { ...dto, groupIds, agentIds }) as Place;
     });
   }
 
@@ -57,13 +62,23 @@ export class PlaceManager {
     });
   }
 
-  /** Un posto punta solo a cose tue, e a gruppi della sua stessa mappa. */
-  #assertRefs(tx: Transaction, ownerId: string, mapId: string, categoryId: string, groupIds: string[]): void {
+  /** Un posto punta solo a cose tue: la mappa, la categoria, i gruppi, l'agente. */
+  #assertRefs(
+    tx: Transaction,
+    ownerId: string,
+    mapId: string,
+    categoryId: string,
+    groupIds: string[],
+    agentIds: string[],
+  ): void {
     if (!new MapRepository(tx).owns(ownerId, mapId)) throw notFound('mappa inesistente');
     if (!new CategoryRepository(tx).owns(ownerId, categoryId)) throw badRequest('categoria inesistente');
 
     const groups = new GroupRepository(tx);
     if (groupIds.some((id) => !groups.owns(ownerId, id))) throw badRequest('gruppo inesistente');
+
+    const agents = new AgentRepository(tx);
+    if (agentIds.some((id) => !agents.owns(ownerId, id))) throw badRequest('agente inesistente');
   }
 }
 

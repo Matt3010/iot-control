@@ -1,13 +1,17 @@
 import { Router } from 'express';
 import { requireUser } from '../auth/strategy.js';
+import { agentController } from '../controllers/AgentController.js';
 import { authController } from '../controllers/AuthController.js';
+import { deviceController } from '../controllers/DeviceController.js';
 import { mapController } from '../controllers/MapController.js';
 import { publicController } from '../controllers/PublicController.js';
 import { categoryController } from '../controllers/CategoryController.js';
 import { groupController } from '../controllers/GroupController.js';
 import { placeController } from '../controllers/PlaceController.js';
 import { stateController } from '../controllers/StateController.js';
+import { AgentDto } from '../dto/agent.dto.js';
 import { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
+import { CommandDto } from '../dto/device.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/group.dto.js';
 import { MapDto } from '../dto/map.dto.js';
@@ -27,6 +31,12 @@ apiRouter.get('/public/u/:handle', publicController.profile);
 apiRouter.get('/public/u/:handle/:slug', publicController.map);
 // l'indirizzo di prima, senza handle: vive per non rompere i link già in giro
 apiRouter.get('/public/m/:slug', publicController.map);
+
+// quello che scarica una macchina appena accesa: non è entrata da
+// nessuna parte, e l'unica prova che porta è il token nell'indirizzo — lo
+// stesso con cui poi si collegherà.
+apiRouter.get('/agents/:id/install', agentController.install);
+apiRouter.get('/agents/:id/compose.yml', agentController.compose);
 
 // --- da qui in poi serve essere entrati ------------------------------------
 apiRouter.use(requireUser);
@@ -70,3 +80,21 @@ apiRouter
   .route('/places/:id')
   .put(validateBody(UpdatePlaceDto), placeController.update)
   .delete(placeController.remove);
+
+apiRouter
+  .route('/agents')
+  .get(agentController.list)
+  .post(validateBody(AgentDto), agentController.create);
+
+apiRouter
+  .route('/agents/:id')
+  .put(validateBody(AgentDto), agentController.rename)
+  .delete(agentController.remove);
+
+/** Rigenera il token: quello di prima smette di funzionare all'istante. */
+apiRouter.post('/agents/:id/token', agentController.rotate);
+
+apiRouter.get('/devices', deviceController.list);
+/** Il filo aperto: da qui scendono gli stati mentre cambiano. */
+apiRouter.get('/devices/stream', deviceController.stream);
+apiRouter.post('/devices/:id/command', validateBody(CommandDto), deviceController.command);

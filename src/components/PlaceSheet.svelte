@@ -4,8 +4,10 @@
   import { swipeToClose } from '../lib/swipe';
   import { ui } from '../lib/ui.svelte';
   import Chip from './Chip.svelte';
+  import AgentField from './AgentField.svelte';
   import Icon from './Icon.svelte';
   import Switch from './Switch.svelte';
+  import Tabs from './Tabs.svelte';
   import Button from './Button.svelte';
 
   // Closing the sheet clears the draft a beat before this component goes away,
@@ -13,9 +15,34 @@
   const draft = $derived(ui.draft);
   const editing = $derived(Boolean(draft?.id));
 
-  // A new place starts in the first category and in the group you are looking at.
+  /**
+   * La bozza deve puntare solo a cose che esistono. Vale all'apertura — un
+   * luogo nuovo nasce nella prima categoria — e vale dopo, perché la scheda
+   * resta aperta mentre vai nell'altra ed elimini proprio quella categoria.
+   * Prima se ne accorgeva solo il server, al salvataggio, e diceva di no.
+   */
   $effect(() => {
-    if (draft && !draft.categoryId && store.categories.length) draft.categoryId = store.categories[0]!.id;
+    if (!draft) return;
+
+    // una categoria si porta via i suoi luoghi: se stavi modificando uno di
+    // quelli, non c'è più niente da modificare
+    if (draft.id && draft.key && !store.places.some((place) => place.key === draft.key)) {
+      ui.closePlace();
+      return;
+    }
+
+    if (draft.mapId && !store.maps.some((map) => map.id === draft.mapId)) {
+      ui.closePlace();
+      return;
+    }
+
+    if (!store.categories.some((category) => category.id === draft.categoryId)) {
+      draft.categoryId = store.categories[0]?.id ?? '';
+    }
+
+    const held = draft.groupIds ?? [];
+    const alive = held.filter((id) => store.groups.some((group) => group.id === id));
+    if (alive.length !== held.length) draft.groupIds = alive;
   });
 
   function save(event: SubmitEvent) {
@@ -27,6 +54,41 @@
     }
 
     const name = (draft.name ?? '').trim();
+    // dalla linguetta "Agenti" il campo del nome non è in pagina, quindi il
+    // browser non può lamentarsi da solo: lo si riporta dove si rimedia
+    if (!name) {
+      tab = 'edit';
+      toast.show('Dai un nome al luogo prima di salvare');
+      return;
+    }
+    // Un luogo con un agente è casa tua, o il locale: quasi mai una cosa da
+    // mettere in bio. Finché resta pubblico la domanda ha senso, quindi si
+    // ripresenta a ogni salvataggio — risponderci una volta non la chiude per
+    // sempre, renderlo privato sì.
+    const salva = event.submitter ?? document.querySelector<HTMLElement>('#place-form .save-go');
+    if ((draft.agentIds ?? []).length && !draft.private && salva) {
+      ui.askSure(salva as HTMLElement, {
+        title: 'Rendere privato questo luogo?',
+        detail:
+          "Qui dentro c'è qualcosa che si accende. Privato vuol dire fuori dalla mappa pubblica: né il luogo, né i suoi agenti.",
+        verb: 'Rendi privato',
+        tone: 'plain',
+        no: 'Lascia pubblico',
+        onYes: () => {
+          if (draft) draft.private = true;
+          commit(name);
+        },
+        onNo: () => commit(name),
+      });
+      return;
+    }
+
+    commit(name);
+  }
+
+  /** Il salvataggio vero, dopo che si è deciso del privato. */
+  function commit(name: string) {
+    if (!draft) return;
     store.savePlace({ ...draft, name });
     // Saving something the filters would hide makes it vanish; show it instead.
     if (store.hiddenCategories.includes(draft.categoryId)) store.toggleCategory(draft.categoryId);
@@ -50,6 +112,14 @@
 
   /** I gruppi sono tuoi e valgono su tutte le mappe: ci sono tutti. */
   const groupsHere = $derived(store.groups);
+
+  /**
+   * Due linguette, come nell'altra scheda. Un agente ha bisogno della colonna
+   * intera — i suoi interruttori, i suoi cursori, il comando da lanciare — e
+   * schiacciato fra i gruppi e le note non ci stava.
+   */
+  let tab = $state<'edit' | 'agent'>('edit');
+
 </script>
 
 {#if draft}
@@ -66,7 +136,18 @@
       </Button>
     </header>
 
+    <Tabs
+      value={tab}
+      onpick={(id) => (tab = id)}
+      options={[
+        { id: 'edit', label: 'Modifica' },
+        { id: 'agent', label: 'Agenti' },
+      ]}
+      label="Cosa stai modificando"
+    />
+
     <form id="place-form" onsubmit={save}>
+      {#if tab === 'edit'}
       <label class="field">
         <span class="eyebrow">Nome del luogo</span>
         <!-- svelte-ignore a11y_autofocus -->
@@ -142,7 +223,16 @@
     </label>
 
     <p id="coords" class="coords">{draft.lat.toFixed(5)}, {draft.lng.toFixed(5)}</p>
+      {:else}
+        <AgentField
+          agentIds={draft.agentIds ?? []}
+          placeKey={draft.key}
+          onchange={(ids) => draft && (draft.agentIds = ids)}
+        />
+      {/if}
 
+    <!-- i tasti restano sotto tutt'e due: una casa scelta e non salvata
+         sarebbe una casa persa -->
     <div class="actions">
       {#if editing}
         <Button
@@ -159,7 +249,7 @@
         </Button>
       {/if}
       <Button look="ghost" onclick={() => ui.closePlace()}>Annulla</Button>
-      <Button look="primary" type="submit">Salva</Button>
+      <Button look="primary" type="submit" extra="save-go">Salva</Button>
     </div>
   </form>
   </aside>
@@ -179,11 +269,13 @@
 
 #place-form { display: grid; gap: 14px; }
 
+
 /* un interruttore, non una casella: la differenza si vede da lontano */
 /* the container is drawn here; the chips inside it come from <Chip> */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .chips :global(.chip) { cursor: pointer; }
+
 
 .coords {
   margin: -4px 0 0;

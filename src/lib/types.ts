@@ -1,3 +1,5 @@
+export type { Capability, DeviceValue } from '../../shared/protocol';
+
 export interface PlaceMap {
   id: string;
   name: string;
@@ -36,6 +38,8 @@ export interface Place {
   note: string;
   /** Un posto privato resta fuori da quello che si pubblica. */
   private: boolean;
+  /** Gli agenti appesi a questo luogo: più d'uno quando le reti sono separate. */
+  agentIds: string[];
   createdAt: string;
 }
 
@@ -62,6 +66,8 @@ export interface Draft {
   /** Di quale mappa è: un posto che modifichi non cambia casa. */
   mapId?: string;
   private?: boolean;
+  /** Un elenco vuoto li stacca tutti: il luogo resta, i fili si tagliano. */
+  agentIds?: string[];
   name?: string;
   note?: string;
   categoryId?: string;

@@ -56,6 +56,14 @@ export class CreatePlaceDto {
   @IsOptional()
   @IsBoolean()
   private?: boolean;
+
+  /** Gli agenti che stanno a questo indirizzo: reti separate, agenti separati. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(24)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  agentIds?: string[];
 }
 
 export class UpdatePlaceDto {
@@ -98,4 +106,12 @@ export class UpdatePlaceDto {
   @IsOptional()
   @IsBoolean()
   private?: boolean;
+
+  /** Un elenco vuoto li stacca tutti: il luogo resta, i fili si tagliano. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(24)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  agentIds?: string[];
 }

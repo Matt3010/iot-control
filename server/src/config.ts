@@ -10,6 +10,8 @@ export const config = {
   dataDir: process.env.DATA_DIR ?? path.join(projectRoot, 'data'),
   /** The built front-end, served by this same process. */
   clientDir: path.join(projectRoot, 'dist'),
+  /** I modelli che l'installer di un agente scarica da qui. */
+  deployDir: path.join(projectRoot, 'connector', 'deploy'),
   bodyLimit: '128kb',
   auth: {
     /** Set it in production; otherwise one is generated and kept next to the data. */
@@ -23,6 +25,20 @@ export const config = {
      * ALLOW_SIGNUP=false.
      */
     allowSignup: process.env.ALLOW_SIGNUP !== 'false',
+  },
+  /**
+   * Come si compone la scatola che va dove sta un agente. Sono numeri che cambiano
+   * quando esce una versione, non quando cambia il codice: stanno
+   * nell'ambiente perché aggiornarli non deve voler dire ricompilare.
+   */
+  house: {
+    /** Chi possiede le immagini su GHCR: di solito il tuo utente GitHub. */
+    owner: process.env.GHCR_OWNER ?? 'place-index',
+    /** L'etichetta grossa che gli agenti seguono: le correzioni sì, le rotture no. */
+    connectorMajor: process.env.CONNECTOR_MAJOR ?? '1',
+    /** Fissata apposta: Home Assistant si aggiorna quando lo decidi tu. */
+    haVersion: process.env.HA_VERSION ?? '2025.9.1',
+    timezone: process.env.HOUSE_TZ ?? 'Europe/Rome',
   },
 } as const;
 

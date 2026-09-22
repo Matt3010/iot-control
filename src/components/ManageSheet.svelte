@@ -14,6 +14,7 @@
   import LinkRow from './LinkRow.svelte';
   import Row from './Row.svelte';
   import Switch from './Switch.svelte';
+  import Tabs from './Tabs.svelte';
   import Button from './Button.svelte';
 
   /** Una volta sola, perché le domande parlino tutte la stessa lingua. */
@@ -162,35 +163,16 @@
     </Button>
   </header>
 
-  <div class="tabs" role="tablist">
-    <button
-      class="tab"
-      class:is-on={ui.manageTab === 'categories'}
-      type="button"
-      role="tab"
-      onclick={() => (ui.manageTab = 'categories')}
-    >
-      Categorie
-    </button>
-    <button
-      class="tab"
-      class:is-on={ui.manageTab === 'groups'}
-      type="button"
-      role="tab"
-      onclick={() => (ui.manageTab = 'groups')}
-    >
-      Gruppi
-    </button>
-    <button
-      class="tab"
-      class:is-on={ui.manageTab === 'maps'}
-      type="button"
-      role="tab"
-      onclick={() => (ui.manageTab = 'maps')}
-    >
-      Mappe
-    </button>
-  </div>
+  <Tabs
+    value={ui.manageTab}
+    onpick={(id) => (ui.manageTab = id)}
+    options={[
+      { id: 'categories', label: 'Categorie' },
+      { id: 'groups', label: 'Gruppi' },
+      { id: 'maps', label: 'Mappe' },
+    ]}
+    label="Cosa stai gestendo"
+  />
 
   {#if ui.manageTab === 'categories'}
     <div class="tab-panel">
@@ -517,39 +499,6 @@
 .swatch:hover {
   transform: scale(1.08);
   box-shadow: inset 0 0 0 1px rgb(14 17 22 / 0.12), 0 2px 8px rgb(10 13 18 / 0.3);
-}
-
-/* tabs -------------------------------------------------------------------- */
-
-.tabs {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  margin-bottom: 12px;
-  border-radius: 99px;
-  background: var(--sunken);
-}
-
-.tab {
-  flex: 1 1 50%;
-  min-width: 0;
-  padding: 7px 12px;
-  border: 0;
-  border-radius: 99px;
-  background: none;
-  color: var(--ink-3);
-  font-size: 12.5px;
-  font-weight: 540;
-  transition: background 0.16s, color 0.16s, box-shadow 0.16s;
-}
-
-.tab:hover { color: var(--ink-2); }
-
-.tab.is-on {
-  background: var(--glass-strong);
-  color: var(--ink);
-  /* a wide blur would bleed past the 3px gutter and read as less padding below */
-  box-shadow: 0 1px 2px rgb(10 13 18 / 0.18);
 }
 
 /* the row that adds one more ----------------------------------------------- */

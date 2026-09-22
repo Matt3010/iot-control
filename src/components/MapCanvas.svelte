@@ -1,5 +1,7 @@
 <script lang="ts">
   import L, { type Marker } from 'leaflet';
+  import { mount, unmount } from 'svelte';
+  import { devices } from '../lib/devices.svelte';
   import { here } from '../lib/here.svelte';
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { clusterGroup, createMap, DEFAULT_COLOR, glyph, meIcon, pinIcon } from '../lib/mapkit';
@@ -7,19 +9,33 @@
   import { store } from '../lib/store.svelte';
   import type { Category, LocalPlace } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
+  import AgentStack from './AgentStack.svelte';
 
   let container: HTMLDivElement;
   let map: L.Map;
   let clusters: L.MarkerClusterGroup;
   const markers = new Map<string, Marker>();
   let draftMarker: Marker | null = null;
+  /**
+   * I controlli dentro un popup sono un componente vero, montato a mano:
+   * Leaflet possiede quel DOM, ma da lì in giù torna a comandare Svelte — e
+   * così il cursore della luce è lo stesso della scheda, non una copia.
+   */
+  let popupControls: Record<string, unknown> | null = null;
+
+  function closeControls(): void {
+    if (!popupControls) return;
+    void unmount(popupControls);
+    popupControls = null;
+  }
 
   /** Il pin di un posto: colore ed emoji della sua categoria. */
-  const lookOf = (category: Category | undefined, extra = '', locked = false) => ({
+  const lookOf = (category: Category | undefined, extra = '', locked = false, count = 0) => ({
     color: category?.color,
     emoji: category?.emoji,
     extra,
     locked,
+    count,
   });
 
   /** The popup stays imperative: Leaflet owns its lifecycle, not Svelte. */
@@ -54,6 +70,15 @@
     note.textContent = place.note || '';
     note.hidden = !place.note;
 
+    // quello che si accende sta sopra ai comandi: è la cosa per cui hai aperto
+    const agentIds = place.agentIds ?? [];
+    const live = document.createElement('div');
+    if (agentIds.length) {
+      live.className = 'pop-live';
+      closeControls();
+      popupControls = mount(AgentStack, { target: live, props: { agentIds } });
+    }
+
     const actions = document.createElement('div');
     actions.className = 'pop-actions';
 
@@ -72,7 +97,9 @@
     directions.append(glyph('directions'), document.createTextNode('Indicazioni'));
 
     actions.append(edit, directions);
-    node.append(badge, name, note, actions);
+    node.append(badge, name, note);
+    if (agentIds.length) node.append(live);
+    node.append(actions);
     return node;
   }
 
@@ -109,10 +136,12 @@
     });
     map.on('popupclose', () => {
       mapBridge.activeKey = null;
+      closeControls();
     });
 
     return () => {
       mapBridge.detach(map);
+      closeControls();
       map.remove();
       markers.clear();
     };
@@ -135,21 +164,34 @@
       let marker = markers.get(place.key);
 
       const colour = category?.color ?? DEFAULT_COLOR;
+      // un agente sotto cui è rimasto acceso qualcosa si vede da lontano
+      const lit = devices.anyOn(place.agentIds) ? 'lit' : '';
+      // quanti agenti stanno a questo indirizzo: il numero nell'altro angolo.
+      // Sono loro e non i dispositivi, perché un agente appena creato non ne
+      // ha ancora nessuno, e un bollino che compare due giorni dopo non serve.
+      const count = place.agentIds?.length ?? 0;
 
       if (!marker) {
         marker = L.marker([place.lat, place.lng], {
-          icon: pinIcon(lookOf(category, '', place.private)),
+          icon: pinIcon(lookOf(category, lit, place.private, count)),
           riseOnHover: true,
           colour,
         } as L.MarkerOptions);
         markers.set(place.key, marker);
       } else {
         marker.setLatLng([place.lat, place.lng]);
-        marker.setIcon(pinIcon(lookOf(category, '', place.private)));
+        marker.setIcon(pinIcon(lookOf(category, lit, place.private, count)));
         // il grappolo legge il colore da qui: se cambia categoria deve saperlo
         (marker.options as { colour?: string }).colour = colour;
       }
-      marker.bindPopup(() => popupFor(place), { closeButton: false, offset: [0, 2], key: place.key } as L.PopupOptions);
+      // con degli agenti dentro il popup si allarga: quella card ha
+      // interruttori e cursori, e a 232px vivrebbe stretta
+      marker.bindPopup(() => popupFor(place), {
+        closeButton: false,
+        offset: [0, 2],
+        key: place.key,
+        className: (place.agentIds ?? []).length ? 'with-agents' : '',
+      } as L.PopupOptions);
 
       // The pin being edited steps aside for the draggable draft standing in for it.
       const onMap = store.visible(place) && ui.draft?.key !== place.key;
@@ -198,9 +240,19 @@
     }
 
     const category = store.categoryOf(draft.categoryId ?? '');
+    // Il pin della bozza prende il posto di quello vero mentre la scheda è
+    // aperta: deve dire le stesse cose, se no aprendo un luogo i suoi agenti
+    // sembrano spariti.
+    const look = lookOf(
+      category,
+      [draft.id ? '' : 'draft', devices.anyOn(draft.agentIds) ? 'lit' : ''].filter(Boolean).join(' '),
+      draft.private ?? false,
+      draft.agentIds?.length ?? 0,
+    );
+
     if (!draftMarker) {
       draftMarker = L.marker([draft.lat, draft.lng], {
-        icon: pinIcon(lookOf(category, draft.id ? '' : 'draft', draft.private ?? false)),
+        icon: pinIcon(look),
         draggable: true,
         zIndexOffset: 1000,
       }).addTo(map);
@@ -213,7 +265,7 @@
       });
     } else {
       draftMarker.setLatLng([draft.lat, draft.lng]);
-      draftMarker.setIcon(pinIcon(lookOf(category, draft.id ? '' : 'draft', draft.private ?? false)));
+      draftMarker.setIcon(pinIcon(look));
     }
   });
 </script>

@@ -9,16 +9,27 @@ export interface EmojiRequest {
   onPick: (emoji: string) => void;
 }
 
-/** Una domanda prima di una cosa che non torna indietro. */
+/**
+ * Una domanda attaccata al tasto che l'ha fatta nascere. Di solito prima di
+ * una cosa che non torna indietro — e allora il tasto è rosso. Ma a volte è
+ * solo un bivio (`tone: 'plain'`): lì il rosso direbbe una cosa falsa, e le
+ * due strade vanno avanti entrambe.
+ */
 export interface SureRequest {
   anchor: HTMLElement;
-  /** Cosa sparisce, detto con il suo nome. */
+  /** Cosa succede, detto con il suo nome. */
   title: string;
   /** Cosa si porta dietro: si scrive solo se si porta dietro qualcosa. */
   detail?: string;
-  /** Il verbo sul tasto rosso: "Elimina", "Sciogli". */
+  /** Il verbo sul tasto di conferma: "Elimina", "Sciogli", "Rendi privato". */
   verb: string;
   onYes: () => void;
+  /** Il tasto di sinistra. "Annulla" se non lo dici. */
+  no?: string;
+  /** Cosa fare scegliendo quello: niente, se non lo dici — e allora si chiude e basta. */
+  onNo?: () => void;
+  /** Rosso solo quando porta via qualcosa. */
+  tone?: 'danger' | 'plain';
 }
 
 export interface ColorRequest {

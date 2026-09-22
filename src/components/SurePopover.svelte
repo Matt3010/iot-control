@@ -4,9 +4,12 @@
   import Button from './Button.svelte';
 
   /**
-   * La domanda prima di una cosa che non torna indietro. Sta attaccata al
-   * tasto che l'ha fatta nascere, dice per nome cosa sparisce e cosa si porta
-   * dietro, e non chiede mai per cose che si possono rifare.
+   * La domanda attaccata al tasto che l'ha fatta nascere. Dice per nome cosa
+   * succede e cosa si porta dietro.
+   *
+   * Quasi sempre è l'ultimo passo prima di una cosa che non torna indietro, e
+   * allora il tasto è rosso. Con `tone: 'plain'` invece è un bivio — «privato
+   * o pubblico?» — e lì il rosso direbbe che una delle due strade fa male.
    */
   const request = $derived(ui.sure!);
   const at = $derived(placeAnchored(request.anchor, 264, request.detail ? 132 : 108));
@@ -15,6 +18,13 @@
     const run = request.onYes;
     ui.sure = null;
     run();
+  }
+
+  /** Anche il no può fare qualcosa: in un bivio l'altra strada è una strada. */
+  function no() {
+    const run = request.onNo;
+    ui.sure = null;
+    run?.();
   }
 </script>
 
@@ -29,8 +39,10 @@
   <p class="sure-what">{request.title}</p>
   {#if request.detail}<p class="sure-detail">{request.detail}</p>{/if}
   <div class="sure-acts">
-    <Button look="ghost" extra="sure-no" onclick={() => (ui.sure = null)}>Annulla</Button>
-    <Button look="danger-solid" onclick={yes}>{request.verb}</Button>
+    <Button look="ghost" size="sm" onclick={no}>{request.no ?? 'Annulla'}</Button>
+    <Button look={request.tone === 'plain' ? 'primary' : 'danger-solid'} size="sm" onclick={yes}>
+      {request.verb}
+    </Button>
   </div>
 </div>
 
@@ -68,6 +80,4 @@
     margin-top: 12px;
   }
 
-  /* i due tassi sono piccoli come la domanda: non è una schermata, è un foglietto */
-  .sure-acts :global(.sure-no) { padding: 7px 12px; font-size: 12.5px; }
 </style>

@@ -1,0 +1,22 @@
+{
+  "name": "place-index-connector",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Il servizio che sta in casa: traduce Home Assistant nel protocollo del backend",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
