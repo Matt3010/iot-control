@@ -1,6 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ownerOf } from '../auth/owner.js';
-import type { CommandDto } from '../dto/device.dto.js';
 import type { SceneDto } from '../dto/scene.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import { sceneService } from '../services/SceneService.js';
@@ -39,11 +38,10 @@ export class SceneController {
     }
   };
 
-  /** La stessa cosa a tutti quelli che ci stanno dentro. */
-  command = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  /** Tutte le sue righe insieme. Non prende niente: la scena è già scritta. */
+  run = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { code, value } = dtoOf<CommandDto>(req);
-      await sceneService.command(ownerOf(req), req.params.id as string, code, value);
+      await sceneService.run(ownerOf(req), req.params.id as string);
       res.status(204).end();
     } catch (error) {
       next(error);

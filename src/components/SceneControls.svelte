@@ -1,54 +1,44 @@
 <script lang="ts">
   import { devices, type Scene } from '../lib/devices.svelte';
-  import type { Capability } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
-  import Chip from './Chip.svelte';
+  import Button from './Button.svelte';
   import Icon from './Icon.svelte';
 
   /**
-   * Un insieme: più dispositivi che rispondono a un colpo solo.
+   * Una scena: più cose che partono insieme, ognuna con la sua.
    *
-   * Non finge di essere un dispositivo. Non dice «acceso», perché due tende
-   * possono stare una aperta e una chiusa e non esiste una parola sola per
-   * quello stato; dice chi c'è dentro e cosa si può chiedergli. Lo stato vero
-   * resta dei dispositivi, ognuno con il suo.
+   * Non finge di essere un dispositivo e non ha un interruttore: non c'è un
+   * «acceso» da mostrare, perché due tende possono stare una aperta e una
+   * chiusa. C'è un tasto solo — parte — e sotto, a parole, cosa succede
+   * quando lo premi. Lo stato vero resta dei dispositivi, ognuno col suo.
    */
   let { scene }: { scene: Scene } = $props();
 
   const members = $derived(devices.membersOf(scene));
-  const actions = $derived(devices.actionsOf(scene));
   const live = $derived(devices.reachable(scene));
-  /** Quanti non rispondono: si dice, perché un insieme parte a metà. */
+  /** Quanti non rispondono: si dice, perché una scena può partire a metà. */
   const mute = $derived(members.filter((device) => !device.online).length);
-
-  const busy = (code: string) => devices.busy.includes(`${scene.id}:${code}`);
+  const busy = $derived(devices.busy.includes(`scena:${scene.id}`));
 
   /**
    * Niente parte senza un sì, come per un dispositivo solo — e qui ancora di
    * più: quello che si muove è più d'uno, e magari in stanze dove non sei.
    */
-  function confirm(anchor: HTMLElement, verb: string, run: () => void): void {
-    const quanti = members.length === 1 ? 'un dispositivo' : `${members.length} dispositivi`;
-    ui.askSure(anchor, {
-      title: `${verb} «${scene.name}»?`,
-      detail: `Parte su ${quanti}${mute ? `, ma ${mute} non rispond${mute === 1 ? 'e' : 'ono'}` : ''}.`,
-      verb,
+  function ask(event: MouseEvent): void {
+    if (busy || !live) return;
+    const quante = scene.steps.length === 1 ? 'una cosa' : `${scene.steps.length} cose`;
+    ui.askSure(event.currentTarget as HTMLElement, {
+      title: `Far partire «${scene.name}»?`,
+      detail: `Muove ${quante}${mute ? `, ma ${mute} non rispond${mute === 1 ? 'e' : 'ono'}` : ''}.`,
+      verb: 'Parti',
       tone: 'plain',
       no: 'Annulla',
-      onYes: run,
+      onYes: () => void devices.runScene(scene),
     });
-  }
-
-  function askSwitch(event: MouseEvent, capability: Capability, on: boolean): void {
-    event.preventDefault();
-    if (busy(capability.code)) return;
-    confirm(event.currentTarget as HTMLElement, on ? 'Accendi' : 'Spegni', () =>
-      void devices.runScene(scene, capability.code, on),
-    );
   }
 </script>
 
-<div class="set" class:is-off={!live}>
+<div class="set" class:is-off={!live} class:is-busy={busy}>
   <div class="set-head">
     <span class="set-mark" aria-hidden="true"><Icon name="layers" /></span>
     <span class="set-name">{scene.name}</span>
@@ -57,85 +47,44 @@
         <Icon name="alert" />
       </span>
     {/if}
+    <Button
+      look="primary"
+      size="sm"
+      extra="set-go"
+      disabled={!scene.steps.length || !live || busy}
+      onclick={ask}
+    >
+      {busy ? 'Parte…' : 'Parti'}
+    </Button>
   </div>
 
-  <div class="set-who">
-    {#if members.length}
-      {members.map((device) => device.name).join(' · ')}
-    {:else}
-      Non c’è ancora niente dentro.
-    {/if}
-  </div>
-
-  {#if actions.length}
-    <div class="set-body">
-      {#each actions as capability (capability.code)}
-        {#if capability.kind === 'switch'}
-          <!-- Il clic si ferma qui: lo Switch non arriva a cambiare, e questo
-               riquadro è anche l'ancora a cui si attacca la domanda. Un
-               insieme non ha un «acceso» suo, quindi la levetta parte spenta
-               e serve solo a dire da che parte stai premendo. -->
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="row" class:is-busy={busy(capability.code)}>
-            <span class="row-what">{capability.label}</span>
-            <span class="pair">
-              <Chip
-                label="Spegni"
-                look="off"
-                size="sm"
-                disabled={!live || busy(capability.code)}
-                onclick={(event: MouseEvent) => askSwitch(event, capability, false)}
-              />
-              <Chip
-                label="Accendi"
-                look="off"
-                size="sm"
-                disabled={!live || busy(capability.code)}
-                onclick={(event: MouseEvent) => askSwitch(event, capability, true)}
-              />
-            </span>
-          </div>
-        {:else if capability.kind === 'enum'}
-          <div class="row" class:is-busy={busy(capability.code)}>
-            <span class="row-what">{capability.label}</span>
-            <span class="pair">
-              {#each capability.values as value (value)}
-                <Chip
-                  label={value}
-                  look="off"
-                  size="sm"
-                  disabled={!live || busy(capability.code)}
-                  onclick={(event: MouseEvent) =>
-                    confirm(event.currentTarget as HTMLElement, value, () =>
-                      void devices.runScene(scene, capability.code, value),
-                    )}
-                />
-              {/each}
-            </span>
-          </div>
-        {/if}
+  {#if scene.steps.length}
+    <ul class="steps">
+      {#each scene.steps as step, at (`${step.deviceId}:${step.code}:${at}`)}
+        {@const says = devices.saysOf(step)}
+        <li>
+          <span class="who">{says.who}</span>
+          <span class="what">{says.what}</span>
+        </li>
       {/each}
-    </div>
-  {:else if members.length}
-    <p class="set-none">
-      Questi non hanno niente in comune da fare insieme. Un insieme mostra solo quello che sanno
-      fare <b>tutti</b>.
-    </p>
+    </ul>
+  {:else}
+    <p class="set-none">Non c’è ancora niente dentro: aggiungi una riga qui sotto.</p>
   {/if}
 </div>
 
 <style>
   .set {
     display: grid;
-    gap: 8px;
+    gap: 9px;
     padding: 11px 12px 12px;
     border-radius: var(--r-md);
     background: var(--sunken);
     box-shadow: inset 0 0 0 1px var(--hairline-soft);
+    transition: opacity 0.16s;
   }
 
-  .set.is-off { opacity: 0.6; }
+  .set.is-off, .set.is-busy { opacity: 0.6; }
 
   .set-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
@@ -168,33 +117,28 @@
 
   .set-away :global(.ico) { width: 14px; height: 14px; }
 
-  /* chi c'è dentro, smorzato: è un promemoria, non un elenco da leggere */
-  .set-who {
-    font-size: 11px;
-    line-height: 1.45;
-    color: var(--ink-3);
+  /* cosa succede quando parte, riga per riga: una scena si legge per sapere
+     cosa muove, e il nome di chi si muove va davanti */
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+
+  .steps li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .who {
+    min-width: 0;
+    font-size: 12px;
+    color: var(--ink-2);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .set-body { display: grid; gap: 7px; }
-
-  .row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    transition: opacity 0.16s;
-  }
-
-  .row.is-busy { opacity: 0.55; pointer-events: none; }
-
-  .row-what { font-size: 12px; font-weight: 540; color: var(--ink-2); }
-
-  .pair { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+  .what { flex: none; font-size: 12px; font-weight: 560; color: var(--ink); }
 
   .set-none { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
-
-  .set-none b { font-weight: 600; color: var(--ink-2); }
 </style>

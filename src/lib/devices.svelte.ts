@@ -23,17 +23,24 @@ export interface Device {
   lastSeenAt: string;
 }
 
+/** Una riga di una scena: a chi, cosa, e con che valore. */
+export interface SceneStep {
+  deviceId: string;
+  code: string;
+  value: DeviceValue;
+}
+
 /**
- * Più dispositivi che rispondono insieme: un nome e un elenco.
+ * Più cose che partono insieme, ognuna con la sua azione.
  *
- * Le azioni non stanno qui: sono quelle che i suoi dispositivi hanno in
- * comune, e si ricavano ogni volta. Così un insieme non può promettere una
- * cosa che i suoi non sanno più fare.
+ * «Sera» chiude le tende e accende l'abat-jour: due azioni diverse su due
+ * cose diverse, premute una volta. Non ha uno stato suo — due tende possono
+ * stare una aperta e una chiusa, e per quello non c'è una parola sola.
  */
 export interface Scene {
   id: string;
   name: string;
-  deviceIds: string[];
+  steps: SceneStep[];
 }
 
 /** Un agente appena creato: il token si vede una volta sola, e poi mai più. */
@@ -74,7 +81,7 @@ class Devices {
    */
   busy = $state<string[]>([]);
 
-  /** Gli insiemi: più dispositivi che rispondono a un colpo solo. */
+  /** Le scene: più cose che partono a un colpo solo. */
   scenes = $state<Scene[]>([]);
 
   byId(id: string | undefined): Device | undefined {
@@ -161,51 +168,47 @@ class Devices {
     }
   }
 
-  /* --------------------------------------------------------------- insiemi */
+  /* ----------------------------------------------------------------- scene */
 
-  /**
-   * I dispositivi di un insieme, nell'ordine in cui ce li hai messi. Quelli
-   * spariti non ci sono già più: li toglie il server quando un agente smette
-   * di raccontarli.
-   */
+  /** I dispositivi nominati da una scena, senza ripetizioni e senza fantasmi. */
   membersOf(scene: Scene): Device[] {
-    return scene.deviceIds
-      .map((id) => this.list.find((device) => device.id === id))
-      .filter((device): device is Device => !!device);
+    const seen = new Set<string>();
+    const out: Device[] = [];
+    for (const step of scene.steps) {
+      if (seen.has(step.deviceId)) continue;
+      const device = this.list.find((one) => one.id === step.deviceId);
+      if (!device) continue;
+      seen.add(step.deviceId);
+      out.push(device);
+    }
+    return out;
   }
 
   /**
-   * Cosa sa fare un insieme: quello che sanno fare **tutti** i suoi.
+   * Una riga detta a parole: «Tenda 1 · Apri», «Mansarda · Accendi».
    *
-   * Non la somma, l'intersezione. Una tenda e una lampadina insieme non hanno
-   * niente in comune, e un insieme che mostrasse «Apri» accendendo metà stanza
-   * sarebbe peggio di un insieme che non mostra niente.
-   *
-   * I sensori non contano: si leggono, non si comandano.
+   * Il nome del dispositivo davanti, perché una scena si legge per sapere
+   * cosa muove; poi cosa gli succede, con la parola che userebbe il suo
+   * comando — non `power=true`, che è come lo dice il protocollo.
    */
-  actionsOf(scene: Scene): Capability[] {
-    const members = this.membersOf(scene);
-    const first = members[0];
-    if (!first || members.length === 0) return [];
+  saysOf(step: SceneStep): { who: string; what: string } {
+    const device = this.list.find((one) => one.id === step.deviceId);
+    const capability = device?.capabilities.find((entry) => entry.code === step.code);
+    const who = device?.name ?? 'Sparito';
 
-    return first.capabilities.filter(
-      (capability) =>
-        capability.kind !== 'sensor' &&
-        members.every((device) =>
-          device.capabilities.some(
-            (other) => other.code === capability.code && other.kind === capability.kind,
-          ),
-        ),
-    );
+    if (!capability) return { who, what: String(step.value) };
+    if (capability.kind === 'switch') return { who, what: step.value ? 'Accendi' : 'Spegni' };
+    if (capability.kind === 'enum') return { who, what: String(step.value) };
+    return { who, what: `${capability.label} ${step.value}${capability.unit ?? ''}` };
   }
 
-  /** Se almeno uno risponde: un insieme tutto spento non si comanda. */
+  /** Se almeno uno risponde: una scena tutta spenta non parte. */
   reachable(scene: Scene): boolean {
     return this.membersOf(scene).some((device) => device.online);
   }
 
-  async createScene(name: string, deviceIds: string[]): Promise<Scene> {
-    const made = await api.post<Scene>('/scenes', { name, deviceIds });
+  async createScene(name: string, steps: SceneStep[]): Promise<Scene> {
+    const made = await api.post<Scene>('/scenes', { name, steps });
     const at = this.scenes.findIndex((scene) => scene.id === made.id);
     if (at >= 0) {
       Object.assign(this.scenes[at]!, made);
@@ -215,8 +218,8 @@ class Devices {
     return made;
   }
 
-  async patchScene(scene: Scene, patch: { name?: string; deviceIds?: string[] }): Promise<void> {
-    const before = { ...scene, deviceIds: [...scene.deviceIds] };
+  async patchScene(scene: Scene, patch: { name?: string; steps?: SceneStep[] }): Promise<void> {
+    const before = { ...scene, steps: [...scene.steps] };
     Object.assign(scene, patch);
     try {
       Object.assign(scene, await api.put<Scene>(`/scenes/${scene.id}`, { name: scene.name, ...patch }));
@@ -238,18 +241,17 @@ class Devices {
   }
 
   /**
-   * La stessa cosa a tutto l'insieme. Non si finge niente: lo stato lo
-   * raccontano i dispositivi quando si sono mossi davvero, uno per uno, dal
-   * filo aperto.
+   * La scena, tutta. Non si finge niente: lo stato lo raccontano i
+   * dispositivi quando si sono mossi davvero, uno per uno, dal filo aperto.
    */
-  async runScene(scene: Scene, code: string, value: DeviceValue): Promise<void> {
-    const key = `${scene.id}:${code}`;
+  async runScene(scene: Scene): Promise<void> {
+    const key = `scena:${scene.id}`;
     if (this.busy.includes(key)) return;
     this.busy = [...this.busy, key];
 
     let rest = SETTLE_MS;
     try {
-      await api.post(`/scenes/${scene.id}/command`, { code, value });
+      await api.post(`/scenes/${scene.id}/run`, {});
     } catch (error) {
       const why = (error as Error).message;
       const silence = why.includes('non ha risposto') || why.includes('nessuna risposta');

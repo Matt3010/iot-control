@@ -1,4 +1,3 @@
-import type { DeviceValue } from '../../../shared/protocol.js';
 import type { SceneDto } from '../dto/scene.dto.js';
 import type { SceneView } from '../dto/views.js';
 import { toSceneView } from '../dto/views.js';
@@ -32,9 +31,9 @@ export class SceneService {
    * Come per un dispositivo solo: un agente che non risponde è un guasto fra
    * noi e lui, non una richiesta sbagliata.
    */
-  async command(ownerId: string, id: string, code: string, value: DeviceValue): Promise<void> {
+  async run(ownerId: string, id: string): Promise<void> {
     try {
-      await sceneManager.command(ownerId, id, code, value);
+      await sceneManager.run(ownerId, id);
     } catch (error) {
       if (error instanceof Error && !('status' in error)) throw badGateway(error.message);
       throw error;

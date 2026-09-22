@@ -65,12 +65,12 @@ Niente categorie preimpostate, niente fronzoli.
   la mappa, o niente. Le tue altre mappe non le vede. Servono degli indirizzi e non un link,
   perche' un link non dice chi sei. Mentre ci si trova dentro, una fascia in alto dice sempre di
   chi sono le mappe che si stanno toccando.
-- **Gli insiemi**: piu' dispositivi che rispondono a un colpo solo. «Apri le tende» sono due
-  tende, e premerle una per volta si vede — partono a mezzo secondo di distanza. Un insieme non e'
-  un dispositivo finto: e' un nome e un elenco, e le azioni che mostra non si scrivono, sono
-  quelle che i suoi dispositivi hanno in comune. O le sanno fare tutti, o non parte niente:
-  mandare «Apri» solo alla tenda di un insieme tenda+lampadina sarebbe fare mezza cosa e dire che
-  e' andata bene.
+- **Le scene**: piu' cose che partono insieme, ognuna con la sua azione. «Sera» chiude le tende e
+  accende l'abat-jour — due azioni diverse su due cose diverse, premute una volta. Premerle a
+  mano una per volta si vede: partono a mezzo secondo di distanza. Una scena non e' un
+  dispositivo finto e non ha uno stato: due tende possono stare una aperta e una chiusa, e per
+  quello non c'e' una parola sola. Le righe partono in parallelo, e chi non risponde si dice con
+  il suo nome.
 - **E un singolo pin puo' restare tuo.** Dentro una mappa condivisa, un luogo segnato `locked`
   gli ospiti lo vedono e non lo toccano: niente modifica, niente eliminazione, e il tasto non
   compare nemmeno. Chi la mappa ce l'ha lo modifica lo stesso — chiude gli altri, non se'.

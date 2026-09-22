@@ -122,8 +122,8 @@ apiRouter.post('/agents/:id/token', agentController.rotate);
 apiRouter.post('/agents/:id/pair', validateBody(PairDto), agentController.pair);
 
 /**
- * Gli insiemi: più dispositivi che rispondono insieme. Le azioni non si
- * scrivono qui dentro: sono quelle che i suoi dispositivi hanno in comune.
+ * Le scene: più cose che partono insieme, ognuna con la sua azione. «Sera»
+ * chiude le tende e accende l'abat-jour, e si preme una volta.
  */
 apiRouter
   .route('/scenes')
@@ -135,7 +135,7 @@ apiRouter
   .put(validateBody(SceneDto), sceneController.update)
   .delete(sceneController.remove);
 
-apiRouter.post('/scenes/:id/command', validateBody(CommandDto), sceneController.command);
+apiRouter.post('/scenes/:id/run', sceneController.run);
 
 apiRouter.get('/devices', deviceController.list);
 apiRouter.post('/devices/:id/command', validateBody(CommandDto), deviceController.command);

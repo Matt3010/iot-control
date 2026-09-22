@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { Transaction } from '../persistence/JsonStore.js';
-import type { Scene } from '../types.js';
+import type { Scene, SceneStep } from '../types.js';
 
 export class SceneRepository {
   constructor(private readonly tx: Transaction) {}
 
-  /** Gli insiemi sono di chi li ha fatti, come gli agenti. */
+  /** Le scene sono di chi le ha fatte, come gli agenti. */
   findAllOf(ownerId: string): Scene[] {
     return this.tx.data.scenes.filter((scene) => scene.ownerId === ownerId);
   }
@@ -18,14 +18,14 @@ export class SceneRepository {
     return this.findById(id)?.ownerId === ownerId;
   }
 
-  insert(ownerId: string, name: string, deviceIds: string[]): Scene {
-    const scene: Scene = { id: `ins-${randomUUID()}`, ownerId, name, deviceIds };
+  insert(ownerId: string, name: string, steps: SceneStep[]): Scene {
+    const scene: Scene = { id: `scn-${randomUUID()}`, ownerId, name, steps };
     this.tx.data.scenes.push(scene);
     this.tx.markDirty();
     return scene;
   }
 
-  update(id: string, patch: Partial<Pick<Scene, 'name' | 'deviceIds'>>): Scene | undefined {
+  update(id: string, patch: Partial<Pick<Scene, 'name' | 'steps'>>): Scene | undefined {
     const current = this.findById(id);
     if (!current) return undefined;
     Object.assign(current, patch);
@@ -42,20 +42,20 @@ export class SceneRepository {
   }
 
   /**
-   * Un dispositivo che non esiste più esce dagli insiemi che lo tenevano.
+   * Un dispositivo che non esiste più si porta via le righe che lo nominavano.
    *
    * Succede quando un agente smette di raccontarlo — l'hai staccato, l'hai
-   * tolto da Home Assistant. Lasciarcelo dentro vorrebbe dire un insieme che
-   * prova a comandare un fantasma, e non si capirebbe perché non va.
+   * tolto da Home Assistant. Lasciarle lì vorrebbe dire una scena che prova a
+   * comandare un fantasma, e non si capirebbe perché non parte.
    *
-   * Torna quanti insiemi ne hanno risentito.
+   * Torna quante scene ne hanno risentito.
    */
   pruneDevices(gone: Set<string>): number {
     let touched = 0;
     for (const scene of this.tx.data.scenes) {
-      const kept = scene.deviceIds.filter((id) => !gone.has(id));
-      if (kept.length === scene.deviceIds.length) continue;
-      scene.deviceIds = kept;
+      const kept = scene.steps.filter((step) => !gone.has(step.deviceId));
+      if (kept.length === scene.steps.length) continue;
+      scene.steps = kept;
       touched += 1;
     }
     if (touched) this.tx.markDirty();

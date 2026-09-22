@@ -151,9 +151,9 @@
       </section>
     {/each}
 
-    <!-- Gli insiemi stanno con le card degli agenti, nella stessa colonna: uno
-         non appartiene a un agente — «apri le tende» possono essere due tende
-         in due stanze — ma si premono nello stesso posto. -->
+    <!-- Le scene stanno con le card degli agenti, nella stessa colonna: una
+         non appartiene a un agente — «sera» può toccare due stanze — ma si
+         premono nello stesso posto. -->
     <section class="card is-new">
       <SceneStack />
     </section>

@@ -1,4 +1,4 @@
-import type { Capability } from '../../shared/protocol.js';
+import type { Capability, DeviceValue } from '../../shared/protocol.js';
 
 export interface User {
   id: string;
@@ -137,20 +137,29 @@ export interface Device {
   lastSeenAt: string;
 }
 
+/** Una riga di una scena: a chi, cosa, e con che valore. */
+export interface SceneStep {
+  deviceId: string;
+  code: string;
+  value: DeviceValue;
+}
+
 /**
- * Piu' dispositivi che rispondono insieme.
+ * Piu' cose che partono insieme.
  *
- * «Apri le tende» sono due tende, e premerle una per volta si vede: partono a
- * mezzo secondo di distanza. Un insieme non e' un dispositivo finto — e' un
- * nome e un elenco — e le azioni che mostra non si scrivono: sono quelle che
- * i suoi dispositivi hanno in comune, e cambiano da sole se cambia chi c'e'
- * dentro.
+ * Non e' un gruppo di dispositivi che fanno la stessa cosa: ogni riga ha la
+ * sua. «Sera» chiude le tende e accende l'abat-jour — due azioni diverse su
+ * due cose diverse, premute una volta. E premerle a mano una per volta si
+ * vede: partono a mezzo secondo di distanza.
+ *
+ * Non e' nemmeno un dispositivo finto: non ha uno stato. Due tende possono
+ * stare una aperta e una chiusa, e per quello non c'e' una parola sola.
  */
 export interface Scene {
   id: string;
   ownerId: string;
   name: string;
-  deviceIds: string[];
+  steps: SceneStep[];
 }
 
 /** Everything the store holds, and the unit a transaction works on. */

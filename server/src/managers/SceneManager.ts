@@ -1,13 +1,40 @@
-import type { DeviceValue } from '../../../shared/protocol.js';
-import type { SceneDto } from '../dto/scene.dto.js';
+import type { Capability, DeviceValue } from '../../../shared/protocol.js';
+import type { SceneDto, SceneStepDto } from '../dto/scene.dto.js';
 import { badGateway, badRequest, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
+import type { Transaction } from '../persistence/JsonStore.js';
 import { store } from '../persistence/JsonStore.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
-import type { Device, Scene } from '../types.js';
+import type { Device, Scene, SceneStep } from '../types.js';
 
-const unique = (ids: string[]): string[] => [...new Set(ids.filter(Boolean))];
+/**
+ * Un valore va bene per quella capacità? Non è pignoleria: una scena si
+ * scrive una volta e si preme per mesi, e un valore storto dentro si scopre
+ * la sera che serviva.
+ */
+function check(capability: Capability, value: DeviceValue): void {
+  if (capability.kind === 'sensor') throw badRequest('un sensore si legge, non si comanda');
+
+  if (capability.kind === 'switch') {
+    if (typeof value !== 'boolean') throw badRequest(`«${capability.label}» si accende o si spegne`);
+    return;
+  }
+
+  if (capability.kind === 'enum') {
+    if (typeof value !== 'string' || !capability.values.includes(value)) {
+      throw badRequest(`«${capability.label}» non sa fare «${String(value)}»`);
+    }
+    return;
+  }
+
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    throw badRequest(`«${capability.label}» vuole un numero`);
+  }
+  if (value < capability.min || value > capability.max) {
+    throw badRequest(`«${capability.label}» sta fra ${capability.min} e ${capability.max}`);
+  }
+}
 
 export class SceneManager {
   list(ownerId: string): Promise<Scene[]> {
@@ -16,18 +43,18 @@ export class SceneManager {
 
   create(ownerId: string, dto: SceneDto): Promise<Scene> {
     return store.transaction((tx) => {
-      const deviceIds = this.#check(tx, ownerId, unique(dto.deviceIds ?? []));
-      return new SceneRepository(tx).insert(ownerId, dto.name, deviceIds);
+      const steps = this.#clean(tx, ownerId, dto.steps ?? []);
+      return new SceneRepository(tx).insert(ownerId, dto.name, steps);
     });
   }
 
   update(ownerId: string, id: string, dto: SceneDto): Promise<Scene> {
     return store.transaction((tx) => {
       const scenes = new SceneRepository(tx);
-      if (!scenes.owns(ownerId, id)) throw notFound('insieme inesistente');
+      if (!scenes.owns(ownerId, id)) throw notFound('scena inesistente');
 
       const patch: Partial<Scene> = { name: dto.name };
-      if (dto.deviceIds) patch.deviceIds = this.#check(tx, ownerId, unique(dto.deviceIds));
+      if (dto.steps) patch.steps = this.#clean(tx, ownerId, dto.steps);
       return scenes.update(id, patch) as Scene;
     });
   }
@@ -35,77 +62,75 @@ export class SceneManager {
   remove(ownerId: string, id: string): Promise<void> {
     return store.transaction((tx) => {
       const scenes = new SceneRepository(tx);
-      if (!scenes.owns(ownerId, id)) throw notFound('insieme inesistente');
+      if (!scenes.owns(ownerId, id)) throw notFound('scena inesistente');
       scenes.delete(id);
     });
   }
 
   /**
-   * La stessa cosa detta a tutti insieme.
+   * La scena, tutta insieme.
    *
-   * Partono in parallelo, non uno dopo l'altro: due tende che si aprono a
-   * mezzo secondo di distanza si vedono, ed è proprio quello che si voleva
-   * evitare mettendole nello stesso insieme.
+   * Le righe partono in parallelo, non una dopo l'altra: due tende che si
+   * chiudono a mezzo secondo di distanza si vedono, ed è proprio quello che
+   * si voleva evitare mettendole nella stessa scena.
    *
-   * Poi si conta. Se qualcuno non ha risposto lo si dice con i nomi: «Tenda 1
-   * non ha risposto» è una frase su cui si può fare qualcosa, «errore» no. E
-   * se non ha risposto nessuno è un guasto, non una richiesta sbagliata.
+   * Poi si conta chi non ha risposto, e lo si dice con i nomi: «Tenda 1 non
+   * ha risposto» è una frase su cui si può fare qualcosa, «errore» no. Se non
+   * ha risposto nessuno è un guasto; se è partita a metà, la scena non si
+   * riavvolge — quello che si è mosso resta mosso, e si dice cosa manca.
    */
-  async command(ownerId: string, id: string, code: string, value: DeviceValue): Promise<void> {
-    const { scene, devices } = await store.transaction((tx) => {
+  async run(ownerId: string, id: string): Promise<void> {
+    const { scene, steps } = await store.transaction((tx) => {
       const found = new SceneRepository(tx).findById(id);
-      if (!found || found.ownerId !== ownerId) throw notFound('insieme inesistente');
+      if (!found || found.ownerId !== ownerId) throw notFound('scena inesistente');
 
-      const all = new DeviceRepository(tx).findAllOf(ownerId);
-      const mine = found.deviceIds
-        .map((deviceId) => all.find((device) => device.id === deviceId))
-        .filter((device): device is Device => !!device);
-      return { scene: found, devices: mine };
+      const devices = new DeviceRepository(tx).findAllOf(ownerId);
+      const ready = found.steps
+        .map((step) => ({ step, device: devices.find((one) => one.id === step.deviceId) }))
+        .filter((pair): pair is { step: SceneStep; device: Device } => !!pair.device);
+      return { scene: found, steps: ready };
     });
 
-    /*
-     * O la sanno fare tutti, o non parte niente.
-     *
-     * Una tenda e una lampadina nello stesso insieme non hanno un «Apri» in
-     * comune: mandarlo solo alla tenda vorrebbe dire fare mezza cosa e dire
-     * che è andata bene. L'interfaccia mostra già solo le azioni comuni, ma la
-     * regola vive qui — è qui che si decide cosa succede davvero.
-     */
-    const able = devices.filter((device) =>
-      device.capabilities.some((entry) => entry.code === code && entry.kind !== 'sensor'),
-    );
-    if (!able.length) throw badRequest(`«${scene.name}» non ha niente che sappia farlo`);
-    if (able.length !== devices.length) {
-      const others = devices.filter((device) => !able.includes(device));
-      throw badRequest(
-        `${others.map((device) => `«${device.name}»`).join(', ')} non sa farlo: «${scene.name}» fa solo quello che sanno fare tutti`,
-      );
-    }
+    if (!steps.length) throw badRequest(`«${scene.name}» è vuota: non c'è niente da fare`);
 
     const results = await Promise.allSettled(
-      able.map((device) => hub.command(device.agentId, device.externalId, code, value)),
+      steps.map(({ step, device }) =>
+        hub.command(device.agentId, device.externalId, step.code, step.value),
+      ),
     );
 
-    const mute = able.filter((_device, at) => results[at]?.status === 'rejected');
-    if (mute.length === able.length) {
-      throw badGateway(
-        mute.length === 1
-          ? `«${mute[0]!.name}» non ha risposto`
-          : `Non ha risposto nessuno di «${scene.name}»`,
-      );
-    }
-    if (mute.length) {
-      throw badGateway(
-        `${mute.map((device) => `«${device.name}»`).join(', ')}: nessuna risposta. Gli altri sono partiti.`,
-      );
-    }
+    const mute = steps.filter((_pair, at) => results[at]?.status === 'rejected');
+    if (!mute.length) return;
+
+    const names = [...new Set(mute.map(({ device }) => `«${device.name}»`))].join(', ');
+    throw badGateway(
+      mute.length === steps.length
+        ? `Non ha risposto niente di «${scene.name}»`
+        : `${names}: nessuna risposta. Il resto è partito.`,
+    );
   }
 
-  /** Ogni dispositivo dev'essere suo: un insieme non comanda roba d'altri. */
-  #check(tx: Parameters<Parameters<typeof store.transaction>[0]>[0], ownerId: string, deviceIds: string[]): string[] {
+  /**
+   * Ogni riga dev'essere possibile: il dispositivo è suo, quella cosa la sa
+   * fare, e il valore ha senso. Un dispositivo può comparire più volte — una
+   * lampadina che si accende e si porta al 30% sono due righe, ed è giusto.
+   */
+  #clean(tx: Transaction, ownerId: string, steps: SceneStepDto[]): SceneStep[] {
     const devices = new DeviceRepository(tx);
-    if (deviceIds.some((id) => !devices.owns(ownerId, id))) throw badRequest('dispositivo inesistente');
-    return deviceIds;
+
+    return steps.map((step) => {
+      const device = devices.findById(step.deviceId);
+      if (!device || device.ownerId !== ownerId) throw badRequest('dispositivo inesistente');
+
+      const capability = device.capabilities.find((entry) => entry.code === step.code);
+      if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
+
+      const kind = typeof step.value;
+      if (kind !== 'string' && kind !== 'number' && kind !== 'boolean') throw badRequest('valore non valido');
+      check(capability, step.value);
+
+      return { deviceId: step.deviceId, code: step.code, value: step.value };
+    });
   }
 }
 
