@@ -145,6 +145,10 @@
 
 <style>
   .cam {
+    /* Il letto di un'immagine e' scuro in tutti e due i temi: una telecamera
+       riprende quello che c'e', e quello che c'e' di notte e' buio. Legarlo
+       al colore del testo voleva dire un riquadro bianco al buio. */
+    --shot-bed: #12161c;
     position: relative;
     display: grid;
     gap: 4px;
@@ -157,7 +161,7 @@
     aspect-ratio: 16 / 9;
     object-fit: cover;
     border-radius: var(--r-sm);
-    background: color-mix(in srgb, var(--ink) 85%, transparent);
+    background: var(--shot-bed);
     transition: opacity 0.2s;
   }
 
@@ -169,7 +173,7 @@
     place-items: center;
     aspect-ratio: 16 / 9;
     border-radius: var(--r-sm);
-    background: color-mix(in srgb, var(--ink) 85%, transparent);
+    background: var(--shot-bed);
     color: rgb(255 255 255 / 0.7);
     font-size: 11.5px;
     text-align: center;
