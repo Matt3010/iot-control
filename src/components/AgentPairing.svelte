@@ -26,6 +26,7 @@
   /** Come si chiamano i campi di HA, detto in italiano. */
   const LABELS: Record<string, string> = {
     user_code: 'Codice utente',
+    country_code: 'Prefisso del paese',
     username: 'Email o numero di telefono',
     password: 'Password',
     email: 'Email',
@@ -143,7 +144,20 @@
       {#each step.fields as field (field.name)}
         <label class="field">
           <span class="eyebrow">{named(field.name)}</span>
-          <input
+          {#if field.options}
+            <select
+              bind:value={
+                () => answers[field.name] ?? '',
+                (value) => (answers = { ...answers, [field.name]: value })
+              }
+            >
+              <option value="">—</option>
+              {#each field.options as option (option.value)}
+                <option value={option.value}>{option.label}</option>
+              {/each}
+            </select>
+          {:else}
+            <input
             type={field.secret ? 'password' : 'text'}
             autocomplete={field.secret ? 'current-password' : 'off'}
             spellcheck="false"
@@ -153,8 +167,9 @@
               () => answers[field.name] ?? '',
               (value) => (answers = { ...answers, [field.name]: value })
             }
-            onkeydown={(event) => event.key === 'Enter' && submit()}
-          />
+              onkeydown={(event) => event.key === 'Enter' && submit()}
+            />
+          {/if}
         </label>
       {/each}
 
@@ -210,4 +225,26 @@
   }
 
   .acts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+  /* un elenco lungo duecento voci: si veste come i campi, non come il menù
+     grigio del sistema */
+  select {
+    font: inherit;
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: var(--sunken);
+    color: var(--ink);
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+
+  select:hover { background: var(--sunken-hover); }
+
+  select:focus {
+    outline: 0;
+    background: var(--glass-strong);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--accent) 11%, transparent);
+  }
 </style>

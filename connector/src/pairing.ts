@@ -92,18 +92,44 @@ function isSecret(entry: Record<string, unknown>): boolean {
   return selector?.text?.type === 'password';
 }
 
-/** I campi da riempire: solo quelli che sono davvero caselle, non i selettori. */
+/**
+ * Un elenco da cui scegliere. HA li manda come coppie [valore, etichetta] —
+ * eWeLink chiede il prefisso del paese così — oppure come oggetti, a seconda
+ * dell'integrazione: si accettano entrambe.
+ */
+function optionsOf(entry: Record<string, unknown>): PairingStep['fields'][number]['options'] {
+  const raw = entry.options;
+  if (!Array.isArray(raw) || !raw.length) return undefined;
+
+  return raw
+    .map((option) => {
+      if (Array.isArray(option)) return { value: String(option[0]), label: String(option[1] ?? option[0]) };
+      if (option && typeof option === 'object') {
+        const record = option as Record<string, unknown>;
+        return { value: String(record.value), label: String(record.label ?? record.value) };
+      }
+      return { value: String(option), label: String(option) };
+    })
+    .filter((option) => option.value && option.value !== 'undefined');
+}
+
+/** I campi da riempire: caselle ed elenchi, non i selettori che non si compilano. */
 function fieldsOf(schema: unknown[] | undefined): PairingStep['fields'] {
   if (!Array.isArray(schema)) return [];
+
   return schema
     .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
-    .filter((entry) => entry.type === 'string' || entry.type === 'integer' || entry.selector)
     .filter((entry) => !!entry.name)
-    .map((entry) => ({
-      name: String(entry.name),
-      required: entry.required === true,
-      ...(isSecret(entry) ? { secret: true } : {}),
-    }));
+    .filter((entry) => entry.type === 'string' || entry.type === 'integer' || entry.type === 'select')
+    .map((entry) => {
+      const options = optionsOf(entry);
+      return {
+        name: String(entry.name),
+        required: entry.required === true,
+        ...(isSecret(entry) ? { secret: true } : {}),
+        ...(options ? { options } : {}),
+      };
+    });
 }
 
 /** Il primo errore che HA segnala, detto in modo leggibile. */

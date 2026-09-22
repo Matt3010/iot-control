@@ -50,8 +50,16 @@ export interface PairingStep {
    * dire che c'è qualcosa in corso e fra poco si potrà riprovare.
    */
   kind: 'form' | 'done' | 'failed' | 'busy';
-  /** Cosa chiedere, se c'è da chiedere. `secret` non si scrive in chiaro. */
-  fields: { name: string; required: boolean; secret?: boolean }[];
+  /**
+   * Cosa chiedere, se c'è da chiedere. `secret` non si scrive in chiaro;
+   * `options` vuol dire che si sceglie da un elenco invece di digitare.
+   */
+  fields: {
+    name: string;
+    required: boolean;
+    secret?: boolean;
+    options?: { value: string; label: string }[];
+  }[];
   /** Cosa sta succedendo, quando non è un errore ma nemmeno una domanda. */
   note?: string;
   /** La stringa da disegnare come QR. Non è un'immagine: i pixel li fai tu. */
