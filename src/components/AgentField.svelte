@@ -174,6 +174,9 @@
     <AgentControls agent={only}>
       {#snippet trail()}{@render kill(only)}{/snippet}
       {#snippet foot()}
+        <!-- collegare un account è cosa dell'agente, non del luogo: si può
+             fare anche prima di deciderne la casa -->
+        <AgentPairing agent={only} />
         <div class="acts">
           <Button look="ghost" onclick={() => attach(only.id)}>Metti su questo luogo</Button>
         </div>
