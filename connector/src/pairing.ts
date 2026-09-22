@@ -120,14 +120,23 @@ function fieldsOf(schema: unknown[] | undefined): PairingStep['fields'] {
   return schema
     .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
     .filter((entry) => !!entry.name)
-    .filter((entry) => entry.type === 'string' || entry.type === 'integer' || entry.type === 'select')
+    .filter(
+      (entry) =>
+        entry.type === 'string' ||
+        entry.type === 'integer' ||
+        entry.type === 'select' ||
+        entry.type === 'boolean',
+    )
     .map((entry) => {
       const options = optionsOf(entry);
+      const preset = entry.default;
       return {
         name: String(entry.name),
         required: entry.required === true,
         ...(isSecret(entry) ? { secret: true } : {}),
         ...(options ? { options } : {}),
+        ...(entry.type === 'boolean' ? { yesno: true } : {}),
+        ...(typeof preset === 'string' || typeof preset === 'boolean' ? { preset } : {}),
       };
     });
 }
@@ -206,7 +215,7 @@ export async function startPairing(config: ConnectorConfig, handler: string): Pr
 export async function submitPairing(
   config: ConnectorConfig,
   flowId: string,
-  input: Record<string, string>,
+  input: Record<string, string | boolean>,
 ): Promise<PairingStep> {
   return translate(await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body: JSON.stringify(input) }));
 }

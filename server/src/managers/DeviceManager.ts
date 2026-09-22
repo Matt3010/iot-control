@@ -74,6 +74,20 @@ export class DeviceManager {
     return devices;
   }
 
+  /**
+   * Un fotogramma da una telecamera.
+   *
+   * Non finisce nel registro: guardare non è successo niente, e una riga a
+   * ogni aggiornamento coprirebbe in un'ora tutto il resto della giornata.
+   */
+  async frame(ownerId: string, id: string): Promise<Buffer> {
+    const device = await this.find(ownerId, id);
+    const guarda = device.capabilities.find((entry) => entry.kind === 'image');
+    if (!guarda) throw badRequest('questo dispositivo non è una telecamera');
+
+    return hub.snapshot(device.agentId, device.externalId);
+  }
+
   /** Premere un interruttore: si aspetta che l'agente dica di sì. */
   async command(
     ownerId: string,
@@ -86,6 +100,7 @@ export class DeviceManager {
     const capability = device.capabilities.find((entry) => entry.code === code);
     if (!capability) throw badRequest('questo dispositivo non sa fare questa cosa');
     if (capability.kind === 'sensor') throw badRequest('un sensore si legge, non si comanda');
+    if (capability.kind === 'image') throw badRequest('una telecamera si guarda, non si comanda');
 
     const kind = typeof value;
     if (kind !== 'string' && kind !== 'number' && kind !== 'boolean') throw badRequest('valore non valido');

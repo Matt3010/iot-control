@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ownerOf, whoIs } from '../auth/owner.js';
+import { isGuest, ownerOf, whoIs } from '../auth/owner.js';
 import type { CommandDto } from '../dto/device.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import { deviceService } from '../services/DeviceService.js';
@@ -7,7 +7,23 @@ import { deviceService } from '../services/DeviceService.js';
 export class DeviceController {
   list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await deviceService.list(ownerOf(req)));
+      res.json(await deviceService.list(ownerOf(req), isGuest(req)));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Un fotogramma, adesso. Non si mette in cache da nessuna parte: quello che
+   * si guarda è quello che c'è, e un'immagine di casa tua rimasta in un proxy
+   * è un'immagine che non controlli più.
+   */
+  frame = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const jpeg = await deviceService.frame(ownerOf(req), req.params.id as string, isGuest(req));
+      res.set('content-type', 'image/jpeg');
+      res.set('cache-control', 'no-store, max-age=0');
+      res.send(jpeg);
     } catch (error) {
       next(error);
     }

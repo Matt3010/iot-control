@@ -18,6 +18,12 @@ export type DeviceValue = string | number | boolean;
  */
 export type Capability =
   | { code: string; kind: 'switch'; label: string }
+  /**
+   * Non si comanda: si guarda. Una telecamera non ha interruttori, ha
+   * un'immagine — e l'immagine non sta nello stato, perche' lo stato viaggia
+   * a ogni cambiamento e un JPEG no. Si chiede quando serve.
+   */
+  | { code: string; kind: 'image'; label: string }
   | { code: string; kind: 'range'; label: string; min: number; max: number; step: number; unit?: string }
   | { code: string; kind: 'enum'; label: string; values: string[] }
   | { code: string; kind: 'sensor'; label: string; unit?: string };
@@ -59,6 +65,10 @@ export interface PairingStep {
     required: boolean;
     secret?: boolean;
     options?: { value: string; label: string }[];
+    /** Una casella da spuntare invece di un campo da riempire. */
+    yesno?: boolean;
+    /** Quello che c'e' dentro prima che tu tocchi niente. */
+    preset?: string | boolean;
   }[];
   /** Cosa sta succedendo, quando non è un errore ma nemmeno una domanda. */
   note?: string;
@@ -112,6 +122,26 @@ export interface AckMessage {
   data?: unknown;
 }
 
+/**
+ * Dammi un fotogramma di quella telecamera, adesso.
+ *
+ * La risposta torna nell'`ack`, dentro `data`: il JPEG in base64 e l'ora. Non
+ * e' un flusso — e' una fotografia, chiesta quando qualcuno sta guardando.
+ */
+export interface SnapshotMessage {
+  type: 'snapshot';
+  reqId: string;
+  externalId: string;
+}
+
+/** Quello che torna da una `snapshot`. */
+export interface Snapshot {
+  /** Il JPEG, in base64. */
+  jpeg: string;
+  /** Quando e' stato preso, in ISO. */
+  at: string;
+}
+
 export interface CommandMessage {
   type: 'command';
   reqId: string;
@@ -138,10 +168,10 @@ export interface PairMessage {
   /** Quale account si sta collegando: `tuya`, e domani altri. */
   handler?: string;
   flowId?: string;
-  input?: Record<string, string>;
+  input?: Record<string, string | boolean>;
   /** Quale collegamento staccare. */
   entryId?: string;
 }
 
 export type AgentMessage = HelloMessage | DevicesMessage | StateMessage | AckMessage;
-export type BackendMessage = CommandMessage | ResyncMessage | PairMessage;
+export type BackendMessage = CommandMessage | ResyncMessage | PairMessage | SnapshotMessage;

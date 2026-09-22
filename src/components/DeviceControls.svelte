@@ -3,6 +3,7 @@
   import type { Capability, DeviceValue } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Chip from './Chip.svelte';
+  import DeviceFrame from './DeviceFrame.svelte';
   import Icon from './Icon.svelte';
   import Switch from './Switch.svelte';
 
@@ -156,6 +157,9 @@
             {/each}
           </span>
         </div>
+      {:else if capability.kind === 'image'}
+        <!-- una telecamera non ha una riga di comandi: ha quello che si vede -->
+        <DeviceFrame {device} />
       {:else}
         <div class="line sensor">
           <span class="line-name">{capability.label}</span>

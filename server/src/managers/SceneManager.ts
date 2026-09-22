@@ -16,6 +16,7 @@ import type { Device, Scene, SceneStep } from '../types.js';
  */
 function check(capability: Capability, value: DeviceValue): void {
   if (capability.kind === 'sensor') throw badRequest('un sensore si legge, non si comanda');
+  if (capability.kind === 'image') throw badRequest('una telecamera si guarda, non si comanda');
 
   if (capability.kind === 'switch') {
     if (typeof value !== 'boolean') throw badRequest(`«${capability.label}» si accende o si spegne`);

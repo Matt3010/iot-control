@@ -4,6 +4,7 @@
   import type { LinkedAccount, PairingStep } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
+  import Switch from './Switch.svelte';
   import Qr from './Qr.svelte';
 
   /**
@@ -37,10 +38,25 @@
       warns:
         "La prima volta l'agente aggiunge a Home Assistant l'integrazione eWeLink e lo riavvia: ci vuole un minuto. Poi ti chiederà le credenziali dell'app.",
     },
+    {
+      handler: 'generic',
+      label: 'Telecamera',
+      warns:
+        "Ti chiederà l'indirizzo del flusso — di solito una riga che comincia per rtsp:// — e come raggiungerlo. Una telecamera per volta: se il registratore ne ha quattro, si fa quattro volte.",
+    },
   ] as const;
 
   /** Come si chiamano i campi di HA, detto in italiano. */
   const LABELS: Record<string, string> = {
+    still_image_url: 'Indirizzo di un fermo immagine',
+    stream_source: 'Indirizzo del flusso',
+    rtsp_transport: 'Come raggiungerlo',
+    authentication: 'Tipo di autenticazione',
+    framerate: 'Fotogrammi al secondo',
+    verify_ssl: 'Controlla il certificato',
+    limit_refetch_to_url_change: "Rileggi solo se cambia l'indirizzo",
+    use_wallclock_as_timestamps: "Usa l'ora del computer",
+    content_type: 'Tipo di contenuto',
     user_code: 'Codice utente',
     country_code: "Paese dell'account",
     username: 'Email o numero di telefono',
@@ -94,12 +110,12 @@
   let handler = $state<string>('tuya');
   let busy = $state(false);
   /** Quello che la persona sta scrivendo, per nome del campo. */
-  let answers = $state<Record<string, string>>({});
+  let answers = $state<Record<string, string | boolean>>({});
 
   const closed = $derived(!step || step.kind === 'done');
   const which = $derived(ACCOUNTS.find((one) => one.handler === handler)?.label ?? handler);
 
-  async function go(action: 'start' | 'submit' | 'cancel', input: Record<string, string> = {}) {
+  async function go(action: 'start' | 'submit' | 'cancel', input: Record<string, string | boolean> = {}) {
     busy = true;
     try {
       const next = await devices.pair(agent, action, {
@@ -154,8 +170,13 @@
    * il rifiuto arriva da un pezzo di codice che parla di espressioni
    * regolari. Se c'è una chiocciola, il prefisso non si manda.
    */
-  function cleaned(): Record<string, string> {
-    return Object.fromEntries(Object.entries(answers).map(([name, value]) => [name, value.trim()]));
+  function cleaned(): Record<string, string | boolean> {
+    return Object.fromEntries(
+      Object.entries(answers).map(([name, value]) => [
+        name,
+        typeof value === 'string' ? value.trim() : value,
+      ]),
+    );
   }
 
   const submit = () => go('submit', cleaned());
@@ -260,7 +281,14 @@
       {#each step.fields as field (field.name)}
         <label class="field">
           <span class="eyebrow">{named(field.name)}</span>
-          {#if field.options}
+          {#if field.yesno}
+            <!-- un sì/no non è un campo da riempire: è una levetta -->
+            <Switch
+              checked={answers[field.name] === true}
+              onchange={(value: boolean) => (answers = { ...answers, [field.name]: value })}
+              label={named(field.name)}
+            />
+          {:else if field.options}
             <select
               bind:value={
                 () => answers[field.name] ?? '',

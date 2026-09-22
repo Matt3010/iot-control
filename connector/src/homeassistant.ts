@@ -43,6 +43,14 @@ const RETRY_MS = [1_000, 2_000, 5_000, 10_000, 30_000];
 const CALL_TIMEOUT_MS = 15_000;
 
 /**
+ * E quanto si aspetta un fotogramma. Di più che per un comando: se la
+ * telecamera dà solo un flusso, prima di poter disegnare qualcosa Home
+ * Assistant deve aspettare un fotogramma chiave, e su certi registratori
+ * ne passa uno ogni cinque secondi.
+ */
+const SNAPSHOT_TIMEOUT_MS = 20_000;
+
+/**
  * Il filo con Home Assistant, che sta qui accanto. Una WebSocket sola: da lì
  * si chiede lo stato, si ascoltano i cambiamenti e si chiamano i servizi.
  *
@@ -124,6 +132,29 @@ export class HomeAssistant {
    * un ventilatore. È il motivo per cui accendere una cosa qualsiasi è una
    * riga sola invece di una tabella.
    */
+  /**
+   * Un fotogramma da una telecamera, come JPEG.
+   *
+   * Passa dalla porta REST e non dalla WebSocket: la WebSocket parla JSON, e
+   * un'immagine dentro al JSON sarebbe da codificare due volte. Qui esce
+   * com'è, e la codifica la fa chi deve mandarla di là.
+   *
+   * Può metterci qualche secondo: se la telecamera dà solo un flusso, Home
+   * Assistant deve aspettare un fotogramma chiave per poterlo decodificare.
+   */
+  async snapshot(entityId: string): Promise<Buffer> {
+    const url = `${this.config.haUrl}/api/camera_proxy/${encodeURIComponent(entityId)}`;
+    const response = await fetch(url, {
+      headers: { authorization: `Bearer ${this.config.haToken}` },
+      signal: AbortSignal.timeout(SNAPSHOT_TIMEOUT_MS),
+    });
+
+    if (!response.ok) throw new Error(`home assistant dice ${response.status}`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length) throw new Error('è tornata un’immagine vuota');
+    return bytes;
+  }
+
   async callService(domain: string, service: string, entityId: string, data: Record<string, unknown> = {}): Promise<void> {
     await this.#call({
       type: 'call_service',

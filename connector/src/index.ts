@@ -1,4 +1,11 @@
-import type { BackendMessage, CommandMessage, DeviceSnapshot, HelloMessage, PairMessage } from '../../shared/protocol.js';
+import type {
+  BackendMessage,
+  CommandMessage,
+  DeviceSnapshot,
+  HelloMessage,
+  PairMessage,
+  SnapshotMessage,
+} from '../../shared/protocol.js';
 import { ConfigError, loadConfig } from './config.js';
 import { toServiceCall, translate } from './entities.js';
 import { HomeAssistant } from './homeassistant.js';
@@ -161,6 +168,30 @@ async function main(): Promise<void> {
   const listen = (message: BackendMessage): void => {
     if (message.type === 'pair') void pair(message);
     else if (message.type === 'command') void obey(message);
+    else if (message.type === 'snapshot') void watch(message);
+  };
+
+  /**
+   * Un fotogramma chiesto da chi sta guardando. Torna in base64 dentro
+   * all'`ack`: il filo parla JSON, e un JPEG di là ci passa così.
+   */
+  const watch = async (ask: SnapshotMessage): Promise<void> => {
+    const fail = (error: string): void => void link.send({ type: 'ack', reqId: ask.reqId, ok: false, error });
+
+    if (!devices.has(ask.externalId)) return fail('telecamera sconosciuta per questo agente');
+    if (!ha.connected) return fail('home assistant non è raggiungibile');
+
+    try {
+      const jpeg = await ha.snapshot(ask.externalId);
+      link.send({
+        type: 'ack',
+        reqId: ask.reqId,
+        ok: true,
+        data: { jpeg: jpeg.toString('base64'), at: new Date().toISOString() },
+      });
+    } catch (error) {
+      fail((error as Error).message);
+    }
   };
 
   const obey = async (command: CommandMessage): Promise<void> => {

@@ -234,6 +234,7 @@ class Devices {
     if (!capability) return { who, what: String(step.value) };
     if (capability.kind === 'switch') return { who, what: step.value ? 'Accendi' : 'Spegni' };
     if (capability.kind === 'enum') return { who, what: String(step.value) };
+    if (capability.kind !== 'range') return { who, what: String(step.value) };
     return { who, what: `${capability.label} ${step.value}${capability.unit ?? ''}` };
   }
 
@@ -428,7 +429,7 @@ class Devices {
   pair(
     agent: Agent,
     action: 'start' | 'submit' | 'cancel',
-    options: { handler?: string; flowId?: string; input?: Record<string, string> } = {},
+    options: { handler?: string; flowId?: string; input?: Record<string, string | boolean> } = {},
   ): Promise<PairingStep | null> {
     return api.post<PairingStep | null>(`/agents/${agent.id}/pair`, { action, ...options });
   }

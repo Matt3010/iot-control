@@ -102,7 +102,7 @@ export class AgentService {
     ownerId: string,
     id: string,
     action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink',
-    options: { handler?: string; flowId?: string; input?: Record<string, string>; entryId?: string },
+    options: { handler?: string; flowId?: string; input?: Record<string, string | boolean>; entryId?: string },
     who?: string,
   ): Promise<PairingStep | LinkedAccount[] | null> {
     // che sia tuo lo si controlla prima di bussare a casa sua

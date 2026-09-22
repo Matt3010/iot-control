@@ -18,6 +18,7 @@ const DOMAINS = new Set([
   'lock',
   'sensor',
   'binary_sensor',
+  'camera',
 ]);
 
 /** I bit con cui HA dice cosa sa fare una tapparella o un ventilatore. */
@@ -68,6 +69,12 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
   const acceso: Capability = { code: 'power', kind: 'switch', label: 'Acceso' };
 
   switch (domain) {
+    // Una telecamera non si accende e non si spegne da qui: si guarda. Il
+    // fotogramma non sta fra le capacita' perche' non e' una cosa che il
+    // dispositivo sa fare, e' quello che il dispositivo *e'*.
+    case 'camera':
+      return [{ code: 'frame', kind: 'image', label: 'Immagine' }];
+
     case 'switch':
     case 'input_boolean':
       return [acceso];

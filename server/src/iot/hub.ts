@@ -201,6 +201,16 @@ export class Hub {
     await this.#ask(agentId, (reqId) => ({ type: 'command', reqId, externalId, code, value }));
   }
 
+  /** Un fotogramma da una telecamera: si chiede, si aspetta, torna un JPEG. */
+  async snapshot(agentId: string, externalId: string): Promise<Buffer> {
+    const data = (await this.#ask(agentId, (reqId) => ({ type: 'snapshot', reqId, externalId }))) as
+      | { jpeg?: string }
+      | undefined;
+
+    if (!data?.jpeg) throw new Error('la telecamera non ha mandato niente');
+    return Buffer.from(data.jpeg, 'base64');
+  }
+
   /**
    * Una battuta della conversazione per collegare un account. Torna il passo
    * successivo: cosa chiedere, e il QR da disegnare quando c'è.
@@ -208,7 +218,7 @@ export class Hub {
   pair(
     agentId: string,
     action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink',
-    options: { handler?: string; flowId?: string; input?: Record<string, string>; entryId?: string } = {},
+    options: { handler?: string; flowId?: string; input?: Record<string, string | boolean>; entryId?: string } = {},
   ): Promise<unknown> {
     return this.#ask(agentId, (reqId) => ({ type: 'pair', reqId, action, ...options }));
   }

@@ -76,6 +76,14 @@ Niente categorie preimpostate, niente fronzoli.
   finisce ogni cambiamento di stato — una sonda che manda un grado ogni dieci secondi
   coprirebbe tutto il resto: ci finisce quello che e' successo *una volta*. Le righe piu'
   vecchie di un giorno se ne vanno da sole, alla prima che si scrive.
+- **Le telecamere si guardano, non si comandano.** Una telecamera che Home Assistant conosce
+  arriva qui come un dispositivo con una capacita' `image`: al posto degli interruttori mostra
+  l'ultima immagine, che si rifa' ogni cinque secondi mentre la stai guardando e si ferma appena
+  esce dallo schermo o la scheda passa in secondo piano. Non e' un video: ogni fotogramma e' una
+  domanda che va fino a casa, e la' dentro Home Assistant deve aspettare un fotogramma chiave
+  prima di poter disegnare qualcosa. Non finisce nel registro — guardare non e' successo niente —
+  e **agli ospiti di una mappa non si mostra**: chi ha la chiave puo' accendere le luci, ma una
+  telecamera non e' una lampadina.
 - **Le mappe hanno la loro pagina** (`/maps`), come gli agenti: una mappa non e' una voce
   d'elenco come una categoria — ha un indirizzo pubblico, dei conteggi, e sotto ognuna chi la puo'
   modificare con le sue regole. In una colonna da trecento pixel diventava una cosa che scorreva.

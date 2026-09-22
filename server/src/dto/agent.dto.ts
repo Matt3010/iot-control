@@ -22,7 +22,7 @@ export class PairDto {
 
   /** Quello che la persona ha scritto nei campi del passo prima. */
   @Allow()
-  input?: Record<string, string>;
+  input?: Record<string, string | boolean>;
 
   /** Quale collegamento staccare. */
   @IsOptional()

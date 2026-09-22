@@ -144,4 +144,7 @@ apiRouter
 apiRouter.post('/scenes/:id/run', sceneController.run);
 
 apiRouter.get('/devices', deviceController.list);
+
+/** Un fotogramma da una telecamera: si chiede quando qualcuno sta guardando. */
+apiRouter.get('/devices/:id/frame', deviceController.frame);
 apiRouter.post('/devices/:id/command', validateBody(CommandDto), deviceController.command);
