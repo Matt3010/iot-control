@@ -43,15 +43,46 @@
   const seen = $derived(onScreen && awake);
 
   /**
-   * Un indirizzo nuovo a ogni giro, se no il browser riuserebbe quello di
-   * prima: è la stessa richiesta, e una telecamera ferma sarebbe indistinguibile
-   * da una telecamera che non risponde più.
+   * Il fotogramma si chiede a mano, non lasciando fare al browser.
+   *
+   * Con un `src` che cambia, quando qualcosa non va resta un'immagine rotta a
+   * schermo e il motivo non arriva mai: il server lo scrive nel corpo della
+   * risposta, e di quel corpo un <img> non sa che farsene. «Non è arrivata»
+   * era tutto quello che si poteva dire, e non è niente. Chiedendola qui, il
+   * motivo si legge e si scrive — e l'ultimo fotogramma buono resta al suo
+   * posto invece di essere sostituito da un quadrato vuoto.
    */
-  function refresh(): void {
+  async function refresh(): Promise<void> {
     if (loading) return;
     loading = true;
-    src = `/api/devices/${device.id}/frame?t=${Date.now()}`;
+
+    try {
+      const response = await fetch(`/api/devices/${device.id}/frame`, { cache: 'no-store' });
+      if (!response.ok) {
+        const said = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+        failing = said?.error || (device.online ? 'Non è arrivata' : 'Non risponde');
+        return;
+      }
+
+      const older = src;
+      src = URL.createObjectURL(await response.blob());
+      if (older) URL.revokeObjectURL(older);
+
+      failing = '';
+      at = new Date();
+      lastMs = Date.now();
+    } catch {
+      failing = 'Non è arrivata';
+    } finally {
+      loading = false;
+    }
   }
+
+  // L'ultima immagine tiene occupata una fetta di memoria finché qualcuno non
+  // la lascia andare: uscendo dalla pagina non ci sarebbe più nessuno.
+  $effect(() => () => {
+    if (src) URL.revokeObjectURL(src);
+  });
 
   $effect(() => {
     if (!box) return;
@@ -90,30 +121,21 @@
 </script>
 
 <div class="cam" bind:this={box} class:is-waiting={loading && !at}>
+  <!-- O l'immagine, o il motivo per cui non c'è: mai tutti e due, che era il
+       modo di occupare il doppio dello spazio per dire mezza cosa. -->
   {#if src}
-    <img
-      {src}
-      alt={`Ultima immagine da ${device.name}`}
-      onload={() => {
-        loading = false;
-        failing = '';
-        at = new Date();
-        lastMs = Date.now();
-      }}
-      onerror={() => {
-        loading = false;
-        failing = device.online ? 'Non è arrivata' : 'Non risponde';
-      }}
-    />
-  {/if}
-
-  {#if !at}
+    <img {src} alt={`Ultima immagine da ${device.name}`} />
+  {:else}
     <span class="waiting">{failing || 'Un momento: sto chiedendo un fotogramma…'}</span>
   {/if}
 
   <div class="foot">
+    <!-- Il motivo si scrive una volta sola: se non c'è ancora nessuna
+         immagine lo dice il riquadro, e ripeterlo qui sotto sarebbe la stessa
+         frase due volte. Con un'immagine vecchia davanti, invece, qui è
+         l'unico posto dove dirlo. -->
     <span class="when">
-      {#if failing}{failing}{:else if at}delle {quando}{:else}&nbsp;{/if}
+      {#if failing && at}{failing}{:else if at}delle {quando}{:else}&nbsp;{/if}
     </span>
     <Button look="icon" size="sm" title="Aggiorna adesso" disabled={loading} onclick={refresh}>
       <Icon name="refresh" />

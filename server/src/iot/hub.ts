@@ -65,6 +65,15 @@ const ACK_TIMEOUT_MS = 20_000;
 const PAIR_TIMEOUT_MS = 90_000;
 
 /**
+ * Un fotogramma non e' un interruttore: prima di poterne disegnare uno, di la'
+ * si aspetta un fotogramma chiave, e su un registratore ne passa uno ogni
+ * pochi secondi. Un po' piu' di quanto aspetta l'agente stesso, cosi' a
+ * scadere e' lui — che sa perche' — e non noi, che diremmo solo «non ha
+ * risposto».
+ */
+const SHOT_TIMEOUT_MS = 25_000;
+
+/**
  * Chi è collegato adesso, cosa sta facendo, e chi sta guardando. Tutto in
  * memoria di proposito: al riavvio gli agenti si ricollegano e raccontano da capo
  * — non c'è niente qui dentro che valga la pena sopravvivere.
@@ -213,7 +222,11 @@ export class Hub {
 
   /** Un fotogramma da una telecamera: si chiede, si aspetta, torna un JPEG. */
   async snapshot(agentId: string, externalId: string): Promise<Buffer> {
-    const data = (await this.#ask(agentId, (reqId) => ({ type: 'snapshot', reqId, externalId }))) as
+    const data = (await this.#ask(
+      agentId,
+      (reqId) => ({ type: 'snapshot', reqId, externalId }),
+      SHOT_TIMEOUT_MS,
+    )) as
       | { jpeg?: string }
       | undefined;
 

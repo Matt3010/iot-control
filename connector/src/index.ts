@@ -13,7 +13,7 @@ import { Link, PROTOCOL } from './link.js';
 import { ensureToken } from './onboarding.js';
 import { cancelPairing, listLinked, startPairing, submitPairing, unlink } from './pairing.js';
 
-const VERSION = '1.5.4';
+const VERSION = '1.5.5';
 /** All'avvio le entità arrivano a centinaia: si aspetta un attimo e si manda una lista sola. */
 const COALESCE_MS = 500;
 
@@ -179,7 +179,7 @@ async function main(): Promise<void> {
     const fail = (error: string): void => void link.send({ type: 'ack', reqId: ask.reqId, ok: false, error });
 
     if (!devices.has(ask.externalId)) return fail('telecamera sconosciuta per questo agente');
-    if (!ha.connected) return fail('home assistant non è raggiungibile');
+    if (!ha.connected) return fail('il servizio in casa non è raggiungibile');
 
     try {
       const jpeg = await ha.snapshot(ask.externalId);
@@ -190,6 +190,10 @@ async function main(): Promise<void> {
         data: { jpeg: jpeg.toString('base64'), at: new Date().toISOString() },
       });
     } catch (error) {
+      // Nel registro della macchina, che e' l'unico posto dove si puo'
+      // guardare: una telecamera che non manda niente ha sempre un motivo, e
+      // di la' arriva solo la frase corta.
+      console.warn(`fotogramma da ${ask.externalId}: ${(error as Error).message}`);
       fail((error as Error).message);
     }
   };
@@ -198,7 +202,7 @@ async function main(): Promise<void> {
     const fail = (error: string): void => void link.send({ type: 'ack', reqId: command.reqId, ok: false, error });
 
     if (!devices.has(command.externalId)) return fail('dispositivo sconosciuto per questo agente');
-    if (!ha.connected) return fail('home assistant non è raggiungibile');
+    if (!ha.connected) return fail('il servizio in casa non è raggiungibile');
 
     const call = toServiceCall(command.externalId, command.code, command.value);
     if (!call) return fail(`"${command.code}" non è una cosa che questo dispositivo sa fare`);
