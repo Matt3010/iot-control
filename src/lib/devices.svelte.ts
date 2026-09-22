@@ -31,10 +31,6 @@ export interface NewAgent {
   install: string;
 }
 
-type LiveEvent =
-  | { kind: 'device'; deviceId: string; online: boolean; state: Record<string, DeviceValue> }
-  | { kind: 'agent'; agentId: string; online: boolean };
-
 /**
  * Quello che si accende, e gli agenti da cui arriva. Lo stato non si chiede:
  * si riceve. Un filo solo aperto verso il server porta ogni cambiamento mentre
@@ -52,8 +48,6 @@ class Devices {
    * mettere l'attesa sul controllo che l'ha chiesta, e non sulla pagina.
    */
   busy = $state<string[]>([]);
-
-  #stream: EventSource | null = null;
 
   byId(id: string | undefined): Device | undefined {
     return id ? this.list.find((device) => device.id === id) : undefined;
@@ -112,44 +106,25 @@ class Devices {
   }
 
   /**
-   * Il filo aperto. `EventSource` si riconnette da sé quando la rete torna,
-   * e a ogni riconnessione il server rimanda quello che sa: non serve tenere
-   * il conto di cosa ci siamo persi.
+   * Quello che arriva dal filo. Il filo non è suo: è uno solo per tutta
+   * l'app, e sta in `live`. Qui si applica soltanto la parte che riguarda
+   * quello che si accende.
    */
-  watch(): void {
-    if (this.#stream) return;
-    const stream = new EventSource('/api/devices/stream');
-    this.#stream = stream;
-
-    stream.onmessage = (message) => {
-      try {
-        this.#apply(JSON.parse(message.data as string) as LiveEvent);
-      } catch {
-        /* un messaggio storto non rompe il filo */
-      }
-    };
-  }
-
-  stop(): void {
-    this.#stream?.close();
-    this.#stream = null;
-  }
-
-  #apply(event: LiveEvent): void {
+  apply(event: { kind: 'device' | 'agent' } & Record<string, unknown>): void {
     if (event.kind === 'agent') {
       const agent = this.agents.find((candidate) => candidate.id === event.agentId);
-      if (agent) agent.online = event.online;
+      if (agent) agent.online = event.online as boolean;
       return;
     }
 
-    const device = this.byId(event.deviceId);
+    const device = this.byId(event.deviceId as string);
     if (!device) {
       // Un dispositivo che non conoscevamo: l'agente ne ha trovato uno nuovo.
       void this.load();
       return;
     }
-    device.online = event.online;
-    device.state = event.state;
+    device.online = event.online as boolean;
+    device.state = event.state as Record<string, DeviceValue>;
   }
 
   /* --------------------------------------------------------------- comandi */

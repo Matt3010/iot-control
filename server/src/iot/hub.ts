@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { BackendMessage, DeviceValue } from '../../../shared/protocol.js';
+import type { CategoryView, GroupView, MapView, PlaceView } from '../dto/views.js';
 import type { Device } from '../types.js';
 
 /** Lo stato di adesso di un dispositivo. Non si scrive su disco: vale solo ora. */
@@ -8,10 +9,20 @@ export interface Live {
   state: Record<string, DeviceValue>;
 }
 
-/** Quello che il browser riceve dalla SSE, a caldo. */
+/**
+ * Quello che il browser riceve dal filo aperto, a caldo.
+ *
+ * Due famiglie. Gli agenti e i dispositivi raccontano com'è il mondo *adesso*.
+ * Il resto sono cose che qualcuno ha cambiato — da un'altra scheda, da un
+ * altro computer — e `value: null` vuol dire che non c'è più.
+ */
 export type LiveEvent =
   | { kind: 'device'; deviceId: string; online: boolean; state: Record<string, DeviceValue> }
-  | { kind: 'agent'; agentId: string; online: boolean };
+  | { kind: 'agent'; agentId: string; online: boolean }
+  | { kind: 'place'; id: string; value: PlaceView | null }
+  | { kind: 'map'; id: string; value: MapView | null }
+  | { kind: 'category'; id: string; value: CategoryView | null }
+  | { kind: 'group'; id: string; value: GroupView | null };
 
 interface Connection {
   ownerId: string;
@@ -140,6 +151,15 @@ export class Hub {
   }
 
   /* ------------------------------------------------------- chi sta a guardare */
+
+  /**
+   * Qualcosa è cambiato e chi guarda deve saperlo. Chi l'ha cambiato lo sa
+   * già — se lo riceve indietro non gli fa niente, perché applicare due volte
+   * la stessa cosa la lascia com'è.
+   */
+  changed(ownerId: string, event: LiveEvent): void {
+    this.#tell(ownerId, event);
+  }
 
   watch(ownerId: string, listener: (event: LiveEvent) => void): () => void {
     const listeners = this.#watchers.get(ownerId) ?? new Set();

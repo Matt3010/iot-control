@@ -4,6 +4,13 @@ import { readJSON, writeJSON } from './storage';
 import { toast, UNDO_MS } from './toast.svelte';
 import type { Category, Draft, Group, LocalPlace, Place, PlaceMap, Snapshot } from './types';
 
+/** Quello che il filo aperto racconta di cambiato. `null` vuol dire sparito. */
+type LiveChange =
+  | { kind: 'place'; id: string; value: Place | null }
+  | { kind: 'map'; id: string; value: PlaceMap | null }
+  | { kind: 'category'; id: string; value: Category | null }
+  | { kind: 'group'; id: string; value: Group | null };
+
 const withKey = (place: Place): LocalPlace => ({ ...place, key: crypto.randomUUID() });
 
 /** What the server is allowed to see of a place. */
@@ -212,6 +219,71 @@ class Store {
 
   countGroup(groupId: string): number {
     return this.currentPlaces.filter((place) => place.groupIds.includes(groupId)).length;
+  }
+
+  /**
+   * Una cosa cambiata da un'altra parte — un'altra scheda, il telefono, una
+   * cancellazione andata a buon fine. Si applica per `id`, e chi l'ha
+   * cambiata la riceve indietro senza danno: applicare due volte la stessa
+   * cosa la lascia com'è.
+   *
+   * Delle cascate non arrivano eventi: che una categoria si porti via i suoi
+   * luoghi lo sappiamo già, ed è la stessa regola che applichiamo quando
+   * siamo noi a eliminarla.
+   */
+  apply(event: LiveChange): void {
+    switch (event.kind) {
+      case 'place': {
+        const at = this.places.findIndex((place) => place.id === event.id);
+        if (!event.value) {
+          if (at >= 0) this.places.splice(at, 1);
+          return;
+        }
+        // il `key` non si tocca: è quello che tiene un marker attaccato al suo luogo
+        if (at >= 0) Object.assign(this.places[at]!, event.value);
+        else this.places.push(withKey(event.value));
+        return;
+      }
+
+      case 'map': {
+        if (!event.value) {
+          this.maps = this.maps.filter((map) => map.id !== event.id);
+          this.places = this.places.filter((place) => place.mapId !== event.id);
+          if (this.activeMapId === event.id) this.openMap(this.maps[0]?.id ?? '');
+          this.extraMapIds = this.extraMapIds.filter((id) => id !== event.id);
+          return;
+        }
+        const map = this.maps.find((candidate) => candidate.id === event.id);
+        if (map) Object.assign(map, event.value);
+        else this.maps.push(event.value);
+        return;
+      }
+
+      case 'category': {
+        if (!event.value) {
+          this.categories = this.categories.filter((category) => category.id !== event.id);
+          this.places = this.places.filter((place) => place.categoryId !== event.id);
+          return;
+        }
+        const category = this.categories.find((candidate) => candidate.id === event.id);
+        if (category) Object.assign(category, event.value);
+        else this.categories.push(event.value);
+        return;
+      }
+
+      case 'group': {
+        if (!event.value) {
+          this.groups = this.groups.filter((group) => group.id !== event.id);
+          for (const place of this.places) place.groupIds = place.groupIds.filter((id) => id !== event.id);
+          if (this.activeGroup === event.id) this.setGroup(null);
+          return;
+        }
+        const group = this.groups.find((candidate) => candidate.id === event.id);
+        if (group) Object.assign(group, event.value);
+        else this.groups.push(event.value);
+        return;
+      }
+    }
   }
 
   async load(): Promise<void> {

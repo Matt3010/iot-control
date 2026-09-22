@@ -1,6 +1,7 @@
 <script lang="ts">
   import { auth } from './lib/auth.svelte';
   import { devices } from './lib/devices.svelte';
+  import { live } from './lib/live.svelte';
   import { readRoute } from './lib/routing';
   import { store } from './lib/store.svelte';
   import { toast } from './lib/toast.svelte';
@@ -31,11 +32,12 @@
     if (!auth.account) return;
     store.load().catch((error: Error) => toast.show(`Caricamento fallito: ${error.message}`));
 
-    // Le case si raccontano da sole: si chiede una volta com'e' messo il
-    // mondo, e da li in poi arriva tutto da un filo aperto.
+    // Si chiede una volta com'è messo il mondo, e da lì in poi arriva tutto
+    // da un filo aperto: gli interruttori, e anche i luoghi che cambi da
+    // un'altra scheda.
     void devices.load();
-    devices.watch();
-    return () => devices.stop();
+    live.start();
+    return () => live.stop();
   });
 
   // The map cursor and the bottom-of-screen rules read these off the body.

@@ -43,6 +43,11 @@ apiRouter.use(requireUser);
 
 apiRouter.get('/auth/me', authController.me);
 apiRouter.get('/state', stateController.snapshot);
+/**
+ * Il filo aperto: da qui scende tutto quello che cambia mentre guardi — gli
+ * interruttori, e anche i luoghi che qualcun altro sposta da un'altra scheda.
+ */
+apiRouter.get('/state/stream', stateController.stream);
 
 apiRouter.route('/maps').get(mapController.list).post(validateBody(MapDto), mapController.create);
 
@@ -95,6 +100,4 @@ apiRouter
 apiRouter.post('/agents/:id/token', agentController.rotate);
 
 apiRouter.get('/devices', deviceController.list);
-/** Il filo aperto: da qui scendono gli stati mentre cambiano. */
-apiRouter.get('/devices/stream', deviceController.stream);
 apiRouter.post('/devices/:id/command', validateBody(CommandDto), deviceController.command);
