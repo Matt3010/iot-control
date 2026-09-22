@@ -1,6 +1,7 @@
 <script lang="ts">
   import { devices, type Device } from '../lib/devices.svelte';
   import type { Capability, DeviceValue } from '../lib/types';
+  import { ui } from '../lib/ui.svelte';
   import Chip from './Chip.svelte';
   import Switch from './Switch.svelte';
 
@@ -14,6 +15,9 @@
    * vestito — sfondo, bordo, angoli — ce l'ha già chi lo ospita.
    */
   let { device }: { device: Device } = $props();
+
+  /** A cosa si attacca la domanda, per ogni controllo che ne fa una. */
+  const anchors: Record<string, HTMLElement | undefined> = $state({});
 
   const lit = $derived(devices.isOn(device));
 
@@ -39,6 +43,33 @@
   function preview(code: string, value: number): void {
     device.state = { ...device.state, [code]: value };
   }
+
+  /**
+   * Niente parte senza un sì. Premere qui vuol dire muovere una cosa in un
+   * posto dove magari non sei: una tapparella che scende mentre qualcuno ci
+   * sta sotto non è un clic qualunque.
+   *
+   * Il cursore no: quello è una regolazione, la scegli trascinando e la
+   * correggi trascinando ancora.
+   */
+  function confirm(anchor: HTMLElement, title: string, verb: string, run: () => void): void {
+    ui.askSure(anchor, { title, verb, tone: 'plain', no: 'Annulla', onYes: run });
+  }
+
+  /**
+   * L'interruttore si muove sotto il dito prima che qualcuno dica di sì: lo
+   * si rimette com'era subito, e se la risposta è sì ci penserà lo stato vero
+   * a spostarlo.
+   */
+  function askSwitch(anchor: HTMLElement, capability: Capability, wanted: boolean): void {
+    device.state = { ...device.state };
+    confirm(
+      anchor,
+      `${wanted ? 'Accendere' : 'Spegnere'} «${device.name}»?`,
+      wanted ? 'Accendi' : 'Spegni',
+      () => void devices.command(device, capability.code, wanted),
+    );
+  }
 </script>
 
 <div class="dev" class:is-lit={lit} class:is-off={!device.online}>
@@ -53,12 +84,18 @@
   <div class="dev-body">
     {#each device.capabilities as capability (capability.code)}
       {#if capability.kind === 'switch'}
-        <div class="line" class:is-busy={devices.isBusy(device.id, capability.code)}>
+        <!-- l'ancora della domanda: lo Switch disegna il suo markup, e a
+             qualcosa la domanda si deve attaccare -->
+        <div
+          class="line"
+          class:is-busy={devices.isBusy(device.id, capability.code)}
+          bind:this={anchors[capability.code]}
+        >
           <Switch
             checked={device.state[capability.code] === true}
             disabled={!device.online}
             label={capability.label}
-            onchange={(value) => devices.command(device, capability.code, value)}
+            onchange={(value) => askSwitch(anchors[capability.code]!, capability, value)}
           />
         </div>
       {:else if capability.kind === 'range'}
@@ -92,7 +129,13 @@
                 look={device.state[capability.code] === value ? 'sel' : 'off'}
                 size="sm"
                 disabled={!device.online}
-                onclick={() => devices.command(device, capability.code, value)}
+                onclick={(event: MouseEvent) =>
+                  confirm(
+                    event.currentTarget as HTMLElement,
+                    `${value} «${device.name}»?`,
+                    value,
+                    () => void devices.command(device, capability.code, value),
+                  )}
               />
             {/each}
           </span>

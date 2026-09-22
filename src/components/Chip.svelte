@@ -20,7 +20,7 @@
     /** Più piccola del normale: dentro a una card, in mezzo ad altri controlli. */
     size?: 'sm';
     disabled?: boolean;
-    onclick?: () => void;
+    onclick?: (event: MouseEvent) => void;
     /* quello che non sappiamo ancora di dover passare: title, aria, dati */
     [key: string]: unknown;
   } = $props();

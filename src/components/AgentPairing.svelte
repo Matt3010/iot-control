@@ -19,15 +19,30 @@
    */
   let { agent }: { agent: Agent } = $props();
 
+  /**
+   * Cosa si può collegare, e cosa comporta collegarlo. Il secondo non è un
+   * dettaglio: aggiungere eWeLink scarica un'integrazione di terze parti su
+   * quella macchina e fa riavviare Home Assistant, e chi preme deve saperlo
+   * prima, non dopo.
+   */
   const ACCOUNTS = [
-    { handler: 'tuya', label: 'Tuya' },
-    { handler: 'sonoff', label: 'eWeLink' },
+    {
+      handler: 'tuya',
+      label: 'Tuya',
+      warns: "Home Assistant ti chiederà il codice che sta nell'app Smart Life, e poi un QR da inquadrare.",
+    },
+    {
+      handler: 'sonoff',
+      label: 'eWeLink',
+      warns:
+        "La prima volta l'agente aggiunge a Home Assistant l'integrazione eWeLink e lo riavvia: ci vuole un minuto. Poi ti chiederà le credenziali dell'app.",
+    },
   ] as const;
 
   /** Come si chiamano i campi di HA, detto in italiano. */
   const LABELS: Record<string, string> = {
     user_code: 'Codice utente',
-    country_code: 'Prefisso del paese',
+    country_code: "Paese dell'account",
     username: 'Email o numero di telefono',
     password: 'Password',
     email: 'Email',
@@ -37,19 +52,31 @@
   const named = (name: string) => LABELS[name] ?? name.replace(/_/g, ' ');
 
   /**
-   * Il prefisso del paese serve solo a chi entra col numero di telefono: per
-   * eWeLink metterlo vuol dire «quello sopra è un numero», e con un'email il
-   * login viene rifiutato da un pezzo di codice che parla di espressioni
-   * regolari. Invece di spiegarlo, il campo compare quando serve: se quello
-   * che stai scrivendo è fatto di cifre.
+   * Il paese non dice «questo è un telefono»: dice **su quale server** sta il
+   * tuo account — Europa, America, Asia, Cina. Senza, eWeLink va di default
+   * sul server cinese e l'accesso fallisce senza spiegare perché.
+   *
+   * Quindi non si chiede: si indovina da dove sei, e resta lì da correggere
+   * se l'account è di un altro paese. Il nome del paese lo sa il browser.
    */
-  const looksLikePhone = (value: string) => /^[+\d][\d\s+()-]*$/.test(value.trim());
-
-  function asked(field: { name: string }): boolean {
-    if (field.name !== 'country_code') return true;
-    const who = (answers.username ?? '').trim();
-    return who.length > 0 && looksLikePhone(who);
+  function guessCountry(options: { value: string; label: string }[]): string {
+    try {
+      const region = new Intl.Locale(navigator.language).region;
+      if (!region) return '';
+      const name = new Intl.DisplayNames(['en'], { type: 'region' }).of(region);
+      return options.find((option) => option.label.startsWith(`${name} `))?.value ?? '';
+    } catch {
+      return '';
+    }
   }
+
+  /** Alla comparsa del campo si propone il paese di chi sta guardando. */
+  $effect(() => {
+    const country = step?.fields.find((field) => field.name === 'country_code');
+    if (!country?.options || answers.country_code) return;
+    const guess = guessCountry(country.options);
+    if (guess) answers = { ...answers, country_code: guess };
+  });
 
   /** Cosa è già collegato: si chiede una volta, e si riaggiorna quando cambia. */
   let linked = $state<LinkedAccount[]>([]);
@@ -106,6 +133,18 @@
     void go('start');
   }
 
+  /** Niente parte prima di un sì: collegare un account non è un clic qualunque. */
+  function ask(event: MouseEvent, account: (typeof ACCOUNTS)[number]) {
+    ui.askSure(event.currentTarget as HTMLElement, {
+      title: `Collegare ${account.label}?`,
+      detail: account.warns,
+      verb: 'Collega',
+      tone: 'plain',
+      no: 'Non ora',
+      onYes: () => begin(account.handler),
+    });
+  }
+
   /**
    * Un codice incollato si porta dietro gli spazi ai bordi, e certi codici
    * distinguono maiuscole e minuscole: si tolgono quelli, non il resto.
@@ -116,10 +155,7 @@
    * regolari. Se c'è una chiocciola, il prefisso non si manda.
    */
   function cleaned(): Record<string, string> {
-    const out = Object.fromEntries(Object.entries(answers).map(([name, value]) => [name, value.trim()]));
-    // rete di sicurezza: se non è un numero, il prefisso non parte comunque
-    if (out.username && !looksLikePhone(out.username)) delete out.country_code;
-    return out;
+    return Object.fromEntries(Object.entries(answers).map(([name, value]) => [name, value.trim()]));
   }
 
   const submit = () => go('submit', cleaned());
@@ -170,7 +206,7 @@
             size="sm"
             disabled={!agent.online || busy}
             title={agent.online ? `Collega ${account.label}` : "L'agente non è collegato"}
-            onclick={() => begin(account.handler)}
+            onclick={(event: MouseEvent) => ask(event, account)}
           >
             Collega
           </Button>
@@ -215,10 +251,13 @@
         </p>
         <p class="say careful">Copialo <b>esattamente</b> com'è: maiuscole e minuscole contano.</p>
       {:else}
-        <p class="say">Entra con le stesse credenziali che usi nell'app <b>eWeLink</b>.</p>
+        <p class="say">
+          Entra con le stesse credenziali che usi nell'app <b>eWeLink</b>: l'email <b>intera</b>,
+          oppure il numero di telefono.
+        </p>
       {/if}
 
-      {#each step.fields.filter(asked) as field (field.name)}
+      {#each step.fields as field (field.name)}
         <label class="field">
           <span class="eyebrow">{named(field.name)}</span>
           {#if field.options}
