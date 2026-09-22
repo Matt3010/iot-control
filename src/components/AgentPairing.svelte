@@ -163,12 +163,8 @@
 
   /**
    * Un codice incollato si porta dietro gli spazi ai bordi, e certi codici
-   * distinguono maiuscole e minuscole: si tolgono quelli, non il resto.
-   *
-   * E il prefisso: per eWeLink metterlo vuol dire «quello sopra è un numero
-   * di telefono». Con un'email diventa `+tuonome@…`, che non è un numero, e
-   * il rifiuto arriva da un pezzo di codice che parla di espressioni
-   * regolari. Se c'è una chiocciola, il prefisso non si manda.
+   * distinguono maiuscole e minuscole: si tolgono quelli, non il resto. Un
+   * sì/no non si tocca: non ha bordi da pulire.
    */
   function cleaned(): Record<string, string | boolean> {
     return Object.fromEntries(
@@ -222,9 +218,11 @@
             Scollega
           </Button>
         {:else}
+          <!-- stessa misura di «Scollega»: in questo elenco ogni azione è un
+               comando scritto piccolo, e due misure diverse sulla stessa
+               colonna si vedono -->
           <Button
-            look="ghost"
-            size="sm"
+            look="link"
             disabled={!agent.online || busy}
             title={agent.online ? `Collega ${account.label}` : "L'agente non è collegato"}
             onclick={(event: MouseEvent) => ask(event, account)}
@@ -271,24 +269,36 @@
           <i>Impostazioni</i> → <i>Account e sicurezza</i>, alla voce <i>User Code</i>.
         </p>
         <p class="say careful">Copialo <b>esattamente</b> com'è: maiuscole e minuscole contano.</p>
-      {:else}
+      {:else if handler === 'sonoff'}
         <p class="say">
           Entra con le stesse credenziali che usi nell'app <b>eWeLink</b>: l'email <b>intera</b>,
           oppure il numero di telefono.
         </p>
+      {:else if handler === 'generic'}
+        <p class="say">
+          Serve l'indirizzo del flusso: una riga che comincia per <b>rtsp://</b>, quella che ti dà
+          il registratore o la telecamera. Un canale per volta.
+        </p>
+        <p class="say careful">
+          Se l'immagine non arriva, scegli <b>TCP</b>: certi registratori dichiarano un indirizzo
+          di ritorno che non esiste più, e solo il TCP lo ignora.
+        </p>
       {/if}
 
       {#each step.fields as field (field.name)}
+        {#if field.yesno}
+          <!-- Un sì/no non è un campo da riempire: è una levetta, e la levetta
+               si porta già il suo nome. Fuori dalla <label> degli altri: una
+               levetta è a sua volta una label, e una dentro l'altra non si fa. -->
+          <Switch
+            checked={answers[field.name] === true}
+            onchange={(value: boolean) => (answers = { ...answers, [field.name]: value })}
+            label={named(field.name)}
+          />
+        {:else}
         <label class="field">
           <span class="eyebrow">{named(field.name)}</span>
-          {#if field.yesno}
-            <!-- un sì/no non è un campo da riempire: è una levetta -->
-            <Switch
-              checked={answers[field.name] === true}
-              onchange={(value: boolean) => (answers = { ...answers, [field.name]: value })}
-              label={named(field.name)}
-            />
-          {:else if field.options}
+          {#if field.options}
             <select
               bind:value={
                 () => answers[field.name] ?? '',
@@ -315,6 +325,7 @@
             />
           {/if}
         </label>
+        {/if}
       {/each}
 
       <div class="acts">
