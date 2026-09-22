@@ -8,7 +8,17 @@ import type { HaEntity } from './homeassistant.js';
  */
 
 /** Quello che ci interessa. Il resto di HA — automazioni, script, scene — non è un dispositivo. */
-const DOMAINS = new Set(['light', 'switch', 'input_boolean', 'fan', 'cover', 'climate', 'sensor', 'binary_sensor']);
+const DOMAINS = new Set([
+  'light',
+  'switch',
+  'input_boolean',
+  'fan',
+  'cover',
+  'climate',
+  'lock',
+  'sensor',
+  'binary_sensor',
+]);
 
 /** I bit con cui HA dice cosa sa fare una tapparella o un ventilatore. */
 const COVER_SET_POSITION = 4;
@@ -79,12 +89,24 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
       return has(entity, COVER_SET_POSITION) ? [move, percent('Apertura', 'position')] : [move];
     }
 
+    case 'lock':
+      // una serratura non è un interruttore: «acceso» non vuol dire niente,
+      // e le due parole devono essere quelle che useresti a voce
+      return [{ code: 'lock', kind: 'enum', label: 'Serratura', values: ['Apri', 'Chiudi a chiave'] }];
+
     case 'climate': {
       const min = Number(entity.attributes.min_temp ?? 5);
       const max = Number(entity.attributes.max_temp ?? 35);
       const step = Number(entity.attributes.target_temp_step ?? 0.5);
       const temperatura: Capability = { code: 'temperature', kind: 'range', label: 'Temperatura', min, max, step, unit: '°C' };
-      return has(entity, CLIMATE_TARGET_TEMPERATURE) ? [acceso, temperatura] : [acceso];
+
+      // i modi che quel condizionatore sa fare davvero, senza «off» che è già
+      // l'interruttore qui sopra
+      const modi = (entity.attributes.hvac_modes as string[] | undefined)?.filter((mode) => mode !== 'off');
+      const modo: Capability | null =
+        modi && modi.length > 1 ? { code: 'mode', kind: 'enum', label: 'Modo', values: modi } : null;
+
+      return [acceso, ...(has(entity, CLIMATE_TARGET_TEMPERATURE) ? [temperatura] : []), ...(modo ? [modo] : [])];
     }
 
     case 'sensor':
@@ -104,6 +126,27 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
   }
 }
 
+/**
+ * Un sensore a due stati dice `on`/`off`, che è la lingua delle macchine.
+ * Le parole giuste dipendono da cosa guarda: una porta è aperta o chiusa,
+ * un rilevatore vede qualcosa o non vede niente.
+ */
+const WORDS: Record<string, [string, string]> = {
+  motion: ['Rilevato', 'Niente'],
+  occupancy: ['Qualcuno', 'Nessuno'],
+  door: ['Aperta', 'Chiusa'],
+  window: ['Aperta', 'Chiusa'],
+  opening: ['Aperto', 'Chiuso'],
+  garage_door: ['Aperto', 'Chiuso'],
+  moisture: ['Bagnato', 'Asciutto'],
+  smoke: ['Fumo', 'Pulito'],
+  gas: ['Gas', 'Pulito'],
+  problem: ['Problema', 'A posto'],
+  battery: ['Scarica', 'Carica'],
+  lock: ['Aperta', 'Chiusa'],
+  presence: ['In casa', 'Fuori'],
+};
+
 /** Un numero resta un numero; quello che non lo è resta la sua parola. */
 const numeric = (value: unknown): DeviceValue | undefined => {
   if (value === null || value === undefined) return undefined;
@@ -115,17 +158,32 @@ export function stateOf(entity: HaEntity): Record<string, DeviceValue> {
   const domain = domainOf(entity.entity_id);
   const state: Record<string, DeviceValue> = {};
 
-  if (domain === 'sensor' || domain === 'binary_sensor') {
+  if (domain === 'binary_sensor') {
+    const words = WORDS[String(entity.attributes.device_class ?? '')] ?? ['Sì', 'No'];
+    state.value = entity.state === 'on' ? words[0] : entity.state === 'off' ? words[1] : '—';
+    return state;
+  }
+
+  if (domain === 'sensor') {
     state.value = numeric(entity.state) ?? entity.state;
     return state;
   }
 
-  state.power = entity.state === 'on' || entity.state === 'open' || entity.state === 'heat' || entity.state === 'cool' || entity.state === 'auto';
-
-  // una tapparella dice dov'è con le stesse parole dei suoi tasti
+  // Una tapparella aperta non è «accesa»: non consuma e non si è dimenticata
+  // niente. Se contasse, il pin sulla mappa si scalderebbe per una tenda
+  // tirata su, che non è quello che vuoi sapere da lontano.
   if (domain === 'cover') {
     if (entity.state === 'open') state.move = 'Apri';
     else if (entity.state === 'closed') state.move = 'Chiudi';
+  } else if (domain === 'lock') {
+    state.lock = entity.state === 'locked' ? 'Chiudi a chiave' : 'Apri';
+  } else if (domain === 'climate') {
+    // un condizionatore acceso può essere in deumidificazione o ventilazione:
+    // «diverso da spento» è l'unica regola che non lascia fuori nessuno
+    state.power = entity.state !== 'off' && entity.state !== 'unavailable';
+    state.mode = entity.state;
+  } else {
+    state.power = entity.state === 'on';
   }
 
   // HA tiene la luminosità su 255; fuori di qui si ragiona in percentuale.
@@ -198,6 +256,16 @@ export function toServiceCall(entityId: string, code: string, value: DeviceValue
 
     case 'temperature':
       return { domain: 'climate', service: 'set_temperature', data: { temperature: Number(value) } };
+
+    case 'lock':
+      return domain === 'lock'
+        ? { domain: 'lock', service: value === 'Apri' ? 'unlock' : 'lock', data: {} }
+        : null;
+
+    case 'mode':
+      return domain === 'climate'
+        ? { domain: 'climate', service: 'set_hvac_mode', data: { hvac_mode: String(value) } }
+        : null;
 
     case 'move': {
       const service = value === 'Apri' ? 'open_cover' : value === 'Chiudi' ? 'close_cover' : 'stop_cover';
