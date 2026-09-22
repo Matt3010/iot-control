@@ -22,6 +22,30 @@ const has = (entity: HaEntity, bit: number): boolean => (features(entity) & bit)
 
 const percent = (label: string, code: string): Capability => ({ code, kind: 'range', label, min: 0, max: 100, step: 1, unit: '%' });
 
+/**
+ * Cosa misura un sensore, detto in italiano. Home Assistant lo sa — lo chiama
+ * `device_class` — e «Temperatura» dice molto più di «Valore».
+ */
+const MEASURES: Record<string, string> = {
+  temperature: 'Temperatura',
+  humidity: 'Umidità',
+  power: 'Potenza',
+  energy: 'Consumo',
+  current: 'Corrente',
+  voltage: 'Tensione',
+  illuminance: 'Luce',
+  battery: 'Batteria',
+  pressure: 'Pressione',
+  co2: 'Anidride carbonica',
+  pm25: 'Polveri sottili',
+  signal_strength: 'Segnale',
+  motion: 'Movimento',
+  door: 'Porta',
+  window: 'Finestra',
+  smoke: 'Fumo',
+  moisture: 'Acqua',
+};
+
 /** Una luce che sa solo accendersi non ha un cursore da mostrare. */
 function dimmable(entity: HaEntity): boolean {
   const modes = entity.attributes.supported_color_modes;
@@ -45,7 +69,13 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
       return has(entity, FAN_SET_SPEED) ? [acceso, percent('Velocità', 'speed')] : [acceso];
 
     case 'cover': {
-      const move: Capability = { code: 'move', kind: 'enum', label: 'Movimento', values: has(entity, COVER_STOP) ? ['open', 'stop', 'close'] : ['open', 'close'] };
+      // in italiano, e con le parole che si usano per una tapparella
+      const move: Capability = {
+        code: 'move',
+        kind: 'enum',
+        label: 'Movimento',
+        values: has(entity, COVER_STOP) ? ['Apri', 'Ferma', 'Chiudi'] : ['Apri', 'Chiudi'],
+      };
       return has(entity, COVER_SET_POSITION) ? [move, percent('Apertura', 'position')] : [move];
     }
 
@@ -60,11 +90,13 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
     case 'sensor':
     case 'binary_sensor': {
       const unit = entity.attributes.unit_of_measurement as string | undefined;
+      const measure = entity.attributes.device_class as string | undefined;
       // Un sensore senza unità e senza tipo non è una misura: è un dettaglio
       // interno dell'integrazione — «Mansarda Action», che vale 0 e non vuol
       // dire niente. Su una mappa è rumore.
-      if (!unit && !entity.attributes.device_class) return [];
-      return [{ code: 'value', kind: 'sensor', label: 'Valore', ...(unit ? { unit } : {}) }];
+      if (!unit && !measure) return [];
+      const label = (measure && MEASURES[measure]) || 'Valore';
+      return [{ code: 'value', kind: 'sensor', label, ...(unit ? { unit } : {}) }];
     }
 
     default:
@@ -89,6 +121,12 @@ export function stateOf(entity: HaEntity): Record<string, DeviceValue> {
   }
 
   state.power = entity.state === 'on' || entity.state === 'open' || entity.state === 'heat' || entity.state === 'cool' || entity.state === 'auto';
+
+  // una tapparella dice dov'è con le stesse parole dei suoi tasti
+  if (domain === 'cover') {
+    if (entity.state === 'open') state.move = 'Apri';
+    else if (entity.state === 'closed') state.move = 'Chiudi';
+  }
 
   // HA tiene la luminosità su 255; fuori di qui si ragiona in percentuale.
   const brightness = numeric(entity.attributes.brightness);
@@ -162,7 +200,7 @@ export function toServiceCall(entityId: string, code: string, value: DeviceValue
       return { domain: 'climate', service: 'set_temperature', data: { temperature: Number(value) } };
 
     case 'move': {
-      const service = value === 'open' ? 'open_cover' : value === 'close' ? 'close_cover' : 'stop_cover';
+      const service = value === 'Apri' ? 'open_cover' : value === 'Chiudi' ? 'close_cover' : 'stop_cover';
       return domain === 'cover' ? { domain: 'cover', service, data: {} } : null;
     }
 

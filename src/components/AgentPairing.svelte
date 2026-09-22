@@ -36,6 +36,21 @@
 
   const named = (name: string) => LABELS[name] ?? name.replace(/_/g, ' ');
 
+  /**
+   * Il prefisso del paese serve solo a chi entra col numero di telefono: per
+   * eWeLink metterlo vuol dire «quello sopra è un numero», e con un'email il
+   * login viene rifiutato da un pezzo di codice che parla di espressioni
+   * regolari. Invece di spiegarlo, il campo compare quando serve: se quello
+   * che stai scrivendo è fatto di cifre.
+   */
+  const looksLikePhone = (value: string) => /^[+\d][\d\s+()-]*$/.test(value.trim());
+
+  function asked(field: { name: string }): boolean {
+    if (field.name !== 'country_code') return true;
+    const who = (answers.username ?? '').trim();
+    return who.length > 0 && looksLikePhone(who);
+  }
+
   /** Cosa è già collegato: si chiede una volta, e si riaggiorna quando cambia. */
   let linked = $state<LinkedAccount[]>([]);
   const joined = (handler: string) => linked.find((one) => one.handler === handler);
@@ -102,7 +117,8 @@
    */
   function cleaned(): Record<string, string> {
     const out = Object.fromEntries(Object.entries(answers).map(([name, value]) => [name, value.trim()]));
-    if (out.username?.includes('@')) delete out.country_code;
+    // rete di sicurezza: se non è un numero, il prefisso non parte comunque
+    if (out.username && !looksLikePhone(out.username)) delete out.country_code;
     return out;
   }
 
@@ -200,17 +216,13 @@
         <p class="say careful">Copialo <b>esattamente</b> com'è: maiuscole e minuscole contano.</p>
       {:else}
         <p class="say">Entra con le stesse credenziali che usi nell'app <b>eWeLink</b>.</p>
-        <p class="say careful">
-          Il prefisso serve <b>solo</b> se entri col numero di telefono. Con l'email lascialo vuoto.
-        </p>
       {/if}
 
-      {#each step.fields as field (field.name)}
+      {#each step.fields.filter(asked) as field (field.name)}
         <label class="field">
           <span class="eyebrow">{named(field.name)}</span>
           {#if field.options}
             <select
-              disabled={field.name === 'country_code' && (answers.username ?? '').includes('@')}
               bind:value={
                 () => answers[field.name] ?? '',
                 (value) => (answers = { ...answers, [field.name]: value })

@@ -10,6 +10,12 @@ services:
     restart: unless-stopped
     # Senza la rete dell'host non vede i broadcast, e senza broadcast non trova niente.
     network_mode: host
+    # Il mestiere di questo container è parlare con dei cloud, e un router che
+    # risponde a singhiozzo si vede solo come "collegamento fallito" nel bel
+    # mezzo di un accoppiamento. Qui i nomi se li risolve da sé.
+    dns:
+      - 1.1.1.1
+      - 9.9.9.9
     volumes:
       - ./homeassistant:/config
       - /etc/localtime:/etc/localtime:ro

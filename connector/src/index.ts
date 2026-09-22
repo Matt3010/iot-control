@@ -24,7 +24,7 @@ async function main(): Promise<void> {
    * ogni volta che l'anagrafe di HA cambia — è così che i dispositivi Tuya
    * compaiono appena aggiungi l'integrazione, senza riavviare niente.
    */
-  let real = new Set<string>();
+  let real = new Map<string, { deviceId: string; deviceName: string }>();
 
   const hello = (): HelloMessage => ({
     type: 'hello',
@@ -58,10 +58,29 @@ async function main(): Promise<void> {
     const entities = await ha.states();
 
     devices.clear();
+    /** Quante entità passa ogni dispositivo: serve a decidere come chiamarle. */
+    const quante = new Map<string, number>();
+
     for (const entity of entities) {
-      if (!real.has(entity.entity_id)) continue;
+      const known = real.get(entity.entity_id);
+      if (!known) continue;
       const device = translate(entity);
-      if (device) devices.set(device.externalId, device);
+      if (!device) continue;
+
+      devices.set(device.externalId, device);
+      quante.set(known.deviceId, (quante.get(known.deviceId) ?? 0) + 1);
+    }
+
+    // Home Assistant chiama un'entità «<dispositivo> <cosa fa>»: "Persiane
+    // Curtain", "Luce salotto Switch". Quando di quel dispositivo passa una
+    // cosa sola, il nome giusto è quello del dispositivo — è come lo chiami
+    // tu. Con più entità i nomi lunghi servono a distinguerle, e restano.
+    for (const [id, device] of devices) {
+      const known = real.get(id);
+      if (!known?.deviceName || quante.get(known.deviceId) !== 1) continue;
+      if (device.name.startsWith(known.deviceName)) {
+        devices.set(id, { ...device, name: known.deviceName });
+      }
     }
 
     console.log(`${devices.size} dispositivi da home assistant`);
@@ -73,10 +92,13 @@ async function main(): Promise<void> {
     () => void refill().catch((error: unknown) => console.warn(`non riesco a leggere home assistant: ${(error as Error).message}`)),
     (entity) => {
       if (!real.has(entity.entity_id)) return;
-      const device = translate(entity);
-      if (!device) return;
+      const fresh = translate(entity);
+      if (!fresh) return;
 
-      const known = devices.get(device.externalId);
+      const known = devices.get(fresh.externalId);
+      // il nome accorciato non si perde a ogni cambio di stato: quello buono
+      // lo ha deciso l'ultimo giro d'inventario, questo porta solo i valori
+      const device = { ...fresh, name: known?.name ?? fresh.name };
       devices.set(device.externalId, device);
 
       // Se cambia solo quanto è accesa una luce non serve rimandare l'inventario:

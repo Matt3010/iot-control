@@ -22,6 +22,15 @@ interface RegistryDevice {
   id: string;
   /** `service` è un dispositivo finto: il sole, i backup, HA stessa. */
   entry_type: string | null;
+  name_by_user?: string | null;
+  name?: string | null;
+}
+
+/** Un'entità che è davvero un dispositivo, e di quale. */
+export interface RealEntity {
+  deviceId: string;
+  /** Come si chiama il dispositivo: quello che la persona ha scritto, se l'ha scritto. */
+  deviceName: string;
 }
 
 interface Pending {
@@ -89,20 +98,25 @@ export class HomeAssistant {
    * dispositivo vero portano una `entity_category`. Resta quello che si
    * accende, si apre o si misura.
    */
-  async devices(): Promise<Set<string>> {
+  async devices(): Promise<Map<string, RealEntity>> {
     const [entities, devices] = (await Promise.all([
       this.#call({ type: 'config/entity_registry/list' }),
       this.#call({ type: 'config/device_registry/list' }),
     ])) as [RegistryEntity[], RegistryDevice[]];
 
     const finti = new Set(devices.filter((device) => device.entry_type === 'service').map((device) => device.id));
+    const nomi = new Map(devices.map((device) => [device.id, device.name_by_user || device.name || '']));
 
-    return new Set(
-      entities
-        .filter((entity) => entity.device_id && !finti.has(entity.device_id))
-        .filter((entity) => !entity.entity_category && !entity.disabled_by && !entity.hidden_by)
-        .map((entity) => entity.entity_id),
-    );
+    const real = new Map<string, RealEntity>();
+    for (const entity of entities) {
+      if (!entity.device_id || finti.has(entity.device_id)) continue;
+      if (entity.entity_category || entity.disabled_by || entity.hidden_by) continue;
+      real.set(entity.entity_id, {
+        deviceId: entity.device_id,
+        deviceName: nomi.get(entity.device_id) ?? '',
+      });
+    }
+    return real;
   }
 
   /**
