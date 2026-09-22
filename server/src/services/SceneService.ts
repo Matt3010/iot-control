@@ -1,0 +1,45 @@
+import type { DeviceValue } from '../../../shared/protocol.js';
+import type { SceneDto } from '../dto/scene.dto.js';
+import type { SceneView } from '../dto/views.js';
+import { toSceneView } from '../dto/views.js';
+import { badGateway } from '../errors/HttpError.js';
+import { hub } from '../iot/hub.js';
+import { sceneManager } from '../managers/SceneManager.js';
+
+export class SceneService {
+  async list(ownerId: string): Promise<SceneView[]> {
+    return (await sceneManager.list(ownerId)).map(toSceneView);
+  }
+
+  async create(ownerId: string, dto: SceneDto): Promise<SceneView> {
+    const scene = toSceneView(await sceneManager.create(ownerId, dto));
+    hub.changed(ownerId, { kind: 'scene', id: scene.id, value: scene });
+    return scene;
+  }
+
+  async update(ownerId: string, id: string, dto: SceneDto): Promise<SceneView> {
+    const scene = toSceneView(await sceneManager.update(ownerId, id, dto));
+    hub.changed(ownerId, { kind: 'scene', id: scene.id, value: scene });
+    return scene;
+  }
+
+  async remove(ownerId: string, id: string): Promise<void> {
+    await sceneManager.remove(ownerId, id);
+    hub.changed(ownerId, { kind: 'scene', id, value: null });
+  }
+
+  /**
+   * Come per un dispositivo solo: un agente che non risponde è un guasto fra
+   * noi e lui, non una richiesta sbagliata.
+   */
+  async command(ownerId: string, id: string, code: string, value: DeviceValue): Promise<void> {
+    try {
+      await sceneManager.command(ownerId, id, code, value);
+    } catch (error) {
+      if (error instanceof Error && !('status' in error)) throw badGateway(error.message);
+      throw error;
+    }
+  }
+}
+
+export const sceneService = new SceneService();

@@ -86,6 +86,7 @@ function migrateToMaps(data: Database): Database {
     users: data.users,
     agents: data.agents,
     devices: data.devices,
+    scenes: data.scenes,
     maps: data.maps.length ? data.maps : [first],
     categories: data.categories.map((category: Category) => ({ ...category, ownerId: category.ownerId ?? owner })),
     groups: data.groups.map((group: Group & { mapId?: string }) => {
@@ -97,7 +98,16 @@ function migrateToMaps(data: Database): Database {
   };
 }
 
-const empty = (): Database => ({ users: [], maps: [], categories: [], groups: [], places: [], agents: [], devices: [] });
+const empty = (): Database => ({
+  users: [],
+  maps: [],
+  categories: [],
+  groups: [],
+  places: [],
+  agents: [],
+  devices: [],
+  scenes: [],
+});
 
 /**
  * The working copy a unit of work mutates. Nothing reaches the disk until the
@@ -141,6 +151,8 @@ export class JsonStore {
         maps: migrateSlugs(Array.isArray(parsed.maps) ? parsed.maps : []),
         categories: Array.isArray(parsed.categories) ? parsed.categories : [],
         groups: Array.isArray(parsed.groups) ? parsed.groups : [],
+        // gli insiemi sono arrivati dopo: chi non li ha non ne ha
+        scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
         places: Array.isArray(parsed.places) ? parsed.places.map(migratePlace) : [],
         // Chi aveva l'indice prima che gli agenti esistessero: niente agenti, niente dispositivi.
         agents: Array.isArray(parsed.agents) ? parsed.agents : [],

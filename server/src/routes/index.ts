@@ -9,10 +9,12 @@ import { publicController } from '../controllers/PublicController.js';
 import { categoryController } from '../controllers/CategoryController.js';
 import { groupController } from '../controllers/GroupController.js';
 import { placeController } from '../controllers/PlaceController.js';
+import { sceneController } from '../controllers/SceneController.js';
 import { stateController } from '../controllers/StateController.js';
 import { AgentDto, PairDto } from '../dto/agent.dto.js';
 import { ActDto, CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { CommandDto } from '../dto/device.dto.js';
+import { SceneDto } from '../dto/scene.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/group.dto.js';
 import { MapDto } from '../dto/map.dto.js';
@@ -118,6 +120,22 @@ apiRouter.post('/agents/:id/token', agentController.rotate);
  * disegna il server: manda la stringa, e i pixel li fa chi ha buon gusto.
  */
 apiRouter.post('/agents/:id/pair', validateBody(PairDto), agentController.pair);
+
+/**
+ * Gli insiemi: più dispositivi che rispondono insieme. Le azioni non si
+ * scrivono qui dentro: sono quelle che i suoi dispositivi hanno in comune.
+ */
+apiRouter
+  .route('/scenes')
+  .get(sceneController.list)
+  .post(validateBody(SceneDto), sceneController.create);
+
+apiRouter
+  .route('/scenes/:id')
+  .put(validateBody(SceneDto), sceneController.update)
+  .delete(sceneController.remove);
+
+apiRouter.post('/scenes/:id/command', validateBody(CommandDto), sceneController.command);
 
 apiRouter.get('/devices', deviceController.list);
 apiRouter.post('/devices/:id/command', validateBody(CommandDto), deviceController.command);

@@ -137,6 +137,22 @@ export interface Device {
   lastSeenAt: string;
 }
 
+/**
+ * Piu' dispositivi che rispondono insieme.
+ *
+ * «Apri le tende» sono due tende, e premerle una per volta si vede: partono a
+ * mezzo secondo di distanza. Un insieme non e' un dispositivo finto — e' un
+ * nome e un elenco — e le azioni che mostra non si scrivono: sono quelle che
+ * i suoi dispositivi hanno in comune, e cambiano da sole se cambia chi c'e'
+ * dentro.
+ */
+export interface Scene {
+  id: string;
+  ownerId: string;
+  name: string;
+  deviceIds: string[];
+}
+
 /** Everything the store holds, and the unit a transaction works on. */
 export interface Database {
   users: User[];
@@ -146,4 +162,5 @@ export interface Database {
   places: Place[];
   agents: Agent[];
   devices: Device[];
+  scenes: Scene[];
 }

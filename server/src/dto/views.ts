@@ -1,5 +1,5 @@
 import type { Capability, DeviceValue } from '../../../shared/protocol.js';
-import type { Agent, Category, Device, Group, Place, PlaceMap } from '../types.js';
+import type { Agent, Category, Device, Group, Place, PlaceMap, Scene } from '../types.js';
 import type { OwnerState } from '../managers/StateManager.js';
 
 /** The shapes that leave the API: entities never go out untouched. */
@@ -86,6 +86,13 @@ export interface DeviceView {
   lastSeenAt: string;
 }
 
+/** Un insieme come esce di qui: le azioni le ricava chi lo disegna. */
+export interface SceneView {
+  id: string;
+  name: string;
+  deviceIds: string[];
+}
+
 export interface StateView {
   maps: MapView[];
   categories: CategoryView[];
@@ -119,6 +126,8 @@ export const toPublicMapView = (map: PlaceMap): PublicMapView => {
 };
 
 export const toGroupView = ({ id, name }: Group): GroupView => ({ id, name });
+
+export const toSceneView = ({ id, name, deviceIds }: Scene): SceneView => ({ id, name, deviceIds });
 
 /** The defaults here also carry records written before groups existed. */
 export const toPlaceView = (place: Place): PlaceView => ({

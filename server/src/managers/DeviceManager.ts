@@ -3,6 +3,7 @@ import { badRequest, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
 import { store } from '../persistence/JsonStore.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
+import { SceneRepository } from '../repositories/SceneRepository.js';
 import type { Device } from '../types.js';
 
 export class DeviceManager {
@@ -25,14 +26,18 @@ export class DeviceManager {
    * viene toccato.
    */
   async sync(ownerId: string, agentId: string, snapshots: DeviceSnapshot[]): Promise<Device[]> {
-    const { devices, gone } = await store.transaction((tx) => {
+    const { devices, gone, scenes } = await store.transaction((tx) => {
       const repository = new DeviceRepository(tx);
       const kept = snapshots.map((snapshot) =>
         repository.upsert(ownerId, agentId, snapshot.externalId, snapshot.name, snapshot.capabilities),
       );
+      const lost = repository.pruneAgent(agentId, new Set(snapshots.map((snapshot) => snapshot.externalId)));
       return {
         devices: kept,
-        gone: repository.pruneAgent(agentId, new Set(snapshots.map((snapshot) => snapshot.externalId))),
+        gone: lost,
+        // chi sparisce esce anche dagli insiemi che lo tenevano: un insieme
+        // che prova a comandare un fantasma non si capisce perché non va
+        scenes: lost.length ? new SceneRepository(tx).pruneDevices(new Set(lost)) : 0,
       };
     });
 
@@ -44,6 +49,8 @@ export class DeviceManager {
     // L'inventario è cambiato: chi guarda deve rileggerlo, se no si tiene i
     // fantasmi di quelli spariti o non vede quelli nuovi.
     if (gone.length || devices.length) hub.changed(ownerId, { kind: 'devices' });
+    // gli insiemi cambiati si rileggono insieme ai dispositivi: è la stessa lista
+    if (scenes) hub.changed(ownerId, { kind: 'devices' });
     return devices;
   }
 

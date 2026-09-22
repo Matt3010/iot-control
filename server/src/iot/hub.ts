@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { BackendMessage, DeviceValue } from '../../../shared/protocol.js';
-import type { CategoryView, GroupView, MapView, PlaceView } from '../dto/views.js';
+import type { CategoryView, GroupView, MapView, PlaceView, SceneView } from '../dto/views.js';
 import type { Device } from '../types.js';
 
 /** Lo stato di adesso di un dispositivo. Non si scrive su disco: vale solo ora. */
@@ -24,7 +24,8 @@ export type LiveEvent =
   | { kind: 'place'; id: string; value: PlaceView | null }
   | { kind: 'map'; id: string; value: MapView | null }
   | { kind: 'category'; id: string; value: CategoryView | null }
-  | { kind: 'group'; id: string; value: GroupView | null };
+  | { kind: 'group'; id: string; value: GroupView | null }
+  | { kind: 'scene'; id: string; value: SceneView | null };
 
 interface Connection {
   ownerId: string;

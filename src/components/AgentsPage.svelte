@@ -8,6 +8,7 @@
   import AgentPairing from './AgentPairing.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
+  import SceneStack from './SceneStack.svelte';
 
   /**
    * La pagina degli agenti.
@@ -149,6 +150,13 @@
         </AgentControls>
       </section>
     {/each}
+
+    <!-- Gli insiemi stanno con le card degli agenti, nella stessa colonna: uno
+         non appartiene a un agente — «apri le tende» possono essere due tende
+         in due stanze — ma si premono nello stesso posto. -->
+    <section class="card is-new">
+      <SceneStack />
+    </section>
 
     <section class="card is-new">
       <span class="eyebrow">Un altro agente</span>

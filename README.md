@@ -65,6 +65,12 @@ Niente categorie preimpostate, niente fronzoli.
   la mappa, o niente. Le tue altre mappe non le vede. Servono degli indirizzi e non un link,
   perche' un link non dice chi sei. Mentre ci si trova dentro, una fascia in alto dice sempre di
   chi sono le mappe che si stanno toccando.
+- **Gli insiemi**: piu' dispositivi che rispondono a un colpo solo. «Apri le tende» sono due
+  tende, e premerle una per volta si vede — partono a mezzo secondo di distanza. Un insieme non e'
+  un dispositivo finto: e' un nome e un elenco, e le azioni che mostra non si scrivono, sono
+  quelle che i suoi dispositivi hanno in comune. O le sanno fare tutti, o non parte niente:
+  mandare «Apri» solo alla tenda di un insieme tenda+lampadina sarebbe fare mezza cosa e dire che
+  e' andata bene.
 - **E un singolo pin puo' restare tuo.** Dentro una mappa condivisa, un luogo segnato `locked`
   gli ospiti lo vedono e non lo toccano: niente modifica, niente eliminazione, e il tasto non
   compare nemmeno. Chi la mappa ce l'ha lo modifica lo stesso — chiude gli altri, non se'.

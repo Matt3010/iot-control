@@ -23,6 +23,19 @@ export interface Device {
   lastSeenAt: string;
 }
 
+/**
+ * Più dispositivi che rispondono insieme: un nome e un elenco.
+ *
+ * Le azioni non stanno qui: sono quelle che i suoi dispositivi hanno in
+ * comune, e si ricavano ogni volta. Così un insieme non può promettere una
+ * cosa che i suoi non sanno più fare.
+ */
+export interface Scene {
+  id: string;
+  name: string;
+  deviceIds: string[];
+}
+
 /** Un agente appena creato: il token si vede una volta sola, e poi mai più. */
 export interface NewAgent {
   agent: Agent;
@@ -60,6 +73,9 @@ class Devices {
    * mettere l'attesa sul controllo che l'ha chiesta, e non sulla pagina.
    */
   busy = $state<string[]>([]);
+
+  /** Gli insiemi: più dispositivi che rispondono a un colpo solo. */
+  scenes = $state<Scene[]>([]);
 
   byId(id: string | undefined): Device | undefined {
     return id ? this.list.find((device) => device.id === id) : undefined;
@@ -127,16 +143,122 @@ class Devices {
 
   async load(): Promise<void> {
     try {
-      const [agents, list] = await Promise.all([api.get<Agent[]>('/agents'), api.get<Device[]>('/devices')]);
+      const [agents, list, scenes] = await Promise.all([
+        api.get<Agent[]>('/agents'),
+        api.get<Device[]>('/devices'),
+        api.get<Scene[]>('/scenes'),
+      ]);
       this.agents = agents;
       this.list = list;
+      this.scenes = scenes;
     } catch {
       // Un indice senza agenti è un indice normale: non si disturba nessuno.
       this.agents = [];
       this.list = [];
+      this.scenes = [];
     } finally {
       this.loading = false;
     }
+  }
+
+  /* --------------------------------------------------------------- insiemi */
+
+  /**
+   * I dispositivi di un insieme, nell'ordine in cui ce li hai messi. Quelli
+   * spariti non ci sono già più: li toglie il server quando un agente smette
+   * di raccontarli.
+   */
+  membersOf(scene: Scene): Device[] {
+    return scene.deviceIds
+      .map((id) => this.list.find((device) => device.id === id))
+      .filter((device): device is Device => !!device);
+  }
+
+  /**
+   * Cosa sa fare un insieme: quello che sanno fare **tutti** i suoi.
+   *
+   * Non la somma, l'intersezione. Una tenda e una lampadina insieme non hanno
+   * niente in comune, e un insieme che mostrasse «Apri» accendendo metà stanza
+   * sarebbe peggio di un insieme che non mostra niente.
+   *
+   * I sensori non contano: si leggono, non si comandano.
+   */
+  actionsOf(scene: Scene): Capability[] {
+    const members = this.membersOf(scene);
+    const first = members[0];
+    if (!first || members.length === 0) return [];
+
+    return first.capabilities.filter(
+      (capability) =>
+        capability.kind !== 'sensor' &&
+        members.every((device) =>
+          device.capabilities.some(
+            (other) => other.code === capability.code && other.kind === capability.kind,
+          ),
+        ),
+    );
+  }
+
+  /** Se almeno uno risponde: un insieme tutto spento non si comanda. */
+  reachable(scene: Scene): boolean {
+    return this.membersOf(scene).some((device) => device.online);
+  }
+
+  async createScene(name: string, deviceIds: string[]): Promise<Scene> {
+    const made = await api.post<Scene>('/scenes', { name, deviceIds });
+    const at = this.scenes.findIndex((scene) => scene.id === made.id);
+    if (at >= 0) {
+      Object.assign(this.scenes[at]!, made);
+      return this.scenes[at]!;
+    }
+    this.scenes.push(made);
+    return made;
+  }
+
+  async patchScene(scene: Scene, patch: { name?: string; deviceIds?: string[] }): Promise<void> {
+    const before = { ...scene, deviceIds: [...scene.deviceIds] };
+    Object.assign(scene, patch);
+    try {
+      Object.assign(scene, await api.put<Scene>(`/scenes/${scene.id}`, { name: scene.name, ...patch }));
+    } catch (error) {
+      Object.assign(scene, before);
+      toast.show((error as Error).message);
+    }
+  }
+
+  async removeScene(scene: Scene): Promise<void> {
+    const at = this.scenes.indexOf(scene);
+    if (at >= 0) this.scenes.splice(at, 1);
+    try {
+      await api.delete(`/scenes/${scene.id}`);
+    } catch (error) {
+      if (at >= 0) this.scenes.splice(at, 0, scene);
+      toast.show((error as Error).message);
+    }
+  }
+
+  /**
+   * La stessa cosa a tutto l'insieme. Non si finge niente: lo stato lo
+   * raccontano i dispositivi quando si sono mossi davvero, uno per uno, dal
+   * filo aperto.
+   */
+  async runScene(scene: Scene, code: string, value: DeviceValue): Promise<void> {
+    const key = `${scene.id}:${code}`;
+    if (this.busy.includes(key)) return;
+    this.busy = [...this.busy, key];
+
+    let rest = SETTLE_MS;
+    try {
+      await api.post(`/scenes/${scene.id}/command`, { code, value });
+    } catch (error) {
+      const why = (error as Error).message;
+      const silence = why.includes('non ha risposto') || why.includes('nessuna risposta');
+      rest = silence ? UNSURE_MS : 0;
+      toast.show(why);
+    }
+
+    if (rest) await new Promise((done) => setTimeout(done, rest));
+    this.busy = this.busy.filter((held) => held !== key);
   }
 
   /**
@@ -144,11 +266,25 @@ class Devices {
    * l'app, e sta in `live`. Qui si applica soltanto la parte che riguarda
    * quello che si accende.
    */
-  apply(event: { kind: 'device' | 'agent' | 'devices' } & Record<string, unknown>): void {
+  apply(event: { kind: 'device' | 'agent' | 'devices' | 'scene' } & Record<string, unknown>): void {
     // L'elenco è cambiato — uno nuovo, o uno sparito — e non vale la pena
     // raccontarlo pezzo per pezzo: si rilegge, che è corto e sempre vero.
     if (event.kind === 'devices') {
       void this.load();
+      return;
+    }
+
+    if (event.kind === 'scene') {
+      const id = event.id as string;
+      const value = event.value as Scene | null;
+      const at = this.scenes.findIndex((scene) => scene.id === id);
+      if (!value) {
+        if (at >= 0) this.scenes.splice(at, 1);
+      } else if (at >= 0) {
+        Object.assign(this.scenes[at]!, value);
+      } else {
+        this.scenes.push(value);
+      }
       return;
     }
 

@@ -1,4 +1,4 @@
-import { devices } from './devices.svelte';
+import { devices, type Scene } from './devices.svelte';
 import { store } from './store.svelte';
 import type { Category, DeviceValue, Group, Place, PlaceMap } from './types';
 
@@ -19,7 +19,8 @@ export type LiveEvent =
   | { kind: 'place'; id: string; value: Place | null }
   | { kind: 'map'; id: string; value: PlaceMap | null }
   | { kind: 'category'; id: string; value: Category | null }
-  | { kind: 'group'; id: string; value: Group | null };
+  | { kind: 'group'; id: string; value: Group | null }
+  | { kind: 'scene'; id: string; value: Scene | null };
 
 class Live {
   #stream: EventSource | null = null;
@@ -60,8 +61,16 @@ class Live {
   }
 
   #apply(event: LiveEvent): void {
-    if (event.kind === 'device' || event.kind === 'agent' || event.kind === 'devices') devices.apply(event);
-    else store.apply(event);
+    if (
+      event.kind === 'device' ||
+      event.kind === 'agent' ||
+      event.kind === 'devices' ||
+      event.kind === 'scene'
+    ) {
+      devices.apply(event);
+    } else {
+      store.apply(event);
+    }
   }
 }
 
