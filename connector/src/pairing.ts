@@ -1,6 +1,7 @@
 import type { LinkedAccount, PairingStep } from '../../shared/protocol.js';
 import type { ConnectorConfig } from './config.js';
 import { EXTRAS, install, installed } from './extras.js';
+import { forget, frameFrom } from './homeassistant.js';
 
 /**
  * Collegare un account a Home Assistant, pilotato da fuori.
@@ -325,6 +326,36 @@ async function pictured(config: ConnectorConfig, flow: HaFlow, step: PairingStep
   return { ...step, preview: bytes.toString('base64') };
 }
 
+/** Il nome del flusso che si apre solo per far vedere una prova. */
+const TRYING = 'prova-collegamento';
+
+/**
+ * Lo scatto per il passo che chiede «e' questa?», quando nessuno ce lo da'.
+ *
+ * Certe versioni di Home Assistant l'anteprima non la mettono a un indirizzo
+ * che si possa aprire: se la tengono su un canale loro. Chi guarda si
+ * ritrova una levetta che dice «l'immagine e' quella giusta» e nessuna
+ * immagine — la stessa domanda a occhi chiusi di prima.
+ *
+ * Ma l'indirizzo del flusso lo ha appena scritto la persona, ed e' tutto
+ * quello che serve per andarselo a prendere. Si apre un flusso apposta, si
+ * scatta, e lo si richiude: quello che si guarda e' la telecamera vera, non
+ * una promessa.
+ */
+async function ourShot(step: PairingStep, input: Record<string, string | boolean>): Promise<PairingStep> {
+  const asks = step.kind === 'form' && step.fields.some((field) => field.name === 'confirmed_ok');
+  const raw = input.stream_source;
+  if (step.preview || !asks || typeof raw !== 'string' || !raw.startsWith('rtsp://')) return step;
+
+  const shot = await frameFrom(raw, TRYING);
+  await forget(TRYING);
+  if (!shot) {
+    console.warn(`prova di ${raw}: nessun fotogramma`);
+    return step;
+  }
+  return { ...step, preview: shot.toString('base64') };
+}
+
 /** Uno schema detto in una riga: i nomi, e cosa propongono. */
 function listed(schema: unknown[] | undefined): string {
   if (!Array.isArray(schema)) return 'nessuno schema';
@@ -386,7 +417,7 @@ export async function submitPairing(
   // passo: un rifiuto su un campo che non si vede si capisce solo vedendo
   // quali campi c'erano e cosa proponevano.
   if (step.error) console.warn(`passo ${flowId}: ${listed(schema)}`);
-  return pictured(config, flow, step);
+  return ourShot(await pictured(config, flow, step), input);
 }
 
 /**

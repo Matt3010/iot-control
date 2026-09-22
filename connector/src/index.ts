@@ -13,7 +13,7 @@ import { Link, PROTOCOL } from './link.js';
 import { ensureToken } from './onboarding.js';
 import { cancelPairing, listLinked, startPairing, submitPairing, unlink } from './pairing.js';
 
-const VERSION = '1.5.6';
+const VERSION = '1.5.7';
 /** All'avvio le entità arrivano a centinaia: si aspetta un attimo e si manda una lista sola. */
 const COALESCE_MS = 500;
 

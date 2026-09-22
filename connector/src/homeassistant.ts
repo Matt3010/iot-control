@@ -101,14 +101,15 @@ async function sourceOf(entityId: string): Promise<string | undefined> {
  * Non si corregge la configurazione di Home Assistant — lui la riscrive a
  * ogni richiesta, e sarebbe una lotta persa a ogni giro. Si apre un flusso
  * nostro, con un nome nostro, che lui non tocca; e da li' si guarda.
+ *
+ * Serve anche prima che una telecamera esista: al passo in cui si chiede «e'
+ * questa?», l'unico indirizzo che c'e' e' quello appena scritto a mano.
  */
-async function ourselves(entityId: string): Promise<Buffer | undefined> {
-  const raw = await sourceOf(entityId);
-  if (!raw) return undefined;
+export async function frameFrom(raw: string, name: string): Promise<Buffer | undefined> {
+  if (!raw.startsWith('rtsp://')) return undefined;
 
   // Si registra ogni volta: costa una richiesta locale, e se di la' hanno
   // riavviato il flusso nostro c'e' lo stesso.
-  const name = `diretto-${entityId}`;
   const set = await fetch(`${STREAMS}?name=${encodeURIComponent(name)}&src=${encodeURIComponent(raw)}`, {
     method: 'PUT',
     signal: AbortSignal.timeout(5000),
@@ -122,6 +123,20 @@ async function ourselves(entityId: string): Promise<Buffer | undefined> {
 
   const bytes = Buffer.from(await shot.arrayBuffer());
   return bytes.length ? bytes : undefined;
+}
+
+/** E lo stesso flusso, quando si lascia: non si tiene aperto per niente. */
+export async function forget(name: string): Promise<void> {
+  await fetch(`${STREAMS}?src=${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => undefined);
+}
+
+async function ourselves(entityId: string): Promise<Buffer | undefined> {
+  const raw = await sourceOf(entityId);
+  if (!raw) return undefined;
+  return frameFrom(raw, `diretto-${entityId}`);
 }
 
 /**
