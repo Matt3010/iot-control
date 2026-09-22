@@ -26,15 +26,26 @@
   const tally = $derived(devices.tally(agent.id));
 
   /**
-   * Tre stati, e sono diversi fra loro: verde parla adesso, rosso parlava e
-   * non parla più — qualcosa è successo — grigio non ha mai parlato, che è
-   * normale per uno appena creato e non ancora installato.
+   * Come sta, con gli stessi quattro colori della pastiglia sul pin — ed è la
+   * stessa funzione a deciderlo, se no i due direbbero cose diverse guardando
+   * la stessa casa.
+   *
+   * Verde parla e tutto risponde. Arancione parla ma qualcosa là dentro no:
+   * era il caso che mancava, e un pallino verde sopra a un dispositivo rosso
+   * è una bugia. Rosso parlava e non parla più. Grigio non ha mai parlato,
+   * che non è un guasto — è da installare.
    */
-  const health = $derived(agent.online ? 'live' : agent.lastSeenAt ? 'lost' : 'new');
+  const health = $derived(devices.health([agent.id]) ?? 'new');
 
   /** Il colore da solo non basta a chi non lo distingue: la parola sta qui. */
   const says = $derived(
-    health === 'live' ? 'Collegato' : health === 'lost' ? 'Non collegato' : 'Mai collegato',
+    health === 'live'
+      ? 'Collegato'
+      : health === 'degraded'
+        ? 'Collegato, ma qualcosa non risponde'
+        : health === 'lost'
+          ? 'Non collegato'
+          : 'Mai collegato',
   );
 </script>
 
@@ -113,6 +124,9 @@
   }
 
   .mark.live { background: #2f9e5e; box-shadow: 0 0 0 3px rgb(47 158 94 / 0.16); }
+
+  /* parla, ma non tutto quello che ha sotto risponde */
+  .mark.degraded { background: #d98613; box-shadow: 0 0 0 3px rgb(217 134 19 / 0.18); }
 
   /* parlava e non parla più: quello sì che è successo qualcosa */
   .mark.lost {
