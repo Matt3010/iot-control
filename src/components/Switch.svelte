@@ -2,6 +2,10 @@
   /**
    * Un interruttore solo per tutta l'app. Con la nota sotto il nome resta
    * sempre acceso di colore; da solo, il nome segue lo stato.
+   *
+   * `side` dice da che parte sta la levetta. Di solito prima lei e poi il
+   * nome; ma in fondo a una riga che finisce a destra il nome viene prima,
+   * se no la levetta resta in mezzo al discorso.
    */
   let {
     checked,
@@ -9,6 +13,7 @@
     label,
     note,
     title,
+    side = 'start',
     disabled = false,
     ...rest
   }: {
@@ -17,12 +22,21 @@
     label: string;
     note?: string;
     title?: string;
+    /** Dove sta la levetta: prima del nome, o dopo. */
+    side?: 'start' | 'end';
     disabled?: boolean;
     [key: string]: unknown;
   } = $props();
 </script>
 
-<label class="switch" class:is-on={checked} class:has-note={!!note} class:is-off={disabled} {title}>
+<label
+  class="switch"
+  class:is-on={checked}
+  class:has-note={!!note}
+  class:is-off={disabled}
+  class:is-end={side === 'end'}
+  {title}
+>
   <input
     type="checkbox"
     {checked}
@@ -47,6 +61,10 @@
     gap: 10px;
     cursor: pointer;
   }
+
+  /* solo al contrario da vedere: nel documento la casella resta prima della
+     levetta, che è quello che tiene in piedi i selettori qui sotto */
+  .switch.is-end { flex-direction: row-reverse; }
 
   .switch input {
     position: absolute;

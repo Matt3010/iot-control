@@ -349,6 +349,7 @@
                   onchange={(published) => store.patchMap(map, { published })}
                   label={map.published ? 'Mappa pubblica' : 'Mappa privata'}
                   title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}
+                  side="end"
                 />
               </div>
 
