@@ -19,22 +19,31 @@ export class DeviceManager {
   }
 
   /**
-   * Quello che un agente racconta di sé. Non si cancella niente: un dispositivo
-   * che oggi non compare può essere solo spento, e buttare via la sua riga
-   * staccherebbe il posto che lo puntava.
+   * Quello che un agente racconta di sé, che è tutto quello che ha: l'elenco è
+   * completo, quindi chi non c'è dentro non c'è più. Un dispositivo solo spento
+   * resta nell'elenco — è l'agente a dire che non lo raggiunge — e quindi non
+   * viene toccato.
    */
   async sync(ownerId: string, agentId: string, snapshots: DeviceSnapshot[]): Promise<Device[]> {
-    const devices = await store.transaction((tx) => {
+    const { devices, gone } = await store.transaction((tx) => {
       const repository = new DeviceRepository(tx);
-      return snapshots.map((snapshot) =>
+      const kept = snapshots.map((snapshot) =>
         repository.upsert(ownerId, agentId, snapshot.externalId, snapshot.name, snapshot.capabilities),
       );
+      return {
+        devices: kept,
+        gone: repository.pruneAgent(agentId, new Set(snapshots.map((snapshot) => snapshot.externalId))),
+      };
     });
 
     hub.index(agentId, devices);
     for (const snapshot of snapshots) {
       hub.publish(ownerId, agentId, snapshot.externalId, { online: snapshot.online, state: snapshot.state });
     }
+
+    // L'inventario è cambiato: chi guarda deve rileggerlo, se no si tiene i
+    // fantasmi di quelli spariti o non vede quelli nuovi.
+    if (gone.length || devices.length) hub.changed(ownerId, { kind: 'devices' });
     return devices;
   }
 

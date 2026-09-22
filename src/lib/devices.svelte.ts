@@ -110,7 +110,14 @@ class Devices {
    * l'app, e sta in `live`. Qui si applica soltanto la parte che riguarda
    * quello che si accende.
    */
-  apply(event: { kind: 'device' | 'agent' } & Record<string, unknown>): void {
+  apply(event: { kind: 'device' | 'agent' | 'devices' } & Record<string, unknown>): void {
+    // L'elenco è cambiato — uno nuovo, o uno sparito — e non vale la pena
+    // raccontarlo pezzo per pezzo: si rilegge, che è corto e sempre vero.
+    if (event.kind === 'devices') {
+      void this.load();
+      return;
+    }
+
     if (event.kind === 'agent') {
       const agent = this.agents.find((candidate) => candidate.id === event.agentId);
       if (agent) agent.online = event.online as boolean;

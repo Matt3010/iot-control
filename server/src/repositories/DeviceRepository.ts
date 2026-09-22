@@ -43,6 +43,24 @@ export class DeviceRepository {
   }
 
   /**
+   * Quelli che l'agente non racconta più non esistono più. Home Assistant un
+   * dispositivo spento lo elenca lo stesso, come «non disponibile»: se manca
+   * dall'elenco vuol dire che è stato tolto, o che non era un dispositivo —
+   * l'ora dell'alba, lo stato dei backup. Tenerli farebbe da fantasmi
+   * perennemente «non raggiungibili».
+   */
+  pruneAgent(agentId: string, keep: Set<string>): string[] {
+    const going = this.tx.data.devices
+      .filter((device) => device.agentId === agentId && !keep.has(device.externalId))
+      .map((device) => device.id);
+    if (!going.length) return [];
+
+    this.tx.data.devices = this.tx.data.devices.filter((device) => !going.includes(device.id));
+    this.tx.markDirty();
+    return going;
+  }
+
+  /**
    * Un agente che se ne va porta via i suoi dispositivi. Il luogo che lo teneva
    * resta dov'è, e torna a essere un luogo: era un indirizzo prima di avere
    * un agente.

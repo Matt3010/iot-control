@@ -19,6 +19,8 @@ export interface Live {
 export type LiveEvent =
   | { kind: 'device'; deviceId: string; online: boolean; state: Record<string, DeviceValue> }
   | { kind: 'agent'; agentId: string; online: boolean }
+  /** L'elenco dei dispositivi è cambiato: rileggilo, invece di indovinare cosa. */
+  | { kind: 'devices' }
   | { kind: 'place'; id: string; value: PlaceView | null }
   | { kind: 'map'; id: string; value: MapView | null }
   | { kind: 'category'; id: string; value: CategoryView | null }
@@ -88,8 +90,13 @@ export class Hub {
 
   /* ----------------------------------------------------- dispositivi vivi */
 
-  /** Dopo ogni sincronizzazione: così uno stato che arriva sa già chi è. */
+  /**
+   * Dopo ogni sincronizzazione: così uno stato che arriva sa già chi è. Si
+   * riparte da zero per quell'agente, se no le chiavi di un dispositivo
+   * sparito resterebbero lì a indicare una riga che non c'è più.
+   */
   index(agentId: string, devices: Device[]): void {
+    this.forget(agentId);
     for (const device of devices) this.#ids.set(this.#key(agentId, device.externalId), device.id);
   }
 
