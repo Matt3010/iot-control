@@ -44,14 +44,15 @@
     <span class="who">{agent.name}</span>
     <!-- quando non è collegato non si scrive niente: lo dice il pallino, e
          ripeterlo a parole è rumore -->
-    {#if agent.online}
+    <!-- Quando è tutto spento non si scrive niente: lo dicono già i pallini
+         qui sotto, che restano grigi. Si scrive solo quando c'è qualcosa
+         acceso — o quando non c'è proprio niente da accendere. -->
+    {#if agent.online && (!tally.total || tally.on)}
       <span class="how">
         {#if !tally.total}
           nessun comando
-        {:else if tally.on}
-          {tally.on} di {tally.total} acces{tally.on === 1 ? 'o' : 'i'}
         {:else}
-          tutto spento
+          {tally.on} di {tally.total} acces{tally.on === 1 ? 'o' : 'i'}
         {/if}
       </span>
     {/if}
