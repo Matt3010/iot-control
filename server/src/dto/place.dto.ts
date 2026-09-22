@@ -3,7 +3,6 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
-  IsIn,
   IsLatitude,
   IsLongitude,
   IsNotEmpty,
@@ -58,6 +57,11 @@ export class CreatePlaceDto {
   @IsBoolean()
   private?: boolean;
 
+  /** Chiuso agli ospiti della mappa: lo vedono, non lo toccano. */
+  @IsOptional()
+  @IsBoolean()
+  locked?: boolean;
+
   /** Gli agenti che stanno a questo indirizzo: reti separate, agenti separati. */
   @IsOptional()
   @IsArray()
@@ -65,11 +69,6 @@ export class CreatePlaceDto {
   @IsString({ each: true })
   @MaxLength(80, { each: true })
   agentIds?: string[];
-
-  /** Cosa può fare chi arriva dal link pubblico. */
-  @IsOptional()
-  @IsIn(['view', 'edit'], { message: 'accesso sconosciuto' })
-  access?: 'view' | 'edit';
 
 }
 
@@ -114,6 +113,11 @@ export class UpdatePlaceDto {
   @IsBoolean()
   private?: boolean;
 
+  /** Chiuso agli ospiti della mappa: lo vedono, non lo toccano. */
+  @IsOptional()
+  @IsBoolean()
+  locked?: boolean;
+
   /** Un elenco vuoto li stacca tutti: il luogo resta, i fili si tagliano. */
   @IsOptional()
   @IsArray()
@@ -121,10 +125,5 @@ export class UpdatePlaceDto {
   @IsString({ each: true })
   @MaxLength(80, { each: true })
   agentIds?: string[];
-
-  /** Cosa può fare chi arriva dal link pubblico. */
-  @IsOptional()
-  @IsIn(['view', 'edit'], { message: 'accesso sconosciuto' })
-  access?: 'view' | 'edit';
 
 }

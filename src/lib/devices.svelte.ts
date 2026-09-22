@@ -32,6 +32,18 @@ export interface NewAgent {
 }
 
 /**
+ * Quanto un comando resta fermo dopo essere andato a buon fine: il tempo di
+ * un dito che rimbalza, non di più.
+ */
+const SETTLE_MS = 500;
+
+/**
+ * E quanto resta fermo quando non è arrivata risposta. Qui il tempo serve a
+ * un'altra cosa: a non far ripremere finché non si sa com'è finita davvero.
+ */
+const UNSURE_MS = 6000;
+
+/**
  * Quello che si accende, e gli agenti da cui arriva. Lo stato non si chiede:
  * si riceve. Un filo solo aperto verso il server porta ogni cambiamento mentre
  * accade — che lo abbia premuto tu da qui, qualcun altro dall'app Smart Life,
@@ -171,14 +183,40 @@ class Devices {
     device.state = { ...device.state, [code]: value };
     this.busy = [...this.busy, key];
 
+    /**
+     * Quanto resta fermo il comando dopo che è finito. Poco se è andata bene:
+     * solo il tempo di non far partire due volte lo stesso dito. Molto di più
+     * se non è arrivata risposta, e il motivo è sotto.
+     */
+    let rest = SETTLE_MS;
+
     try {
       await api.post(`/devices/${device.id}/command`, { code, value });
     } catch (error) {
       device.state = before;
-      toast.show((error as Error).message);
-    } finally {
-      this.busy = this.busy.filter((held) => held !== key);
+      const why = (error as Error).message;
+
+      /*
+       * «Non ha risposto» non vuol dire «non è successo niente». Il comando
+       * può essere arrivato lo stesso — la risposta si è persa per strada, o
+       * il cloud di Tuya ci ha messo più di quanto aspettiamo — e a quel punto
+       * l'interruttore che torna indietro racconta una bugia comoda: sembra
+       * che non sia partito, si preme di nuovo, e la tapparella fa due giri.
+       *
+       * Quindi lo si dice, e si tiene fermo il comando per qualche secondo:
+       * il tempo che lo stato vero arrivi da solo dal filo aperto.
+       */
+      const silence = why.includes('non ha risposto');
+      rest = silence ? UNSURE_MS : 0;
+      toast.show(
+        silence
+          ? 'Nessuna risposta: il comando potrebbe essere partito lo stesso. Un attimo prima di riprovare.'
+          : why,
+      );
     }
+
+    if (rest) await new Promise((done) => setTimeout(done, rest));
+    this.busy = this.busy.filter((held) => held !== key);
   }
 
   /* ---------------------------------------------------------------- agenti */

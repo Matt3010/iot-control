@@ -86,6 +86,15 @@ export interface Place {
   /** Un posto privato resta fuori da quello che si pubblica. */
   private: boolean;
   /**
+   * Chiuso a chi ha la chiave della mappa: lo vede, ma non lo tocca.
+   *
+   * Aprire una mappa a qualcuno non vuol dire aprirgli ogni riga che c'e'
+   * dentro. Un indirizzo che non si discute, una cosa scritta da chi la sa:
+   * resta li' com'e'. Vale solo per gli ospiti — chi la mappa ce l'ha
+   * modifica tutto, se no si sarebbe chiuso fuori da casa sua.
+   */
+  locked?: boolean;
+  /**
    * Gli agenti appesi a questo luogo. Più d'uno quando le reti sono separate —
    * la sala e la cucina, due edifici — e ognuno porta i suoi dispositivi. Un
    * indirizzo resta un pin solo, anche con quindici interruttori sotto.

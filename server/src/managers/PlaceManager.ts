@@ -34,6 +34,8 @@ export class PlaceManager {
         lng: dto.lng,
         note: dto.note ?? '',
         private: dto.private ?? false,
+        // un ospite non chiude una riga: si chiuderebbe fuori da sola
+        locked: scope.maps === null && dto.locked === true,
         agentIds,
       });
     });
@@ -45,11 +47,19 @@ export class PlaceManager {
       const current = places.findById(id);
       if (!current || !new MapRepository(tx).within(scope, current.mapId)) throw notFound('posto inesistente');
 
+      // Chiuso vuol dire chiuso per gli ospiti. Per loro quel luogo non e'
+      // «vietato» — semplicemente non c'e', come tutto il resto che non
+      // possono toccare: dire di no e dire cosa esiste sono due frasi.
+      const guest = scope.maps !== null;
+      if (guest && current.locked === true) throw notFound('posto inesistente');
+
       const groupIds = dto.groupIds ? unique(dto.groupIds) : current.groupIds;
       const agentIds = dto.agentIds ? unique(dto.agentIds) : (current.agentIds ?? []);
       this.#assertRefs(tx, scope, current.mapId, dto.categoryId ?? current.categoryId, groupIds, agentIds);
 
-      return places.update(id, { ...dto, groupIds, agentIds }) as Place;
+      const { locked, ...rest } = dto;
+      const patch = guest ? rest : { ...rest, locked: locked ?? current.locked };
+      return places.update(id, { ...patch, groupIds, agentIds }) as Place;
     });
   }
 
@@ -58,6 +68,8 @@ export class PlaceManager {
       const places = new PlaceRepository(tx);
       const current = places.findById(id);
       if (!current || !new MapRepository(tx).within(scope, current.mapId)) throw notFound('posto inesistente');
+      // un ospite non lo modifica, quindi tanto meno lo butta via
+      if (scope.maps !== null && current.locked === true) throw notFound('posto inesistente');
       places.delete(id);
     });
   }

@@ -63,6 +63,10 @@
    */
   function askSwitch(event: MouseEvent, capability: Capability, current: boolean): void {
     event.preventDefault();
+    // finché quello di prima non è finito non si chiede niente: il riquadro è
+    // già spento al tocco, ma un clic arrivato un attimo prima passerebbe
+    if (devices.isBusy(device.id, capability.code)) return;
+
     const wanted = !current;
 
     confirm(
@@ -140,7 +144,7 @@
                 label={value}
                 look={device.state[capability.code] === value ? 'sel' : 'off'}
                 size="sm"
-                disabled={!device.online}
+                disabled={!device.online || devices.isBusy(device.id, capability.code)}
                 onclick={(event: MouseEvent) =>
                   confirm(
                     event.currentTarget as HTMLElement,

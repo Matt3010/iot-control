@@ -47,6 +47,8 @@ export interface PlaceView {
   lng: number;
   note: string;
   private: boolean;
+  /** Chiuso a chi ha la chiave della mappa: lo vede, ma non lo tocca. */
+  locked: boolean;
   /** Gli agenti appesi a questo luogo: nessuno, uno, o più se le reti sono separate. */
   agentIds: string[];
   createdAt: string;
@@ -56,9 +58,11 @@ export interface PlaceView {
  * Quello che di un posto può vedere un estraneo.
  *
  * Il legame con l'agente non esce mai: da fuori una mappa si guarda, e le
- * luci di casa d'altri non si toccano nemmeno per sbaglio.
+ * luci di casa d'altri non si toccano nemmeno per sbaglio. E nemmeno esce
+ * `locked`: da fuori non si modifica niente comunque, quindi dire quali righe
+ * sono chiuse sarebbe raccontare di una porta che li' non c'e'.
  */
-export type PublicPlaceView = Omit<PlaceView, 'agentIds'>;
+export type PublicPlaceView = Omit<PlaceView, 'agentIds' | 'locked'>;
 
 export interface AgentView {
   id: string;
@@ -127,12 +131,13 @@ export const toPlaceView = (place: Place): PlaceView => ({
   lng: place.lng,
   note: place.note ?? '',
   private: place.private ?? false,
+  locked: place.locked === true,
   agentIds: place.agentIds ?? [],
   createdAt: place.createdAt,
 });
 
 export const toPublicPlaceView = (place: Place): PublicPlaceView => {
-  const { agentIds: _agenti, ...outside } = toPlaceView(place);
+  const { agentIds: _agenti, locked: _chiuso, ...outside } = toPlaceView(place);
   return outside;
 };
 

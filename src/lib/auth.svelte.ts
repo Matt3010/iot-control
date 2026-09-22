@@ -44,6 +44,11 @@ class Auth {
     });
   }
 
+  /** Se sto lavorando in casa d'altri: certe cose li' dentro non si toccano. */
+  get guest(): boolean {
+    return !!this.account?.actingAs;
+  }
+
   async load(): Promise<void> {
     try {
       this.account = await api.get<Account>('/auth/me');

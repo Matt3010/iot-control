@@ -1,5 +1,6 @@
 <script lang="ts">
   import L, { type Marker } from 'leaflet';
+  import { auth } from '../lib/auth.svelte';
   import { devices } from '../lib/devices.svelte';
   import { here } from '../lib/here.svelte';
   import { mapBridge } from '../lib/mapBridge.svelte';
@@ -69,6 +70,14 @@
     const actions = document.createElement('div');
     actions.className = 'pop-actions';
 
+    /*
+     * In casa d'altri certi luoghi sono chiusi: si vedono e non si toccano.
+     * Il tasto non c'e' proprio, invece di esserci e dire di no — un comando
+     * che non porta da nessuna parte e' peggio di un comando che non c'e'.
+     * Per chi la mappa ce l'ha non cambia niente: chiude gli altri, non se'.
+     */
+    const shut = auth.guest && place.locked;
+
     const edit = document.createElement('button');
     edit.type = 'button';
     edit.append(glyph('edit'), document.createTextNode('Modifica'));
@@ -83,7 +92,14 @@
     directions.href = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
     directions.append(glyph('directions'), document.createTextNode('Indicazioni'));
 
-    actions.append(edit, directions);
+    if (shut) {
+      const kept = document.createElement('span');
+      kept.className = 'pop-kept';
+      kept.append(glyph('lock'), document.createTextNode('Solo di chi ha la mappa'));
+      actions.append(kept, directions);
+    } else {
+      actions.append(edit, directions);
+    }
 
     // Gli interruttori non stanno qui. Un fumetto sopra a un pin è largo due
     // dita: dentro ci stava un elenco che scorreva, e per accendere una luce

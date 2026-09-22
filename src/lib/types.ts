@@ -43,6 +43,11 @@ export interface Place {
   note: string;
   /** Un posto privato resta fuori da quello che si pubblica. */
   private: boolean;
+  /**
+   * Chiuso a chi ha la chiave della mappa: lo vede, ma non lo tocca. Chi la
+   * mappa ce l'ha modifica tutto lo stesso.
+   */
+  locked: boolean;
   /** Gli agenti appesi a questo luogo: più d'uno quando le reti sono separate. */
   agentIds: string[];
   createdAt: string;
@@ -71,6 +76,8 @@ export interface Draft {
   /** Di quale mappa è: un posto che modifichi non cambia casa. */
   mapId?: string;
   private?: boolean;
+  /** Chiuso agli ospiti della mappa. */
+  locked?: boolean;
   /** Un elenco vuoto li stacca tutti: il luogo resta, i fili si tagliano. */
   agentIds?: string[];
   name?: string;

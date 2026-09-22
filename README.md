@@ -65,6 +65,9 @@ Niente categorie preimpostate, niente fronzoli.
   la mappa, o niente. Le tue altre mappe non le vede. Servono degli indirizzi e non un link,
   perche' un link non dice chi sei. Mentre ci si trova dentro, una fascia in alto dice sempre di
   chi sono le mappe che si stanno toccando.
+- **E un singolo pin puo' restare tuo.** Dentro una mappa condivisa, un luogo segnato `locked`
+  gli ospiti lo vedono e non lo toccano: niente modifica, niente eliminazione, e il tasto non
+  compare nemmeno. Chi la mappa ce l'ha lo modifica lo stesso — chiude gli altri, non se'.
 
 ## Il front-end
 

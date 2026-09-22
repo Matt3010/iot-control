@@ -50,6 +50,8 @@ function migratePlace(place: Place & { groupId?: string; agentId?: string }): Pl
   const { groupId, agentId, ...rest } = place;
   return {
     ...rest,
+    // chi e' nato prima che si potesse chiudere un luogo: aperto
+    locked: place.locked === true,
     groupIds: Array.isArray(place.groupIds) ? place.groupIds : groupId ? [groupId] : [],
     agentIds: Array.isArray(place.agentIds) ? place.agentIds : agentId ? [agentId] : [],
   };
