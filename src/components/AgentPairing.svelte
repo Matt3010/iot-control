@@ -370,7 +370,7 @@
     {#if step.kind === 'failed'}
       <div class="acts">
         <Button look="ghost" size="sm" disabled={busy} onclick={() => begin(handler)}>Riprova</Button>
-        <Button look="link" disabled={busy} onclick={() => (step = null)}>Lascia stare</Button>
+        <Button look="link" disabled={busy} onclick={() => (step = null)}>Annulla</Button>
       </div>
     {:else if step.kind === 'busy'}
       <p class="say">{step.note}</p>

@@ -98,7 +98,7 @@
                     'Quello di adesso smette di funzionare subito, e quella macchina resta scollegata finché non la reinstalli con il comando nuovo.',
                   verb: 'Rigenera',
                   tone: 'plain',
-                  no: 'Lascia stare',
+                  no: 'Annulla',
                   onYes: () => void rotate(agent),
                 })}
             >
