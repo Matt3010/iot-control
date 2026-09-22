@@ -62,34 +62,15 @@
       toast.show('Dai un nome al luogo prima di salvare');
       return;
     }
-    // Un luogo con un agente è casa tua, o il locale: quasi mai una cosa da
-    // mettere in bio. Finché resta pubblico la domanda ha senso, quindi si
-    // ripresenta a ogni salvataggio — risponderci una volta non la chiude per
-    // sempre, renderlo privato sì.
-    const salva = event.submitter ?? document.querySelector<HTMLElement>('#place-form .save-go');
-    if ((draft.agentIds ?? []).length && !draft.private && salva) {
-      ui.askSure(salva as HTMLElement, {
-        title: 'Rendere privato questo luogo?',
-        detail:
-          "Qui dentro c'è qualcosa che si accende. Privato vuol dire fuori dalla mappa pubblica: né il luogo, né i suoi agenti.",
-        verb: 'Rendi privato',
-        tone: 'plain',
-        no: 'Lascia pubblico',
-        onYes: () => {
-          if (draft) draft.private = true;
-          commit(name);
-        },
-        onNo: () => commit(name),
-      });
-      return;
-    }
-
-    commit(name);
-  }
-
-  /** Il salvataggio vero, dopo che si è deciso del privato. */
-  function commit(name: string) {
-    if (!draft) return;
+    /*
+     * Qui c'era una domanda: «questo luogo ha un agente, lo rendo privato?».
+     * Aveva senso quando gli agenti sembravano una cosa che poteva uscire dal
+     * link pubblico. Non lo sono mai stati — dalla mappa pubblica un agente
+     * non esce, e adesso nemmeno i suoi interruttori stanno più su un pin —
+     * quindi la domanda avvisava di un pericolo che non c'è, a ogni
+     * salvataggio. Una domanda che si impara a chiudere senza leggerla fa
+     * male anche alle altre.
+     */
     store.savePlace({ ...draft, name });
     // Saving something the filters would hide makes it vanish; show it instead.
     if (store.hiddenCategories.includes(draft.categoryId)) store.toggleCategory(draft.categoryId);
