@@ -91,3 +91,21 @@ export interface Draft {
   lat: number;
   lng: number;
 }
+
+/**
+ * Una marca che si può collegare a un agente, come la vede chi la disegna.
+ *
+ * Sta qui e non dentro a un componente perché la usano in due: chi tiene
+ * l'elenco e chi decide cosa mostrare. Un tipo esportato da un pezzo di
+ * interfaccia è un tipo che va a cercare chi lo importa.
+ */
+export interface Account {
+  handler: string;
+  label: string;
+  /** Se se ne può avere più d'uno: una telecamera per canale, sì; un account, no. */
+  many: boolean;
+  /** Come si chiama la riga per aggiungerne un altro. */
+  more: string;
+  /** Cosa succede premendo, detto prima. */
+  warns: string;
+}
