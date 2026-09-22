@@ -76,9 +76,11 @@ Niente categorie preimpostate, niente fronzoli.
   finisce ogni cambiamento di stato — una sonda che manda un grado ogni dieci secondi
   coprirebbe tutto il resto: ci finisce quello che e' successo *una volta*. Le righe piu'
   vecchie di un giorno se ne vanno da sole, alla prima che si scrive.
-- **E un singolo pin puo' restare tuo.** Dentro una mappa condivisa, un luogo segnato `locked`
-  gli ospiti lo vedono e non lo toccano: niente modifica, niente eliminazione, e il tasto non
-  compare nemmeno. Chi la mappa ce l'ha lo modifica lo stesso — chiude gli altri, non se'.
+- **Le regole stanno sulla persona, non sul pin.** Ogni indirizzo nell'elenco di una mappa puo'
+  averla tutta, oppure solo certi luoghi: «questi tre a lui, tutti a lei» si decide in un posto
+  solo, e si puo' dire diverso a persone diverse. Gli altri luoghi si vedono — stanno sulla
+  mappa, sarebbe strano sparissero — ma non si toccano, e chi e' limitato non ne aggiunge di
+  nuovi: nascerebbero fuori dal suo elenco.
 
 ## Il front-end
 

@@ -21,8 +21,12 @@ export interface Account {
   createdAt: string;
   /** Le mappe di altri che posso modificare: chi mi ha dato la chiave. */
   keys: KeyRef[];
-  /** In casa di chi sto lavorando adesso, se non è la mia. */
-  actingAs: { ownerId: string; handle: string } | null;
+  /**
+   * In casa di chi sto lavorando adesso, se non è la mia — e fin dove arrivo.
+   * `places: null` vuol dire tutti quelli delle mappe che posso toccare; un
+   * elenco vuol dire soltanto quelli.
+   */
+  actingAs: { ownerId: string; handle: string; places: string[] | null } | null;
 }
 
 interface Gate {
@@ -44,9 +48,22 @@ class Auth {
     });
   }
 
-  /** Se sto lavorando in casa d'altri: certe cose li' dentro non si toccano. */
+  /** Se sto lavorando in casa d'altri: certe cose lì dentro non si toccano. */
   get guest(): boolean {
     return !!this.account?.actingAs;
+  }
+
+  /**
+   * Questo luogo, posso toccarlo?
+   *
+   * A casa mia sempre. In casa d'altri dipende da cosa mi hanno aperto: tutta
+   * la mappa, o certi pin. Il server rifiuta comunque — questo serve a non
+   * offrire un tasto che porterebbe a un no.
+   */
+  canTouch(placeId: string): boolean {
+    const acting = this.account?.actingAs;
+    if (!acting) return true;
+    return acting.places === null || acting.places.includes(placeId);
   }
 
   async load(): Promise<void> {

@@ -1,4 +1,4 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -10,10 +10,29 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 
 const trim = () =>
   Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
+
+/** Uno che può modificare una mappa, e fin dove. */
+export class MapEditorDto {
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
+  @IsEmail({}, { message: "serve un'email valida" })
+  @MaxLength(120)
+  email!: string;
+
+  /** Assente: tutta la mappa. Con un elenco: solo quei luoghi. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  only?: string[];
+}
 
 export class MapDto {
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
@@ -36,16 +55,13 @@ export class MapDto {
   published?: boolean;
 
   /**
-   * Chi puo' modificarla oltre a chi ce l'ha. Sono email perche' questa e' la
-   * chiave della mappa intera: un link non dice chi sei.
+   * Chi può modificarla oltre a chi ce l'ha, e con quali regole. Sono email
+   * perché questa è una chiave: un link non dice chi sei.
    */
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(24)
-  @Transform(({ value }: { value: unknown }) =>
-    Array.isArray(value) ? value.map((one) => String(one).trim().toLowerCase()) : value,
-  )
-  @IsEmail({}, { each: true, message: "serve un'email valida" })
-  @MaxLength(120, { each: true })
-  editors?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => MapEditorDto)
+  editors?: MapEditorDto[];
 }

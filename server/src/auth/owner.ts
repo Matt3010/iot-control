@@ -18,7 +18,7 @@ export const ownerOf = (req: Request): string => scopeOf(req).ownerId;
  * padrone ha aperto a questo indirizzo, e le altre non esistono.
  */
 export const scopeOf = (req: Request): Scope =>
-  req.acting ?? { ownerId: (req.user as User).id, maps: null };
+  req.acting ?? { ownerId: (req.user as User).id, maps: null, places: null };
 
 /** Vero se sta lavorando in casa d'altri: certe cose non si fanno da ospiti. */
 export const isGuest = (req: Request): boolean => !!req.acting;

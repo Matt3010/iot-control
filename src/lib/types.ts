@@ -1,5 +1,16 @@
 export type { Capability, DeviceValue, LinkedAccount, PairingStep } from '../../shared/protocol';
 
+/**
+ * Uno che può modificare una mappa, e fin dove.
+ *
+ * `only` assente vuol dire tutta la mappa — il caso normale. Con un elenco
+ * dentro, solo quei luoghi: gli altri li vede e non li tocca.
+ */
+export interface MapEditor {
+  email: string;
+  only?: string[];
+}
+
 export interface PlaceMap {
   id: string;
   name: string;
@@ -11,10 +22,10 @@ export interface PlaceMap {
   slug: string;
   published: boolean;
   /**
-   * Chi può modificarla oltre a te: email. Non è un permesso a metà - e'
-   * tutta la mappa o niente.
+   * Chi può modificarla oltre a te, e con quali regole. Le regole stanno sulla
+   * persona, non su ogni pin: «questi tre a lui, tutti a lei».
    */
-  editors: string[];
+  editors: MapEditor[];
   createdAt: string;
 }
 
@@ -43,11 +54,6 @@ export interface Place {
   note: string;
   /** Un posto privato resta fuori da quello che si pubblica. */
   private: boolean;
-  /**
-   * Chiuso a chi ha la chiave della mappa: lo vede, ma non lo tocca. Chi la
-   * mappa ce l'ha modifica tutto lo stesso.
-   */
-  locked: boolean;
   /** Gli agenti appesi a questo luogo: più d'uno quando le reti sono separate. */
   agentIds: string[];
   createdAt: string;
@@ -76,8 +82,6 @@ export interface Draft {
   /** Di quale mappa è: un posto che modifichi non cambia casa. */
   mapId?: string;
   private?: boolean;
-  /** Chiuso agli ospiti della mappa. */
-  locked?: boolean;
   /** Un elenco vuoto li stacca tutti: il luogo resta, i fili si tagliano. */
   agentIds?: string[];
   name?: string;

@@ -1,38 +1,76 @@
 <script lang="ts">
+  import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
+  import type { MapEditor } from '../lib/types';
   import Button from './Button.svelte';
+  import Chip from './Chip.svelte';
   import Icon from './Icon.svelte';
 
   /**
-   * Chi può modificare una mappa oltre a chi ce l'ha.
+   * Chi può modificare una mappa, e fin dove.
    *
-   * Non è «può correggere due campi»: dentro quella mappa fa quello che fai
-   * tu. Per questo servono degli indirizzi e non un link: un link non dice chi
-   * sei, e questa è una chiave.
+   * Le regole stanno qui, sulla persona, e non su ogni singolo pin: «questi
+   * tre a lui, tutti a lei» si decide in un posto solo invece che entrando in
+   * venti schede — e soprattutto si può dire diverso a persone diverse, che
+   * da dentro un pin non si poteva proprio.
    */
   let {
-    emails = [],
+    mapId,
+    editors = [],
     onchange,
   }: {
-    emails?: string[];
-    onchange: (emails: string[]) => void;
+    mapId: string;
+    editors?: MapEditor[];
+    onchange: (editors: MapEditor[]) => void;
   } = $props();
 
   let fresh = $state('');
+  /** Di chi si stanno guardando le regole: una per volta. */
+  let open = $state<string | null>(null);
+
+  /** I luoghi di questa mappa: sono quelli che si possono spuntare. */
+  const places = $derived(store.places.filter((place) => place.mapId === mapId));
 
   function add() {
     const email = fresh.trim().toLowerCase();
     if (!email) return;
-    if (emails.includes(email)) {
+    if (editors.some((editor) => editor.email === email)) {
       toast.show('Quell’indirizzo c’è già');
       fresh = '';
       return;
     }
-    onchange([...emails, email]);
+    // si entra con tutta la mappa: è il caso normale, e le eccezioni si
+    // scrivono dopo, guardando l'elenco
+    onchange([...editors, { email }]);
     fresh = '';
+    open = email;
   }
 
-  const drop = (email: string) => onchange(emails.filter((held) => held !== email));
+  const drop = (email: string) => onchange(editors.filter((editor) => editor.email !== email));
+
+  /** Cambiare le regole di uno, lasciando gli altri dov'erano. */
+  function rule(email: string, only: string[] | undefined) {
+    onchange(
+      editors.map((editor) =>
+        editor.email === email ? (only ? { email, only } : { email }) : editor,
+      ),
+    );
+  }
+
+  function toggle(editor: MapEditor, placeId: string) {
+    const held = editor.only ?? [];
+    rule(
+      editor.email,
+      held.includes(placeId) ? held.filter((id) => id !== placeId) : [...held, placeId],
+    );
+  }
+
+  /** Cosa può toccare, in una riga: è quello che si legge di sfuggita. */
+  function reach(editor: MapEditor): string {
+    if (!editor.only) return 'tutta la mappa';
+    if (!editor.only.length) return 'nessun luogo';
+    return editor.only.length === 1 ? 'un luogo' : `${editor.only.length} luoghi`;
+  }
 </script>
 
 <div class="field">
@@ -42,26 +80,73 @@
     vedono. Devono entrare con quell’indirizzo — un link non dice chi sei, un accesso sì.
   </p>
 
-  {#if emails.length}
-    <!-- non sono <Chip>: una chip è già un bottone, e la ✕ qui dentro è un
-         secondo comando. Stessa forma di quelle degli agenti. -->
-    <div class="chips">
-      {#each emails as email (email)}
-        <span class="pill">
-          <span class="mail">{email}</span>
-          <button
-            type="button"
-            class="drop"
-            title="Togli la chiave"
-            aria-label={`Togli la chiave a ${email}`}
-            onclick={() => drop(email)}
-          >
-            <Icon name="close" />
-          </button>
-        </span>
-      {/each}
+  {#each editors as editor (editor.email)}
+    <div class="one" class:is-open={open === editor.email}>
+      <div class="who">
+        <button
+          type="button"
+          class="pick"
+          title="Cosa può modificare"
+          onclick={() => (open = open === editor.email ? null : editor.email)}
+        >
+          <span class="mail">{editor.email}</span>
+          <span class="reach">{reach(editor)}</span>
+        </button>
+        <button
+          type="button"
+          class="drop"
+          title="Togli la chiave"
+          aria-label={`Togli la chiave a ${editor.email}`}
+          onclick={() => drop(editor.email)}
+        >
+          <Icon name="close" />
+        </button>
+      </div>
+
+      {#if open === editor.email}
+        <div class="rules">
+          <div class="chips">
+            <Chip
+              label="Tutta la mappa"
+              size="sm"
+              look={editor.only ? 'off' : 'sel'}
+              onclick={() => rule(editor.email, undefined)}
+            />
+            <Chip
+              label="Solo alcuni luoghi"
+              size="sm"
+              look={editor.only ? 'sel' : 'off'}
+              onclick={() => rule(editor.email, editor.only ?? [])}
+            />
+          </div>
+
+          {#if editor.only}
+            {#if places.length}
+              <div class="chips">
+                {#each places as place (place.id)}
+                  <Chip
+                    label={place.name}
+                    size="sm"
+                    look={editor.only.includes(place.id) ? 'sel' : 'off'}
+                    onclick={() => toggle(editor, place.id)}
+                  />
+                {/each}
+              </div>
+              {#if !editor.only.length}
+                <p class="sub">
+                  Con l’elenco vuoto non tocca niente: entra, guarda, e non cambia una riga.
+                </p>
+              {:else}
+                <p class="sub">Gli altri luoghi li vede, ma non li tocca. E non ne aggiunge di nuovi.</p>
+              {/if}
+            {:else}
+              <p class="sub">Questa mappa non ha ancora nessun luogo da spuntare.</p>
+            {/if}
+          {/if}
+        </div>
+      {/if}
     </div>
-  {/if}
+  {/each}
 
   <div class="add">
     <input
@@ -77,13 +162,7 @@
         add();
       }}
     />
-    <Button
-      look="icon"
-      extra="add-go"
-      title="Dai la chiave"
-      disabled={!fresh.trim()}
-      onclick={add}
-    >
+    <Button look="icon" extra="add-go" title="Dai la chiave" disabled={!fresh.trim()} onclick={add}>
       <Icon name="plus" />
     </Button>
   </div>
@@ -96,24 +175,43 @@
 
   .sub { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
 
-  /* la forma è quella di una chip spenta, come nell'elenco degli agenti */
-  .pill {
-    display: inline-flex;
+  .one { display: grid; gap: 6px; min-width: 0; }
+
+  /* la riga di una persona: si apre premendola, e mentre è aperta si stacca
+     dal resto, se no non si capisce di chi sono le regole sotto */
+  .who {
+    display: flex;
     align-items: center;
-    max-width: 100%;
-    height: 30px;
-    padding: 0 4px 0 11px;
+    gap: 2px;
+    min-width: 0;
     border: 1px solid var(--hairline);
     border-radius: 99px;
     opacity: 0.75;
-    transition: opacity 0.16s, border-color 0.16s, transform 0.14s var(--ease);
+    transition: opacity 0.16s, border-color 0.16s;
   }
 
-  .pill:hover, .pill:focus-within { opacity: 1; transform: translateY(-1px); }
+  .who:hover, .who:focus-within { opacity: 1; }
+
+  .one.is-open .who {
+    opacity: 1;
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .pick {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 6px 4px 6px 11px;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+  }
 
   .mail {
     min-width: 0;
-    padding-right: 6px;
     color: var(--ink-2);
     font-size: 12.5px;
     font-weight: 500;
@@ -121,6 +219,11 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* fin dove arriva, detto di sfuggita: è quello che si cerca scorrendo */
+  .reach { flex: none; font-size: 11px; color: var(--ink-3); }
+
+  .one.is-open .pick .mail { color: var(--ink); }
 
   /* la ✕ sta sempre, smorta: un comando che si scopre solo passandoci sopra
      non si scopre */
@@ -130,6 +233,7 @@
     flex: none;
     width: 20px;
     height: 20px;
+    margin-right: 4px;
     padding: 0;
     border: 0;
     border-radius: 50%;
@@ -140,13 +244,22 @@
     transition: opacity 0.16s, background 0.16s, color 0.16s;
   }
 
-  .pill:hover .drop, .drop:hover, .drop:focus-visible { opacity: 1; }
+  .who:hover .drop, .drop:hover, .drop:focus-visible { opacity: 1; }
 
   .drop:hover { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
 
   .drop :global(.ico) { width: 12px; height: 12px; }
 
-  /* la riga per aggiungerne uno: il tratteggio dice che è un posto da riempire */
+  /* le regole di quella persona: rientrate, così si vede che sono sue */
+  .rules {
+    display: grid;
+    gap: 7px;
+    margin-left: 10px;
+    padding-left: 10px;
+    border-left: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  /* la riga per darne una nuova: il tratteggio dice che è un posto da riempire */
   .add {
     display: flex;
     align-items: center;

@@ -71,12 +71,11 @@
     actions.className = 'pop-actions';
 
     /*
-     * In casa d'altri certi luoghi sono chiusi: si vedono e non si toccano.
-     * Il tasto non c'e' proprio, invece di esserci e dire di no — un comando
-     * che non porta da nessuna parte e' peggio di un comando che non c'e'.
-     * Per chi la mappa ce l'ha non cambia niente: chiude gli altri, non se'.
+     * In casa d'altri si arriva fin dove ti hanno aperto. Il tasto non c'è
+     * proprio, invece di esserci e dire di no — un comando che non porta da
+     * nessuna parte è peggio di un comando che non c'è.
      */
-    const shut = auth.guest && place.locked;
+    const shut = !auth.canTouch(place.id);
 
     const edit = document.createElement('button');
     edit.type = 'button';
@@ -95,7 +94,7 @@
     if (shut) {
       const kept = document.createElement('span');
       kept.className = 'pop-kept';
-      kept.append(glyph('lock'), document.createTextNode('Solo di chi ha la mappa'));
+      kept.append(glyph('lock'), document.createTextNode('Non è fra i tuoi'));
       actions.append(kept, directions);
     } else {
       actions.append(edit, directions);

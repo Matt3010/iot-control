@@ -33,7 +33,7 @@ export class PublicService {
       groups: found.groups.map(toGroupView),
       places: found.places.map(toPublicPlaceView),
       // le chiavi sono di questa mappa, non dell'indice: si guarda lei
-      canManage: !!who && (found.map.editors ?? []).includes(who),
+      canManage: !!who && (found.map.editors ?? []).some((editor) => editor.email === who),
     };
   }
 

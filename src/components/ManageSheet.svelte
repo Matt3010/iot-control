@@ -389,7 +389,8 @@
               {#if atHome}
                 <div class="map-keys">
                   <ShareField
-                    emails={map.editors ?? []}
+                    mapId={map.id}
+                    editors={map.editors ?? []}
                     onchange={(editors) => store.patchMap(map, { editors })}
                   />
                 </div>

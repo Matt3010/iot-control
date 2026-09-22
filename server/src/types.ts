@@ -38,15 +38,14 @@ export interface PlaceMap {
   /** Di quelle, quante venivano dal profilo: la stessa persona, poco prima. */
   viewsFromProfile: number;
   /**
-   * Chi può modificarla oltre a chi ce l'ha: email, minuscole.
+   * Chi può modificarla oltre a chi ce l'ha.
    *
-   * Non è un permesso a metà — è tutta la mappa o niente: chi è in questo
-   * elenco entra e ci lavora come chi l'ha fatta, e vede anche le categorie,
-   * i gruppi e gli agenti che quella mappa usa, perché senza non si può
-   * toccare un luogo. Servono degli indirizzi e non un link: un link non dice
-   * chi sei, e questa è la chiave.
+   * Servono degli indirizzi e non un link: un link non dice chi sei, e questa
+   * è una chiave. Ognuno ha le sue regole, e stanno qui — sulla persona, non
+   * su ogni singolo luogo: «questi tre pin a lui, tutti a lei» si decide in
+   * un posto solo invece che entrando in venti schede.
    */
-  editors?: string[];
+  editors?: MapEditor[];
   createdAt: string;
 }
 
@@ -57,6 +56,13 @@ export interface PlaceMap {
 export interface Scope {
   ownerId: string;
   maps: string[] | null;
+  /**
+   * E quali dei suoi luoghi. `null` vuol dire tutti quelli delle mappe qui
+   * sopra. Un elenco vuol dire soltanto quelli: gli altri si vedono — stanno
+   * sulla mappa, sarebbe strano sparissero — ma non si toccano, e non se ne
+   * aggiungono di nuovi.
+   */
+  places: string[] | null;
 }
 
 export interface Category {
@@ -85,15 +91,6 @@ export interface Place {
   note: string;
   /** Un posto privato resta fuori da quello che si pubblica. */
   private: boolean;
-  /**
-   * Chiuso a chi ha la chiave della mappa: lo vede, ma non lo tocca.
-   *
-   * Aprire una mappa a qualcuno non vuol dire aprirgli ogni riga che c'e'
-   * dentro. Un indirizzo che non si discute, una cosa scritta da chi la sa:
-   * resta li' com'e'. Vale solo per gli ospiti — chi la mappa ce l'ha
-   * modifica tutto, se no si sarebbe chiuso fuori da casa sua.
-   */
-  locked?: boolean;
   /**
    * Gli agenti appesi a questo luogo. Più d'uno quando le reti sono separate —
    * la sala e la cucina, due edifici — e ognuno porta i suoi dispositivi. Un
@@ -135,6 +132,19 @@ export interface Device {
   name: string;
   capabilities: Capability[];
   lastSeenAt: string;
+}
+
+/**
+ * Uno che può modificare una mappa, e fin dove.
+ *
+ * `only` assente vuol dire tutta la mappa: è il caso normale, e non si scrive.
+ * Con un elenco dentro, solo quei luoghi — e nient'altro: chi è limitato a
+ * dei pin non ne crea di nuovi, perché nascerebbero fuori dal suo elenco e
+ * non potrebbe nemmeno correggerli.
+ */
+export interface MapEditor {
+  email: string;
+  only?: string[];
 }
 
 /** Una riga di una scena: a chi, cosa, e con che valore. */

@@ -3,6 +3,7 @@ import type { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { badRequest } from '../errors/HttpError.js';
 import { store } from '../persistence/JsonStore.js';
 import { MapRepository } from '../repositories/MapRepository.js';
+import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import { UserRepository } from '../repositories/UserRepository.js';
 import type { PlaceMap, Scope, User } from '../types.js';
 
@@ -30,15 +31,37 @@ export class UserManager {
   }
 
   /**
-   * Il raggio d'azione di chi entra in casa d'altri: il padrone, e le sue
-   * mappe aperte a me. Se non ce n'è nessuna, non c'è niente da aprire.
+   * Il raggio d'azione di chi entra in casa d'altri: il padrone, le sue mappe
+   * aperte a me, e — se me l'hanno ristretto — quali luoghi.
+   *
+   * I luoghi si contano adesso, non si portano dietro: una mappa che mi si
+   * apre tutta vale per i pin che ha in questo momento, anche per quelli
+   * aggiunti un minuto fa. Se anche una sola delle mie mappe è aperta tutta,
+   * l'elenco non serve: `null` vuol dire «tutti quelli che posso vedere».
    */
   reachOf(who: string, email: string): Promise<Scope | undefined> {
     return store.transaction((tx) => {
       const owner = new UserRepository(tx).findByIdOrHandle(who);
       if (!owner || owner.email === email) return undefined;
-      const maps = new MapRepository(tx).findEditableOf(owner.id, email);
-      return maps.length ? { ownerId: owner.id, maps: maps.map((map) => map.id) } : undefined;
+
+      const maps = new MapRepository(tx);
+      const mie = maps.findEditableOf(owner.id, email);
+      if (!mie.length) return undefined;
+
+      const regole = mie.map((map) => ({ map, rule: maps.ruleFor(map, email) }));
+      const aperte = regole.some(({ rule }) => !rule?.only);
+      if (aperte) return { ownerId: owner.id, maps: mie.map((map) => map.id), places: null };
+
+      const places = new PlaceRepository(tx);
+      const dentro = new Set(
+        regole.flatMap(({ map, rule }) =>
+          places
+            .findAllOfMaps([map.id])
+            .filter((place) => rule?.only?.includes(place.id))
+            .map((place) => place.id),
+        ),
+      );
+      return { ownerId: owner.id, maps: mie.map((map) => map.id), places: [...dentro] };
     });
   }
 

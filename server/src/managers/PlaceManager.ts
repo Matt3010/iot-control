@@ -20,6 +20,12 @@ export class PlaceManager {
   }
 
   create(scope: Scope, dto: CreatePlaceDto): Promise<Place> {
+    /*
+     * Chi può toccare solo certi pin non ne aggiunge: quello nuovo nascerebbe
+     * fuori dal suo elenco, e non potrebbe nemmeno correggerlo un attimo dopo.
+     */
+    if (scope.places !== null) throw notFound('mappa inesistente');
+
     return store.transaction((tx) => {
       const groupIds = unique(dto.groupIds ?? []);
       const agentIds = unique(dto.agentIds ?? []);
@@ -34,8 +40,6 @@ export class PlaceManager {
         lng: dto.lng,
         note: dto.note ?? '',
         private: dto.private ?? false,
-        // un ospite non chiude una riga: si chiuderebbe fuori da sola
-        locked: scope.maps === null && dto.locked === true,
         agentIds,
       });
     });
@@ -45,21 +49,13 @@ export class PlaceManager {
     return store.transaction((tx) => {
       const places = new PlaceRepository(tx);
       const current = places.findById(id);
-      if (!current || !new MapRepository(tx).within(scope, current.mapId)) throw notFound('posto inesistente');
-
-      // Chiuso vuol dire chiuso per gli ospiti. Per loro quel luogo non e'
-      // «vietato» — semplicemente non c'e', come tutto il resto che non
-      // possono toccare: dire di no e dire cosa esiste sono due frasi.
-      const guest = scope.maps !== null;
-      if (guest && current.locked === true) throw notFound('posto inesistente');
+      if (!current || !this.#reaches(scope, tx, current)) throw notFound('posto inesistente');
 
       const groupIds = dto.groupIds ? unique(dto.groupIds) : current.groupIds;
       const agentIds = dto.agentIds ? unique(dto.agentIds) : (current.agentIds ?? []);
       this.#assertRefs(tx, scope, current.mapId, dto.categoryId ?? current.categoryId, groupIds, agentIds);
 
-      const { locked, ...rest } = dto;
-      const patch = guest ? rest : { ...rest, locked: locked ?? current.locked };
-      return places.update(id, { ...patch, groupIds, agentIds }) as Place;
+      return places.update(id, { ...dto, groupIds, agentIds }) as Place;
     });
   }
 
@@ -67,11 +63,22 @@ export class PlaceManager {
     return store.transaction((tx) => {
       const places = new PlaceRepository(tx);
       const current = places.findById(id);
-      if (!current || !new MapRepository(tx).within(scope, current.mapId)) throw notFound('posto inesistente');
-      // un ospite non lo modifica, quindi tanto meno lo butta via
-      if (scope.maps !== null && current.locked === true) throw notFound('posto inesistente');
+      if (!current || !this.#reaches(scope, tx, current)) throw notFound('posto inesistente');
       places.delete(id);
     });
+  }
+
+  /**
+   * Ci arriva, questa richiesta?
+   *
+   * Dev'essere una mappa che può toccare, e — se le hanno dato un elenco di
+   * luoghi — uno di quelli. Per chi non ci arriva quel posto non è «vietato»:
+   * semplicemente non c'è. Dire di no e dire cosa esiste sono due frasi
+   * diverse, e la seconda non la dobbiamo.
+   */
+  #reaches(scope: Scope, tx: Transaction, place: Place): boolean {
+    if (!new MapRepository(tx).within(scope, place.mapId)) return false;
+    return scope.places === null || scope.places.includes(place.id);
   }
 
   /**

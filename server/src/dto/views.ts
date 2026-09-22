@@ -1,5 +1,15 @@
 import type { Capability, DeviceValue } from '../../../shared/protocol.js';
-import type { Agent, Category, Device, Group, Place, PlaceMap, Scene, SceneStep } from '../types.js';
+import type {
+  Agent,
+  Category,
+  Device,
+  Group,
+  MapEditor,
+  Place,
+  PlaceMap,
+  Scene,
+  SceneStep,
+} from '../types.js';
 import type { OwnerState } from '../managers/StateManager.js';
 
 /** The shapes that leave the API: entities never go out untouched. */
@@ -21,8 +31,8 @@ export interface MapView {
   viewers: number;
   /** Di quelle aperture, quante arrivavano dal profilo. */
   viewsFromProfile: number;
-  /** Chi la può modificare oltre a chi ce l'ha: tutta, o niente. */
-  editors: string[];
+  /** Chi la può modificare oltre a chi ce l'ha, e con quali regole. */
+  editors: MapEditor[];
   createdAt: string;
 }
 
@@ -47,8 +57,6 @@ export interface PlaceView {
   lng: number;
   note: string;
   private: boolean;
-  /** Chiuso a chi ha la chiave della mappa: lo vede, ma non lo tocca. */
-  locked: boolean;
   /** Gli agenti appesi a questo luogo: nessuno, uno, o più se le reti sono separate. */
   agentIds: string[];
   createdAt: string;
@@ -58,11 +66,9 @@ export interface PlaceView {
  * Quello che di un posto può vedere un estraneo.
  *
  * Il legame con l'agente non esce mai: da fuori una mappa si guarda, e le
- * luci di casa d'altri non si toccano nemmeno per sbaglio. E nemmeno esce
- * `locked`: da fuori non si modifica niente comunque, quindi dire quali righe
- * sono chiuse sarebbe raccontare di una porta che li' non c'e'.
+ * luci di casa d'altri non si toccano nemmeno per sbaglio.
  */
-export type PublicPlaceView = Omit<PlaceView, 'agentIds' | 'locked'>;
+export type PublicPlaceView = Omit<PlaceView, 'agentIds'>;
 
 export interface AgentView {
   id: string;
@@ -140,13 +146,12 @@ export const toPlaceView = (place: Place): PlaceView => ({
   lng: place.lng,
   note: place.note ?? '',
   private: place.private ?? false,
-  locked: place.locked === true,
   agentIds: place.agentIds ?? [],
   createdAt: place.createdAt,
 });
 
 export const toPublicPlaceView = (place: Place): PublicPlaceView => {
-  const { agentIds: _agenti, locked: _chiuso, ...outside } = toPlaceView(place);
+  const { agentIds: _agenti, ...outside } = toPlaceView(place);
   return outside;
 };
 

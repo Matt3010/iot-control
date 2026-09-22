@@ -38,7 +38,21 @@ export class MapManager {
       // le chiavi le da' chi la mappa ce l'ha: un ospite non ne fa altri
       if (dto.editors !== undefined && scope.maps === null) {
         const owner = new UserRepository(tx).findById(scope.ownerId);
-        patch.editors = [...new Set(dto.editors)].filter((one) => one && one !== owner?.email);
+        const suoi = new Set(new PlaceRepository(tx).findAllOfMaps([id]).map((place) => place.id));
+        const visti = new Set<string>();
+
+        patch.editors = dto.editors
+          .filter((editor) => editor.email && editor.email !== owner?.email)
+          .filter((editor) => (visti.has(editor.email) ? false : (visti.add(editor.email), true)))
+          .map((editor) => {
+            // un elenco di luoghi vale solo per quelli che stanno su questa
+            // mappa: gli altri non sono «vietati», semplicemente non c'entrano
+            if (!editor.only) return { email: editor.email };
+            return {
+              email: editor.email,
+              only: [...new Set(editor.only)].filter((one) => suoi.has(one)),
+            };
+          });
       }
       return maps.update(id, patch) as PlaceMap;
     });

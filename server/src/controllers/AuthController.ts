@@ -54,7 +54,7 @@ export class AuthController {
 
   me = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await authService.me(whoIs(req), scopeOf(req).ownerId));
+      res.json(await authService.me(whoIs(req), req.acting));
     } catch (error) {
       next(error);
     }
@@ -70,7 +70,7 @@ export class AuthController {
       const reach = await userManager.reachOf(dtoOf<ActDto>(req).handle, me.email);
       if (!reach) throw badRequest('quelle mappe non sono aperte a te');
       res.cookie(config.auth.actCookie, reach.ownerId, cookieOptions(req));
-      res.json(await authService.me(me, reach.ownerId));
+      res.json(await authService.me(me, reach));
     } catch (error) {
       next(error);
     }

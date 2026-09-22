@@ -2,7 +2,18 @@ import fs from 'node:fs/promises';
 import { config, dataFile } from '../config.js';
 import { randomUUID } from 'node:crypto';
 import { slugify, uniqueSlug } from '../auth/slug.js';
-import type { Agent, Category, Database, Device, Group, Place, PlaceMap, Scene, User } from '../types.js';
+import type {
+  Agent,
+  Category,
+  Database,
+  Device,
+  Group,
+  MapEditor,
+  Place,
+  PlaceMap,
+  Scene,
+  User,
+} from '../types.js';
 
 /** Chi si era registrato prima che esistessero i link pubblici. */
 function migrateHandles(users: User[]): User[] {
@@ -44,8 +55,14 @@ function migrateSlugs(maps: PlaceMap[]): PlaceMap[] {
       views: map.views ?? 0,
       viewers: map.viewers ?? 0,
       viewsFromProfile: map.viewsFromProfile ?? 0,
-      // mappe nate prima che si potessero tenere in due: nessuno ha la chiave
-      editors: Array.isArray(map.editors) ? map.editors : [],
+      // mappe nate prima che si potessero tenere in due: nessuno ha la chiave.
+      // E le prime chiavi erano solo indirizzi, senza regole: valevano per
+      // tutta la mappa, che e' esattamente un editor senza `only`.
+      editors: Array.isArray(map.editors)
+        ? map.editors.map((editor) =>
+            typeof editor === 'string' ? { email: editor } : (editor as MapEditor),
+          )
+        : [],
     };
     if (counted.slug) return counted;
     const slug = uniqueSlug(slugify(map.name), (candidate) => taken.has(key(map.ownerId, candidate)));
@@ -62,8 +79,6 @@ function migratePlace(place: Place & { groupId?: string; agentId?: string }): Pl
   const { groupId, agentId, ...rest } = place;
   return {
     ...rest,
-    // chi e' nato prima che si potesse chiudere un luogo: aperto
-    locked: place.locked === true,
     groupIds: Array.isArray(place.groupIds) ? place.groupIds : groupId ? [groupId] : [],
     agentIds: Array.isArray(place.agentIds) ? place.agentIds : agentId ? [agentId] : [],
   };

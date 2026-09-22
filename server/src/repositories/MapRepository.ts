@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { uniqueSlug } from '../auth/slug.js';
 import type { Transaction } from '../persistence/JsonStore.js';
-import type { PlaceMap, Scope } from '../types.js';
+import type { MapEditor, PlaceMap, Scope } from '../types.js';
 
 export class MapRepository {
   constructor(private readonly tx: Transaction) {}
@@ -36,7 +36,12 @@ export class MapRepository {
 
   /** Le mappe che qualcuno ha aperto a questo indirizzo. */
   findEditableBy(email: string): PlaceMap[] {
-    return this.tx.data.maps.filter((map) => (map.editors ?? []).includes(email));
+    return this.tx.data.maps.filter((map) => !!this.ruleFor(map, email));
+  }
+
+  /** Le regole che una mappa dà a quell'indirizzo, se gliene dà. */
+  ruleFor(map: PlaceMap, email: string): MapEditor | undefined {
+    return (map.editors ?? []).find((editor) => editor.email === email);
   }
 
   /** Di quel padrone, quelle aperte a me: è il raggio di chi entra da ospite. */

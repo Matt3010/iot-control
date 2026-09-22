@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import type { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { mapManager } from '../managers/MapManager.js';
 import { userManager } from '../managers/UserManager.js';
-import type { User } from '../types.js';
+import type { Scope, User } from '../types.js';
 
 /** Una mappa di qualcun altro che posso modificare: la porta e chi la tiene. */
 export interface KeyRef {
@@ -21,8 +21,12 @@ export interface UserView {
   handle: string;
   /** Le mappe di altri che posso modificare: chi mi ha dato la chiave. */
   keys: KeyRef[];
-  /** In casa di chi mi trovo adesso, se non sono a casa mia. */
-  actingAs: { ownerId: string; handle: string } | null;
+  /**
+   * In casa di chi mi trovo adesso, se non sono a casa mia — e fin dove
+   * arrivo. `places: null` vuol dire tutti quelli delle mappe che posso
+   * toccare; un elenco vuol dire soltanto quelli, e gli altri si guardano.
+   */
+  actingAs: { ownerId: string; handle: string; places: string[] | null } | null;
   /** Quante volte hanno aperto il tuo /u/<handle>. */
   profileViews: number;
   /** Quante persone diverse, contate una volta al giorno. */
@@ -78,7 +82,7 @@ export class AuthService {
    * di chi ti trovi: si ricontrolla contro le chiavi vere, così un cookie
    * vecchio non racconta un permesso che non c'è più.
    */
-  async me(user: User, actingOwnerId?: string): Promise<UserView> {
+  async me(user: User, acting?: Scope): Promise<UserView> {
     const keys: KeyRef[] = (await userManager.keysOf(user.email)).map(({ owner, map }) => ({
       ownerId: owner.id,
       handle: owner.handle,
@@ -86,11 +90,11 @@ export class AuthService {
       mapName: map.name,
       slug: map.slug,
     }));
-    const here = keys.find((key) => key.ownerId === actingOwnerId);
+    const here = acting ? keys.find((key) => key.ownerId === acting.ownerId) : undefined;
     return {
       ...toUserView(user),
       keys,
-      actingAs: here ? { ownerId: here.ownerId, handle: here.handle } : null,
+      actingAs: here ? { ownerId: here.ownerId, handle: here.handle, places: acting?.places ?? null } : null,
     };
   }
 }

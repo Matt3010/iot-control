@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { auth } from '../lib/auth.svelte';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { swipeToClose } from '../lib/swipe';
@@ -94,19 +93,6 @@
 
   /** I gruppi sono tuoi e valgono su tutte le mappe: ci sono tutti. */
   const groupsHere = $derived(store.groups);
-
-  /**
-   * Chiudere un luogo ha senso solo dove c'e' qualcuno da cui chiuderlo:
-   * l'interruttore compare quando quella mappa ha delle chiavi in giro, o
-   * quando quel luogo e' gia' chiuso — se no e' una domanda senza motivo.
-   *
-   * E non lo vede un ospite: chiuderlo o aprirlo e' una decisione di chi la
-   * mappa ce l'ha, e a un ospite un luogo chiuso non si apre nemmeno.
-   */
-  const sharedMap = $derived(
-    (store.maps.find((map) => map.id === draft?.mapId)?.editors ?? []).length > 0,
-  );
-  const canLock = $derived(!auth.guest && (sharedMap || draft?.locked === true));
 
   /**
    * Due linguette, come nell'altra scheda. Un agente ha bisogno della colonna
@@ -205,18 +191,6 @@
       label="Luogo privato"
       note="Non compare nella mappa pubblica."
     />
-
-    <!-- Aprire una mappa a qualcuno non vuol dire aprirgli ogni riga che c'e'
-         dentro: questa resta tua. -->
-    {#if canLock}
-      <Switch
-        checked={draft.locked ?? false}
-        onchange={(value) => draft && (draft.locked = value)}
-        label="Solo tu puoi modificarlo"
-        note="Chi ha la chiave della mappa lo vede, ma non lo tocca."
-      />
-    {/if}
-
 
     <label class="field">
       <span class="eyebrow">Note</span>

@@ -2,7 +2,7 @@ import { api } from './api';
 import { DEFAULT_EMOJI, SUGGESTED } from './format';
 import { forgetJSON, readJSON, writeJSON } from './storage';
 import { toast, UNDO_MS } from './toast.svelte';
-import type { Category, Draft, Group, LocalPlace, Place, PlaceMap, Snapshot } from './types';
+import type { Category, Draft, Group, LocalPlace, MapEditor, Place, PlaceMap, Snapshot } from './types';
 
 /** Quello che il filo aperto racconta di cambiato. `null` vuol dire sparito. */
 type LiveChange =
@@ -40,7 +40,6 @@ const placePayload = (mapId: string, draft: Required<Pick<Draft, 'lat' | 'lng'>>
   lat: draft.lat,
   lng: draft.lng,
   private: draft.private ?? false,
-  locked: draft.locked ?? false,
   agentIds: draft.agentIds ?? [],
 });
 
@@ -149,7 +148,7 @@ class Store {
 
   async patchMap(
     map: PlaceMap,
-    patch: { name?: string; slug?: string; published?: boolean; editors?: string[] },
+    patch: { name?: string; slug?: string; published?: boolean; editors?: MapEditor[] },
   ): Promise<void> {
     const before = { ...map };
     Object.assign(map, patch);
