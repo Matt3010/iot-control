@@ -1,7 +1,8 @@
 import type { LinkedAccount, PairingStep } from '../../shared/protocol.js';
 import type { ConnectorConfig } from './config.js';
 import { EXTRAS, install, installed } from './extras.js';
-import { forget, frameFrom, sourceOf } from './homeassistant.js';
+import { forget, sourceOf } from './go2rtc.js';
+import { frameFrom } from './homeassistant.js';
 
 /**
  * Collegare un account a Home Assistant, pilotato da fuori.

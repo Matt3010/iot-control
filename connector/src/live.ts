@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws';
 import type { ConnectorConfig } from './config.js';
-import { sourceOf } from './homeassistant.js';
+import { flowing, forget, remember, sourceOf } from './go2rtc.js';
 
 /**
  * Una telecamera guardata in diretta.
@@ -14,9 +14,6 @@ import { sourceOf } from './homeassistant.js';
  * Quello che sale sono JPEG interi, uno per messaggio: di là un browser li
  * disegna da solo, senza lettori e senza codec.
  */
-
-const STREAMS = 'http://127.0.0.1:11984/api/streams';
-const MJPEG = 'http://127.0.0.1:11984/api/stream.mjpeg';
 
 /**
  * Quanto si lascia accumulare sul collegamento prima di buttare via un
@@ -100,12 +97,12 @@ export async function look(
   const raw = await sourceOf(entityId);
   if (!raw) throw new Error('non si riesce a sapere l’indirizzo di questa telecamera');
 
+  // Transcodificato: la telecamera parla una lingua che serve a registrare, e
+  // a noi ne serve una che un browser capisca senza attrezzi.
   const name = `vivo-${entityId}`;
-  const set = await fetch(`${STREAMS}?name=${encodeURIComponent(name)}&src=${encodeURIComponent(`ffmpeg:${raw}#video=mjpeg`)}`, {
-    method: 'PUT',
-    signal: AbortSignal.timeout(5000),
-  }).catch(() => undefined);
-  if (!set?.ok) throw new Error('non si riesce ad aprire il flusso della telecamera');
+  if (!(await remember(name, `ffmpeg:${raw}#video=mjpeg`))) {
+    throw new Error('non si riesce ad aprire il flusso della telecamera');
+  }
 
   const halt = new AbortController();
   const socket = new WebSocket(videoUrl(config, session), {
@@ -120,10 +117,7 @@ export async function look(
     eyes.delete(session);
     halt.abort();
     if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) socket.close();
-    void fetch(`${STREAMS}?src=${encodeURIComponent(name)}`, {
-      method: 'DELETE',
-      signal: AbortSignal.timeout(5000),
-    }).catch(() => undefined);
+    void forget(name);
   };
 
   eyes.set(session, { stop });
@@ -152,7 +146,7 @@ async function pump(
   let last = 0;
 
   try {
-    const flow = await fetch(`${MJPEG}?src=${encodeURIComponent(name)}`, { signal: halt.signal });
+    const flow = await fetch(flowing(name), { signal: halt.signal });
     if (!flow.ok || !flow.body) throw new Error(`il flusso dice ${flow.status}`);
 
     const said = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(flow.headers.get('content-type') ?? '');

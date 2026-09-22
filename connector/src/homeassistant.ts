@@ -1,5 +1,6 @@
 import { WebSocket } from 'ws';
 import type { ConnectorConfig } from './config.js';
+import { frameOf, remember, sourceOf } from './go2rtc.js';
 
 /** Un'entità di Home Assistant, ridotta a quello che ci serve. */
 export interface HaEntity {
@@ -51,38 +52,11 @@ const CALL_TIMEOUT_MS = 15_000;
 const SNAPSHOT_TIMEOUT_MS = 20_000;
 
 /**
- * Chi smista i flussi video, qui accanto sulla stessa macchina.
- *
- * Non e' un servizio nostro: e' quello che Home Assistant si porta dietro per
- * i video, e risponde solo da dentro casa.
- */
-const STREAMS = 'http://127.0.0.1:11984/api/streams';
-const FRAME = 'http://127.0.0.1:11984/api/frame.jpeg';
-
-/**
  * Le telecamere per cui la via di casa si e' gia' vista che non porta niente.
  * Si ricorda, se no si rifarebbe la stessa domanda inutile ogni cinque
  * secondi, e ogni domanda inutile e' un'immagine che tarda.
  */
 const dritte = new Set<string>();
-
-/** L'indirizzo vero di una telecamera, come lo conosce chi smista i flussi. */
-export async function sourceOf(entityId: string): Promise<string | undefined> {
-  const known = await fetch(`${STREAMS}?src=${encodeURIComponent(entityId)}`, {
-    signal: AbortSignal.timeout(5000),
-  }).catch(() => undefined);
-  if (!known?.ok) return undefined;
-
-  const info = (await known.json().catch(() => undefined)) as { producers?: { url?: string }[] } | undefined;
-  for (const one of info?.producers ?? []) {
-    const url = one.url ?? '';
-    const bare = url.startsWith('ffmpeg:') ? url.slice('ffmpeg:'.length) : url;
-    // via i parametri di ffmpeg: al client nativo non dicono niente
-    const clean = bare.split('#')[0] ?? '';
-    if (clean.startsWith('rtsp://')) return clean;
-  }
-  return undefined;
-}
 
 /**
  * Un fotogramma preso per conto nostro, per la via dritta.
@@ -107,30 +81,8 @@ export async function sourceOf(entityId: string): Promise<string | undefined> {
  */
 export async function frameFrom(raw: string, name: string): Promise<Buffer | undefined> {
   if (!raw.startsWith('rtsp://')) return undefined;
-
-  // Si registra ogni volta: costa una richiesta locale, e se di la' hanno
-  // riavviato il flusso nostro c'e' lo stesso.
-  const set = await fetch(`${STREAMS}?name=${encodeURIComponent(name)}&src=${encodeURIComponent(raw)}`, {
-    method: 'PUT',
-    signal: AbortSignal.timeout(5000),
-  }).catch(() => undefined);
-  if (!set?.ok) return undefined;
-
-  const shot = await fetch(`${FRAME}?src=${encodeURIComponent(name)}`, {
-    signal: AbortSignal.timeout(SNAPSHOT_TIMEOUT_MS),
-  }).catch(() => undefined);
-  if (!shot?.ok) return undefined;
-
-  const bytes = Buffer.from(await shot.arrayBuffer());
-  return bytes.length ? bytes : undefined;
-}
-
-/** E lo stesso flusso, quando si lascia: non si tiene aperto per niente. */
-export async function forget(name: string): Promise<void> {
-  await fetch(`${STREAMS}?src=${encodeURIComponent(name)}`, {
-    method: 'DELETE',
-    signal: AbortSignal.timeout(5000),
-  }).catch(() => undefined);
+  if (!(await remember(name, raw))) return undefined;
+  return frameOf(name);
 }
 
 async function ourselves(entityId: string): Promise<Buffer | undefined> {

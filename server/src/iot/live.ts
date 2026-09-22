@@ -33,6 +33,7 @@ const HELLO_MS = 25_000;
 
 /** Il segno che separa un fotogramma dall'altro. Lo sceglie chi manda. */
 const SEP = 'fotogramma';
+const CRLF = Buffer.from('\r\n');
 
 interface Viewer {
   res: Response;
@@ -92,14 +93,20 @@ class LiveHub {
     if (!session || !frame.length) return;
 
     session.frames += 1;
-    const head = `--${SEP}\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`;
+
+    /*
+     * Un pezzo solo, non tre. La testa, l'immagine e l'a capo finivano in tre
+     * scritture separate: tre viaggi verso la rete per una cosa sola, dieci
+     * volte al secondo, per ognuno che guarda. Qui si incollano prima.
+     */
+    const head = Buffer.from(
+      `--${SEP}\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`,
+    );
+    const whole = Buffer.concat([head, frame, CRLF]);
 
     for (const viewer of session.viewers) {
       if (viewer.slow) continue;
-      viewer.res.write(head);
-      const room = viewer.res.write(frame);
-      viewer.res.write('\r\n');
-      if (!room) viewer.slow = true;
+      if (!viewer.res.write(whole)) viewer.slow = true;
     }
   }
 

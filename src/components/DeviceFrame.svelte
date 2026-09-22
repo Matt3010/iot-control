@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Device } from '../lib/devices.svelte';
   import Button from './Button.svelte';
+  import CameraSheet from './CameraSheet.svelte';
   import Icon from './Icon.svelte';
 
   /**
@@ -63,7 +64,6 @@
    * grande: cosi' sta sopra a tutto senza dipendere da dove si trovava nella
    * pagina, si chiude con Esc, e su un telefono copre davvero lo schermo.
    */
-  let sheet = $state<HTMLDialogElement | undefined>();
   let full = $state(false);
   /**
    * E quando quella grande ha disegnato il primo fotogramma, la piccola si
@@ -216,13 +216,6 @@
     return () => clearInterval(battito);
   });
 
-  function enlarge(): void {
-    full = true;
-    fullReady = false;
-    // il dialogo esiste solo dopo che Svelte l'ha disegnato
-    queueMicrotask(() => sheet?.showModal());
-  }
-
   const quando = $derived(
     at ? at.toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '',
   );
@@ -274,7 +267,10 @@
           <Icon name="refresh" />
         </Button>
       {/if}
-      <Button look="icon" size="sm" title="A tutto schermo" onclick={enlarge}>
+      <Button look="icon" size="sm" title="A tutto schermo" onclick={() => {
+          full = true;
+          fullReady = false;
+        }}>
         <Icon name="full" />
       </Button>
     </span>
@@ -282,32 +278,15 @@
 </div>
 
 {#if full}
-  <!-- Fuori dalla card, sopra a tutto: quello che si guarda a tutto schermo
-       non deve sapere niente di dove stava prima. -->
-  <dialog
-    class="big"
-    bind:this={sheet}
+  <CameraSheet
+    name={device.name}
+    src={noLive ? src : liveUrl}
+    onready={() => (fullReady = true)}
     onclose={() => {
       full = false;
       fullReady = false;
     }}
-    onclick={(event) => {
-      // fuori dall'immagine si chiude: è il gesto che fanno tutti
-      if (event.target === sheet) sheet?.close();
-    }}
-  >
-    <img
-      src={noLive ? src : liveUrl}
-      alt={`${device.name} a tutto schermo`}
-      onload={() => (fullReady = true)}
-    />
-    <div class="over">
-      <span class="who">{device.name}</span>
-      <Button look="icon" size="sm" title="Chiudi" onclick={() => sheet?.close()}>
-        <Icon name="close" />
-      </Button>
-    </div>
-  </dialog>
+  />
 {/if}
 
 <style>
@@ -351,54 +330,6 @@
     display: flex;
     align-items: center;
     gap: 2px;
-  }
-
-  /* a tutto schermo: nero intorno, e l'immagine intera — qui non si taglia
-     niente, perché il pezzo tagliato è sempre quello che volevi vedere */
-  .big {
-    width: 100vw;
-    max-width: 100vw;
-    height: 100dvh;
-    max-height: 100dvh;
-    padding: 0;
-    border: 0;
-    background: #000;
-    overflow: hidden;
-  }
-
-  .big::backdrop { background: #000; }
-
-  .big img {
-    width: 100%;
-    height: 100%;
-    aspect-ratio: auto;
-    object-fit: contain;
-    border-radius: 0;
-    background: #000;
-  }
-
-  /* il nome e la chiusura stanno sopra l'immagine, su una sfumatura: sopra a
-     un'inquadratura chiara il bianco su bianco non si legge */
-  .over {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: max(10px, env(safe-area-inset-top)) 12px 18px;
-    color: #fff;
-    background: linear-gradient(180deg, rgb(0 0 0 / 0.55), transparent);
-  }
-
-  .over .who {
-    font-size: 13px;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .foot {

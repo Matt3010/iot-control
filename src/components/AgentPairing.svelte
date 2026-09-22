@@ -305,6 +305,19 @@
   }
 </script>
 
+<!--
+  Il pallino e il nome: uguali per una riga collegata e per una da collegare,
+  e scritti una volta sola. Due copie della stessa riga diventano due righe
+  diverse alla prima correzione fatta di fretta su una sola.
+-->
+{#snippet segno(label: string, as: string)}
+  <span class="mark" aria-hidden="true"></span>
+  <span class="who">
+    <b>{label}</b>
+    {#if as}<span class="as">{as}</span>{/if}
+  </span>
+{/snippet}
+
 {#if closed}
   <div class="accounts">
     {#each ACCOUNTS as account (account.handler)}
@@ -314,11 +327,7 @@
            n'e' una per canale, e staccarne una non deve staccare le altre. -->
       {#each mine as joint (joint.entryId)}
         <div class="account is-joined">
-          <span class="mark" aria-hidden="true"></span>
-          <span class="who">
-            <b>{account.label}</b>
-            <span class="as">{joint.title}</span>
-          </span>
+          {@render segno(account.label, joint.title)}
 
           <Button
             look="link"
@@ -341,8 +350,7 @@
       <!-- E la riga per aggiungerne: sempre, dove se ne puo' avere piu' d'una. -->
       {#if !mine.length || account.many}
         <div class="account">
-          <span class="mark" aria-hidden="true"></span>
-          <span class="who"><b>{mine.length ? account.more : account.label}</b></span>
+          {@render segno(mine.length ? account.more : account.label, '')}
 
           <!-- stessa misura di «Scollega»: in questo elenco ogni azione è un
                comando scritto piccolo, e due misure diverse sulla stessa
