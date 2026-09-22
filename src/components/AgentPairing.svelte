@@ -47,8 +47,15 @@
     }
   }
 
-  /** Il passo col QR non ha campi: si conferma e basta. */
-  const submit = () => go('submit', answers);
+  /**
+   * Il codice distingue maiuscole e minuscole, e uno incollato si porta
+   * dietro gli spazi: si tolgono quelli ai bordi, non il resto.
+   */
+  const submit = () =>
+    go(
+      'submit',
+      Object.fromEntries(Object.entries(answers).map(([name, value]) => [name, value.trim()])),
+    );
 </script>
 
 {#if closed}
@@ -67,7 +74,10 @@
         <Button look="link" disabled={busy} onclick={() => (step = null)}>Lascia stare</Button>
       </div>
     {:else if step.qr}
-      <p class="say">Inquadra questo codice con l'app <b>Smart Life</b>, poi conferma qui sotto.</p>
+      <p class="say">
+        Inquadra questo codice con l'app <b>Smart Life</b> (o Tuya Smart). Quando l'app ha
+        finito, conferma qui sotto.
+      </p>
       <Qr data={step.qr} label="Codice da inquadrare con Smart Life" />
       <div class="acts">
         <Button look="primary" size="sm" disabled={busy} onclick={submit}>Ho inquadrato</Button>
@@ -75,14 +85,19 @@
       </div>
     {:else if step.fields.length}
       <p class="say">
-        Serve il tuo codice Tuya. Nell'app <b>Smart Life</b>: <i>Io</i> → l'ingranaggio in alto →
-        <i>Account e sicurezza</i>.
+        Serve il tuo codice utente. Nell'app <b>Smart Life</b> (o Tuya Smart):
+        <i>Impostazioni</i> → <i>Account e sicurezza</i>, alla voce <i>User Code</i>.
+      </p>
+      <p class="say careful">
+        Copialo <b>esattamente</b> com'è: maiuscole e minuscole contano.
       </p>
       {#each step.fields as field (field.name)}
         <input
           type="text"
           autocomplete="off"
           spellcheck="false"
+          autocapitalize="off"
+          autocorrect="off"
           placeholder="Il codice dall'app"
           aria-label="Codice Tuya"
           bind:value={
@@ -120,6 +135,11 @@
   .say b { font-weight: 600; color: var(--ink); }
 
   .say i { font-style: normal; font-weight: 560; color: var(--ink); }
+
+  /* La tastiera del telefono mette la maiuscola alla prima lettera da sola, e
+     quel codice diventa sbagliato senza che tu abbia toccato niente. Il campo
+     la disattiva; questa riga lo dice comunque, perché uno lo copia a mano. */
+  .careful { color: var(--ink-3); }
 
   /* quello che Tuya ha da ridire: il motivo arriva intero, non tradotto in
      "qualcosa è andato storto" */
