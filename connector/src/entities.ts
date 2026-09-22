@@ -60,6 +60,10 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
     case 'sensor':
     case 'binary_sensor': {
       const unit = entity.attributes.unit_of_measurement as string | undefined;
+      // Un sensore senza unità e senza tipo non è una misura: è un dettaglio
+      // interno dell'integrazione — «Mansarda Action», che vale 0 e non vuol
+      // dire niente. Su una mappa è rumore.
+      if (!unit && !entity.attributes.device_class) return [];
       return [{ code: 'value', kind: 'sensor', label: 'Valore', ...(unit ? { unit } : {}) }];
     }
 
@@ -102,8 +106,14 @@ export function stateOf(entity: HaEntity): Record<string, DeviceValue> {
   return state;
 }
 
-/** Spento e sconosciuto non sono la stessa cosa: il secondo vuol dire che HA non lo sente. */
-export const isOnline = (entity: HaEntity): boolean => entity.state !== 'unavailable' && entity.state !== 'unknown';
+/**
+ * Irraggiungibile è una cosa sola: `unavailable`, cioè Home Assistant non lo
+ * sente. `unknown` è un'altra — il dispositivo c'è e risponde, ma non ha
+ * ancora detto a che punto è. Una tapparella che nessuno ha mosso da quando
+ * HA si è acceso sta così, e chiamarla irraggiungibile è una bugia: si può
+ * comandare benissimo.
+ */
+export const isOnline = (entity: HaEntity): boolean => entity.state !== 'unavailable';
 
 export function translate(entity: HaEntity): DeviceSnapshot | null {
   if (!DOMAINS.has(domainOf(entity.entity_id))) return null;

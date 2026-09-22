@@ -1,6 +1,6 @@
 import { api } from './api';
 import { toast } from './toast.svelte';
-import type { Capability, DeviceValue, PairingStep } from './types';
+import type { Capability, DeviceValue, LinkedAccount, PairingStep } from './types';
 
 /** Un agente, per come lo vede il sito: il servizio installato in quel posto. */
 export interface Agent {
@@ -189,6 +189,20 @@ class Devices {
     options: { handler?: string; flowId?: string; input?: Record<string, string> } = {},
   ): Promise<PairingStep | null> {
     return api.post<PairingStep | null>(`/agents/${agent.id}/pair`, { action, ...options });
+  }
+
+  /** Cosa è già collegato a quell'agente: Tuya, eWeLink, quello che c'è. */
+  linked(agent: Agent): Promise<LinkedAccount[]> {
+    return api
+      .post<LinkedAccount[] | null>(`/agents/${agent.id}/pair`, { action: 'list' })
+      .then((list) => list ?? []);
+  }
+
+  /** Staccare un account: Home Assistant si porta via anche i suoi dispositivi. */
+  unlink(agent: Agent, entryId: string): Promise<LinkedAccount[]> {
+    return api
+      .post<LinkedAccount[] | null>(`/agents/${agent.id}/pair`, { action: 'unlink', entryId })
+      .then((list) => list ?? []);
   }
 
   /** Il token di prima smette di funzionare all'istante: l'agente va reinstallato. */

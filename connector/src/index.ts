@@ -4,7 +4,7 @@ import { toServiceCall, translate } from './entities.js';
 import { HomeAssistant } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
 import { ensureToken } from './onboarding.js';
-import { cancelPairing, startPairing, submitPairing } from './pairing.js';
+import { cancelPairing, listLinked, startPairing, submitPairing, unlink } from './pairing.js';
 
 const VERSION = '1.0.0';
 /** All'avvio le entità arrivano a centinaia: si aspetta un attimo e si manda una lista sola. */
@@ -110,6 +110,17 @@ async function main(): Promise<void> {
       if (message.action === 'cancel') {
         if (message.flowId) await cancelPairing(config, message.flowId);
         link.send({ type: 'ack', reqId: message.reqId, ok: true });
+        return;
+      }
+
+      if (message.action === 'list') {
+        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await listLinked(config) });
+        return;
+      }
+
+      if (message.action === 'unlink') {
+        await unlink(config, message.entryId ?? '');
+        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await listLinked(config) });
         return;
       }
 

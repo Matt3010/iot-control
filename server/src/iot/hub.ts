@@ -155,8 +155,8 @@ export class Hub {
    */
   pair(
     agentId: string,
-    action: 'start' | 'submit' | 'cancel',
-    options: { handler?: string; flowId?: string; input?: Record<string, string> } = {},
+    action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink',
+    options: { handler?: string; flowId?: string; input?: Record<string, string>; entryId?: string } = {},
   ): Promise<unknown> {
     return this.#ask(agentId, (reqId) => ({ type: 'pair', reqId, action, ...options }));
   }

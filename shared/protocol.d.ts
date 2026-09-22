@@ -68,6 +68,16 @@ export interface PairingStep {
   error?: string;
 }
 
+/** Un account già collegato a quell'agente, e come si fa a staccarlo. */
+export interface LinkedAccount {
+  /** Chi è: `tuya`, `sonoff`. */
+  handler: string;
+  /** Come lo chiama lui: di solito l'utente con cui sei entrato. */
+  title: string;
+  /** Serve a scollegarlo. */
+  entryId: string;
+}
+
 /** Sale l'inventario intero: alla connessione, e ogni volta che cambia. */
 export interface HelloMessage {
   type: 'hello';
@@ -123,11 +133,14 @@ export interface ResyncMessage {
 export interface PairMessage {
   type: 'pair';
   reqId: string;
-  action: 'start' | 'submit' | 'cancel';
+  /** `list` chiede cosa è già collegato, `unlink` stacca. */
+  action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink';
   /** Quale account si sta collegando: `tuya`, e domani altri. */
   handler?: string;
   flowId?: string;
   input?: Record<string, string>;
+  /** Quale collegamento staccare. */
+  entryId?: string;
 }
 
 export type AgentMessage = HelloMessage | DevicesMessage | StateMessage | AckMessage;

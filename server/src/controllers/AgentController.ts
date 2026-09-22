@@ -66,6 +66,7 @@ export class AgentController {
         handler: dto.handler,
         flowId: dto.flowId,
         input: dto.input,
+        entryId: dto.entryId,
       });
       res.json(step);
     } catch (error) {

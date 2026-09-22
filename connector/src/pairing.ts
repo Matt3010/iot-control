@@ -1,4 +1,4 @@
-import type { PairingStep } from '../../shared/protocol.js';
+import type { LinkedAccount, PairingStep } from '../../shared/protocol.js';
 import type { ConnectorConfig } from './config.js';
 import { EXTRAS, install, installed } from './extras.js';
 
@@ -209,6 +209,38 @@ export async function submitPairing(
   input: Record<string, string>,
 ): Promise<PairingStep> {
   return translate(await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body: JSON.stringify(input) }));
+}
+
+/**
+ * Cosa è già collegato. Si guarda solo fra quelli che sappiamo offrire: le
+ * altre voci sono roba di Home Assistant — il sole, i backup, la radio — e
+ * non sono account di nessuno.
+ */
+export async function listLinked(config: ConnectorConfig): Promise<LinkedAccount[]> {
+  const response = await fetch(`${config.haUrl}/api/config/config_entries/entry`, {
+    headers: { authorization: `Bearer ${config.haToken}` },
+  });
+  if (!response.ok) return [];
+
+  const entries = (await response.json()) as { entry_id: string; domain: string; title: string }[];
+  const ours = new Set(['tuya', ...Object.keys(EXTRAS)]);
+
+  return entries
+    .filter((entry) => ours.has(entry.domain))
+    .map((entry) => ({ handler: entry.domain, title: entry.title, entryId: entry.entry_id }));
+}
+
+/**
+ * Staccare un account. Home Assistant si porta via anche i suoi dispositivi,
+ * e l'agente se ne accorge da solo: l'anagrafe cambia, e l'inventario che
+ * sale è già senza.
+ */
+export async function unlink(config: ConnectorConfig, entryId: string): Promise<void> {
+  const response = await fetch(`${config.haUrl}/api/config/config_entries/entry/${entryId}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${config.haToken}` },
+  });
+  if (!response.ok) throw new Error(`non si riesce a scollegare: ${response.status}`);
 }
 
 /** Lasciare a metà una conversazione la lascia aperta in HA: meglio chiuderla. */

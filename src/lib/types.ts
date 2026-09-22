@@ -1,4 +1,4 @@
-export type { Capability, DeviceValue, PairingStep } from '../../shared/protocol';
+export type { Capability, DeviceValue, LinkedAccount, PairingStep } from '../../shared/protocol';
 
 export interface PlaceMap {
   id: string;

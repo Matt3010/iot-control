@@ -5,8 +5,8 @@ const trim = () => Transform(({ value }: { value: unknown }) => (typeof value ==
 
 /** Una battuta della conversazione per collegare un account a un agente. */
 export class PairDto {
-  @IsIn(['start', 'submit', 'cancel'], { message: 'azione sconosciuta' })
-  action!: 'start' | 'submit' | 'cancel';
+  @IsIn(['start', 'submit', 'cancel', 'list', 'unlink'], { message: 'azione sconosciuta' })
+  action!: 'start' | 'submit' | 'cancel' | 'list' | 'unlink';
 
   /** Quale account: `tuya`, e domani altri. */
   @IsOptional()
@@ -23,6 +23,12 @@ export class PairDto {
   /** Quello che la persona ha scritto nei campi del passo prima. */
   @Allow()
   input?: Record<string, string>;
+
+  /** Quale collegamento staccare. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  entryId?: string;
 }
 
 /** Un agente ha solo un nome: tutto il resto lo racconta lui quando si collega. */

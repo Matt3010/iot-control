@@ -1,7 +1,8 @@
 <script lang="ts">
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
-  import type { PairingStep } from '../lib/types';
+  import type { LinkedAccount, PairingStep } from '../lib/types';
+  import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Qr from './Qr.svelte';
 
@@ -35,6 +36,18 @@
 
   const named = (name: string) => LABELS[name] ?? name.replace(/_/g, ' ');
 
+  /** Cosa è già collegato: si chiede una volta, e si riaggiorna quando cambia. */
+  let linked = $state<LinkedAccount[]>([]);
+  const joined = (handler: string) => linked.find((one) => one.handler === handler);
+
+  $effect(() => {
+    if (!agent.online) return;
+    void devices
+      .linked(agent)
+      .then((list) => (linked = list))
+      .catch(() => undefined);
+  });
+
   let step = $state<PairingStep | null>(null);
   let handler = $state<string>('tuya');
   let busy = $state(false);
@@ -61,7 +74,10 @@
 
       step = next;
       answers = {};
-      if (next?.kind === 'done') toast.show(`${which} collegato: i dispositivi stanno arrivando`);
+      if (next?.kind === 'done') {
+        toast.show(`${which} collegato: i dispositivi stanno arrivando`);
+        linked = await devices.linked(agent).catch(() => linked);
+      }
     } catch (error) {
       toast.show((error as Error).message);
     } finally {
@@ -91,21 +107,59 @@
   }
 
   const submit = () => go('submit', cleaned());
+
+  async function detach(account: LinkedAccount, label: string) {
+    busy = true;
+    try {
+      linked = await devices.unlink(agent, account.entryId);
+      toast.show(`${label} scollegato: i suoi dispositivi se ne vanno con lui`);
+    } catch (error) {
+      toast.show((error as Error).message);
+    } finally {
+      busy = false;
+    }
+  }
 </script>
 
 {#if closed}
-  <div class="offer">
-    <span class="lead">Collega un account:</span>
+  <div class="accounts">
     {#each ACCOUNTS as account (account.handler)}
-      <Button
-        look="ghost"
-        size="sm"
-        disabled={!agent.online || busy}
-        title={agent.online ? `Collega ${account.label}` : "L'agente non è collegato"}
-        onclick={() => begin(account.handler)}
-      >
-        {account.label}
-      </Button>
+      {@const joint = joined(account.handler)}
+      <div class="account" class:is-joined={!!joint}>
+        <span class="mark" aria-hidden="true"></span>
+        <span class="who">
+          <b>{account.label}</b>
+          {#if joint}<span class="as">{joint.title}</span>{/if}
+        </span>
+
+        {#if joint}
+          <Button
+            look="link"
+            tone="danger"
+            extra="kill"
+            disabled={busy}
+            onclick={(event: MouseEvent) =>
+              ui.askSure(event.currentTarget as HTMLElement, {
+                title: `Scollegare ${account.label}?`,
+                detail: 'Home Assistant si porta via i suoi dispositivi. Il collegamento si rifà quando vuoi.',
+                verb: 'Scollega',
+                onYes: () => void detach(joint, account.label),
+              })}
+          >
+            Scollega
+          </Button>
+        {:else}
+          <Button
+            look="ghost"
+            size="sm"
+            disabled={!agent.online || busy}
+            title={agent.online ? `Collega ${account.label}` : "L'agente non è collegato"}
+            onclick={() => begin(account.handler)}
+          >
+            Collega
+          </Button>
+        {/if}
+      </div>
     {/each}
   </div>
 {:else if step}
@@ -198,9 +252,50 @@
 {/if}
 
 <style>
-  .offer { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .accounts { display: grid; gap: 4px; }
 
-  .lead { font-size: 11.5px; color: var(--ink-3); margin-right: 2px; }
+  .account {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  /* collegato o no, si vede dal pallino prima ancora di leggere */
+  .mark {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink-3);
+    opacity: 0.5;
+  }
+
+  .account.is-joined .mark { background: #2f9e5e; opacity: 1; }
+
+  .who {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--ink-3);
+    overflow: hidden;
+  }
+
+  .who b { font-weight: 560; color: var(--ink-2); }
+
+  .account.is-joined .who b { color: var(--ink); }
+
+  /* con che utente sei entrato: utile per sapere se è quello giusto */
+  .as {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
 
   .pair {
     display: grid;
