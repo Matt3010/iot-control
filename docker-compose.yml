@@ -13,6 +13,15 @@ services:
       # Dopo il primo accesso le iscrizioni si chiudono; riaprile con:
       # ALLOW_SIGNUP: "true"
       JWT_TTL_DAYS: "30"
+      # Chi possiede l'immagine del connettore su GHCR: finisce dentro il
+      # compose che ogni agente si scarica, quindi se è sbagliato la macchina
+      # di casa prova a tirare giù un'immagine che non esiste.
+      GHCR_OWNER: matt3010
+      # La versione di Home Assistant che va in casa. Fissata apposta: si
+      # cambia quando hai letto cosa si rompe, non da sola.
+      HA_VERSION: "2025.9.1"
+      # L'etichetta grossa che le case seguono: le correzioni sì, le rotture no.
+      CONNECTOR_MAJOR: "1"
     volumes:
       - place-index-data:/data
 
