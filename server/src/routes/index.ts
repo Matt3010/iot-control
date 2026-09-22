@@ -147,4 +147,5 @@ apiRouter.get('/devices', deviceController.list);
 
 /** Un fotogramma da una telecamera: si chiede quando qualcuno sta guardando. */
 apiRouter.get('/devices/:id/frame', deviceController.frame);
+apiRouter.get('/devices/:id/live', deviceController.live);
 apiRouter.post('/devices/:id/command', validateBody(CommandDto), deviceController.command);

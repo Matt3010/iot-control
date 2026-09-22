@@ -7,6 +7,7 @@ import { logManager } from '../managers/LogManager.js';
 import { deviceManager } from '../managers/DeviceManager.js';
 import type { Agent } from '../types.js';
 import { hub } from './hub.js';
+import { liveHub } from './live.js';
 
 /**
  * La versione del contratto, scritta anche nel connettore. Se non combaciano
@@ -16,6 +17,13 @@ import { hub } from './hub.js';
 export const PROTOCOL = 1;
 
 const PATH = '/api/agent/link';
+/**
+ * La porta accanto: da qui passano solo fotogrammi, e solo per una guardata.
+ *
+ * Separata apposta. Sul filo dei comandi un video farebbe la coda davanti
+ * all'accensione di una luce, e quella e' la cosa che non deve mai aspettare.
+ */
+const VIDEO = '/api/agent/live';
 const HEARTBEAT_MS = 30_000;
 
 /**
@@ -114,6 +122,24 @@ function serve(socket: WebSocket, agent: Agent): void {
 }
 
 /**
+ * Il collegamento che porta il video di una sola telecamera, per il tempo in
+ * cui qualcuno la guarda. Il numero di sessione e' nato qui un attimo fa: non
+ * si indovina, e non vale per un'altra.
+ */
+function carry(socket: WebSocket, agent: Agent, session: string): void {
+  if (!liveHub.attach(session, agent.id, socket)) {
+    socket.close(4004, 'sessione sconosciuta');
+    return;
+  }
+
+  socket.on('message', (data, isBinary) => {
+    if (isBinary) liveHub.feed(session, data as Buffer);
+  });
+  socket.on('close', () => liveHub.dropped(session));
+  socket.on('error', () => liveHub.dropped(session));
+}
+
+/**
  * È l'agent che chiama noi, sempre. Qui si apre solo la porta e si controlla
  * chi bussa — il token porta con sé l'id dell'agente, quindi la derivata da
  * confrontare è una sola.
@@ -122,13 +148,20 @@ export function attachAgentLink(server: Server): void {
   const agents = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
-    const { pathname } = new URL(request.url ?? '/', 'http://localhost');
-    if (pathname !== PATH) return refuse(socket, 404, 'Not Found');
+    const { pathname, searchParams } = new URL(request.url ?? '/', 'http://localhost');
+    if (pathname !== PATH && pathname !== VIDEO) return refuse(socket, 404, 'Not Found');
 
     agentManager
       .authenticate(bearer(request.headers.authorization))
       .then((agent) => {
         if (!agent) return refuse(socket, 401, 'Unauthorized');
+
+        if (pathname === VIDEO) {
+          const session = searchParams.get('session') ?? '';
+          agents.handleUpgrade(request, socket, head, (ws) => carry(ws, agent, session));
+          return;
+        }
+
         agents.handleUpgrade(request, socket, head, (ws) => serve(ws, agent));
       })
       .catch(() => refuse(socket, 500, 'Internal Server Error'));

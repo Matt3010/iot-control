@@ -4,6 +4,7 @@ import { toDeviceView } from '../dto/views.js';
 import { badGateway, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
 import { deviceManager } from '../managers/DeviceManager.js';
+import type { Device } from '../types.js';
 
 /** Una telecamera si riconosce da questo: non si comanda, si guarda. */
 const isCamera = (device: { capabilities: { kind: string }[] }): boolean =>
@@ -38,6 +39,17 @@ export class DeviceService {
       if (error instanceof Error && !('status' in error)) throw badGateway(error.message);
       throw error;
     }
+  }
+
+  /**
+   * La telecamera da guardare in diretta.
+   *
+   * Stesse regole del fotogramma singolo: un ospite non sa nemmeno che esista.
+   * Cambia solo che qui non torna un'immagine ma chi la sa mandare.
+   */
+  async watchable(ownerId: string, id: string, guest = false): Promise<Device> {
+    if (guest) throw notFound('dispositivo inesistente');
+    return deviceManager.camera(ownerId, id);
   }
 
   /**

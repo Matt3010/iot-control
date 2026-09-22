@@ -5,15 +5,18 @@ import type {
   HelloMessage,
   PairMessage,
   SnapshotMessage,
+  UnwatchMessage,
+  WatchMessage,
 } from '../../shared/protocol.js';
 import { ConfigError, loadConfig } from './config.js';
 import { toServiceCall, translate } from './entities.js';
 import { HomeAssistant } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
+import { blind, look } from './live.js';
 import { ensureToken } from './onboarding.js';
 import { cancelPairing, listLinked, startPairing, submitPairing, titled, unlink } from './pairing.js';
 
-const VERSION = '1.5.9';
+const VERSION = '1.6.0';
 /** All'avvio le entità arrivano a centinaia: si aspetta un attimo e si manda una lista sola. */
 const COALESCE_MS = 500;
 
@@ -173,6 +176,8 @@ async function main(): Promise<void> {
     if (message.type === 'pair') void pair(message);
     else if (message.type === 'command') void obey(message);
     else if (message.type === 'snapshot') void watch(message);
+    else if (message.type === 'watch') void guarda(message);
+    else if (message.type === 'unwatch') void smetti(message);
   };
 
   /**
@@ -200,6 +205,32 @@ async function main(): Promise<void> {
       console.warn(`fotogramma da ${ask.externalId}: ${(error as Error).message}`);
       fail((error as Error).message);
     }
+  };
+
+  /**
+   * Qualcuno ha aperto una telecamera: si apre il flusso e si comincia a
+   * spingere. La risposta qui e' solo «ho capito» — i fotogrammi vanno per
+   * la loro strada.
+   */
+  const guarda = async (ask: WatchMessage): Promise<void> => {
+    const fail = (error: string): void => void link.send({ type: 'ack', reqId: ask.reqId, ok: false, error });
+
+    if (!devices.has(ask.externalId)) return fail('telecamera sconosciuta per questo agente');
+    if (!ha.connected) return fail('il servizio in casa non è raggiungibile');
+
+    try {
+      await look(config, ask.session, ask.externalId, ask.fps);
+      link.send({ type: 'ack', reqId: ask.reqId, ok: true });
+    } catch (error) {
+      console.warn(`diretta di ${ask.externalId}: ${(error as Error).message}`);
+      fail((error as Error).message);
+    }
+  };
+
+  /** Non guarda piu' nessuno: si chiude, e la macchina torna a respirare. */
+  const smetti = async (ask: UnwatchMessage): Promise<void> => {
+    blind(ask.session);
+    link.send({ type: 'ack', reqId: ask.reqId, ok: true });
   };
 
   const obey = async (command: CommandMessage): Promise<void> => {

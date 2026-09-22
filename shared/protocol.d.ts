@@ -143,6 +143,31 @@ export interface SnapshotMessage {
   externalId: string;
 }
 
+/**
+ * Qualcuno sta guardando: apri il flusso e comincia a spingere fotogrammi.
+ *
+ * I fotogrammi non tornano da qui. Questo filo porta i comandi, e un comando
+ * che aspetta il suo turno dietro a mezz'ora di video sarebbe una tenda che
+ * non si apre quando la premi. Il video si presenta a parte, con il numero di
+ * sessione, su un collegamento suo che nasce e muore con la guardata.
+ */
+export interface WatchMessage {
+  type: 'watch';
+  reqId: string;
+  externalId: string;
+  /** Il numero da dire presentandosi con il video. */
+  session: string;
+  /** Il tetto: piu' di cosi' non se ne mandano, anche se la telecamera ne da' di piu'. */
+  fps: number;
+}
+
+/** Non guarda piu' nessuno: chiudi tutto. */
+export interface UnwatchMessage {
+  type: 'unwatch';
+  reqId: string;
+  session: string;
+}
+
 /** Quello che torna da una `snapshot`. */
 export interface Snapshot {
   /** Il JPEG, in base64. */
@@ -183,4 +208,10 @@ export interface PairMessage {
 }
 
 export type AgentMessage = HelloMessage | DevicesMessage | StateMessage | AckMessage;
-export type BackendMessage = CommandMessage | ResyncMessage | PairMessage | SnapshotMessage;
+export type BackendMessage =
+  | CommandMessage
+  | ResyncMessage
+  | PairMessage
+  | SnapshotMessage
+  | WatchMessage
+  | UnwatchMessage;

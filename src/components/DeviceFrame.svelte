@@ -6,22 +6,33 @@
   /**
    * Quello che si vede da una telecamera.
    *
-   * Non è un video: è una fotografia che si rifà ogni pochi secondi. Ogni
-   * fotogramma è una domanda che attraversa il filo fino a casa, e là dentro
-   * Home Assistant deve aspettare un fotogramma chiave prima di poter
-   * disegnare qualcosa — sui registratori ne passa uno ogni pochi secondi.
-   * Chiederne sessanta al secondo sarebbe chiederne cinquantacinque che non
-   * esistono.
+   * Mentre la guardi è una diretta: il flusso resta aperto a casa e i
+   * fotogrammi arrivano da soli, dentro una risposta sola che il browser sa
+   * già disegnare — niente lettori, niente codec.
    *
-   * E si chiede solo mentre qualcuno guarda davvero: se la card è fuori
-   * schermo o la scheda del browser è in secondo piano, non parte niente.
+   * Se la diretta non parte si ripiega sulle fotografie, una ogni cinque
+   * secondi: è più lenta, ma è la strada che funziona sempre. Meglio un
+   * riquadro che si aggiorna piano di uno che resta vuoto.
+   *
+   * In tutti e due i casi si chiede solo mentre qualcuno guarda davvero: card
+   * fuori schermo o scheda in secondo piano, non parte niente. Un flusso
+   * aperto per nessuno costa banda a casa di qualcuno e un cuore di macchina.
    */
   let { device }: { device: Device } = $props();
 
-  /** Ogni quanto si rifà, mentre lo stai guardando. */
+  /** Ogni quanto si rifà la fotografia, quando si è ripiegati su quelle. */
   const OGNI_MS = 5000;
 
+  /**
+   * Quanto si dà alla diretta per farsi vedere. Il primo fotogramma costa:
+   * il flusso va aperto e bisogna aspettare un fotogramma chiave, che su un
+   * registratore passa ogni pochi secondi. Ma se non arriva nemmeno dopo
+   * questo, è meglio una fotografia lenta di un riquadro scuro per sempre.
+   */
+  const ASPETTA_MS = 12_000;
+
   let box = $state<HTMLDivElement | undefined>();
+  let shown = $state<HTMLImageElement | undefined>();
   let src = $state('');
   let at = $state<Date | null>(null);
   /**
@@ -42,15 +53,54 @@
   let awake = $state(true);
   const seen = $derived(onScreen && awake);
 
+  /** La diretta è aperta adesso. */
+  let live = $state(false);
+  /** Vero appena la diretta ha disegnato qualcosa: prima è solo una promessa. */
+  let flowing = $state(false);
+  const liveUrl = $derived(`/api/devices/${device.id}/live`);
+
   /**
-   * Il fotogramma si chiede a mano, non lasciando fare al browser.
+   * Smettendo di guardare, l'ultimo fotogramma della diretta diventa la
+   * fotografia ferma.
+   *
+   * Non e' un vezzo: togliere l'immagine dalla pagina non basta a far
+   * chiudere la diretta — il browser si tiene la presa aperta chissa' quanto,
+   * e di la' resta un flusso acceso per nessuno. Cambiarle indirizzo invece
+   * la chiude subito, e tanto vale metterci dentro quello che si stava
+   * guardando: resta a schermo, e non costa una richiesta.
+   */
+  function freeze(): void {
+    const img = shown;
+    if (!img?.naturalWidth) return;
+
+    try {
+      const tela = document.createElement('canvas');
+      tela.width = img.naturalWidth;
+      tela.height = img.naturalHeight;
+      tela.getContext('2d')?.drawImage(img, 0, 0);
+
+      const older = src;
+      src = tela.toDataURL('image/jpeg', 0.7);
+      if (older.startsWith('blob:')) URL.revokeObjectURL(older);
+      at = new Date();
+      lastMs = Date.now();
+    } catch {
+      // se non si riesce, pazienza: resta l'ultima fotografia di prima
+    }
+  }
+  /**
+   * La diretta non ce l'ha fatta, e per questa telecamera non si ritenta:
+   * riprovarla ogni volta che guardi vorrebbe dire aspettare ogni volta lo
+   * stesso mezzo minuto per sapere la stessa cosa. Ricaricando si riparte.
+   */
+  let noLive = $state(false);
+
+  /**
+   * La fotografia si chiede a mano, non lasciando fare al browser.
    *
    * Con un `src` che cambia, quando qualcosa non va resta un'immagine rotta a
    * schermo e il motivo non arriva mai: il server lo scrive nel corpo della
-   * risposta, e di quel corpo un <img> non sa che farsene. «Non è arrivata»
-   * era tutto quello che si poteva dire, e non è niente. Chiedendola qui, il
-   * motivo si legge e si scrive — e l'ultimo fotogramma buono resta al suo
-   * posto invece di essere sostituito da un quadrato vuoto.
+   * risposta, e di quel corpo un <img> non sa che farsene.
    */
   async function refresh(): Promise<void> {
     if (loading) return;
@@ -103,15 +153,46 @@
     };
   });
 
+  /**
+   * La diretta, finché la guardi. Smettendo, l'indirizzo sparisce: è quello
+   * che chiude la risposta, e chiudere la risposta è quello che fa spegnere
+   * il flusso a casa.
+   */
   $effect(() => {
-    if (!seen) return;
+    if (!seen || noLive) {
+      live = false;
+      return;
+    }
 
-    // Tornando a guardarla se ne chiede uno subito, se l'ultimo è vecchio:
+    live = true;
+    flowing = false;
+
+    // Una diretta che non comincia non dà nessun segno: non fallisce, non
+    // arriva, sta. L'unico modo di accorgersene è guardare l'orologio.
+    const pazienza = setTimeout(() => {
+      if (flowing) return;
+      noLive = true;
+      live = false;
+    }, ASPETTA_MS);
+
+    return () => {
+      clearTimeout(pazienza);
+      // prima si ferma quello che si vede, poi si lascia la presa
+      freeze();
+      live = false;
+    };
+  });
+
+  /** Le fotografie, ma solo quando la diretta non c'è. */
+  $effect(() => {
+    if (!seen || live) return;
+
+    // Tornando a guardarla se ne chiede una subito, se l'ultima è vecchia:
     // restare cinque secondi davanti a un'immagine di un minuto fa è peggio
     // che non averla, perché sembra adesso e non lo è.
-    if (Date.now() - lastMs >= OGNI_MS) refresh();
+    if (Date.now() - lastMs >= OGNI_MS) void refresh();
 
-    const battito = setInterval(refresh, OGNI_MS);
+    const battito = setInterval(() => void refresh(), OGNI_MS);
     return () => clearInterval(battito);
   });
 
@@ -123,10 +204,30 @@
 <div class="cam" bind:this={box} class:is-waiting={loading && !at}>
   <!-- O l'immagine, o il motivo per cui non c'è: mai tutti e due, che era il
        modo di occupare il doppio dello spazio per dire mezza cosa. -->
-  {#if src}
-    <img {src} alt={`Ultima immagine da ${device.name}`} />
+  {#if live || src}
+    <!-- Un elemento solo, che cambia indirizzo: e' cambiare indirizzo a
+         chiudere la diretta, mentre toglierlo di mezzo la lascia aperta. -->
+    <img
+      bind:this={shown}
+      src={live ? liveUrl : src}
+      alt={live ? `Diretta da ${device.name}` : `Ultima immagine da ${device.name}`}
+      onload={() => {
+        if (!live) return;
+        flowing = true;
+        failing = '';
+        at = new Date();
+        lastMs = Date.now();
+      }}
+      onerror={() => {
+        if (!live) return;
+        // La diretta è caduta o non è mai partita: si torna alle fotografie,
+        // che è peggio ma è qualcosa.
+        noLive = true;
+        live = false;
+      }}
+    />
   {:else}
-    <span class="waiting">{failing || 'Un momento: sto chiedendo un fotogramma…'}</span>
+    <span class="waiting">{failing || 'Un momento: sto aprendo…'}</span>
   {/if}
 
   <div class="foot">
@@ -135,11 +236,16 @@
          frase due volte. Con un'immagine vecchia davanti, invece, qui è
          l'unico posto dove dirlo. -->
     <span class="when">
-      {#if failing && at}{failing}{:else if at}delle {quando}{:else}&nbsp;{/if}
+      {#if live && at}<i class="now"></i> in diretta
+      {:else if failing && at}{failing}
+      {:else if at}delle {quando}
+      {:else}&nbsp;{/if}
     </span>
-    <Button look="icon" size="sm" title="Aggiorna adesso" disabled={loading} onclick={refresh}>
-      <Icon name="refresh" />
-    </Button>
+    {#if !live}
+      <Button look="icon" size="sm" title="Aggiorna adesso" disabled={loading} onclick={refresh}>
+        <Icon name="refresh" />
+      </Button>
+    {/if}
   </div>
 </div>
 
@@ -198,5 +304,17 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* il pallino della diretta: piccolo, rosso, e non lampeggia — una cosa che
+     lampeggia in un angolo la si guarda invece di guardare l'immagine */
+  .now {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 3px;
+    border-radius: 50%;
+    background: var(--danger);
+    vertical-align: middle;
   }
 </style>

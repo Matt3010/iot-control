@@ -81,11 +81,16 @@ export class DeviceManager {
    * ogni aggiornamento coprirebbe in un'ora tutto il resto della giornata.
    */
   async frame(ownerId: string, id: string): Promise<Buffer> {
+    const device = await this.camera(ownerId, id);
+    return hub.snapshot(device.agentId, device.externalId);
+  }
+
+  /** Una telecamera, e non un'altra cosa: la domanda si fa in un posto solo. */
+  async camera(ownerId: string, id: string): Promise<Device> {
     const device = await this.find(ownerId, id);
     const guarda = device.capabilities.find((entry) => entry.kind === 'image');
     if (!guarda) throw badRequest('questo dispositivo non è una telecamera');
-
-    return hub.snapshot(device.agentId, device.externalId);
+    return device;
   }
 
   /** Premere un interruttore: si aspetta che l'agente dica di sì. */

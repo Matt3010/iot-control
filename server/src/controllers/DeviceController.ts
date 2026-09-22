@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { isGuest, ownerOf, whoIs } from '../auth/owner.js';
 import type { CommandDto } from '../dto/device.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
+import { liveHub } from '../iot/live.js';
 import { deviceService } from '../services/DeviceService.js';
 
 export class DeviceController {
@@ -24,6 +25,20 @@ export class DeviceController {
       res.set('content-type', 'image/jpeg');
       res.set('cache-control', 'no-store, max-age=0');
       res.send(jpeg);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * La diretta. Non risponde e finisce: resta aperta, e i fotogrammi ci
+   * cadono dentro finché qualcuno guarda. Chi chiude la pagina chiude la
+   * risposta, e l'ultimo che esce fa spegnere il flusso a casa.
+   */
+  live = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const device = await deviceService.watchable(ownerOf(req), req.params.id as string, isGuest(req));
+      liveHub.join(device.ownerId, device.agentId, device.externalId, res);
     } catch (error) {
       next(error);
     }

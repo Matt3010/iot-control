@@ -235,6 +235,22 @@ export class Hub {
   }
 
   /**
+   * «Qualcuno sta guardando»: apri il flusso e comincia a spingere.
+   *
+   * La risposta che si aspetta qui e' solo un «ho capito»: i fotogrammi
+   * arrivano da un'altra parte, e se arrivassero da questo filo un comando
+   * resterebbe in coda dietro di loro.
+   */
+  async watchCamera(agentId: string, externalId: string, session: string, fps: number): Promise<void> {
+    await this.#ask(agentId, (reqId) => ({ type: 'watch', reqId, externalId, session, fps }));
+  }
+
+  /** Non guarda piu' nessuno. */
+  async unwatchCamera(agentId: string, session: string): Promise<void> {
+    await this.#ask(agentId, (reqId) => ({ type: 'unwatch', reqId, session }));
+  }
+
+  /**
    * Una battuta della conversazione per collegare un account. Torna il passo
    * successivo: cosa chiedere, e il QR da disegnare quando c'è.
    */
