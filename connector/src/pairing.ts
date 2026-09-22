@@ -132,7 +132,7 @@ async function ask(config: ConnectorConfig, path: string, options: RequestInit =
     if (!flow.message) {
       flow.message =
         response.status === 400
-          ? 'quello che hai scritto non è stato accettato: ricontrolla l’indirizzo'
+          ? 'quello che hai scritto non è stato accettato: ricontrolla i dati inseriti'
           : `non si riesce a collegarlo (${response.status})`;
     }
   }

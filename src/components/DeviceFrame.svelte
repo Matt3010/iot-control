@@ -110,7 +110,7 @@
       const response = await fetch(`/api/devices/${device.id}/frame`, { cache: 'no-store' });
       if (!response.ok) {
         const said = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
-        failing = said?.error || (device.online ? 'Non è arrivata' : 'Non risponde');
+        failing = said?.error || (device.online ? 'L’immagine non è arrivata' : 'La telecamera non risponde');
         return;
       }
 
@@ -122,7 +122,7 @@
       at = new Date();
       lastMs = Date.now();
     } catch {
-      failing = 'Non è arrivata';
+      failing = 'L’immagine non è arrivata';
     } finally {
       loading = false;
     }
@@ -227,7 +227,7 @@
       }}
     />
   {:else}
-    <span class="waiting">{failing || 'Un momento: sto aprendo…'}</span>
+    <span class="waiting">{failing || 'Un momento: sto aprendo la diretta…'}</span>
   {/if}
 
   <div class="foot">

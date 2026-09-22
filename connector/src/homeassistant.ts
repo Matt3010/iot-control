@@ -278,7 +278,12 @@ export class HomeAssistant {
     // Nemmeno cosi': al giro dopo si riprova anche quella di casa, che magari
     // nel frattempo e' tornata a funzionare.
     dritte.delete(entityId);
-    throw new Error(said ? `la telecamera non ha risposto (${said})` : 'la telecamera non ha mandato niente');
+
+    // Il numero serve a chi cerca il guasto, e sta nel registro di questa
+    // macchina: a schermo sarebbe una cifra in mezzo a una frase, che non
+    // dice niente a chi la legge e non aiuta a fare niente.
+    if (said) console.warn(`fotogramma da ${entityId}: risposta ${said}`);
+    throw new Error(said ? 'la telecamera non ha risposto' : 'la telecamera non ha mandato niente');
   }
 
   async callService(domain: string, service: string, entityId: string, data: Record<string, unknown> = {}): Promise<void> {

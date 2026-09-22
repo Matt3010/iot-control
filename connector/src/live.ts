@@ -98,14 +98,14 @@ export async function look(
   if (eyes.has(session)) return;
 
   const raw = await sourceOf(entityId);
-  if (!raw) throw new Error('di questa telecamera non si sa da dove guarda');
+  if (!raw) throw new Error('non si riesce a sapere l’indirizzo di questa telecamera');
 
   const name = `vivo-${entityId}`;
   const set = await fetch(`${STREAMS}?name=${encodeURIComponent(name)}&src=${encodeURIComponent(`ffmpeg:${raw}#video=mjpeg`)}`, {
     method: 'PUT',
     signal: AbortSignal.timeout(5000),
   }).catch(() => undefined);
-  if (!set?.ok) throw new Error('il flusso non si apre');
+  if (!set?.ok) throw new Error('non si riesce ad aprire il flusso della telecamera');
 
   const halt = new AbortController();
   const socket = new WebSocket(videoUrl(config, session), {

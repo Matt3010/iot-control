@@ -16,7 +16,7 @@ import { blind, look } from './live.js';
 import { ensureToken } from './onboarding.js';
 import { cancelPairing, listLinked, startPairing, submitPairing, titled, unlink } from './pairing.js';
 
-const VERSION = '1.6.0';
+const VERSION = '1.6.1';
 /** All'avvio le entità arrivano a centinaia: si aspetta un attimo e si manda una lista sola. */
 const COALESCE_MS = 500;
 

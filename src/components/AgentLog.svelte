@@ -45,11 +45,11 @@
        * soggetto se lo fa cercare a chi legge.
        */
       case 'up':
-        return { what: 'si è collegato qui', who: agent.name };
+        return { what: 'si è collegato', who: agent.name };
       case 'down':
         return { what: 'si è scollegato', who: agent.name };
       case 'inventory':
-        return { what: `vede qualcosa di diverso: ${entry.detail}`, who: agent.name };
+        return { what: `ha ${entry.detail}`, who: agent.name };
       case 'device-up':
         return { what: 'ha ripreso a rispondere', who: chi };
       case 'device-down':

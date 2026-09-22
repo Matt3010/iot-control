@@ -8,6 +8,16 @@ import { logManager } from './LogManager.js';
 import { says } from './says.js';
 import type { Device } from '../types.js';
 
+/**
+ * «1 dispositivo in più», «2 dispositivi in meno».
+ *
+ * Nel registro ci finiva «1 in più», e uno in più di cosa lo doveva indovinare
+ * chi leggeva. Una riga di registro si legge di sfuggita, magari la mattina
+ * dopo: deve dire per intero di cosa parla.
+ */
+const conta = (quanti: number, come: string): string =>
+  `${quanti} ${quanti === 1 ? 'dispositivo' : 'dispositivi'} ${come}`;
+
 export class DeviceManager {
   list(ownerId: string): Promise<Device[]> {
     return store.transaction((tx) => new DeviceRepository(tx).findAllOf(ownerId));
@@ -60,8 +70,8 @@ export class DeviceManager {
         agentId,
         kind: 'inventory',
         detail: [
-          devices.length > before ? `${devices.length - before} in più` : '',
-          gone.length ? `${gone.length} spariti` : '',
+          devices.length > before ? conta(devices.length - before, 'in più') : '',
+          gone.length ? conta(gone.length, 'in meno') : '',
         ]
           .filter(Boolean)
           .join(', '),

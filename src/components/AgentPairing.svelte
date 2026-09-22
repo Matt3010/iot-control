@@ -68,12 +68,12 @@
   /** Come si chiamano i campi di HA, detto in italiano. */
   const LABELS: Record<string, string> = {
     confirmed_ok: 'L’immagine è quella giusta',
-    still_image_url: 'Indirizzo di un fermo immagine',
+    still_image_url: 'Indirizzo di un’immagine fissa',
     stream_source: 'Indirizzo del flusso',
-    rtsp_transport: 'Come raggiungerlo',
+    rtsp_transport: 'Come raggiungere il flusso',
     authentication: 'Tipo di autenticazione',
     framerate: 'Fotogrammi al secondo',
-    verify_ssl: 'Controlla il certificato',
+    verify_ssl: 'Verifica il certificato',
     limit_refetch_to_url_change: "Rileggi solo se cambia l'indirizzo",
     use_wallclock_as_timestamps: "Usa l'ora del computer",
     content_type: 'Tipo di contenuto',
@@ -424,7 +424,7 @@
           Questo è quello che si vede adesso da quella telecamera. Se è la
           ripresa giusta, conferma qui sotto.
         </p>
-        <img class="shot" src={`data:image/jpeg;base64,${step.preview}`} alt="Prova della telecamera" />
+        <img class="shot" src={`data:image/jpeg;base64,${step.preview}`} alt="Anteprima della telecamera" />
       {/if}
 
       {#each step.fields as field (field.name)}
