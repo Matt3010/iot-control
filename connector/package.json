@@ -1,6 +1,6 @@
 {
   "name": "place-index-connector",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "private": true,
   "type": "module",
   "description": "Il servizio che sta in casa: traduce Home Assistant nel protocollo del backend",

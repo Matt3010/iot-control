@@ -149,7 +149,7 @@ export class HomeAssistant {
       signal: AbortSignal.timeout(SNAPSHOT_TIMEOUT_MS),
     });
 
-    if (!response.ok) throw new Error(`home assistant dice ${response.status}`);
+    if (!response.ok) throw new Error(`la telecamera non ha risposto (${response.status})`);
     const bytes = Buffer.from(await response.arrayBuffer());
     if (!bytes.length) throw new Error('è tornata un’immagine vuota');
     return bytes;
@@ -175,7 +175,9 @@ export class HomeAssistant {
     socket.on('close', () => {
       if (this.#socket === socket) this.#socket = null;
       // Le chiamate in volo non torneranno mai: meglio dirlo che lasciarle appese.
-      for (const pending of this.#pending.values()) pending.reject(new Error('home assistant si è scollegato'));
+      for (const pending of this.#pending.values()) {
+        pending.reject(new Error('il servizio in casa si è scollegato'));
+      }
       this.#pending.clear();
       this.onLost();
       this.#schedule();
@@ -212,7 +214,7 @@ export class HomeAssistant {
         if (!pending) return;
         this.#pending.delete(message.id as number);
         if (message.success) pending.resolve(message.result);
-        else pending.reject(new Error(((message.error as { message?: string })?.message) ?? 'rifiutato da home assistant'));
+        else pending.reject(new Error(((message.error as { message?: string })?.message) ?? 'rifiutato dal servizio in casa'));
         return;
       }
 
@@ -246,13 +248,13 @@ export class HomeAssistant {
   }
 
   #call(payload: Record<string, unknown>): Promise<unknown> {
-    if (!this.connected) return Promise.reject(new Error('home assistant non è collegato'));
+    if (!this.connected) return Promise.reject(new Error('il servizio in casa non è raggiungibile'));
 
     const id = this.#nextId++;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#pending.delete(id);
-        reject(new Error('home assistant non ha risposto'));
+        reject(new Error('il servizio in casa non ha risposto'));
       }, CALL_TIMEOUT_MS);
       timer.unref?.();
 

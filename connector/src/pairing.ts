@@ -42,13 +42,27 @@ async function ask(config: ConnectorConfig, path: string, options: RequestInit =
   // Un 400 è HA che dice "così non va": il corpo spiega, e vale la pena leggerlo.
   const text = await response.text();
   if (!response.ok && !text.startsWith('{')) {
-    throw new Error(`home assistant: ${response.status} ${text.slice(0, 120)}`);
+    console.warn(`configurazione ${path}: ${response.status} — ${text.slice(0, 300)}`);
+    throw new Error(`non si riesce a collegarlo (${response.status})`);
   }
 
   const flow = JSON.parse(text) as HaFlow;
-  // Un rifiuto senza spiegazione diventerebbe «la richiesta e' scaduta», che
-  // e' un'ipotesi. Il numero non spiega tutto, ma non inventa niente.
-  if (!response.ok && !flow.message) flow.message = `home assistant ha risposto ${response.status}`;
+  if (!response.ok) {
+    // Per intero nel registro di questa macchina: e' l'unico posto dove si
+    // puo' guardare davvero cos'e' andato storto, e l'unico dove il nome di
+    // chi l'ha detto non da' fastidio a nessuno.
+    console.warn(`configurazione ${path}: ${response.status} — ${text.slice(0, 300)}`);
+
+    // A chi guarda si dice cosa fare, non chi si e' lamentato. Un rifiuto
+    // senza spiegazione diventerebbe «la richiesta e' scaduta», che e'
+    // un'ipotesi; il numero da solo non aiuta nessuno.
+    if (!flow.message) {
+      flow.message =
+        response.status === 400
+          ? 'quello che hai scritto non è stato accettato: ricontrolla l’indirizzo'
+          : `non si riesce a collegarlo (${response.status})`;
+    }
+  }
   return flow;
 }
 
@@ -205,7 +219,7 @@ export async function startPairing(config: ConnectorConfig, handler: string): Pr
       flowId: '',
       kind: 'busy',
       fields: [],
-      note: `Sto aggiungendo il supporto ${extra.label} a Home Assistant, che si sta riavviando. Ci vuole un minuto.`,
+      note: `Sto aggiungendo il supporto ${extra.label} su quella macchina, che si sta riavviando. Ci vuole un minuto.`,
     };
   }
 

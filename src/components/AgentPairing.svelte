@@ -26,17 +26,24 @@
    * quella macchina e fa riavviare Home Assistant, e chi preme deve saperlo
    * prima, non dopo.
    */
+  /*
+   * Nei testi non si nomina mai cosa gira dentro l'agente. Chi guarda questa
+   * pagina non deve sapere che la' sotto c'e' Home Assistant: per lui c'e'
+   * l'agente, che sta in un posto e collega le cose. Anche gli errori che
+   * salgono da laggiu' parlano cosi' — il nome vero resta nel registro della
+   * macchina, che e' dove serve.
+   */
   const ACCOUNTS = [
     {
       handler: 'tuya',
       label: 'Tuya',
-      warns: "Home Assistant ti chiederà il codice che sta nell'app Smart Life, e poi un QR da inquadrare.",
+      warns: "Ti verrà chiesto il codice che sta nell'app Smart Life, e poi un QR da inquadrare.",
     },
     {
       handler: 'sonoff',
       label: 'eWeLink',
       warns:
-        "La prima volta l'agente aggiunge a Home Assistant l'integrazione eWeLink e lo riavvia: ci vuole un minuto. Poi ti chiederà le credenziali dell'app.",
+        "La prima volta l'agente aggiunge il supporto eWeLink e si riavvia: ci vuole un minuto. Poi ti chiederà le credenziali dell'app.",
     },
     {
       handler: 'generic',
@@ -282,7 +289,7 @@
             onclick={(event: MouseEvent) =>
               ui.askSure(event.currentTarget as HTMLElement, {
                 title: `Scollegare ${account.label}?`,
-                detail: 'Home Assistant si porta via i suoi dispositivi. Il collegamento si rifà quando vuoi.',
+                detail: "L'agente si porta via i suoi dispositivi. Il collegamento si rifà quando vuoi.",
                 verb: 'Scollega',
                 onYes: () => void detach(joint, account.label),
               })}

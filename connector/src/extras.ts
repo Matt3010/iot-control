@@ -113,6 +113,6 @@ export async function install(config: ConnectorConfig, extra: Extra): Promise<vo
     headers: { authorization: `Bearer ${config.haToken}`, 'content-type': 'application/json' },
     body: '{}',
   });
-  if (!response.ok) throw new Error(`home assistant non si riavvia: ${response.status}`);
+  if (!response.ok) throw new Error(`il servizio in casa non si riavvia: ${response.status}`);
   console.log('home assistant si sta riavviando');
 }
