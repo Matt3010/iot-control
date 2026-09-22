@@ -67,7 +67,7 @@ const FRAME = 'http://127.0.0.1:11984/api/frame.jpeg';
 const dritte = new Set<string>();
 
 /** L'indirizzo vero di una telecamera, come lo conosce chi smista i flussi. */
-async function sourceOf(entityId: string): Promise<string | undefined> {
+export async function sourceOf(entityId: string): Promise<string | undefined> {
   const known = await fetch(`${STREAMS}?src=${encodeURIComponent(entityId)}`, {
     signal: AbortSignal.timeout(5000),
   }).catch(() => undefined);
@@ -182,6 +182,25 @@ export class HomeAssistant {
 
   async states(): Promise<HaEntity[]> {
     return (await this.#call({ type: 'get_states' })) as HaEntity[];
+  }
+
+  /**
+   * Da quale collegamento viene ogni entità.
+   *
+   * Serve a dare un nome alle telecamere: Home Assistant le chiama tutte
+   * come il registratore da cui vengono, e tre righe uguali non si
+   * distinguono. Sapendo quale entità e' nata da quale collegamento si puo'
+   * andare a chiedere da dove guarda davvero.
+   */
+  async entriesOf(): Promise<Map<string, string>> {
+    const entities = (await this.#call({ type: 'config/entity_registry/list' })) as {
+      entity_id: string;
+      config_entry_id: string | null;
+    }[];
+
+    const born = new Map<string, string>();
+    for (const one of entities) if (one.config_entry_id) born.set(one.entity_id, one.config_entry_id);
+    return born;
   }
 
   /**

@@ -38,12 +38,18 @@
   function says(entry: LogEntry): { what: string; who: string } {
     const chi = entry.subject ?? '';
     switch (entry.kind) {
+      /*
+       * Queste tre parlano dell'agente stesso, e senza il suo nome davanti
+       * sembravano parlare di una persona: «si è collegato» chi? In un
+       * registro dove ogni altra riga comincia con un nome, una riga senza
+       * soggetto se lo fa cercare a chi legge.
+       */
       case 'up':
-        return { what: 'Si è collegato', who: '' };
+        return { what: 'si è collegato qui', who: agent.name };
       case 'down':
-        return { what: 'Si è scollegato', who: '' };
+        return { what: 'si è scollegato', who: agent.name };
       case 'inventory':
-        return { what: `Quello che vede è cambiato: ${entry.detail}`, who: '' };
+        return { what: `vede qualcosa di diverso: ${entry.detail}`, who: agent.name };
       case 'device-up':
         return { what: 'ha ripreso a rispondere', who: chi };
       case 'device-down':

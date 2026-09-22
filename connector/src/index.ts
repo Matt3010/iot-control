@@ -11,9 +11,9 @@ import { toServiceCall, translate } from './entities.js';
 import { HomeAssistant } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
 import { ensureToken } from './onboarding.js';
-import { cancelPairing, listLinked, startPairing, submitPairing, unlink } from './pairing.js';
+import { cancelPairing, listLinked, startPairing, submitPairing, titled, unlink } from './pairing.js';
 
-const VERSION = '1.5.8';
+const VERSION = '1.5.9';
 /** All'avvio le entità arrivano a centinaia: si aspetta un attimo e si manda una lista sola. */
 const COALESCE_MS = 500;
 
@@ -143,13 +143,13 @@ async function main(): Promise<void> {
       }
 
       if (message.action === 'list') {
-        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await listLinked(config) });
+        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await titled(await listLinked(config), await born()) });
         return;
       }
 
       if (message.action === 'unlink') {
         await unlink(config, message.entryId ?? '');
-        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await listLinked(config) });
+        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await titled(await listLinked(config), await born()) });
         return;
       }
 
@@ -163,6 +163,10 @@ async function main(): Promise<void> {
       link.send({ type: 'ack', reqId: message.reqId, ok: false, error: (error as Error).message });
     }
   };
+
+  /** Da quale collegamento viene ogni entità, se si riesce a saperlo. */
+  const born = (): Promise<Map<string, string>> =>
+    ha.entriesOf().catch(() => new Map<string, string>());
 
   /** Quello che scende dal filo: un comando, o una battuta di accoppiamento. */
   const listen = (message: BackendMessage): void => {

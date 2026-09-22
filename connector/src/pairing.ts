@@ -1,7 +1,7 @@
 import type { LinkedAccount, PairingStep } from '../../shared/protocol.js';
 import type { ConnectorConfig } from './config.js';
 import { EXTRAS, install, installed } from './extras.js';
-import { forget, frameFrom } from './homeassistant.js';
+import { forget, frameFrom, sourceOf } from './homeassistant.js';
 
 /**
  * Collegare un account a Home Assistant, pilotato da fuori.
@@ -440,6 +440,44 @@ export async function listLinked(config: ConnectorConfig): Promise<LinkedAccount
   return entries
     .filter((entry) => ours.has(entry.domain))
     .map((entry) => ({ handler: entry.domain, title: entry.title, entryId: entry.entry_id }));
+}
+
+/**
+ * Alle telecamere Home Assistant da' tutte lo stesso nome.
+ *
+ * Le chiama come il registratore da cui vengono — e vengono tutte dallo
+ * stesso — quindi in elenco diventano tre righe identiche, e staccare
+ * «quella giusta» e' un indovinello. Quello che le distingue e' il canale,
+ * che poi e' esattamente quello che la persona ha scritto per collegarle:
+ * si rimette li' davanti.
+ */
+export async function titled(
+  list: LinkedAccount[],
+  born: Map<string, string>,
+): Promise<LinkedAccount[]> {
+  if (!list.some((one) => one.handler === 'generic')) return list;
+
+  const eyes = new Map<string, string>();
+  for (const [entityId, entryId] of born) {
+    if (entityId.startsWith('camera.') && !eyes.has(entryId)) eyes.set(entryId, entityId);
+  }
+
+  return Promise.all(
+    list.map(async (one) => {
+      if (one.handler !== 'generic') return one;
+
+      const eye = eyes.get(one.entryId);
+      const raw = eye ? await sourceOf(eye) : undefined;
+      if (!raw) return one;
+
+      try {
+        const where = new URL(raw);
+        return { ...one, title: `${where.hostname}${where.pathname}` };
+      } catch {
+        return one;
+      }
+    }),
+  );
 }
 
 /**
