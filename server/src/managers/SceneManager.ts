@@ -93,7 +93,7 @@ export class SceneManager {
       return { scene: found, steps: ready };
     });
 
-    if (!steps.length) throw badRequest(`«${scene.name}» è vuota: non c'è niente da fare`);
+    if (!steps.length) throw badRequest(`«${scene.name}» è vuota e non c'è niente da fare`);
 
     const results = await Promise.allSettled(
       steps.map(({ step, device }) =>

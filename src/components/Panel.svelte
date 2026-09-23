@@ -294,7 +294,7 @@
         onclick={(event: MouseEvent) =>
           ui.askSure(event.currentTarget as HTMLElement, {
             title: `Uscire da @${auth.account?.handle ?? ''}?`,
-            detail: 'Le tue mappe restano dove sono: si rientra quando vuoi.',
+            detail: 'Le tue mappe restano dove sono. Si rientra quando vuoi.',
             verb: 'Esci',
             no: 'Resto',
             onYes: () => auth.leave(),

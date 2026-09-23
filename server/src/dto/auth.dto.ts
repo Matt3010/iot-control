@@ -26,7 +26,7 @@ export class RegisterDto extends CredentialsDto {
   @clean()
   @IsString()
   @Matches(/^[a-z0-9][a-z0-9-]{1,18}[a-z0-9]$/, {
-    message: 'il nome utente va da 3 a 20 caratteri: lettere, numeri e trattini',
+    message: 'il nome utente va da 3 a 20 caratteri fra lettere, numeri e trattini',
   })
   handle!: string;
 }

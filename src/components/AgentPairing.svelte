@@ -40,7 +40,7 @@
       many: false,
       more: '',
       warns:
-        "La prima volta l'agente aggiunge il supporto eWeLink e si riavvia: ci vuole un minuto. Poi ti chiederà le credenziali dell'app.",
+        "La prima volta l'agente aggiunge il supporto eWeLink e si riavvia, e ci vuole un minuto. Poi ti chiederà le credenziali dell'app.",
     },
     {
       handler: 'generic',
@@ -53,7 +53,7 @@
       many: true,
       more: 'Un’altra telecamera',
       warns:
-        "Ti chiederà l'indirizzo del flusso — di solito una riga che comincia per rtsp:// — e come raggiungerlo. Una telecamera per volta: se il registratore ne ha quattro, si fa quattro volte.",
+        "Ti chiederà l'indirizzo del flusso — di solito una riga che comincia per rtsp:// — e come raggiungerlo. Si fa una telecamera per volta, quindi con un registratore da quattro si ripete quattro volte.",
     },
   ];
 
@@ -79,7 +79,7 @@
     busy = true;
     try {
       linked = await devices.unlink(agent, joint.entryId);
-      toast.show(`${label} scollegato: i suoi dispositivi se ne vanno con lui`);
+      toast.show(`${label} scollegato, i suoi dispositivi se ne vanno con lui`);
     } catch (error) {
       toast.show((error as Error).message);
     } finally {

@@ -35,7 +35,7 @@
       clearTimeout(timer);
       timer = setTimeout(() => (copied = false), 1600);
     } catch {
-      toast.show('Copia non riuscita: il comando è quello che vedi');
+      toast.show('Copia non riuscita, il comando è quello che vedi');
     }
   }
 
@@ -52,7 +52,7 @@
   async function rotate(agent: Agent) {
     try {
       fresh = { id: agent.id, install: (await devices.newToken(agent)).install };
-      toast.show("Token nuovo: l'agente va reinstallato con questo comando");
+      toast.show("Token nuovo. L'agente va reinstallato con questo comando.");
     } catch (error) {
       toast.show((error as Error).message);
     }
@@ -71,7 +71,7 @@
 
 <PageShell
   title="Agenti"
-  lead="Un agente è il servizio che installi su una macchina accesa in un luogo: trova i dispositivi sulla rete di casa e si collega qui da solo. Ne servono due quando le reti sono separate."
+  lead="Un agente è il servizio che installi su una macchina accesa in un luogo. Trova i dispositivi sulla rete di casa e si collega qui da solo. Ne servono due quando le reti sono separate."
 >
   {#each devices.agents as agent (agent.id)}
     {@const where = placeOf(agent)}
@@ -130,7 +130,7 @@
                 </Button>
               </div>
               <p class="once">
-                Si vede una volta sola: dentro c'è il token, e qui ne resta solo un'impronta.
+                Si vede una volta sola, perché dentro c'è il token e qui ne resta solo un'impronta.
                 Vuole <b>Linux</b> — su Windows incollala dentro WSL.
               </p>
             </div>

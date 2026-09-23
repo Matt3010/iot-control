@@ -393,7 +393,7 @@ class Devices {
       rest = silence ? UNSURE_MS : 0;
       toast.show(
         silence
-          ? 'Nessuna risposta: il comando potrebbe essere partito lo stesso. Un attimo prima di riprovare.'
+          ? 'Nessuna risposta, e il comando potrebbe essere partito lo stesso. Un attimo prima di riprovare.'
           : why,
       );
     }

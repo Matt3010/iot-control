@@ -36,9 +36,9 @@
     }
 
     const acceso = await push.enable();
-    if (acceso) toast.show('Avvisi accesi: te ne mando uno di prova');
-    else if (push.permission === 'denied') toast.show('Il browser li ha bloccati: si riaccendono dalle sue impostazioni');
-    else if (push.permission === 'default') toast.show('Avvisi non accesi: il permesso non è stato dato');
+    if (acceso) toast.show('Avvisi accesi. Te ne mando uno di prova.');
+    else if (push.permission === 'denied') toast.show('Il browser li ha bloccati. Si riaccendono dalle sue impostazioni.');
+    else if (push.permission === 'default') toast.show('Avvisi non accesi, perché il permesso non è stato dato');
     else toast.show('Non si è riusciti ad accenderli');
 
     if (acceso) void prova();
@@ -56,9 +56,9 @@
       const { sent, failed } = await push.tryIt();
       partita = sent > 0;
       if (sent > 1) toast.show(`Avviso di prova mandato a ${sent} macchine`);
-      else if (sent === 1) toast.show('Avviso di prova mandato: arriva fra un istante');
-      else if (failed) toast.show('La consegna è stata respinta: non dipende da questa macchina');
-      else toast.show('Nessuna macchina iscritta: spegni e riaccendi la levetta');
+      else if (sent === 1) toast.show('Avviso di prova mandato, arriva fra un istante');
+      else if (failed) toast.show('La consegna è stata respinta, e non dipende da questa macchina');
+      else toast.show('Nessuna macchina iscritta. Spegni e riaccendi la levetta.');
     } catch (error) {
       toast.show(`Prova non riuscita: ${(error as Error).message}`);
     }
@@ -80,14 +80,14 @@
       label="Mandameli su questa macchina"
       note={push.on
         ? 'Quando un agente smette di rispondere, o quando succede qualcosa che hai chiesto di sapere.'
-        : 'Spenti: qui non arriva niente, nemmeno quando un agente smette di rispondere.'}
+        : 'Spenti. Qui non arriva niente, nemmeno quando un agente smette di rispondere.'}
       onchange={(value: boolean) => void flip(value)}
     />
 
     {#if partita}
       <p class="nota">
         <Icon name="alert" />
-        <span>Se non ne vedi arrivare nessuna, è il sistema a trattenerla: su Mac in
+        <span>Se non ne vedi arrivare nessuna, è il sistema a trattenerla. Su Mac in
         <b>Impostazioni di Sistema › Notifiche</b>, su Windows in <b>Sistema › Notifiche</b>, il
         browser dev'essere fra quelli che possono mostrarle — e una modalità «non disturbare»
           accesa le mette da parte in silenzio.</span
@@ -114,7 +114,7 @@
     <p class="nota">
       <Icon name="alert" />
       <span
-        >Su iPhone gli avvisi arrivano solo se aggiungi questa pagina alla schermata home: il tasto
+        >Su iPhone gli avvisi arrivano solo se aggiungi questa pagina alla schermata home, con il tasto
         <b>Condividi</b>, poi <b>Aggiungi alla schermata Home</b>. Da lì si accendono.</span
       >
     </p>

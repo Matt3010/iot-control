@@ -155,7 +155,7 @@
             onclick={(event: MouseEvent) =>
               ui.askSure(event.currentTarget as HTMLElement, {
                 title: `Eliminare “${map.name}”?`,
-                detail: takesAway(map.id) ?? 'È vuota: non porta via niente.',
+                detail: takesAway(map.id) ?? 'È vuota e non porta via niente.',
                 verb: 'Elimina',
                 onYes: () => store.deleteMap(map),
               })}

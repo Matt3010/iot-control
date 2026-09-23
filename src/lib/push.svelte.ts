@@ -50,10 +50,10 @@ function excuse(error: unknown): string {
   const detto = error instanceof Error ? error.message : String(error);
 
   if (/mime|script|register|ServiceWorker/i.test(detto))
-    return 'Questa copia del sito non è al completo: manca il pezzo che resta in ascolto mentre l’app è chiusa. Non dipende da questo telefono — riprova fra un po’.';
+    return 'Questa copia del sito non è al completo, perché manca il pezzo che resta in ascolto mentre l’app è chiusa. Non dipende da questo telefono — riprova fra un po’.';
 
   if (/applicationServerKey|subscribe|push service/i.test(detto))
-    return 'Il servizio di consegna del browser ha rifiutato l’iscrizione. Succede quando il telefono è senza rete o quando il sito era stato iscritto con una chiave diversa: spegni e riaccendi.';
+    return 'Il servizio di consegna del browser ha rifiutato l’iscrizione. Succede quando il telefono è senza rete o quando il sito era stato iscritto con una chiave diversa. Spegni e riaccendi.';
 
   return `Non si è riusciti ad accenderli: ${detto}`;
 }

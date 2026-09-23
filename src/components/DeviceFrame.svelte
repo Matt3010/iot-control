@@ -258,7 +258,7 @@
       }}
     />
   {:else}
-    <span class="waiting">{failing || 'Un momento: sto chiedendo un fotogramma…'}</span>
+    <span class="waiting">{failing || 'Un momento, sto chiedendo un fotogramma…'}</span>
   {/if}
 
   <!-- Il play sta sopra l'immagine, al centro: è il gesto che ci si aspetta

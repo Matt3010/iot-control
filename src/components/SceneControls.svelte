@@ -69,7 +69,7 @@
       {/each}
     </ul>
   {:else}
-    <p class="set-none">Non c’è ancora niente dentro: aggiungi una riga qui sotto.</p>
+    <p class="set-none">Non c’è ancora niente dentro. Aggiungi una riga qui sotto.</p>
   {/if}
 </div>
 

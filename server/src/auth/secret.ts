@@ -15,7 +15,7 @@ export function resolveSecret(): string {
     const generated = randomBytes(48).toString('hex');
     fs.mkdirSync(config.dataDir, { recursive: true });
     fs.writeFileSync(secretFile, generated, { encoding: 'utf8', mode: 0o600 });
-    console.warn('JWT_SECRET non impostato: ne ho generato uno in', secretFile);
+    console.warn('JWT_SECRET non impostato, ne ho generato uno in', secretFile);
     return generated;
   }
 }

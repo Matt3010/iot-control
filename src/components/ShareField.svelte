@@ -134,7 +134,7 @@
               </div>
               {#if !editor.only.length}
                 <p class="sub">
-                  Con l’elenco vuoto non tocca niente: entra, guarda, e non cambia una riga.
+                  Con l’elenco vuoto non tocca niente, entra e guarda senza cambiare una riga.
                 </p>
               {:else}
                 <p class="sub">Gli altri luoghi li vede, ma non li tocca. E non ne aggiunge di nuovi.</p>

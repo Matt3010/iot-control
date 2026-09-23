@@ -197,7 +197,7 @@
           </button>
         </p>
       {:else}
-        <p class="route-foot">Le iscrizioni sono chiuse: l'indice ha già i suoi.</p>
+        <p class="route-foot">Le iscrizioni sono chiuse, questo indice ha già i suoi.</p>
       {/if}
     {/if}
   </form>

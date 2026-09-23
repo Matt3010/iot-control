@@ -70,7 +70,7 @@
       clearTimeout(timer);
       timer = setTimeout(() => (copied = false), 1600);
     } catch {
-      toast.show('Copia non riuscita: il comando è quello che vedi');
+      toast.show('Copia non riuscita, il comando è quello che vedi');
     }
   }
 
@@ -89,7 +89,7 @@
   async function rotate(agent: Agent) {
     try {
       fresh = { id: agent.id, install: (await devices.newToken(agent)).install };
-      toast.show("Token nuovo: l'agente va reinstallato con questo comando");
+      toast.show("Token nuovo. L'agente va reinstallato con questo comando.");
     } catch (error) {
       toast.show((error as Error).message);
     }
@@ -140,7 +140,7 @@
         ui.askSure(event.currentTarget as HTMLElement, {
           title: 'Staccarlo da questo luogo?',
           detail:
-            "L'agente resta e continua a funzionare: questo luogo smette solo di mostrarlo, e lo puoi rimettere qui o altrove.",
+            "L'agente resta e continua a funzionare. Questo luogo smette solo di mostrarlo, e lo puoi rimettere qui o altrove.",
           verb: 'Stacca',
           tone: 'plain',
           no: 'Annulla',
@@ -178,7 +178,7 @@
       </Button>
     </div>
     <p class="once">
-      Si vede una volta sola: dentro c'è il token, e qui ne resta solo un'impronta.
+      Si vede una volta sola, perché dentro c'è il token e qui ne resta solo un'impronta.
       Vuole <b>Linux</b>: su Windows incollala dentro WSL, su Mac dentro una macchina virtuale.
       Fuori di lì Docker non sta sulla rete di casa, e l'agente i dispositivi non li vedrebbe.
     </p>
@@ -283,7 +283,7 @@
 
   {#if !mine.length}
     <p class="hint">
-      Un agente è il servizio che installi su una macchina in quel luogo: trova i dispositivi
+      Un agente è il servizio che installi su una macchina in quel luogo. Trova i dispositivi
       sulla rete e si collega qui da solo. Appena creato si attacca a questo luogo, e ti diamo il
       comando da lanciare là sopra. Ne servono due quando le reti sono separate.
     </p>

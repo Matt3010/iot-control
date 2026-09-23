@@ -36,7 +36,7 @@
       ? 'Raggiungibile'
       : how === 'lost'
         ? 'Non risponde'
-        : 'Non si sa: l’agente non è collegato',
+        : 'Non si sa, perché l’agente non è collegato',
   );
 
   const numberOf = (value: DeviceValue | undefined): number => (typeof value === 'number' ? value : 0);

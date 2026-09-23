@@ -43,7 +43,7 @@
     class="mark-search"
     type="text"
     autofocus
-    placeholder="Cerca: casa, mangiare, treno…"
+    placeholder="Cerca fra casa, mangiare, treno…"
     bind:value={query}
     onkeydown={(event) => {
       // invio prende il primo: con la ricerca in mano è il gesto naturale

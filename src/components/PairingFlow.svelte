@@ -170,7 +170,7 @@
       touched = {};
 
       if (next?.kind === 'done') {
-        toast.show(`${label} collegato: i dispositivi stanno arrivando`);
+        toast.show(`${label} collegato, i dispositivi stanno arrivando`);
         ondone();
       }
     } catch (error) {
@@ -276,7 +276,7 @@
         Serve il tuo codice utente. Nell'app <b>Smart Life</b> (o Tuya Smart):
         <i>Impostazioni</i> → <i>Account e sicurezza</i>, alla voce <i>User Code</i>.
       </p>
-      <p class="say careful">Copialo <b>esattamente</b> com'è: maiuscole e minuscole contano.</p>
+      <p class="say careful">Copialo <b>esattamente</b> com'è, perché maiuscole e minuscole contano.</p>
     {:else if handler === 'sonoff'}
       <p class="say">
         Entra con le stesse credenziali che usi nell'app <b>eWeLink</b>: l'email <b>intera</b>,
@@ -284,7 +284,7 @@
       </p>
     {:else if handler === 'generic'}
       <p class="say">
-        Serve l'indirizzo del flusso: una riga che comincia per <b>rtsp://</b>, quella che ti dà
+        Serve l'indirizzo del flusso, una riga che comincia per <b>rtsp://</b>, quella che ti dà
         il registratore o la telecamera. Un canale per volta.
       </p>
       <p class="say careful">

@@ -32,7 +32,7 @@
       clearTimeout(timer);
       timer = setTimeout(() => (copied = false), 1600);
     } catch {
-      toast.show('Copia non riuscita: il link è quello che vedi');
+      toast.show('Copia non riuscita, il link è quello che vedi');
     }
   }
 </script>

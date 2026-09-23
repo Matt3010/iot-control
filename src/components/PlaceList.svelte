@@ -28,7 +28,7 @@
   {#if rows.length === 0}
     <li class="row-empty">
       {near || viewport.narrow
-        ? 'Nessun luogo: i filtri qui sopra li stanno escludendo tutti.'
+        ? 'Nessun luogo da mostrare, perché i filtri qui sopra li stanno escludendo tutti.'
         : 'Nessun luogo in questa parte di mappa.'}
     </li>
   {:else}

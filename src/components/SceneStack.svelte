@@ -28,8 +28,8 @@
   /** Cosa porta via eliminarla: niente. I dispositivi restano dove sono. */
   const takesAway = (scene: Scene): string =>
     scene.steps.length
-      ? 'I dispositivi restano dove sono: se ne va solo quello che facevano insieme.'
-      : 'È vuota: non porta via niente.';
+      ? 'I dispositivi restano dove sono. Se ne va solo quello che facevano insieme.'
+      : 'È vuota e non porta via niente.';
 
   async function create(name: string) {
     try {
