@@ -114,13 +114,7 @@ class Push {
           applicationServerKey: bytesOf(key) as BufferSource,
         }));
 
-      const raw = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
-      await api.post('/push/subscribe', {
-        endpoint: raw.endpoint,
-        p256dh: raw.keys?.p256dh,
-        auth: raw.keys?.auth,
-        agent: whichMachine(),
-      });
+      await this.#tell(sub);
 
       this.on = true;
       return true;
@@ -156,10 +150,46 @@ class Push {
     }
   }
 
-  /** Una di prova a sé stessi: l'unico modo di sapere che arrivano davvero. */
+  /**
+   * Una di prova a sé stessi: l'unico modo di sapere che arrivano davvero.
+   *
+   * Se non ne parte nessuna, questa macchina si crede iscritta e il server
+   * non la conosce — l'iscrizione l'ha presa il browser, ma la riga non è
+   * mai arrivata: la rete caduta un attimo, o una copia del sito senza il
+   * pezzo che resta in ascolto. Allora si riconsegna l'indirizzo e si
+   * riprova una volta, invece di lasciare un tasto che non fa niente.
+   */
   async tryIt(): Promise<number> {
-    const { sent } = await api.post<{ sent: number }>('/push/test', {});
-    return sent;
+    if (this.busy) return 0;
+    this.busy = true;
+
+    try {
+      const { sent } = await api.post<{ sent: number }>('/push/test', {});
+      if (sent) return sent;
+
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = await reg?.pushManager.getSubscription();
+      if (!sub) {
+        this.on = false;
+        return 0;
+      }
+
+      await this.#tell(sub);
+      return (await api.post<{ sent: number }>('/push/test', {})).sent;
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  /** Dire al server dove consegnare, e da quale macchina lo stiamo dicendo. */
+  async #tell(sub: PushSubscription): Promise<void> {
+    const raw = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+    await api.post('/push/subscribe', {
+      endpoint: raw.endpoint,
+      p256dh: raw.keys?.p256dh,
+      auth: raw.keys?.auth,
+      agent: whichMachine(),
+    });
   }
 
   #standalone(): boolean {

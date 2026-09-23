@@ -17,6 +17,17 @@
     void push.look();
   });
 
+  /**
+   * Se una prova è partita davvero.
+   *
+   * Quando il server dice che l'ha consegnata e sullo schermo non compare
+   * niente, il guasto è rimasto uno solo e non è nostro: è il sistema che
+   * non lascia passare le notifiche di questo browser. Si dice lì, appena
+   * serve — dirlo prima sarebbe una riga di istruzioni per un problema che
+   * quasi nessuno ha.
+   */
+  let partita = $state(false);
+
   async function flip(wanted: boolean): Promise<void> {
     if (!wanted) {
       await push.disable();
@@ -30,7 +41,26 @@
     else if (push.permission === 'default') toast.show('Avvisi non accesi: il permesso non è stato dato');
     else toast.show('Non si è riusciti ad accenderli');
 
-    if (acceso) void push.tryIt().catch(() => undefined);
+    if (acceso) void prova();
+  }
+
+  /**
+   * La prova, con l'esito.
+   *
+   * Premere e non vedere niente è la cosa peggiore proprio qui: se non arriva
+   * nulla non si sa se il tasto non ha fatto niente o se è la notifica a non
+   * essere passata, e sono due guasti diversi con due rimedi diversi.
+   */
+  async function prova(): Promise<void> {
+    try {
+      const partite = await push.tryIt();
+      partita = partite > 0;
+      if (partite > 1) toast.show(`Avviso di prova mandato a ${partite} macchine`);
+      else if (partite === 1) toast.show('Avviso di prova mandato: arriva fra un istante');
+      else toast.show('Nessuna macchina iscritta: spegni e riaccendi la levetta');
+    } catch (error) {
+      toast.show(`Prova non riuscita: ${(error as Error).message}`);
+    }
   }
 </script>
 
@@ -38,7 +68,7 @@
   <div class="testa">
     <span class="eyebrow">Avvisi</span>
     {#if push.on}
-      <Button look="link" disabled={push.busy} onclick={() => void push.tryIt()}>Provane uno</Button>
+      <Button look="link" disabled={push.busy} onclick={() => void prova()}>Invia una prova</Button>
     {/if}
   </div>
 
@@ -53,7 +83,15 @@
       onchange={(value: boolean) => void flip(value)}
     />
 
-    {#if push.why}
+    {#if partita}
+      <p class="nota">
+        <Icon name="alert" />
+        Se non ne vedi arrivare nessuna, è il sistema a trattenerla: su Mac in
+        <b>Impostazioni di Sistema › Notifiche</b>, su Windows in <b>Sistema › Notifiche</b>, il
+        browser dev'essere fra quelli che possono mostrarle — e una modalità «non disturbare»
+        accesa le mette da parte in silenzio.
+      </p>
+    {:else if push.why}
       <!-- cos'è andato storto, per esteso: la levetta da sola direbbe solo
            che è tornata indietro -->
       <p class="nota">

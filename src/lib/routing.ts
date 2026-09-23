@@ -30,11 +30,9 @@ export function readRoute(path = window.location.pathname): Route {
 
   if (/^\/maps\/?$/i.test(path)) return { kind: 'maps' };
 
-  // `/scene` e `/avvisi` sono i primi indirizzi che avevano, rimasti in giro
-  // per qualche ora: si riconoscono ancora e la pagina si mette quello giusto
-  if (/^\/(scenes|scene)\/?$/i.test(path)) return { kind: 'scenes' };
+  if (/^\/scenes\/?$/i.test(path)) return { kind: 'scenes' };
 
-  if (/^\/(alerts|avvisi)\/?$/i.test(path)) return { kind: 'alerts' };
+  if (/^\/alerts\/?$/i.test(path)) return { kind: 'alerts' };
 
   return { kind: 'app' };
 }
@@ -50,9 +48,9 @@ export const ALERTS_PATH = '/alerts';
 /**
  * L'indirizzo buono di una pagina, dato uno qualsiasi che porti lì.
  *
- * Gli indirizzi sono in inglese come tutto il resto del codice; quelli
- * vecchi continuano ad aprirsi, ma nella barra ci va questo — un link
- * copiato da lì è quello che resta.
+ * Oggi serve solo a togliere la barra in fondo — `/agents/` e `/agents`
+ * sono la stessa stanza, e un link copiato dalla barra dev'essere sempre
+ * scritto allo stesso modo.
  */
 export function canonical(path: string): string {
   const route = readRoute(path);
