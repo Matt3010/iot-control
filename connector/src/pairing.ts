@@ -257,6 +257,24 @@ const PAROLE: Record<string, string> = {
   template: 'Quel servizio ha risposto in un modo che non ci aspettavamo.',
 };
 
+/**
+ * Il motivo vero, quando sta dentro al testo dell'eccezione.
+ *
+ * Certe integrazioni rispondono sempre con la stessa chiave — quella di
+ * eWeLink dice «template» sia per una password sbagliata sia per un
+ * tentativo rimasto aperto — e quello che e' successo davvero e' scritto solo
+ * dentro il testo dell'eccezione. Si guarda li' dentro, invece di dire
+ * sempre la stessa cosa a tutti.
+ */
+function dentro(testo: string): string | undefined {
+  for (const chiave of Object.keys(PAROLE)) {
+    if (testo.includes(chiave)) return PAROLE[chiave];
+  }
+  if (/(401|403|invalid.?password|wrong.?password)/i.test(testo)) return PAROLE.invalid_auth;
+  if (/(429|too many|limit)/i.test(testo)) return 'Quel servizio ha messo in pausa gli accessi. Riprova fra qualche minuto.';
+  return undefined;
+}
+
 /** Se un dettaglio e' una frase o un pezzo di codice buttato li'. */
 const leggibile = (testo: string): boolean =>
   !/[(){}[\]<>]|https?:\/\/|Error|Exception|Traceback|^[a-z_]+$/.test(testo.trim());
@@ -269,7 +287,10 @@ function errorOf(flow: HaFlow): string | undefined {
   if (!first) return undefined;
   const which = where && where !== 'base' ? `${where}: ` : '';
 
-  const detto = PAROLE[first] ?? first;
+  const crudo = Object.values(flow.description_placeholders ?? {})
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ');
+  const detto = dentro(crudo) ?? PAROLE[first] ?? first;
 
   // I dettagli si tengono solo se sono una frase: il testo di un'eccezione e
   // un indirizzo di un sito, in fondo a un messaggio, sono rumore che spaventa.
@@ -403,8 +424,18 @@ function listed(schema: unknown[] | undefined): string {
       const bits = [String(entry.name)];
       if (entry.required === true) bits.push('obbligatorio');
 
+      /*
+       * Il valore proposto si scrive, tranne quando è un segreto.
+       *
+       * Una password nel registro di una macchina di casa e' una password
+       * scritta in chiaro su un disco, che resta li' e finisce dentro a
+       * qualunque copia di quei log. Qui serve sapere se il campo era pieno o
+       * vuoto, non cosa c'era scritto.
+       */
       const value = proposed(entry);
-      if (value !== undefined) bits.push(`propone ${JSON.stringify(value)}`);
+      if (value !== undefined) {
+        bits.push(isSecret(entry) ? 'già compilato' : `propone ${JSON.stringify(value)}`);
+      }
       if (entry.type !== undefined) bits.push(`tipo ${String(entry.type)}`);
       return bits.join(' ');
     })
@@ -514,6 +545,25 @@ export async function submitPairing(
   // Finita o andata storta, quella conversazione non e' piu' aperta: non c'e'
   // niente da chiudere la prossima volta.
   if (step.kind === 'done' || step.kind === 'failed') scorda(config, flowId);
+
+  /*
+   * «Ce n'e' gia' una in corso» vuol dire che un nostro tentativo di prima e'
+   * rimasto aperto con dentro lo stesso account. Si chiudono gli altri e si
+   * riprova una volta sola: chi guarda non deve imparare che esiste questa
+   * roba, e non potrebbe comunque farci niente.
+   */
+  const bloccata = JSON.stringify(flow.description_placeholders ?? {}).includes('already_in_progress');
+  const handler = APERTE.get(flowId);
+  if (step.error && bloccata && handler) {
+    const altre = [...APERTE].filter(([id, chi]) => chi === handler && id !== flowId).map(([id]) => id);
+    if (altre.length) {
+      await Promise.all(altre.map((id) => cancelPairing(config, id)));
+      const ancora = await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body });
+      const dopo = translate(ancora, { flowId, schema });
+      if (dopo.kind === 'done' || dopo.kind === 'failed') scorda(config, flowId);
+      return ourShot(await pictured(config, ancora, dopo), input);
+    }
+  }
 
   /*
    * Se si e' lamentato, nel registro finisce tutto quello che ha detto: di
