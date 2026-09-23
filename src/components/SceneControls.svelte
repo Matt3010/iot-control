@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { devices, type Scene } from '../lib/devices.svelte';
+  import { thingHealth } from '../lib/health';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
@@ -34,15 +35,28 @@
   const mute = $derived(members.filter((device) => !device.online).length);
 
   /**
-   * Se quel dispositivo risponde adesso.
+   * Come sta il dispositivo di una riga, con le stesse tre parole e gli
+   * stessi tre colori che ha nella sua scheda.
    *
-   * In testa c'era un punto esclamativo che diceva che qualcosa non
-   * rispondeva, e non serviva a niente: la domanda vera è «quale?», e la
-   * risposta era in un suggerimento che su un telefono non si apre nemmeno.
-   * Si dice sulla riga di chi non risponde, che è dove si guarda.
+   * In testa alla scena c'era un punto esclamativo che diceva che qualcosa
+   * non rispondeva, e non serviva a niente: la domanda vera è «quale?», e la
+   * risposta stava in un suggerimento che su un telefono non si apre nemmeno.
+   * Si dice sulla riga, che è dove si guarda — e si dice come altrove, se no
+   * la stessa cosa avrebbe due facce a seconda della pagina.
    */
-  const answers = (deviceId: string): boolean =>
-    devices.list.find((device) => device.id === deviceId)?.online !== false;
+  function how(deviceId: string): { state: 'live' | 'lost' | 'unknown'; says: string } {
+    const device = devices.list.find((one) => one.id === deviceId);
+    const state = thingHealth(device ? devices.agentUp(device.agentId) : false, device?.online ?? false);
+    return {
+      state,
+      says:
+        state === 'live'
+          ? 'Raggiungibile'
+          : state === 'lost'
+            ? 'Non risponde'
+            : 'Non si sa, perché l’agente non è collegato',
+    };
+  }
   const busy = $derived(devices.busy.includes(`scena:${scene.id}`));
 
   /**
@@ -86,9 +100,15 @@
         {@const says = devices.saysOf(step)}
         <!-- di fila e non incolonnate a destra: l'azione staccata sul bordo
              sembrava un tasto da premere, e invece si legge e basta -->
-        <li class:is-mute={!answers(step.deviceId)}>
+        {@const sta = how(step.deviceId)}
+        <li>
+          <!-- lo stesso pallino della scheda del dispositivo: verde risponde,
+               rosso non risponde, grigio non si sa -->
+          <span class="dot is-{sta.state}" role="img" aria-label={sta.says} title={sta.says}></span>
           {says.who} · <b>{says.what}</b>
-          {#if !answers(step.deviceId)}<span class="mute">non risponde</span>{/if}
+          <!-- per il guasto vero anche l'icona, come nella scheda del
+               dispositivo: il colore da solo non basta a chi non lo distingue -->
+          {#if sta.state === 'lost'}<span class="away" title={sta.says}><Icon name="alert" /></span>{/if}
         </li>
       {/each}
     </ul>
@@ -129,6 +149,9 @@
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 
   .steps li {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
     min-width: 0;
     font-size: 12px;
     color: var(--ink-3);
@@ -137,18 +160,26 @@
     white-space: nowrap;
   }
 
+  .dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ok);
+  }
+
+  .dot.is-lost { background: var(--danger); }
+
+  /* non si sa, perche' l'agente non e' collegato: da qui non si puo' dire
+     niente di una tenda a trenta chilometri */
+  .dot.is-unknown { background: var(--ink-3); opacity: 0.55; }
+
+  .away { display: inline-grid; place-items: center; flex: none; color: var(--danger); }
+
+  .away :global(.ico) { width: 12px; height: 12px; }
+
   .steps b { font-weight: 560; color: var(--ink-2); }
 
-  /* la riga di chi non risponde lo dice da sé: così si sa quale delle due
-     tende sta per non muoversi, che è l'unica cosa che si voleva sapere */
-  .steps li.is-mute, .steps li.is-mute b { color: var(--warn); }
-
-  .mute {
-    margin-left: 6px;
-    font-size: 11px;
-    color: var(--warn);
-    opacity: 0.85;
-  }
 
   .set-none { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
 </style>
