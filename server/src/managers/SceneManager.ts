@@ -228,6 +228,42 @@ export class SceneManager {
       return `parte a metà — ${quanti_(quanti - zitti)} su ${quanti}`;
     };
 
+    /**
+     * Quando una scena parte a meta' senza che nessuno la stia guardando.
+     *
+     * Se l'hai premuta tu, te lo dice il messaggio in fondo allo schermo e
+     * basta cosi'. Ma una scena che parte da sola alle sette di sera, o
+     * chiamata da un'altra, fallisce in silenzio: le tende restano dove sono
+     * e lo scopri l'indomani. Quello e' un avviso.
+     */
+    const zitte = (): void => {
+      if (who || !mute.length) return;
+
+      const nomi = [...new Set(mute.map(({ device, step }) => device?.name ?? (step.scene ? 'una scena' : 'un avviso')))];
+      const tutte = mute.length === steps.length;
+
+      /*
+       * Il verbo si accorda con quanti sono, non con i loro nomi: quanti sono
+       * lo sappiamo noi, come si chiamano no.
+       */
+      const uno = nomi.length === 1;
+      const elenco = nomi.join(', ');
+
+      void noticeManager.tell(ownerId, {
+        kind: 'scene',
+        who: scene.name,
+        short: tutte
+          ? 'non è partita'
+          : `partita a metà, non ${uno ? 'risponde' : 'rispondono'} ${elenco}`,
+        title: tutte
+          ? `La scena «${scene.name}» non è partita`
+          : `La scena «${scene.name}» è partita a metà`,
+        body: tutte
+          ? 'Non ha risposto nessuno dei dispositivi che doveva muovere.'
+          : `Non ${uno ? 'ha' : 'hanno'} risposto ${elenco}. Il resto è partito.`,
+      });
+    };
+
     const nota = (): void => {
       /*
        * Una riga per agente, non una per passo: «Sera» è una cosa sola anche
@@ -276,6 +312,7 @@ export class SceneManager {
       void (async () => {
         for (const [at, momento] of resto.entries()) await suona(momento, at + 2);
         nota();
+        zitte();
         finita();
       })().catch((error: Error) => {
         console.warn(`«${scene.name}» si è fermata: ${error.message}`);
@@ -288,6 +325,7 @@ export class SceneManager {
     }
 
     nota();
+    zitte();
     finita();
 
     if (!mute.length) return;
