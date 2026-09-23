@@ -10,6 +10,7 @@ import type {
 } from '../../shared/protocol.js';
 import { ConfigError, loadConfig } from './config.js';
 import { toServiceCall, translate } from './entities.js';
+import { channelOf } from './go2rtc.js';
 import { HomeAssistant } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
 import { blind, look } from './live.js';
@@ -102,8 +103,39 @@ async function main(): Promise<void> {
       }
     }
 
+    await distinte();
+
     console.log(`${devices.size} dispositivi da home assistant`);
     announceAll();
+  }
+
+  /**
+   * Telecamere con lo stesso nome: si aggiunge il canale.
+   *
+   * Un registratore con quattro obiettivi risponde a un indirizzo solo, e
+   * Home Assistant le chiama tutte e quattro come lui: in elenco diventano
+   * quattro righe identiche, e scegliere «quella giusta» e' un indovinello.
+   * Quello che le distingue e' il canale — `/video1`, `/video2` — che poi e'
+   * esattamente quello che la persona ha scritto per collegarle.
+   *
+   * Solo quando il nome e' davvero in comune: una telecamera che qualcuno ha
+   * gia' chiamato «Cancello» ha il nome migliore che potesse avere, e
+   * rifarlo a partire da un indirizzo IP sarebbe un passo indietro.
+   */
+  async function distinte(): Promise<void> {
+    const occhi = [...devices.values()].filter((one) => one.externalId.startsWith('camera.'));
+
+    const quanti = new Map<string, number>();
+    for (const one of occhi) quanti.set(one.name, (quanti.get(one.name) ?? 0) + 1);
+
+    await Promise.all(
+      occhi
+        .filter((one) => (quanti.get(one.name) ?? 0) > 1)
+        .map(async (one) => {
+          const canale = await channelOf(one.externalId);
+          if (canale) devices.set(one.externalId, { ...one, name: canale });
+        }),
+    );
   }
 
   const ha = new HomeAssistant(

@@ -2,7 +2,7 @@ import type { Health, LinkedAccount, PairingStep } from '../../shared/protocol.j
 import fs from 'node:fs';
 import { stateFile, type ConnectorConfig } from './config.js';
 import { EXTRAS, install, installed } from './extras.js';
-import { forget, sourceOf } from './go2rtc.js';
+import { channelOf, forget } from './go2rtc.js';
 import { frameFrom } from './homeassistant.js';
 
 /**
@@ -651,15 +651,8 @@ export async function titled(
       if (one.handler !== 'generic') return one;
 
       const eye = eyes.get(one.entryId);
-      const raw = eye ? await sourceOf(eye) : undefined;
-      if (!raw) return one;
-
-      try {
-        const where = new URL(raw);
-        return { ...one, title: `${where.hostname}${where.pathname}` };
-      } catch {
-        return one;
-      }
+      const canale = eye ? await channelOf(eye) : undefined;
+      return canale ? { ...one, title: canale } : one;
     }),
   );
 }

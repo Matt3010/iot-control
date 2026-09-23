@@ -49,6 +49,26 @@ export async function sourceOf(entityId: string): Promise<string | undefined> {
   return undefined;
 }
 
+/**
+ * Da quale canale guarda, detto in breve.
+ *
+ * Un registratore con quattro telecamere risponde a un indirizzo solo, e
+ * quello che distingue le sue immagini è la coda: `/video1`, `/video2`. È
+ * anche esattamente quello che la persona ha scritto per collegarle, quindi
+ * lo riconosce.
+ */
+export async function channelOf(entityId: string): Promise<string | undefined> {
+  const raw = await sourceOf(entityId);
+  if (!raw) return undefined;
+
+  try {
+    const where = new URL(raw);
+    return `${where.hostname}${where.pathname}`;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Apri questo flusso con questo nome, se non è già aperto così. */
 export async function remember(name: string, src: string): Promise<boolean> {
   if (known.get(name) === src) return true;
