@@ -120,6 +120,7 @@ function migrateToMaps(data: Database): Database {
     log: data.log,
     pushes: data.pushes,
     alerts: data.alerts,
+    notices: data.notices,
     maps: data.maps.length ? data.maps : [first],
     categories: data.categories.map((category: Category) => ({ ...category, ownerId: category.ownerId ?? owner })),
     groups: data.groups.map((group: Group & { mapId?: string }) => {
@@ -143,6 +144,7 @@ const empty = (): Database => ({
   log: [],
   pushes: [],
   alerts: [],
+  notices: [],
 });
 
 /**
@@ -199,6 +201,7 @@ export class JsonStore {
         // li ha non ne ha, e non è un guasto
         pushes: Array.isArray(parsed.pushes) ? parsed.pushes : [],
         alerts: Array.isArray(parsed.alerts) ? parsed.alerts : [],
+        notices: Array.isArray(parsed.notices) ? parsed.notices : [],
       });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;

@@ -259,6 +259,31 @@ export interface Alert {
   firedAt?: string;
 }
 
+/**
+ * Un avviso avvenuto. Non la regola: il fatto.
+ *
+ * La regola dice cosa vogliamo sapere, questo dice cosa e' successo davvero e
+ * com'e' andata a finire. Sono due cose diverse e serve tenerle separate: una
+ * notifica puo' non arrivare — telefono spento, senza rete, notifiche
+ * negate — e senza una riga scritta da qualche parte un avviso che non e'
+ * arrivato non e' mai esistito.
+ */
+export interface Notice {
+  id: string;
+  ownerId: string;
+  /** `silent`: un posto ha smesso di rispondere. `back`: e' tornato. */
+  kind: 'silent' | 'back';
+  /** Di chi si parla, se e' un agente. */
+  agentId?: string;
+  /** Come si legge: le stesse parole arrivate sul telefono. */
+  title: string;
+  body: string;
+  at: string;
+  /** Quante macchine l'hanno ricevuta e quante l'hanno respinta. */
+  sent: number;
+  failed: number;
+}
+
 export interface Database {
   users: User[];
   maps: PlaceMap[];
@@ -271,4 +296,5 @@ export interface Database {
   log: LogEntry[];
   pushes: PushSub[];
   alerts: Alert[];
+  notices: Notice[];
 }
