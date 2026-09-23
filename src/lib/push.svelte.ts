@@ -33,6 +33,25 @@ function whichMachine(): string {
   return `${sistema} · ${browser}`;
 }
 
+/**
+ * Da un errore di sistema a una frase che si legge.
+ *
+ * Quasi tutti questi guasti non sono di chi guarda e non si risolvono da
+ * qui: dire quale è successo serve a sapere se vale la pena riprovare o se
+ * bisogna aspettare noi.
+ */
+function excuse(error: unknown): string {
+  const detto = error instanceof Error ? error.message : String(error);
+
+  if (/mime|script|register|ServiceWorker/i.test(detto))
+    return 'Questa copia del sito non è al completo: manca il pezzo che resta in ascolto mentre l’app è chiusa. Non dipende da questo telefono — riprova fra un po’.';
+
+  if (/applicationServerKey|subscribe|push service/i.test(detto))
+    return 'Il servizio di consegna del browser ha rifiutato l’iscrizione. Succede quando il telefono è senza rete o quando il sito era stato iscritto con una chiave diversa: spegni e riaccendi.';
+
+  return `Non si è riusciti ad accenderli: ${detto}`;
+}
+
 class Push {
   /** Se questo browser le sa fare. */
   can = $state(false);
@@ -47,6 +66,15 @@ class Push {
    * home. Non è un nostro limite e non si può aggirare: si può solo dirlo.
    */
   needsInstall = $state(false);
+  /**
+   * Perché non si sono accesi, quando non si accendono.
+   *
+   * Senza questo la levetta tornava indietro da sola e non diceva niente, e
+   * «non funziona» è la cosa meno utile che un'interfaccia possa dire: la
+   * prima volta che è successo davvero mancava un file sul server, e da qui
+   * non si poteva sapere.
+   */
+  why = $state('');
 
   async look(): Promise<void> {
     this.can = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -66,6 +94,7 @@ class Push {
   async enable(): Promise<boolean> {
     if (this.busy) return this.on;
     this.busy = true;
+    this.why = '';
 
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
@@ -95,6 +124,9 @@ class Push {
 
       this.on = true;
       return true;
+    } catch (error) {
+      this.why = excuse(error);
+      return false;
     } finally {
       this.busy = false;
     }

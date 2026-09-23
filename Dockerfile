@@ -4,6 +4,10 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY vite.config.js svelte.config.js tsconfig.json index.html ./
 COPY src ./src
+# Quello che esce dal sito cosi' com'e': il service worker, l'icona, il
+# manifesto. Senza, il browser riceve la pagina al posto di /sw.js, si
+# rifiuta di registrarlo — non e' JavaScript — e gli avvisi non si accendono.
+COPY public ./public
 COPY server ./server
 # il contratto con gli agenti: lo importano sia il server che il web, quindi
 # senza di lui non compila ne l'uno ne l'altro

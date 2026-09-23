@@ -27,6 +27,7 @@
     const acceso = await push.enable();
     if (acceso) toast.show('Avvisi accesi: te ne mando uno di prova');
     else if (push.permission === 'denied') toast.show('Il browser li ha bloccati: si riaccendono dalle sue impostazioni');
+    else if (push.permission === 'default') toast.show('Avvisi non accesi: il permesso non è stato dato');
     else toast.show('Non si è riusciti ad accenderli');
 
     if (acceso) void push.tryIt().catch(() => undefined);
@@ -52,7 +53,14 @@
       onchange={(value: boolean) => void flip(value)}
     />
 
-    {#if push.permission === 'denied'}
+    {#if push.why}
+      <!-- cos'è andato storto, per esteso: la levetta da sola direbbe solo
+           che è tornata indietro -->
+      <p class="nota">
+        <Icon name="alert" />
+        {push.why}
+      </p>
+    {:else if push.permission === 'denied'}
       <p class="nota">
         <Icon name="alert" />
         Il browser li ha bloccati per questo sito. Si riaccendono dalle sue impostazioni, alla voce
