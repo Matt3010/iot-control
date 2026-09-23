@@ -17,6 +17,7 @@ import { canonical, readRoute, type Route } from './routing';
 const NOSTRI: ReadonlySet<Route['kind']> = new Set<Route['kind']>([
   'app',
   'agents',
+  'agent',
   'maps',
   'scenes',
   'alerts',

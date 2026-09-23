@@ -3,8 +3,10 @@ export type Route =
   /** Senza handle è un link vecchio: la pagina lo riconosce e si corregge. */
   | { kind: 'map'; handle?: string; slug: string }
   | { kind: 'profile'; handle: string }
-  /** La stanza degli agenti: installarli e collegarli vuole spazio. */
+  /** La stanza degli agenti, dove si installano e si collegano. */
   | { kind: 'agents' }
+  /** E quella di uno solo, grande: le sue telecamere e i suoi comandi. */
+  | { kind: 'agent'; id: string }
   /** E quella delle mappe: indirizzi pubblici, conteggi, e chi può modificarle. */
   | { kind: 'maps' }
   /** Le scene: più cose che partono insieme, ognuna con la sua azione. */
@@ -27,6 +29,9 @@ export function readRoute(path = window.location.pathname): Route {
   if (legacy) return { kind: 'map', slug: legacy[1]!.toLowerCase() };
 
   if (/^\/agents\/?$/i.test(path)) return { kind: 'agents' };
+
+  const one = /^\/agents\/(ag-[a-z0-9-]+)\/?$/i.exec(path);
+  if (one) return { kind: 'agent', id: one[1]! };
 
   if (/^\/maps\/?$/i.test(path)) return { kind: 'maps' };
 
@@ -55,11 +60,14 @@ export const ALERTS_PATH = '/alerts';
 export function canonical(path: string): string {
   const route = readRoute(path);
   if (route.kind === 'agents') return AGENTS_PATH;
+  if (route.kind === 'agent') return agentPath(route.id);
   if (route.kind === 'maps') return MAPS_PATH;
   if (route.kind === 'scenes') return SCENES_PATH;
   if (route.kind === 'alerts') return ALERTS_PATH;
   return path;
 }
+
+export const agentPath = (id: string): string => `${AGENTS_PATH}/${id}`;
 
 export const mapPath = (handle: string, slug: string): string => `/u/${handle}/${slug}`;
 

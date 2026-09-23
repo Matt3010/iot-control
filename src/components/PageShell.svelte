@@ -23,6 +23,7 @@
     count,
     lead,
     siblings = true,
+    back = { href: '/', label: 'Torna alla mappa' },
     layout = 'columns',
     children,
   }: {
@@ -33,6 +34,14 @@
     lead?: string;
     /** Se questa pagina sta nella fila delle altre. Le mappe no. */
     siblings?: boolean;
+    /**
+     * Dove porta il link in cima, quando non è la mappa.
+     *
+     * La pagina di un agente si apre dall'elenco degli agenti, e tornare da
+     * lì alla mappa vorrebbe dire rifare due clic per guardare quello
+     * accanto.
+     */
+    back?: { href: string; label: string };
     /**
      * Come si dispongono le schede.
      *
@@ -60,9 +69,9 @@
 
 <div class="page">
   <header>
-    <a class="back" href="/">
+    <a class="back" href={back.href}>
       <Icon name="collapse" />
-      Torna alla mappa
+      {back.label}
     </a>
 
     <div class="named">

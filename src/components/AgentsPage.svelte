@@ -1,5 +1,6 @@
 <script lang="ts">
   import { devices, type Agent } from '../lib/devices.svelte';
+  import { agentPath } from '../lib/routing';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui } from '../lib/ui.svelte';
@@ -78,6 +79,11 @@
     <section class="card">
       <AgentControls {agent}>
         {#snippet trail()}
+          <!-- la sua pagina, dove le telecamere sono grandi e i comandi
+               stanno sotto le immagini invece che in coda a una colonna -->
+          <Button look="icon" href={agentPath(agent.id)} title="Apri questo agente">
+            <Icon name="full" />
+          </Button>
           <Button
             look="icon"
             title="Rigenera il token"

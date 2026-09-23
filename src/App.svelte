@@ -15,6 +15,7 @@
   import LoginScreen from './components/LoginScreen.svelte';
   import PublicMap from './components/PublicMap.svelte';
   import PublicProfile from './components/PublicProfile.svelte';
+  import AgentPage from './components/AgentPage.svelte';
   import AgentsPage from './components/AgentsPage.svelte';
   import MapsPage from './components/MapsPage.svelte';
   import ScenesPage from './components/ScenesPage.svelte';
@@ -131,6 +132,9 @@
 {:else if route.kind === 'agents'}
   <GuestBar />
   <AgentsPage />
+{:else if route.kind === 'agent'}
+  <GuestBar />
+  <AgentPage id={route.id} />
 {:else if route.kind === 'maps'}
   <GuestBar />
   <MapsPage />
