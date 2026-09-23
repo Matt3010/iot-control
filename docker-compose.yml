@@ -1,12 +1,36 @@
 services:
+  # L'archivio. Sta qui accanto e non esce di casa: nessuna porta pubblicata,
+  # lo raggiunge solo chi e' sulla stessa rete di questo compose.
+  db:
+    image: postgres:17-alpine
+    container_name: place-index-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: place
+      POSTGRES_PASSWORD: place
+      POSTGRES_DB: place_index
+    volumes:
+      - place-index-db:/var/lib/postgresql/data
+    healthcheck:
+      # il server non parte prima che l'archivio risponda: le migrazioni sono
+      # la prima cosa che fa, e su un archivio che non c'e' ancora falliscono
+      test: ["CMD-SHELL", "pg_isready -U place -d place_index"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   place-index:
     build: .
     image: place-index
     container_name: place-index
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
+      DATABASE_URL: postgres://place:place@db:5432/place_index
       # Senza, ne viene generato uno accanto ai dati: mettilo tu se vuoi
       # poter ricreare il container senza buttare fuori nessuno.
       # JWT_SECRET: cambiami
@@ -26,4 +50,7 @@ services:
       - place-index-data:/data
 
 volumes:
+  # Qui dentro restano il segreto delle sessioni e le chiavi degli avvisi: due
+  # file piccoli, che non sono dati da interrogare e non hanno una tabella.
   place-index-data:
+  place-index-db:

@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import type { Transaction } from '../persistence/JsonStore.js';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { iso, when, type Transaction } from '../persistence/db.js';
+import type { Ask, Page } from '../persistence/page.js';
+import { notices } from '../persistence/schema.js';
 import type { Notice } from '../types.js';
 
 /**
@@ -7,19 +10,60 @@ import type { Notice } from '../types.js';
  *
  * Se ne tengono duecento a testa e non uno di più: è una bacheca, non un
  * archivio. Quello che serve è «cos'è successo mentre non guardavo», e la
- * risposta sta nelle ultime dieci righe — il resto è peso che si porta dietro
- * ogni salvataggio.
+ * risposta sta nelle ultime dieci righe.
  */
 const QUANTI = 200;
+
+type Row = typeof notices.$inferSelect;
+
+const toNotice = (row: Row): Notice => ({
+  id: row.id,
+  ownerId: row.ownerId,
+  kind: row.kind,
+  title: row.title,
+  body: row.body,
+  at: iso(row.at) as string,
+  sent: row.sent,
+  failed: row.failed,
+  ...(row.agentId === null ? {} : { agentId: row.agentId }),
+  ...(row.deviceId === null ? {} : { deviceId: row.deviceId }),
+  ...(row.who === null ? {} : { who: row.who }),
+  ...(row.placeName === null ? {} : { where: row.placeName }),
+  ...(row.short === null ? {} : { short: row.short }),
+  ...(row.since === null ? {} : { since: iso(row.since) as string }),
+});
 
 export class NoticeRepository {
   constructor(private readonly tx: Transaction) {}
 
-  /** Tutti i suoi, dal piu' recente. Il pezzo da mostrare lo taglia chi chiede. */
-  findAllOf(ownerId: string): Notice[] {
-    return this.tx.data.notices
-      .filter((one) => one.ownerId === ownerId)
-      .sort((a, b) => b.at.localeCompare(a.at));
+  /**
+   * Un pezzo di elenco, e quanti sono in tutto.
+   *
+   * Il taglio lo fa il database. Prima si leggevano tutte le righe per
+   * buttarne via tutte tranne venti, il che andava bene finché stavano in un
+   * file che era già in memoria: qui vorrebbe dire farsele mandare attraverso
+   * un collegamento per poi scartarle.
+   */
+  async pageOf(ownerId: string, ask: Ask): Promise<Page<Notice>> {
+    const rows = await this.tx.db
+      .select()
+      .from(notices)
+      .where(eq(notices.ownerId, ownerId))
+      .orderBy(desc(notices.at))
+      .limit(ask.limit)
+      .offset(ask.offset);
+
+    const [conto] = await this.tx.db
+      .select({ quanti: sql<number>`count(*)::int` })
+      .from(notices)
+      .where(eq(notices.ownerId, ownerId));
+
+    return {
+      rows: rows.map(toNotice),
+      total: conto?.quanti ?? 0,
+      offset: ask.offset,
+      limit: ask.limit,
+    };
   }
 
   /**
@@ -27,44 +71,69 @@ export class NoticeRepository {
    *
    * Anche gli avvisi di un dispositivo portano il nome del suo agente — serve
    * a sapere di quale casa si parla — ma non sono avvisi *sull'agente*:
-   * contarli faceva credere di aver gia' detto che era tornato, e l'avviso
+   * contarli faceva credere di aver già detto che era tornato, e l'avviso
    * vero partiva due volte.
    */
-  lastAbout(agentId: string): Notice | undefined {
-    return this.tx.data.notices
-      .filter((one) => one.agentId === agentId && !one.deviceId)
-      .sort((a, b) => b.at.localeCompare(a.at))[0];
+  async lastAbout(agentId: string): Promise<Notice | undefined> {
+    const [row] = await this.tx.db
+      .select()
+      .from(notices)
+      .where(and(eq(notices.agentId, agentId), isNull(notices.deviceId)))
+      .orderBy(desc(notices.at))
+      .limit(1);
+    return row ? toNotice(row) : undefined;
   }
 
   /** E l'ultimo detto su un dispositivo, per la stessa ragione. */
-  lastAboutDevice(deviceId: string): Notice | undefined {
-    return this.tx.data.notices
-      .filter((one) => one.deviceId === deviceId)
-      .sort((a, b) => b.at.localeCompare(a.at))[0];
+  async lastAboutDevice(deviceId: string): Promise<Notice | undefined> {
+    const [row] = await this.tx.db
+      .select()
+      .from(notices)
+      .where(eq(notices.deviceId, deviceId))
+      .orderBy(desc(notices.at))
+      .limit(1);
+    return row ? toNotice(row) : undefined;
   }
 
-  add(notice: Omit<Notice, 'id' | 'at'>): Notice {
-    const made: Notice = { id: `avv-${randomUUID()}`, at: new Date().toISOString(), ...notice };
-    this.tx.data.notices.push(made);
+  async add(notice: Omit<Notice, 'id' | 'at'>): Promise<Notice> {
+    const [row] = await this.tx.db
+      .insert(notices)
+      .values({
+        id: `avv-${randomUUID()}`,
+        ownerId: notice.ownerId,
+        kind: notice.kind,
+        agentId: notice.agentId ?? null,
+        deviceId: notice.deviceId ?? null,
+        title: notice.title,
+        body: notice.body,
+        who: notice.who ?? null,
+        placeName: notice.where ?? null,
+        short: notice.short ?? null,
+        since: when(notice.since),
+        sent: notice.sent,
+        failed: notice.failed,
+      })
+      .returning();
 
-    const suoi = this.tx.data.notices.filter((one) => one.ownerId === notice.ownerId);
-    if (suoi.length > QUANTI) {
-      const vecchi = new Set(
-        suoi.sort((a, b) => a.at.localeCompare(b.at)).slice(0, suoi.length - QUANTI).map((one) => one.id),
-      );
-      this.tx.data.notices = this.tx.data.notices.filter((one) => !vecchi.has(one.id));
-    }
-
-    this.tx.markDirty();
-    return made;
+    await this.#prune(notice.ownerId);
+    return toNotice(row as Row);
   }
 
   /** Come è andata la consegna, saputa dopo: si manda e poi si sa. */
-  settle(id: string, sent: number, failed: number): void {
-    const one = this.tx.data.notices.find((row) => row.id === id);
-    if (!one) return;
-    one.sent = sent;
-    one.failed = failed;
-    this.tx.markDirty();
+  async settle(id: string, sent: number, failed: number): Promise<void> {
+    await this.tx.db.update(notices).set({ sent, failed }).where(eq(notices.id, id));
+  }
+
+  /** Oltre la duecentesima si butta, e lo sceglie il database per data. */
+  async #prune(ownerId: string): Promise<void> {
+    await this.tx.db.execute(sql`
+      delete from ${notices}
+      where ${notices.id} in (
+        select ${notices.id} from ${notices}
+        where ${notices.ownerId} = ${ownerId}
+        order by ${notices.at} desc
+        offset ${QUANTI}
+      )
+    `);
   }
 }

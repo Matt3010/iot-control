@@ -1,6 +1,6 @@
 import type { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { notFound } from '../errors/HttpError.js';
-import { store } from '../persistence/JsonStore.js';
+import { store } from '../persistence/db.js';
 import { CategoryRepository } from '../repositories/CategoryRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import type { Category } from '../types.js';
@@ -30,10 +30,10 @@ export class CategoryManager {
   }
 
   update(ownerId: string, id: string, dto: UpdateCategoryDto): Promise<Category> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const categories = new CategoryRepository(tx);
-      if (!categories.owns(ownerId, id)) throw notFound('categoria inesistente');
-      return categories.update(id, dto) as Category;
+      if (!(await categories.owns(ownerId, id))) throw notFound('categoria inesistente');
+      return (await categories.update(id, dto)) as Category;
     });
   }
 
@@ -42,11 +42,11 @@ export class CategoryManager {
    * category and its places are gone, or nothing is.
    */
   remove(ownerId: string, id: string): Promise<{ removedPlaces: number }> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const categories = new CategoryRepository(tx);
-      if (!categories.owns(ownerId, id)) throw notFound('categoria inesistente');
-      const removedPlaces = new PlaceRepository(tx).deleteByCategory(id);
-      categories.delete(id);
+      if (!(await categories.owns(ownerId, id))) throw notFound('categoria inesistente');
+      const removedPlaces = await new PlaceRepository(tx).deleteByCategory(id);
+      await categories.delete(id);
       return { removedPlaces };
     });
   }

@@ -1,7 +1,7 @@
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import type { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { badRequest } from '../errors/HttpError.js';
-import { store } from '../persistence/JsonStore.js';
+import { store } from '../persistence/db.js';
 import { MapRepository } from '../repositories/MapRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import { UserRepository } from '../repositories/UserRepository.js';
@@ -21,12 +21,15 @@ export class UserManager {
    * l'elenco delle porte che qualcuno mi ha lasciato aperte.
    */
   keysOf(email: string): Promise<{ owner: User; map: PlaceMap }[]> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const users = new UserRepository(tx);
-      return new MapRepository(tx)
-        .findEditableBy(email)
-        .map((map) => ({ owner: users.findById(map.ownerId), map }))
-        .filter((pair): pair is { owner: User; map: PlaceMap } => !!pair.owner);
+      const out: { owner: User; map: PlaceMap }[] = [];
+
+      for (const map of await new MapRepository(tx).findEditableBy(email)) {
+        const owner = await users.findById(map.ownerId);
+        if (owner) out.push({ owner, map });
+      }
+      return out;
     });
   }
 
@@ -40,12 +43,12 @@ export class UserManager {
    * l'elenco non serve: `null` vuol dire «tutti quelli che posso vedere».
    */
   reachOf(who: string, email: string): Promise<Scope | undefined> {
-    return store.transaction((tx) => {
-      const owner = new UserRepository(tx).findByIdOrHandle(who);
+    return store.transaction(async (tx) => {
+      const owner = await new UserRepository(tx).findByIdOrHandle(who);
       if (!owner || owner.email === email) return undefined;
 
       const maps = new MapRepository(tx);
-      const mie = maps.findEditableOf(owner.id, email);
+      const mie = await maps.findEditableOf(owner.id, email);
       if (!mie.length) return undefined;
 
       const regole = mie.map((map) => ({ map, rule: maps.ruleFor(map, email) }));
@@ -53,14 +56,12 @@ export class UserManager {
       if (aperte) return { ownerId: owner.id, maps: mie.map((map) => map.id), places: null };
 
       const places = new PlaceRepository(tx);
-      const dentro = new Set(
-        regole.flatMap(({ map, rule }) =>
-          places
-            .findAllOfMaps([map.id])
-            .filter((place) => rule?.only?.includes(place.id))
-            .map((place) => place.id),
-        ),
-      );
+      const dentro = new Set<string>();
+      for (const { map, rule } of regole) {
+        for (const place of await places.findAllOfMaps([map.id])) {
+          if (rule?.only?.includes(place.id)) dentro.add(place.id);
+        }
+      }
       return { ownerId: owner.id, maps: mie.map((map) => map.id), places: [...dentro] };
     });
   }
@@ -72,12 +73,12 @@ export class UserManager {
   async register(dto: RegisterDto, opened: boolean): Promise<User> {
     const { salt, hash } = await hashPassword(dto.password);
 
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const users = new UserRepository(tx);
-      if (users.count() > 0 && !opened) throw badRequest('le iscrizioni sono chiuse');
-      if (users.findByEmail(dto.email)) throw badRequest('questa email è già registrata');
+      if ((await users.count()) > 0 && !opened) throw badRequest('le iscrizioni sono chiuse');
+      if (await users.findByEmail(dto.email)) throw badRequest('questa email è già registrata');
       // il nome lo scegli tu, quindi se è preso te lo diciamo invece di cambiartelo
-      if (users.findByHandle(dto.handle)) throw badRequest('questo nome utente è già preso');
+      if (await users.findByHandle(dto.handle)) throw badRequest('questo nome utente è già preso');
       return users.insert({ email: dto.email, handle: dto.handle, salt, hash });
     });
   }

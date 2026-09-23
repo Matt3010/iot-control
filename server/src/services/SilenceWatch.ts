@@ -1,6 +1,9 @@
 import { hub } from '../iot/hub.js';
 import { noticeManager } from '../managers/NoticeManager.js';
-import { store } from '../persistence/JsonStore.js';
+import { store } from '../persistence/db.js';
+import { AgentRepository } from '../repositories/AgentRepository.js';
+import { DeviceRepository } from '../repositories/DeviceRepository.js';
+import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import type { Agent } from '../types.js';
 
 /**
@@ -71,14 +74,29 @@ function howLong(from: string): string {
  * chilometri non si sa niente, e lo dice gia' il suo avviso.
  */
 async function sweepThings(): Promise<void> {
-  const cose = await store.transaction((tx) =>
-    tx.data.devices
-      .filter((device) => device.watch)
-      .map((device) => ({
-        device,
-        luogo: tx.data.places.find((place) => (place.agentIds ?? []).includes(device.agentId))?.name,
-      })),
-  );
+  const cose = await store.transaction(async (tx) => {
+    const guardati = await new DeviceRepository(tx).findWatched();
+    const places = new PlaceRepository(tx);
+
+    /*
+     * Dove sta ognuno, chiesto una volta per agente.
+     *
+     * Quattro cose guardate nella stessa casa sono quattro volte lo stesso
+     * luogo: la domanda si fa una volta e si tiene da parte, se no ogni giro
+     * di minuto ne farebbe quattro uguali.
+     */
+    const dove = new Map<string, string | undefined>();
+    const out: { device: (typeof guardati)[number]; luogo?: string }[] = [];
+
+    for (const device of guardati) {
+      if (!dove.has(device.agentId)) {
+        dove.set(device.agentId, (await places.findByAgent(device.agentId))?.name);
+      }
+      const luogo = dove.get(device.agentId);
+      out.push({ device, ...(luogo ? { luogo } : {}) });
+    }
+    return out;
+  });
 
   for (const { device, luogo } of cose) {
     if (!hub.isOnline(device.agentId)) {
@@ -136,12 +154,16 @@ export async function sweep(): Promise<void> {
    * quello di Via Panigale e' l'unica informazione che serve davvero per
    * decidere se alzarsi. Un agente puo' anche non stare su nessun luogo.
    */
-  const agents = await store.transaction((tx) =>
-    tx.data.agents.map((agent) => ({
-      agent,
-      luogo: tx.data.places.find((place) => (place.agentIds ?? []).includes(agent.id))?.name,
-    })),
-  );
+  const agents = await store.transaction(async (tx) => {
+    const places = new PlaceRepository(tx);
+    const out: { agent: Agent; luogo?: string }[] = [];
+
+    for (const agent of await new AgentRepository(tx).findAll()) {
+      const luogo = (await places.findByAgent(agent.id))?.name;
+      out.push({ agent, ...(luogo ? { luogo } : {}) });
+    }
+    return out;
+  });
 
   for (const { agent, luogo } of agents) {
     const tace = quiet(agent);

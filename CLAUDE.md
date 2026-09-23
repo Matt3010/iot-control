@@ -84,6 +84,27 @@ sposterebbe su di lui il compito di capirlo.
   dell'app non ne ha, e niente vuoti grandi come mezza pagina.
 - Ogni pezzo nuovo porta il suo commento sul perché esiste, non su cosa fa.
 
+## L'archivio
+
+I dati stanno in Postgres, e ci si parla solo dai repository: un manager non
+scrive SQL e non sa che tabelle esistono. Ogni metodo di un manager è una
+transazione sola — `store.transaction(async (tx) => …)` — e quello che sta
+dentro o succede tutto o non succede niente.
+
+- **Niente leggi-modifica-riscrivi su un numero.** Un contatore si somma
+  dentro al database (`views + 1`), se no due visite nello stesso istante ne
+  contano una. Lo stesso vale per chi si prende un turno: la condizione sta
+  dentro alla scrittura, e chi vince è chi si vede tornare indietro una riga.
+- **Lo schema dice cosa si porta via cosa.** Un agente eliminato porta con sé
+  i suoi dispositivi, e quelli le regole scritte su di loro. Quando serve
+  sapere *quante* ne sono cadute bisogna contarle prima di toglierle.
+- **Una migrazione per ogni modifica allo schema**, generata con
+  `npm run db:genera` e letta prima di lanciarla. Il server le applica da sé
+  quando parte.
+- Per lavorarci in locale serve un Postgres: `docker run -d --name
+  place-index-pg -e POSTGRES_USER=place -e POSTGRES_PASSWORD=place -e
+  POSTGRES_DB=place_index -p 5432:5432 postgres:17-alpine`.
+
 ## Prima di dire che è fatto
 
 Il lavoro si vede girare. `npx svelte-check`, `npx tsc -p server/tsconfig.json

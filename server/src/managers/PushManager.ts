@@ -1,5 +1,5 @@
 import webpush from 'web-push';
-import { store } from '../persistence/JsonStore.js';
+import { store } from '../persistence/db.js';
 import { PushRepository } from '../repositories/PushRepository.js';
 import { pushKeys, subject } from '../push/keys.js';
 import type { PushSub } from '../types.js';

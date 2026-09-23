@@ -3,8 +3,8 @@ import type { SceneDto, SceneStepDto } from '../dto/scene.dto.js';
 import { badGateway, badRequest, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
 import { noticeManager } from './NoticeManager.js';
-import type { Transaction } from '../persistence/JsonStore.js';
-import { store } from '../persistence/JsonStore.js';
+import type { Transaction } from '../persistence/db.js';
+import { store } from '../persistence/db.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { logManager } from './LogManager.js';
@@ -46,7 +46,7 @@ function check(capability: Capability, value: DeviceValue): void {
  * chiama A» girerebbe per sempre, e accorgersene mentre le tende vanno su e
  * giu' e' tardi. Si guarda in avanti prima di scrivere, non dopo.
  */
-function leadsTo(tx: Transaction, from: string, target: string): boolean {
+async function leadsTo(tx: Transaction, from: string, target: string): Promise<boolean> {
   const scenes = new SceneRepository(tx);
   const visti = new Set<string>();
   const da = [from];
@@ -57,7 +57,7 @@ function leadsTo(tx: Transaction, from: string, target: string): boolean {
     if (visti.has(qui)) continue;
     visti.add(qui);
 
-    for (const step of scenes.findById(qui)?.steps ?? []) {
+    for (const step of (await scenes.findById(qui))?.steps ?? []) {
       if (step.scene) da.push(step.scene);
     }
   }
@@ -70,19 +70,19 @@ export class SceneManager {
   }
 
   create(ownerId: string, dto: SceneDto): Promise<Scene> {
-    return store.transaction((tx) => {
-      const steps = this.#clean(tx, ownerId, dto.steps ?? []);
+    return store.transaction(async (tx) => {
+      const steps = await this.#clean(tx, ownerId, dto.steps ?? []);
       return new SceneRepository(tx).insert(ownerId, dto.name, steps);
     });
   }
 
   update(ownerId: string, id: string, dto: SceneDto): Promise<Scene> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const scenes = new SceneRepository(tx);
-      if (!scenes.owns(ownerId, id)) throw notFound('scena inesistente');
+      if (!(await scenes.owns(ownerId, id))) throw notFound('scena inesistente');
 
       const patch: Partial<Scene> = { name: dto.name };
-      if (dto.steps) patch.steps = this.#clean(tx, ownerId, dto.steps, id);
+      if (dto.steps) patch.steps = await this.#clean(tx, ownerId, dto.steps, id);
 
       /*
        * `null` vuol dire «non parte piu' da sola», che e' diverso da «non ne
@@ -101,15 +101,15 @@ export class SceneManager {
             }
           : undefined;
       }
-      return scenes.update(id, patch) as Scene;
+      return (await scenes.update(id, patch)) as Scene;
     });
   }
 
   remove(ownerId: string, id: string): Promise<void> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const scenes = new SceneRepository(tx);
-      if (!scenes.owns(ownerId, id)) throw notFound('scena inesistente');
-      scenes.delete(id);
+      if (!(await scenes.owns(ownerId, id))) throw notFound('scena inesistente');
+      await scenes.delete(id);
     });
   }
 
@@ -134,8 +134,8 @@ export class SceneManager {
    * un giro senza fine muove le tende per sempre.
    */
   async run(ownerId: string, id: string, who?: string, chiamanti: string[] = []): Promise<void> {
-    const { scene, steps } = await store.transaction((tx) => {
-      const found = new SceneRepository(tx).findById(id);
+    const { scene, steps } = await store.transaction(async (tx) => {
+      const found = await new SceneRepository(tx).findById(id);
       if (!found || found.ownerId !== ownerId) throw notFound('scena inesistente');
 
       /*
@@ -143,7 +143,7 @@ export class SceneManager {
        * questo sono da buttare: restano in fila con le altre, perche' l'ordine
        * fra un comando e un avviso e' quello che si e' scritto.
        */
-      const devices = new DeviceRepository(tx).findAllOf(ownerId);
+      const devices = await new DeviceRepository(tx).findAllOf(ownerId);
       const ready = found.steps
         .map((step) => ({ step, device: devices.find((one) => one.id === step.deviceId) }))
         .filter((pair) => !!pair.device || !!pair.step.notify || !!pair.step.scene);
@@ -346,7 +346,12 @@ export class SceneManager {
    * momenti diversi: «apri, aspetta un minuto, richiudi» è una scena sensata,
    * «apri e chiudi nello stesso istante» no.
    */
-  #clean(tx: Transaction, ownerId: string, steps: SceneStepDto[], id?: string): SceneStep[] {
+  async #clean(
+    tx: Transaction,
+    ownerId: string,
+    steps: SceneStepDto[],
+    id?: string,
+  ): Promise<SceneStep[]> {
     const devices = new DeviceRepository(tx);
 
     /*
@@ -358,7 +363,8 @@ export class SceneManager {
     let momento = 0;
     const gia = new Map<string, number>();
 
-    return steps.map((step) => {
+    const out: SceneStep[] = [];
+    for (const step of steps) {
       const after = Math.max(0, Math.round(step.after ?? 0));
 
       /*
@@ -368,7 +374,8 @@ export class SceneManager {
        */
       if (step.notify !== undefined) {
         if (after > 0) momento += 1;
-        return { notify: step.notify, ...(after ? { after } : {}) };
+        out.push({ notify: step.notify, ...(after ? { after } : {}) });
+        continue;
       }
 
       /*
@@ -377,19 +384,20 @@ export class SceneManager {
        * per sempre, e accorgersene mentre le tende vanno su e giù e' tardi.
        */
       if (step.scene) {
-        const altra = new SceneRepository(tx).findById(step.scene);
+        const altra = await new SceneRepository(tx).findById(step.scene);
         if (!altra || altra.ownerId !== ownerId) throw badRequest('scena inesistente');
         if (step.scene === id) throw badRequest('una scena non può chiamare se stessa');
         // in creazione un id ancora non c'è, e un anello non può esistere
-        if (id && leadsTo(tx, step.scene, id)) {
+        if (id && (await leadsTo(tx, step.scene, id))) {
           throw badRequest(`«${altra.name}» riporta a questa, e sarebbe un giro senza fine`);
         }
 
         if (after > 0) momento += 1;
-        return { scene: step.scene, ...(after ? { after } : {}) };
+        out.push({ scene: step.scene, ...(after ? { after } : {}) });
+        continue;
       }
 
-      const device = step.deviceId ? devices.findById(step.deviceId) : undefined;
+      const device = step.deviceId ? await devices.findById(step.deviceId) : undefined;
       if (!device || device.ownerId !== ownerId) throw badRequest('dispositivo inesistente');
 
       const capability = device.capabilities.find((entry) => entry.code === step.code);
@@ -409,13 +417,14 @@ export class SceneManager {
       }
       gia.set(chiave, momento);
 
-      return {
+      out.push({
         deviceId: step.deviceId,
         code: step.code,
         value: step.value as DeviceValue,
         ...(after ? { after } : {}),
-      };
-    });
+      });
+    }
+    return out;
   }
 }
 

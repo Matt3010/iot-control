@@ -13,6 +13,16 @@ export const config = {
   /** I modelli che l'installer di un agente scarica da qui. */
   deployDir: path.join(projectRoot, 'connector', 'deploy'),
   bodyLimit: '128kb',
+  db: {
+    /**
+     * Dove sta l'archivio. Senza, si prova quello che il compose tira su
+     * accanto: in sviluppo la riga giusta e' gia' quella, e in produzione
+     * DATABASE_URL la scrive chi mette in piedi il servizio.
+     */
+    url: process.env.DATABASE_URL ?? 'postgres://place:place@127.0.0.1:5432/place_index',
+    /** Quanti collegamenti aperti al massimo. */
+    pool: Number(process.env.DB_POOL ?? 10),
+  },
   auth: {
     /** Set it in production; otherwise one is generated and kept next to the data. */
     secret: process.env.JWT_SECRET,

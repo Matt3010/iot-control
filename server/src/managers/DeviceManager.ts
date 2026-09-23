@@ -1,7 +1,7 @@
 import type { DeviceSnapshot } from '../../../shared/protocol.js';
 import { badRequest, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
-import { store } from '../persistence/JsonStore.js';
+import { store } from '../persistence/db.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { AlertRepository } from '../repositories/AlertRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
@@ -26,18 +26,18 @@ export class DeviceManager {
 
   /** Accende o spegne l'avviso su un dispositivo. */
   watch(ownerId: string, id: string, wanted: boolean): Promise<Device> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const devices = new DeviceRepository(tx);
-      const device = devices.findById(id);
+      const device = await devices.findById(id);
       if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
 
-      return devices.watch(id, wanted) as Device;
+      return (await devices.watch(id, wanted)) as Device;
     });
   }
 
   find(ownerId: string, id: string): Promise<Device> {
-    return store.transaction((tx) => {
-      const device = new DeviceRepository(tx).findById(id);
+    return store.transaction(async (tx) => {
+      const device = await new DeviceRepository(tx).findById(id);
       if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
       return device;
     });
@@ -50,24 +50,38 @@ export class DeviceManager {
    * viene toccato.
    */
   async sync(ownerId: string, agentId: string, snapshots: DeviceSnapshot[]): Promise<Device[]> {
-    const { devices, gone, scenes, before } = await store.transaction((tx) => {
+    const { devices, gone, scenes, before } = await store.transaction(async (tx) => {
       const repository = new DeviceRepository(tx);
-      const was = repository.findAllOfAgent(agentId).length;
-      const kept = snapshots.map((snapshot) =>
-        repository.upsert(ownerId, agentId, snapshot.externalId, snapshot.name, snapshot.capabilities),
+      const was = (await repository.findAllOfAgent(agentId)).length;
+
+      const kept: Device[] = [];
+      for (const snapshot of snapshots) {
+        kept.push(
+          await repository.upsert(ownerId, agentId, snapshot.externalId, snapshot.name, snapshot.capabilities),
+        );
+      }
+
+      /*
+       * Prima si conta chi li nominava, e solo dopo si tolgono.
+       *
+       * Adesso un dispositivo che sparisce si porta via da sé le regole
+       * scritte su di lui — lo dice lo schema — e contarle dopo vorrebbe dire
+       * contarne sempre zero, cioè dire a chi guarda che non è caduto niente.
+       */
+      const lost = await repository.lostOfAgent(
+        agentId,
+        new Set(snapshots.map((snapshot) => snapshot.externalId)),
       );
-      const lost = repository.pruneAgent(agentId, new Set(snapshots.map((snapshot) => snapshot.externalId)));
-      return {
-        devices: kept,
-        gone: lost,
-        // chi sparisce esce anche dagli insiemi che lo tenevano: un insieme
-        // che prova a comandare un fantasma non si capisce perché non va
-        scenes: lost.length ? new SceneRepository(tx).pruneDevices(new Set(lost)) : 0,
-        // e le regole che lo guardavano: una regola su un fantasma non
-        // scattera' mai, e resterebbe li' a far credere di essere coperti
-        rules: lost.length ? new AlertRepository(tx).pruneDevices(new Set(lost)) : 0,
-        before: was,
-      };
+
+      // chi sparisce esce anche dagli insiemi che lo tenevano: un insieme
+      // che prova a comandare un fantasma non si capisce perché non va
+      const scene = await new SceneRepository(tx).pruneDevices(ownerId, new Set(lost));
+      // e le regole che lo guardavano: una regola su un fantasma non
+      // scattera' mai, e resterebbe li' a far credere di essere coperti
+      await new AlertRepository(tx).pruneDevices(new Set(lost));
+      await repository.deleteMany(lost);
+
+      return { devices: kept, gone: lost, scenes: scene, before: was };
     });
 
     hub.index(agentId, devices);

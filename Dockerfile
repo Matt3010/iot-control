@@ -23,6 +23,9 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server/dist ./server/dist
+# Le migrazioni: file SQL, non codice compilato, e senza di loro il server
+# parte e non trova le tabelle. Le legge lui stesso all'avvio.
+COPY server/drizzle ./server/drizzle
 # I modelli che l'installer di una casa scarica da qui: compose e install.sh.
 COPY connector/deploy ./connector/deploy
 RUN mkdir -p /data && chown -R node:node /data

@@ -3,6 +3,10 @@ import type { Request } from 'express';
 /**
  * Un pezzo di elenco, con il conto di quanto e' lungo.
  *
+ * Il taglio vero lo fa il database, che e' l'unico a poterlo fare senza
+ * mandare in giro le righe da buttare. Qui c'e' la forma della domanda e la
+ * forma della risposta.
+ *
  * Sta qui e non dentro un controllore perche' ogni elenco che cresce da solo
  * — gli avvisi, il registro di una casa, un giorno i luoghi — finisce per
  * volere la stessa cosa: dammene venti, e dimmi quanti sono in tutto. Senza
@@ -42,12 +46,3 @@ export function askOf(req: Request, fallback = 20, max = 100): Ask {
   };
 }
 
-/** Il pezzo chiesto, da un elenco gia' in ordine. */
-export function pageOf<T>(all: T[], ask: Ask): Page<T> {
-  return {
-    rows: all.slice(ask.offset, ask.offset + ask.limit),
-    total: all.length,
-    offset: ask.offset,
-    limit: ask.limit,
-  };
-}

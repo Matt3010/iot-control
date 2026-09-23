@@ -1,5 +1,5 @@
 import { hub } from '../iot/hub.js';
-import { store } from '../persistence/JsonStore.js';
+import { store } from '../persistence/db.js';
 import { AgentRepository } from '../repositories/AgentRepository.js';
 import { LogRepository } from '../repositories/LogRepository.js';
 import type { LogEntry } from '../types.js';
@@ -10,8 +10,8 @@ type Note = Omit<LogEntry, 'id' | 'at'>;
 export class LogManager {
   /** Le ultime ventiquattr'ore di un agente. Di un agente d'altri: niente. */
   ofAgent(ownerId: string, agentId: string): Promise<LogEntry[]> {
-    return store.transaction((tx) => {
-      if (!new AgentRepository(tx).owns(ownerId, agentId)) return [];
+    return store.transaction(async (tx) => {
+      if (!(await new AgentRepository(tx).owns(ownerId, agentId))) return [];
       return new LogRepository(tx).findAgent(ownerId, agentId);
     });
   }

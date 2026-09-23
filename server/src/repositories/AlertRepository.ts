@@ -1,65 +1,103 @@
 import { randomUUID } from 'node:crypto';
-import type { Transaction } from '../persistence/JsonStore.js';
+import { and, eq, inArray } from 'drizzle-orm';
+import { iso, when, type Transaction } from '../persistence/db.js';
+import { alerts } from '../persistence/schema.js';
 import type { Alert } from '../types.js';
 
 /**
  * Le regole: «quando questa cosa diventa così, dimmelo».
  *
- * Stanno sul dispositivo di cui parlano e non in un elenco a parte, perché è
- * lì che si decidono e lì che si vanno a spegnere. Sono poche per definizione
- * — una porta, un congelatore, un sensore — e chi ne scrive venti le spegne
- * tutte dopo due giorni.
+ * Sono poche per definizione — una porta, un congelatore, un sensore — e chi
+ * ne scrive venti le spegne tutte dopo due giorni.
  */
+type Row = typeof alerts.$inferSelect;
+
+const toAlert = (row: Row): Alert => ({
+  id: row.id,
+  ownerId: row.ownerId,
+  deviceId: row.deviceId,
+  code: row.code,
+  becomes: row.becomes,
+  says: row.says,
+  also: row.also,
+  createdAt: iso(row.createdAt) as string,
+  ...(row.off ? { off: true } : {}),
+  ...(row.firedAt ? { firedAt: iso(row.firedAt) as string } : {}),
+});
+
 export class AlertRepository {
   constructor(private readonly tx: Transaction) {}
 
-  findAllOf(ownerId: string): Alert[] {
-    return this.tx.data.alerts.filter((one) => one.ownerId === ownerId);
+  async findAllOf(ownerId: string): Promise<Alert[]> {
+    const rows = await this.tx.db.select().from(alerts).where(eq(alerts.ownerId, ownerId));
+    return rows.map(toAlert);
   }
 
-  findById(id: string): Alert | undefined {
-    return this.tx.data.alerts.find((one) => one.id === id);
+  async findById(id: string): Promise<Alert | undefined> {
+    const [row] = await this.tx.db.select().from(alerts).where(eq(alerts.id, id)).limit(1);
+    return row ? toAlert(row) : undefined;
   }
 
   /** Quelle che guardano quella cosa di quel dispositivo. */
-  findWatching(deviceId: string, code: string): Alert[] {
-    return this.tx.data.alerts.filter((one) => one.deviceId === deviceId && one.code === code && !one.off);
+  async findWatching(deviceId: string, code: string): Promise<Alert[]> {
+    const rows = await this.tx.db
+      .select()
+      .from(alerts)
+      .where(and(eq(alerts.deviceId, deviceId), eq(alerts.code, code), eq(alerts.off, false)));
+    return rows.map(toAlert);
   }
 
-  add(alert: Omit<Alert, 'id' | 'createdAt'>): Alert {
-    const made: Alert = { id: `reg-${randomUUID()}`, createdAt: new Date().toISOString(), ...alert };
-    this.tx.data.alerts.push(made);
-    this.tx.markDirty();
-    return made;
+  async add(alert: Omit<Alert, 'id' | 'createdAt'>): Promise<Alert> {
+    const [row] = await this.tx.db
+      .insert(alerts)
+      .values({
+        id: `reg-${randomUUID()}`,
+        ownerId: alert.ownerId,
+        deviceId: alert.deviceId,
+        code: alert.code,
+        becomes: alert.becomes,
+        says: alert.says,
+        also: alert.also,
+        off: alert.off ?? false,
+        firedAt: when(alert.firedAt),
+      })
+      .returning();
+    return toAlert(row as Row);
   }
 
-  update(id: string, patch: Partial<Pick<Alert, 'off' | 'firedAt'>>): Alert | undefined {
-    const alert = this.findById(id);
-    if (!alert) return undefined;
+  /**
+   * `firedAt` passato vuoto vuol dire «è rientrata», e si scrive come
+   * assenza: è quello che rimette la regola in condizione di scattare.
+   */
+  async update(id: string, patch: Partial<Pick<Alert, 'off' | 'firedAt'>>): Promise<Alert | undefined> {
+    const set = {
+      ...(patch.off === undefined ? {} : { off: patch.off }),
+      ...('firedAt' in patch ? { firedAt: when(patch.firedAt) } : {}),
+    };
+    if (!Object.keys(set).length) return this.findById(id);
 
-    Object.assign(alert, patch);
-    // `firedAt` tolto vuol dire «e' rientrata»: si scrive come assenza
-    if (patch.firedAt === undefined && 'firedAt' in patch) delete alert.firedAt;
-    this.tx.markDirty();
-    return alert;
+    const [row] = await this.tx.db.update(alerts).set(set).where(eq(alerts.id, id)).returning();
+    return row ? toAlert(row) : undefined;
   }
 
-  delete(id: string): boolean {
-    const at = this.tx.data.alerts.findIndex((one) => one.id === id);
-    if (at < 0) return false;
-
-    this.tx.data.alerts.splice(at, 1);
-    this.tx.markDirty();
-    return true;
+  async delete(id: string): Promise<boolean> {
+    const rows = await this.tx.db.delete(alerts).where(eq(alerts.id, id)).returning({ id: alerts.id });
+    return rows.length > 0;
   }
 
-  /** Un dispositivo che non c'è più si porta via le regole che lo nominavano. */
-  pruneDevices(gone: Set<string>): number {
-    const prima = this.tx.data.alerts.length;
-    this.tx.data.alerts = this.tx.data.alerts.filter((one) => !gone.has(one.deviceId));
-
-    const tolte = prima - this.tx.data.alerts.length;
-    if (tolte) this.tx.markDirty();
-    return tolte;
+  /**
+   * Un dispositivo che non c'è più si porta via le regole che lo nominavano.
+   *
+   * Lo dice anche lo schema, con il vincolo sul dispositivo: questo serve a
+   * chi vuole sapere quante ne sono cadute per dirlo a chi sta guardando.
+   */
+  async pruneDevices(gone: Set<string>): Promise<number> {
+    const ids = [...gone];
+    if (!ids.length) return 0;
+    const rows = await this.tx.db
+      .delete(alerts)
+      .where(inArray(alerts.deviceId, ids))
+      .returning({ id: alerts.id });
+    return rows.length;
   }
 }

@@ -1,43 +1,42 @@
 import { randomUUID } from 'node:crypto';
-import type { Transaction } from '../persistence/JsonStore.js';
+import { eq } from 'drizzle-orm';
+import type { Transaction } from '../persistence/db.js';
+import { categories } from '../persistence/schema.js';
 import type { Category } from '../types.js';
 
 export class CategoryRepository {
   constructor(private readonly tx: Transaction) {}
 
   /** Le categorie sono di chi le ha fatte, e valgono su tutte le sue mappe. */
-  findAllOf(ownerId: string): Category[] {
-    return this.tx.data.categories.filter((category) => category.ownerId === ownerId);
+  findAllOf(ownerId: string): Promise<Category[]> {
+    return this.tx.db.select().from(categories).where(eq(categories.ownerId, ownerId));
   }
 
-  findById(id: string): Category | undefined {
-    return this.tx.data.categories.find((category) => category.id === id);
+  async findById(id: string): Promise<Category | undefined> {
+    const [row] = await this.tx.db.select().from(categories).where(eq(categories.id, id)).limit(1);
+    return row;
   }
 
-  owns(ownerId: string, id: string): boolean {
-    return this.findById(id)?.ownerId === ownerId;
+  async owns(ownerId: string, id: string): Promise<boolean> {
+    return (await this.findById(id))?.ownerId === ownerId;
   }
 
-  insert(ownerId: string, data: Omit<Category, 'id' | 'ownerId'>): Category {
-    const category: Category = { id: `cat-${randomUUID()}`, ownerId, ...data };
-    this.tx.data.categories.push(category);
-    this.tx.markDirty();
-    return category;
+  async insert(ownerId: string, data: Omit<Category, 'id' | 'ownerId'>): Promise<Category> {
+    const [row] = await this.tx.db
+      .insert(categories)
+      .values({ id: `cat-${randomUUID()}`, ownerId, ...data })
+      .returning();
+    return row as Category;
   }
 
-  update(id: string, patch: Partial<Omit<Category, 'id' | 'ownerId'>>): Category | undefined {
-    const current = this.findById(id);
-    if (!current) return undefined;
-    Object.assign(current, patch);
-    this.tx.markDirty();
-    return current;
+  async update(id: string, patch: Partial<Omit<Category, 'id' | 'ownerId'>>): Promise<Category | undefined> {
+    if (!Object.keys(patch).length) return this.findById(id);
+    const [row] = await this.tx.db.update(categories).set(patch).where(eq(categories.id, id)).returning();
+    return row;
   }
 
-  delete(id: string): boolean {
-    const at = this.tx.data.categories.findIndex((category) => category.id === id);
-    if (at < 0) return false;
-    this.tx.data.categories.splice(at, 1);
-    this.tx.markDirty();
-    return true;
+  async delete(id: string): Promise<boolean> {
+    const rows = await this.tx.db.delete(categories).where(eq(categories.id, id)).returning({ id: categories.id });
+    return rows.length > 0;
   }
 }

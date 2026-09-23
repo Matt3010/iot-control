@@ -1,43 +1,49 @@
 import { randomUUID } from 'node:crypto';
-import type { Transaction } from '../persistence/JsonStore.js';
+import { eq } from 'drizzle-orm';
+import type { Transaction } from '../persistence/db.js';
+import { groups } from '../persistence/schema.js';
 import type { Group } from '../types.js';
 
 export class GroupRepository {
   constructor(private readonly tx: Transaction) {}
 
   /** I gruppi sono di chi li ha fatti, e valgono su tutte le sue mappe. */
-  findAllOf(ownerId: string): Group[] {
-    return this.tx.data.groups.filter((group) => group.ownerId === ownerId);
+  findAllOf(ownerId: string): Promise<Group[]> {
+    return this.tx.db.select().from(groups).where(eq(groups.ownerId, ownerId));
   }
 
-  findById(id: string): Group | undefined {
-    return this.tx.data.groups.find((group) => group.id === id);
+  async findById(id: string): Promise<Group | undefined> {
+    const [row] = await this.tx.db.select().from(groups).where(eq(groups.id, id)).limit(1);
+    return row;
   }
 
-  owns(ownerId: string, id: string): boolean {
-    return this.findById(id)?.ownerId === ownerId;
+  async owns(ownerId: string, id: string): Promise<boolean> {
+    return (await this.findById(id))?.ownerId === ownerId;
   }
 
-  insert(ownerId: string, name: string): Group {
-    const group: Group = { id: `grp-${randomUUID()}`, ownerId, name };
-    this.tx.data.groups.push(group);
-    this.tx.markDirty();
-    return group;
+  async insert(ownerId: string, name: string): Promise<Group> {
+    const [row] = await this.tx.db
+      .insert(groups)
+      .values({ id: `grp-${randomUUID()}`, ownerId, name })
+      .returning();
+    return row as Group;
   }
 
-  update(id: string, patch: Partial<Pick<Group, 'name'>>): Group | undefined {
-    const current = this.findById(id);
-    if (!current) return undefined;
-    Object.assign(current, patch);
-    this.tx.markDirty();
-    return current;
+  async update(id: string, patch: Partial<Pick<Group, 'name'>>): Promise<Group | undefined> {
+    if (!Object.keys(patch).length) return this.findById(id);
+    const [row] = await this.tx.db.update(groups).set(patch).where(eq(groups.id, id)).returning();
+    return row;
   }
 
-  delete(id: string): boolean {
-    const at = this.tx.data.groups.findIndex((group) => group.id === id);
-    if (at < 0) return false;
-    this.tx.data.groups.splice(at, 1);
-    this.tx.markDirty();
-    return true;
+  /**
+   * Un gruppo eliminato si porta via i suoi legami da solo.
+   *
+   * Lo dice lo schema — `on delete cascade` sulla tabella che tiene insieme
+   * luoghi e gruppi — e non una riga di codice qui che qualcuno un giorno si
+   * dimenticherebbe di scrivere nell'altra cancellazione.
+   */
+  async delete(id: string): Promise<boolean> {
+    const rows = await this.tx.db.delete(groups).where(eq(groups.id, id)).returning({ id: groups.id });
+    return rows.length > 0;
   }
 }

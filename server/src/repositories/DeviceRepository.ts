@@ -1,56 +1,102 @@
 import { randomUUID } from 'node:crypto';
+import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import type { Capability } from '../../../shared/protocol.js';
-import type { Transaction } from '../persistence/JsonStore.js';
+import { iso, type Transaction } from '../persistence/db.js';
+import { devices } from '../persistence/schema.js';
 import type { Device, Place } from '../types.js';
+import { PlaceRepository } from './PlaceRepository.js';
+
+type Row = typeof devices.$inferSelect;
+
+/**
+ * `watch` esce solo quando è acceso.
+ *
+ * Nel database è un sì o un no, qui fuori è un campo che c'è o non c'è: è
+ * come l'hanno sempre visto il protocollo e il browser, e cambiarlo adesso
+ * vorrebbe dire un `false` in più su ogni dispositivo di ogni risposta.
+ */
+const toDevice = (row: Row): Device => ({
+  id: row.id,
+  ownerId: row.ownerId,
+  agentId: row.agentId,
+  externalId: row.externalId,
+  name: row.name,
+  capabilities: row.capabilities,
+  lastSeenAt: iso(row.lastSeenAt) as string,
+  ...(row.watch ? { watch: true } : {}),
+});
 
 export class DeviceRepository {
   constructor(private readonly tx: Transaction) {}
 
-  findAllOf(ownerId: string): Device[] {
-    return this.tx.data.devices.filter((device) => device.ownerId === ownerId);
+  async findAllOf(ownerId: string): Promise<Device[]> {
+    const rows = await this.tx.db.select().from(devices).where(eq(devices.ownerId, ownerId));
+    return rows.map(toDevice);
   }
 
-  findById(id: string): Device | undefined {
-    return this.tx.data.devices.find((device) => device.id === id);
+  async findById(id: string): Promise<Device | undefined> {
+    const [row] = await this.tx.db.select().from(devices).where(eq(devices.id, id)).limit(1);
+    return row ? toDevice(row) : undefined;
   }
 
-  owns(ownerId: string, id: string): boolean {
-    return this.findById(id)?.ownerId === ownerId;
+  async owns(ownerId: string, id: string): Promise<boolean> {
+    return (await this.findById(id))?.ownerId === ownerId;
   }
 
-  findAllOfAgent(agentId: string): Device[] {
-    return this.tx.data.devices.filter((device) => device.agentId === agentId);
+  async findAllOfAgent(agentId: string): Promise<Device[]> {
+    const rows = await this.tx.db.select().from(devices).where(eq(devices.agentId, agentId));
+    return rows.map(toDevice);
+  }
+
+  /** Quelli su cui qualcuno vuole essere avvisato se tacciono. */
+  async findWatched(): Promise<Device[]> {
+    const rows = await this.tx.db.select().from(devices).where(eq(devices.watch, true));
+    return rows.map(toDevice);
+  }
+
+  /** Accende o spegne l'avviso su un dispositivo. */
+  async watch(id: string, wanted: boolean): Promise<Device | undefined> {
+    const [row] = await this.tx.db
+      .update(devices)
+      .set({ watch: wanted })
+      .where(eq(devices.id, id))
+      .returning();
+    return row ? toDevice(row) : undefined;
   }
 
   /**
    * Un dispositivo che torna non è un dispositivo nuovo: si riconosce dal suo
    * id dentro il suo agente, e conserva quello che i luoghi già puntano.
+   *
+   * È una scrittura sola e non una ricerca seguita da una scrittura: fra le
+   * due, due agenti che si ricollegano insieme farebbero in tempo a crearne
+   * due copie. Ora è il vincolo sulla coppia agente-identificativo a dire che
+   * quella riga è una, e chi arriva secondo aggiorna invece di duplicare.
    */
-  /** Accende o spegne l'avviso su un dispositivo. */
-  watch(id: string, wanted: boolean): Device | undefined {
-    const device = this.findById(id);
-    if (!device) return undefined;
-
-    if (wanted) device.watch = true;
-    else delete device.watch;
-    this.tx.markDirty();
-    return device;
-  }
-
-  upsert(ownerId: string, agentId: string, externalId: string, name: string, capabilities: Capability[]): Device {
-    const found = this.tx.data.devices.find((device) => device.agentId === agentId && device.externalId === externalId);
-    const lastSeenAt = new Date().toISOString();
-
-    if (found) {
-      Object.assign(found, { name, capabilities, lastSeenAt });
-      this.tx.markDirty();
-      return found;
-    }
-
-    const device: Device = { id: `dev-${randomUUID()}`, ownerId, agentId, externalId, name, capabilities, lastSeenAt };
-    this.tx.data.devices.push(device);
-    this.tx.markDirty();
-    return device;
+  async upsert(
+    ownerId: string,
+    agentId: string,
+    externalId: string,
+    name: string,
+    capabilities: Capability[],
+  ): Promise<Device> {
+    const [row] = await this.tx.db
+      .insert(devices)
+      .values({
+        id: `dev-${randomUUID()}`,
+        ownerId,
+        agentId,
+        externalId,
+        name,
+        capabilities,
+        lastSeenAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [devices.agentId, devices.externalId],
+        set: { name, capabilities, lastSeenAt: new Date() },
+      })
+      .returning();
+    return toDevice(row as Row);
   }
 
   /**
@@ -60,15 +106,33 @@ export class DeviceRepository {
    * l'ora dell'alba, lo stato dei backup. Tenerli farebbe da fantasmi
    * perennemente «non raggiungibili».
    */
-  pruneAgent(agentId: string, keep: Set<string>): string[] {
-    const going = this.tx.data.devices
-      .filter((device) => device.agentId === agentId && !keep.has(device.externalId))
-      .map((device) => device.id);
-    if (!going.length) return [];
+  async lostOfAgent(agentId: string, keep: Set<string>): Promise<string[]> {
+    const restano = [...keep];
+    const rows = await this.tx.db
+      .select({ id: devices.id })
+      .from(devices)
+      .where(
+        restano.length
+          ? and(eq(devices.agentId, agentId), notInArray(devices.externalId, restano))
+          : eq(devices.agentId, agentId),
+      );
+    return rows.map((row) => row.id);
+  }
 
-    this.tx.data.devices = this.tx.data.devices.filter((device) => !going.includes(device.id));
-    this.tx.markDirty();
-    return going;
+  /**
+   * E poi si tolgono.
+   *
+   * Sono due gesti e non uno perché fra i due ci sta il lavoro di chi li
+   * nominava: una regola scritta su un dispositivo se ne va insieme a lui, e
+   * per poter dire quante ne sono cadute bisogna contarle finché esistono.
+   */
+  async deleteMany(ids: string[]): Promise<number> {
+    if (!ids.length) return 0;
+    const rows = await this.tx.db
+      .delete(devices)
+      .where(inArray(devices.id, ids))
+      .returning({ id: devices.id });
+    return rows.length;
   }
 
   /**
@@ -76,20 +140,16 @@ export class DeviceRepository {
    * resta dov'è, e torna a essere un luogo: era un indirizzo prima di avere
    * un agente.
    */
-  deleteByAgent(agentId: string): { devices: string[]; places: Place[] } {
-    const going = this.tx.data.devices.filter((device) => device.agentId === agentId).map((device) => device.id);
-    this.tx.data.devices = this.tx.data.devices.filter((device) => device.agentId !== agentId);
+  async deleteByAgent(agentId: string): Promise<{ devices: string[]; places: Place[] }> {
+    const rows = await this.tx.db
+      .delete(devices)
+      .where(eq(devices.agentId, agentId))
+      .returning({ id: devices.id });
 
     // i luoghi che lo tenevano cambiano: chi li sta guardando da un'altra
     // scheda deve vederselo staccare, non ritrovarselo staccato ricaricando
-    const touched: Place[] = [];
-    for (const place of this.tx.data.places) {
-      if (place.agentIds?.includes(agentId)) {
-        place.agentIds = place.agentIds.filter((id) => id !== agentId);
-        touched.push(place);
-      }
-    }
-    this.tx.markDirty();
-    return { devices: going, places: touched };
+    const places = await new PlaceRepository(this.tx).detachAgent(agentId);
+    return { devices: rows.map((row) => row.id), places };
   }
+
 }

@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
-import { store } from '../persistence/JsonStore.js';
+import { store } from '../persistence/db.js';
 import { AgentRepository } from '../repositories/AgentRepository.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import type { Agent, Place } from '../types.js';
@@ -29,8 +29,8 @@ export class AgentManager {
   }
 
   find(ownerId: string, id: string): Promise<Agent> {
-    return store.transaction((tx) => {
-      const agent = new AgentRepository(tx).findById(id);
+    return store.transaction(async (tx) => {
+      const agent = await new AgentRepository(tx).findById(id);
       if (!agent || agent.ownerId !== ownerId) throw notFound('agente inesistente');
       return agent;
     });
@@ -44,10 +44,10 @@ export class AgentManager {
   }
 
   rename(ownerId: string, id: string, name: string): Promise<Agent> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
-      if (!agents.owns(ownerId, id)) throw notFound('agente inesistente');
-      return agents.update(id, { name }) as Agent;
+      if (!(await agents.owns(ownerId, id))) throw notFound('agente inesistente');
+      return (await agents.update(id, { name })) as Agent;
     });
   }
 
@@ -56,10 +56,10 @@ export class AgentManager {
     const secret = randomBytes(32).toString('hex');
     const { salt, hash } = await hashPassword(secret);
 
-    const agent = await store.transaction((tx) => {
+    const agent = await store.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
-      if (!agents.owns(ownerId, id)) throw notFound('agente inesistente');
-      return agents.update(id, { salt, hash }) as Agent;
+      if (!(await agents.owns(ownerId, id))) throw notFound('agente inesistente');
+      return (await agents.update(id, { salt, hash })) as Agent;
     });
 
     hub.resync(id);
@@ -71,11 +71,11 @@ export class AgentManager {
    * tenevano restano dove sono: erano luoghi prima di essere interruttori.
    */
   async remove(ownerId: string, id: string): Promise<Place[]> {
-    const { places } = await store.transaction((tx) => {
+    const { places } = await store.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
-      if (!agents.owns(ownerId, id)) throw notFound('agente inesistente');
-      const gone = new DeviceRepository(tx).deleteByAgent(id);
-      agents.delete(id);
+      if (!(await agents.owns(ownerId, id))) throw notFound('agente inesistente');
+      const gone = await new DeviceRepository(tx).deleteByAgent(id);
+      await agents.delete(id);
       return gone;
     });
     hub.forget(id);
@@ -96,8 +96,8 @@ export class AgentManager {
 
   /** Si è fatta viva: serve a dire "collegata l'ultima volta il…" quando non c'è. */
   touch(id: string): Promise<void> {
-    return store.transaction((tx) => {
-      new AgentRepository(tx).update(id, { lastSeenAt: new Date().toISOString() });
+    return store.transaction(async (tx) => {
+      await new AgentRepository(tx).update(id, { lastSeenAt: new Date().toISOString() });
     });
   }
 }

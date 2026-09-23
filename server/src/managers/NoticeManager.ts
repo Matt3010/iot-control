@@ -1,6 +1,6 @@
 import { hub } from '../iot/hub.js';
-import { store } from '../persistence/JsonStore.js';
-import { pageOf, type Ask, type Page } from '../persistence/page.js';
+import { store } from '../persistence/db.js';
+import type { Ask, Page } from '../persistence/page.js';
 import { NoticeRepository } from '../repositories/NoticeRepository.js';
 import { pushManager, type Note } from './PushManager.js';
 import type { Notice } from '../types.js';
@@ -16,7 +16,7 @@ import type { Notice } from '../types.js';
  */
 export class NoticeManager {
   mine(ownerId: string, ask: Ask): Promise<Page<Notice>> {
-    return store.transaction((tx) => pageOf(new NoticeRepository(tx).findAllOf(ownerId), ask));
+    return store.transaction((tx) => new NoticeRepository(tx).pageOf(ownerId, ask));
   }
 
   /** L'ultimo detto su un agente: serve a non ripetere la stessa cosa. */

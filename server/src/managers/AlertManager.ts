@@ -1,8 +1,9 @@
 import { badRequest, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
-import { store } from '../persistence/JsonStore.js';
+import { store } from '../persistence/db.js';
 import { AlertRepository } from '../repositories/AlertRepository.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
+import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import type { Alert, Device } from '../types.js';
 import { noticeManager } from './NoticeManager.js';
 import { says } from './says.js';
@@ -23,17 +24,17 @@ export class AlertManager {
 
   /** Scrive una regola nuova, dopo aver controllato che abbia senso. */
   add(ownerId: string, deviceId: string, code: string, becomes: string): Promise<Alert> {
-    return store.transaction((tx) => {
-      const device = new DeviceRepository(tx).findById(deviceId);
+    return store.transaction(async (tx) => {
+      const device = await new DeviceRepository(tx).findById(deviceId);
       if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
 
       const capability = device.capabilities.find((one) => one.code === code);
       if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
 
       const alerts = new AlertRepository(tx);
-      const gia = alerts
-        .findAllOf(ownerId)
-        .some((one) => one.deviceId === deviceId && one.code === code && one.becomes === becomes);
+      const gia = (await alerts.findAllOf(ownerId)).some(
+        (one) => one.deviceId === deviceId && one.code === code && one.becomes === becomes,
+      );
       if (gia) throw badRequest('questa regola c’è già');
 
       return alerts.add({
@@ -49,21 +50,21 @@ export class AlertManager {
 
   /** Spegne o riaccende una regola senza cancellarla. */
   flip(ownerId: string, id: string, off: boolean): Promise<Alert> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const alerts = new AlertRepository(tx);
-      const alert = alerts.findById(id);
+      const alert = await alerts.findById(id);
       if (!alert || alert.ownerId !== ownerId) throw notFound('regola inesistente');
 
-      return alerts.update(id, { off }) as Alert;
+      return (await alerts.update(id, { off })) as Alert;
     });
   }
 
   remove(ownerId: string, id: string): Promise<void> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const alerts = new AlertRepository(tx);
-      const alert = alerts.findById(id);
+      const alert = await alerts.findById(id);
       if (!alert || alert.ownerId !== ownerId) throw notFound('regola inesistente');
-      alerts.delete(id);
+      await alerts.delete(id);
     });
   }
 
@@ -78,25 +79,24 @@ export class AlertManager {
   async happened(deviceId: string, code: string, value: unknown): Promise<void> {
     const adesso = String(value);
 
-    const scattate = await store.transaction((tx) => {
+    const scattate = await store.transaction(async (tx) => {
       const alerts = new AlertRepository(tx);
-      const devices = new DeviceRepository(tx);
+      const device = await new DeviceRepository(tx).findById(deviceId);
       const out: { alert: Alert; device: Device; luogo?: string }[] = [];
+      if (!device) return out;
 
-      for (const alert of alerts.findWatching(deviceId, code)) {
-        const device = devices.findById(deviceId);
-        if (!device) continue;
+      const luogo = (await new PlaceRepository(tx).findByAgent(device.agentId))?.name;
 
+      for (const alert of await alerts.findWatching(deviceId, code)) {
         const centrata = alert.becomes === adesso;
         if (!centrata) {
           // è rientrata: da qui in poi può scattare di nuovo
-          if (alert.firedAt) alerts.update(alert.id, { firedAt: undefined });
+          if (alert.firedAt) await alerts.update(alert.id, { firedAt: undefined });
           continue;
         }
 
         if (alert.firedAt) continue;
-        alerts.update(alert.id, { firedAt: new Date().toISOString() });
-        const luogo = tx.data.places.find((place) => (place.agentIds ?? []).includes(device.agentId))?.name;
+        await alerts.update(alert.id, { firedAt: new Date().toISOString() });
         out.push({ alert, device, ...(luogo ? { luogo } : {}) });
       }
       return out;

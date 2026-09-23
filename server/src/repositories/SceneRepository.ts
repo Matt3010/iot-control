@@ -1,71 +1,93 @@
 import { randomUUID } from 'node:crypto';
-import type { Transaction } from '../persistence/JsonStore.js';
+import { and, eq, isNull, ne, or } from 'drizzle-orm';
+import type { Transaction } from '../persistence/db.js';
+import { scenes } from '../persistence/schema.js';
 import type { Scene, SceneStep } from '../types.js';
+
+type Row = typeof scenes.$inferSelect;
+
+const toScene = (row: Row): Scene => ({
+  id: row.id,
+  ownerId: row.ownerId,
+  name: row.name,
+  steps: row.steps,
+  ...(row.timing ? { when: row.timing } : {}),
+  ...(row.lastRunAt ? { lastRunAt: row.lastRunAt } : {}),
+});
 
 export class SceneRepository {
   constructor(private readonly tx: Transaction) {}
 
   /** Le scene sono di chi le ha fatte, come gli agenti. */
-  findAllOf(ownerId: string): Scene[] {
-    return this.tx.data.scenes.filter((scene) => scene.ownerId === ownerId);
+  async findAllOf(ownerId: string): Promise<Scene[]> {
+    const rows = await this.tx.db.select().from(scenes).where(eq(scenes.ownerId, ownerId));
+    return rows.map(toScene);
   }
 
-  findById(id: string): Scene | undefined {
-    return this.tx.data.scenes.find((scene) => scene.id === id);
+  /** Tutte, di tutti: le guarda l'orologio, che non lavora per nessuno in particolare. */
+  async findAll(): Promise<Scene[]> {
+    const rows = await this.tx.db.select().from(scenes);
+    return rows.map(toScene);
   }
 
-  owns(ownerId: string, id: string): boolean {
-    return this.findById(id)?.ownerId === ownerId;
+  async findById(id: string): Promise<Scene | undefined> {
+    const [row] = await this.tx.db.select().from(scenes).where(eq(scenes.id, id)).limit(1);
+    return row ? toScene(row) : undefined;
   }
 
-  insert(ownerId: string, name: string, steps: SceneStep[]): Scene {
-    const scene: Scene = { id: `scn-${randomUUID()}`, ownerId, name, steps };
-    this.tx.data.scenes.push(scene);
-    this.tx.markDirty();
-    return scene;
+  async owns(ownerId: string, id: string): Promise<boolean> {
+    return (await this.findById(id))?.ownerId === ownerId;
   }
 
-  update(id: string, patch: Partial<Pick<Scene, 'name' | 'steps' | 'when'>>): Scene | undefined {
-    const current = this.findById(id);
-    if (!current) return undefined;
-    Object.assign(current, patch);
-    this.tx.markDirty();
-    return current;
+  async insert(ownerId: string, name: string, steps: SceneStep[]): Promise<Scene> {
+    const [row] = await this.tx.db
+      .insert(scenes)
+      .values({ id: `scn-${randomUUID()}`, ownerId, name, steps })
+      .returning();
+    return toScene(row as Row);
+  }
+
+  async update(id: string, patch: Partial<Pick<Scene, 'name' | 'steps' | 'when'>>): Promise<Scene | undefined> {
+    const set = {
+      ...(patch.name === undefined ? {} : { name: patch.name }),
+      ...(patch.steps === undefined ? {} : { steps: patch.steps }),
+      ...('when' in patch ? { timing: patch.when ?? null } : {}),
+    };
+    if (!Object.keys(set).length) return this.findById(id);
+
+    const [row] = await this.tx.db.update(scenes).set(set).where(eq(scenes.id, id)).returning();
+    return row ? toScene(row) : undefined;
   }
 
   /**
-   * Si prende il turno di questo minuto, se nessuno l'ha gia' preso.
+   * Si prende il turno di questo minuto, se nessuno l'ha già preso.
    *
    * L'orologio non esegue mai di sua iniziativa: prima scrive che quella
-   * scena e' partita in quel minuto, e solo se la scrittura ha vinto la fa
-   * partire davvero. Oggi vince sempre, perche' il processo e' uno; domani,
-   * con un archivio condiviso, la stessa riga diventa la gara fra due server
-   * senza che l'orologio debba saperne niente.
+   * scena è partita in quel minuto, e solo se la scrittura ha vinto la fa
+   * partire davvero. Adesso la gara è vera. La condizione sta dentro alla
+   * scrittura, non in una lettura fatta prima: è il database a dire chi è
+   * arrivato primo, e due server che battono lo stesso minuto ne vedono uno
+   * solo tornare con una riga in mano.
    */
-  claim(id: string, minute: string): boolean {
-    const scene = this.findById(id);
-    if (!scene || scene.lastRunAt === minute) return false;
-
-    scene.lastRunAt = minute;
-    this.tx.markDirty();
-    return true;
+  async claim(id: string, minute: string): Promise<boolean> {
+    const rows = await this.tx.db
+      .update(scenes)
+      .set({ lastRunAt: minute })
+      .where(
+        and(eq(scenes.id, id), or(isNull(scenes.lastRunAt), ne(scenes.lastRunAt, minute))),
+      )
+      .returning({ id: scenes.id });
+    return rows.length > 0;
   }
 
-  /** Toglie l'orario a una scena: un appuntamento passato non e' un appuntamento. */
-  forgetWhen(id: string): void {
-    const scene = this.findById(id);
-    if (!scene?.when) return;
-
-    delete scene.when;
-    this.tx.markDirty();
+  /** Toglie l'orario a una scena: un appuntamento passato non è un appuntamento. */
+  async forgetWhen(id: string): Promise<void> {
+    await this.tx.db.update(scenes).set({ timing: null }).where(eq(scenes.id, id));
   }
 
-  delete(id: string): boolean {
-    const at = this.tx.data.scenes.findIndex((scene) => scene.id === id);
-    if (at < 0) return false;
-    this.tx.data.scenes.splice(at, 1);
-    this.tx.markDirty();
-    return true;
+  async delete(id: string): Promise<boolean> {
+    const rows = await this.tx.db.delete(scenes).where(eq(scenes.id, id)).returning({ id: scenes.id });
+    return rows.length > 0;
   }
 
   /**
@@ -75,18 +97,24 @@ export class SceneRepository {
    * tolto da Home Assistant. Lasciarle lì vorrebbe dire una scena che prova a
    * comandare un fantasma, e non si capirebbe perché non parte.
    *
-   * Torna quante scene ne hanno risentito.
+   * Le righe stanno dentro a un documento, quindi il taglio si fa qui: si
+   * guardano le scene di chi ha perso quei dispositivi — non quelle di
+   * tutti — e si riscrivono solo quelle che li nominavano davvero. Torna
+   * quante scene ne hanno risentito.
    */
-  pruneDevices(gone: Set<string>): number {
+  async pruneDevices(ownerId: string, gone: Set<string>): Promise<number> {
+    if (!gone.size) return 0;
+
+    const rows = await this.tx.db.select().from(scenes).where(eq(scenes.ownerId, ownerId));
+
     let touched = 0;
-    for (const scene of this.tx.data.scenes) {
+    for (const row of rows) {
       // le righe che mandano un avviso non nominano nessun dispositivo
-      const kept = scene.steps.filter((step) => !step.deviceId || !gone.has(step.deviceId));
-      if (kept.length === scene.steps.length) continue;
-      scene.steps = kept;
+      const kept = row.steps.filter((step) => !step.deviceId || !gone.has(step.deviceId));
+      if (kept.length === row.steps.length) continue;
+      await this.tx.db.update(scenes).set({ steps: kept }).where(eq(scenes.id, row.id));
       touched += 1;
     }
-    if (touched) this.tx.markDirty();
     return touched;
   }
 }

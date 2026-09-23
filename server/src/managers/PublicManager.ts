@@ -1,5 +1,5 @@
 import { notFound } from '../errors/HttpError.js';
-import { store } from '../persistence/JsonStore.js';
+import { store } from '../persistence/db.js';
 import { CategoryRepository } from '../repositories/CategoryRepository.js';
 import { GroupRepository } from '../repositories/GroupRepository.js';
 import { MapRepository } from '../repositories/MapRepository.js';
@@ -50,31 +50,31 @@ export class PublicManager {
    * stessa persona di poco fa, o se è chi la mappa ce l'ha.
    */
   map(handle: string | undefined, slug: string, visit?: Visit): Promise<PublicMap> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const users = new UserRepository(tx);
       const maps = new MapRepository(tx);
 
       let map;
       if (handle === undefined) {
-        map = maps.findPublishedBySlug(slug);
+        map = await maps.findPublishedBySlug(slug);
       } else {
-        const of = users.findByHandle(handle);
-        map = of && maps.findBySlug(of.id, slug);
+        const of = await users.findByHandle(handle);
+        map = of ? await maps.findBySlug(of.id, slug) : undefined;
       }
       if (!map?.published) throw notFound('mappa inesistente');
 
-      const owner = users.findById(map.ownerId);
+      const owner = await users.findById(map.ownerId);
       if (counts(visit, map.ownerId) && visit) {
-        maps.countVisit(map.id, {
+        await maps.countVisit(map.id, {
           opened: visit.opened,
           newToday: visit.newToday,
           fromProfile: visit.fromProfile,
         });
-        if (visit.firstAfterProfile) users.countFollowed(map.ownerId);
+        if (visit.firstAfterProfile) await users.countFollowed(map.ownerId);
       }
-      const places = new PlaceRepository(tx)
-        .findAllOfMaps([map.id])
-        .filter((place) => !place.private);
+      const places = (await new PlaceRepository(tx).findAllOfMaps([map.id])).filter(
+        (place) => !place.private,
+      );
 
       const usedCategories = new Set(places.map((place) => place.categoryId));
       const usedGroups = new Set(places.flatMap((place) => place.groupIds));
@@ -82,27 +82,29 @@ export class PublicManager {
       return {
         map,
         handle: owner?.handle ?? '',
-        categories: new CategoryRepository(tx)
-          .findAllOf(map.ownerId)
-          .filter((category) => usedCategories.has(category.id)),
-        groups: new GroupRepository(tx).findAllOf(map.ownerId).filter((group) => usedGroups.has(group.id)),
+        categories: (await new CategoryRepository(tx).findAllOf(map.ownerId)).filter((category) =>
+          usedCategories.has(category.id),
+        ),
+        groups: (await new GroupRepository(tx).findAllOf(map.ownerId)).filter((group) =>
+          usedGroups.has(group.id),
+        ),
         places,
       };
     });
   }
 
   profile(handle: string, visit?: Visit): Promise<PublicProfile> {
-    return store.transaction((tx) => {
+    return store.transaction(async (tx) => {
       const users = new UserRepository(tx);
-      const owner = users.findByHandle(handle);
+      const owner = await users.findByHandle(handle);
       if (!owner) throw notFound('profilo inesistente');
       if (counts(visit, owner.id) && visit) {
-        users.countVisit(owner.id, { opened: visit.opened, newToday: visit.newToday });
+        await users.countVisit(owner.id, { opened: visit.opened, newToday: visit.newToday });
       }
 
-      const maps = new MapRepository(tx).findPublishedOf(owner.id);
-      const places = new PlaceRepository(tx).findAllOfMaps(maps.map((map) => map.id));
-      const categories = new CategoryRepository(tx).findAllOf(owner.id);
+      const maps = await new MapRepository(tx).findPublishedOf(owner.id);
+      const places = await new PlaceRepository(tx).findAllOfMaps(maps.map((map) => map.id));
+      const categories = await new CategoryRepository(tx).findAllOf(owner.id);
       const emojiOf = new Map(categories.map((category) => [category.id, category.emoji]));
 
       return {

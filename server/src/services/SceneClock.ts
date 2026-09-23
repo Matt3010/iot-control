@@ -1,7 +1,7 @@
 import { toSceneView } from '../dto/views.js';
 import { hub } from '../iot/hub.js';
 import { sceneManager } from '../managers/SceneManager.js';
-import { store } from '../persistence/JsonStore.js';
+import { store } from '../persistence/db.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import type { Scene } from '../types.js';
 
@@ -78,7 +78,7 @@ function due(scene: Scene): { yes: boolean; minute: string; over: boolean } {
 
 /** Un giro solo. Esportato perché si possa provare senza aspettare un minuto. */
 export async function tick(): Promise<void> {
-  const scenes = await store.transaction((tx) => tx.data.scenes.slice());
+  const scenes = await store.transaction((tx) => new SceneRepository(tx).findAll());
 
   for (const scene of scenes) {
     const { yes, minute, over } = due(scene);
@@ -118,9 +118,9 @@ export async function tick(): Promise<void> {
  * passato, la prossima volta non ci si fida piu' di quello che c'e' scritto.
  */
 async function scorda(scene: Scene): Promise<void> {
-  const dopo = await store.transaction((tx) => {
+  const dopo = await store.transaction(async (tx) => {
     const scenes = new SceneRepository(tx);
-    scenes.forgetWhen(scene.id);
+    await scenes.forgetWhen(scene.id);
     return scenes.findById(scene.id);
   });
   if (dopo) hub.changed(scene.ownerId, { kind: 'scene', id: dopo.id, value: toSceneView(dopo) });
