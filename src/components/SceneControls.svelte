@@ -54,7 +54,6 @@
 
 <div class="set" class:is-off={!live} class:is-busy={busy}>
   <div class="set-head">
-    <span class="set-mark" aria-hidden="true"><Icon name="scene" /></span>
     <span class="set-name">{scene.name}</span>
     {#if mute}
       <span class="set-away" title={`${mute} non rispond${mute === 1 ? 'e' : 'ono'}`}>
@@ -66,8 +65,7 @@
     <!-- un triangolo e non la parola «parti»: quello che fa un tasto del
          genere si sa già, e scritto sembrava un'etichetta da leggere -->
     <Button
-      look="icon"
-      extra="set-go"
+      look="play"
       title={busy ? 'Sta partendo' : `Fai partire «${scene.name}»`}
       disabled={!scene.steps.length || !live || busy}
       onclick={ask}
@@ -105,19 +103,6 @@
 
   .set-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
-  .set-mark {
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    flex: none;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
-    color: var(--accent);
-  }
-
-  .set-mark :global(.ico) { width: 13px; height: 13px; }
-
   .set-name {
     flex: 1;
     min-width: 0;
@@ -133,25 +118,6 @@
   .set-away { display: grid; place-items: center; flex: none; color: var(--danger); }
 
   .set-away :global(.ico) { width: 14px; height: 14px; }
-
-  /* il tasto che la fa partire: tondo e pieno come un tasto di riproduzione,
-     perche' e' l'unica cosa che si preme tutti i giorni */
-  .set :global(.set-go) {
-    flex: none;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: rgb(var(--base));
-  }
-
-  .set :global(.set-go:hover:not(:disabled)) {
-    background: color-mix(in srgb, var(--accent) 86%, white);
-  }
-
-  .set :global(.set-go:disabled) { background: var(--sunken-hover); color: var(--ink-3); }
-
-  .set :global(.set-go .ico) { width: 14px; height: 14px; }
 
   /* cosa succede quando parte, riga per riga: una scena si legge per sapere
      cosa muove, e il nome di chi si muove va davanti */

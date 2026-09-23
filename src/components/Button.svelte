@@ -8,6 +8,7 @@
    * - `primary`: la cosa da fare, una per schermata
    * - `ghost`:   l'alternativa, con il suo contorno
    * - `icon`:    un'icona sola, nelle testate e nelle righe
+   * - `play`:    tondo e pieno, per la cosa che fa partire qualcosa
    * - `link`:    un comando scritto piccolo, in mezzo al testo
    * - `danger`:  quello che porta via qualcosa
    * - `danger-solid`: lo stesso, ma quando è lui la risposta a una domanda
@@ -24,7 +25,7 @@
    * ospita per decorarlo (la classe finisce sull'elemento, ma va raggiunta con
    * :global perché il markup è di questo componente).
    */
-  type Look = 'primary' | 'ghost' | 'icon' | 'link' | 'danger' | 'danger-solid';
+  type Look = 'primary' | 'ghost' | 'icon' | 'play' | 'link' | 'danger' | 'danger-solid';
 
   let {
     look = 'ghost',
@@ -148,6 +149,42 @@
 
   .icon:hover { background: var(--sunken-hover); color: var(--ink); }
   .icon:disabled, .icon[aria-disabled='true'] { opacity: 0.3; }
+
+  /* il tondo pieno ------------------------------------------------------- */
+
+  /* Un triangolo dentro un cerchio pieno: la forma che vuol dire «parte» in
+     ogni cosa che si sia mai premuta. Sta qui e non in un foglio di stile
+     accanto a chi lo usa, se no la prossima cosa che parte avrebbe un tondo
+     di un altro verde. */
+  .play {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    transition: background 0.15s, filter 0.15s, transform 0.14s var(--ease);
+  }
+
+  .play :global(.ico) {
+    width: 14px;
+    height: 14px;
+    /* la punta del triangolo tira a destra: al centro esatto sembra storto */
+    margin-left: 1px;
+    fill: currentColor;
+  }
+
+  .play:hover:not(:disabled) { filter: brightness(1.08); }
+  .play:active:not(:disabled) { transform: scale(0.94); }
+
+  .play:disabled, .play[aria-disabled='true'] {
+    background: var(--sunken-hover);
+    color: var(--ink-3);
+  }
 
   /* ---------------------------------------------------------------- link -- */
   .link {
