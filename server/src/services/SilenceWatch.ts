@@ -111,15 +111,28 @@ async function sweepThings(): Promise<void> {
       mute.delete(device.id);
       if (detto?.kind !== 'silent') continue;
 
+      /*
+       * Quanto è durato, come per un agente.
+       *
+       * «Ha ripreso a rispondere» da solo non dice niente di utile: una cosa
+       * tornata dopo due minuti e una tornata dopo due giorni sono due
+       * notizie diverse, e di solito quella lunga vuol dire che qualcuno è
+       * andato lì a rimetterla a posto. Il conto parte da dove il silenzio
+       * era cominciato — per questo l'avviso di prima si porta dietro
+       * `since` — e non da quando ce ne siamo accorti: in mezzo ci sono i
+       * minuti che si aspettano apposta.
+       */
+      const muto = howLong(detto.since ?? detto.at);
+
       await noticeManager.tell(device.ownerId, {
         kind: 'back',
         deviceId: device.id,
         agentId: device.agentId,
         who: device.name,
         ...(luogo ? { where: luogo } : {}),
-        short: 'ha ripreso a rispondere',
+        short: `ha ripreso a rispondere dopo ${muto}`,
         title: `${device.name} risponde di nuovo`,
-        body: `Il dispositivo${luogo ? ` su «${luogo}»` : ''} ha ripreso a rispondere.`,
+        body: `Il dispositivo${luogo ? ` su «${luogo}»` : ''} ha ripreso a rispondere dopo ${muto} di silenzio.`,
       });
       continue;
     }
