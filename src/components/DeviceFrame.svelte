@@ -280,11 +280,16 @@
     </button>
   {/if}
 
-  <div class="foot">
+  <!-- La fascia sta dentro l'inquadratura, in alto.
+       Sotto rubava una riga a ogni telecamera, e in una colonna di quattro
+       erano quattro righe di cornice per due tasti che si premono di rado.
+       Sopra l'immagine non tolgono niente: l'alto di un'inquadratura e' cielo
+       o soffitto, ed e' il posto che gia' guardano le telecamere vere. -->
+  <div class="hud" class:is-bare={!src && !live}>
     <!-- Il motivo si scrive una volta sola: se non c'è ancora nessuna
-         immagine lo dice il riquadro, e ripeterlo qui sotto sarebbe la stessa
-         frase due volte. Con un'immagine vecchia davanti, invece, qui è
-         l'unico posto dove dirlo. -->
+         immagine lo dice il riquadro, e ripeterlo qui sarebbe la stessa frase
+         due volte. Con un'immagine vecchia davanti, invece, qui è l'unico
+         posto dove dirlo. -->
     <span class="when">
       {#if live && at}<i class="now"></i> in diretta
       {:else if failing && at}{failing}
@@ -295,18 +300,24 @@
       {#if live}
         <!-- Fermarla è quello che fa smettere di arrivare: finché scorre,
              scorre anche l'upload di casa. -->
-        <Button look="icon" size="sm" title="Ferma la diretta" onclick={() => (asked = false)}>
+        <Button look="icon" size="sm" extra="hud-btn" title="Ferma la diretta" onclick={() => (asked = false)}>
           <Icon name="pause" />
         </Button>
       {:else}
-        <Button look="icon" size="sm" title="Aggiorna adesso" disabled={loading} onclick={refresh}>
+        <Button look="icon" size="sm" extra="hud-btn" title="Aggiorna adesso" disabled={loading} onclick={refresh}>
           <Icon name="refresh" />
         </Button>
       {/if}
-      <Button look="icon" size="sm" title="A tutto schermo" onclick={() => {
+      <Button
+        look="icon"
+        size="sm"
+        extra="hud-btn"
+        title="A tutto schermo"
+        onclick={() => {
           full = true;
           fullReady = false;
-        }}>
+        }}
+      >
         <Icon name="full" />
       </Button>
     </span>
@@ -391,23 +402,48 @@
   .acts {
     display: flex;
     align-items: center;
+    flex: none;
     gap: 2px;
   }
 
-  .foot {
+  .hud :global(.hud-btn) { color: rgb(255 255 255 / 0.8); }
+
+  .hud :global(.hud-btn:hover) { background: rgb(255 255 255 / 0.16); color: #fff; }
+
+  .hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
     min-width: 0;
+    padding: 5px 5px 14px;
+    border-radius: var(--r-sm) var(--r-sm) 0 0;
+    /* una velatura che sfuma, non una barra: sotto c'e' un'immagine, e una
+       striscia piena la taglierebbe in due */
+    background: linear-gradient(to bottom, rgb(0 0 0 / 0.55), transparent);
+    pointer-events: none;
   }
 
+  /* i tasti invece si premono: la fascia lascia passare il clic all'immagine,
+     loro no */
+  .hud :global(.hud-btn) { pointer-events: auto; }
+
+  /* senza niente da guardare sotto non serve velare il nero */
+  .hud.is-bare { background: none; }
+
   /* l'ora del fotogramma: è l'unica cosa che distingue una telecamera ferma
-     da una telecamera che ha smesso di rispondere */
+     da una telecamera che ha smesso di rispondere. Bianca, perche' adesso sta
+     su un'immagine e non su una scheda. */
   .when {
     min-width: 0;
+    padding-left: 5px;
     font-size: 11px;
-    color: var(--ink-3);
+    color: rgb(255 255 255 / 0.82);
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
     font-variant-numeric: tabular-nums;
     overflow: hidden;
     text-overflow: ellipsis;
