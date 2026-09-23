@@ -94,7 +94,21 @@
 
 <div id="panel" class="surface" class:is-collapsed={collapsed}>
   <div class="panel-head">
-    <MapSwitcher />
+    <!--
+      Il nome della mappa, e sotto con che utente sei entrato.
+      Chi sei stava solo nel titolo del tasto per uscire: cioè da nessuna
+      parte su un telefono, e «esci» senza sapere da cosa è una domanda senza
+      risposta — soprattutto in un'app dove si può stare dentro i dati di
+      qualcun altro. Accanto al nome della mappa non ci stava per intero, e
+      mezzo nome utente non dice niente; sotto, nella stessa colonna, ha la
+      riga tutta per sé.
+    -->
+    <span class="titled">
+      <MapSwitcher />
+      {#if auth.account}
+        <span class="whoami" title={auth.account.email}>@{auth.account.handle}</span>
+      {/if}
+    </span>
     <span class="panel-head-end">
       {#if !store.loading}
         <span
@@ -107,13 +121,6 @@
           {store.currentPlaces.length}
           {store.currentPlaces.length === 1 ? 'luogo' : 'luoghi'}
         </span>
-      {/if}
-      <!-- Chi sei. Stava solo nel titolo del tasto per uscire, cioè da nessuna
-           parte su un telefono: e «esci» senza sapere da cosa è una domanda
-           senza risposta. Il nome per esteso resta lì sotto, a portata di
-           passaggio del mouse. -->
-      {#if auth.account}
-        <span class="me" title={auth.account.email}>@{auth.account.handle}</span>
       {/if}
       <Button
         look="icon"
@@ -393,16 +400,25 @@
 
 #filters, #group-filters { display: flex; flex-wrap: wrap; gap: 6px; }
 
-/* chi sei: piccolo e smorto, ma scritto */
-.me {
+/* Chi sei: piccolo e smorto, ma scritto per intero. Un nome utente arriva a
+   venti caratteri, e «@sca…» non dice con che utente sei entrato.
+   Non si chiama «me»: quel nome è già del puntino blu di dove sei, sulla
+   mappa, e due cose con lo stesso nome si vestono a vicenda. */
+.titled {
+  display: grid;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 11ch;
+  gap: 1px;
+}
+
+.whoami {
+  padding-left: 6px;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 600px) {
