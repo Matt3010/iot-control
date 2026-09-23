@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { auth } from '../lib/auth.svelte';
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
   import Icon from './Icon.svelte';
@@ -15,10 +16,14 @@
   };
 </script>
 
-<button id="add-btn" type="button" class:active={ui.picking} onclick={add}>
-  <Icon name="plus" />
-  <span class="add-label">{ui.picking ? 'Annulla' : 'Aggiungi luogo'}</span>
-</button>
+<!-- Chi è stato limitato a certi pin non ne aggiunge: il server glielo
+     rifiuterebbe, e un tasto che porta a un no è peggio che non averlo. -->
+{#if auth.canAdd}
+  <button id="add-btn" type="button" class:active={ui.picking} onclick={add}>
+    <Icon name="plus" />
+    <span class="add-label">{ui.picking ? 'Annulla' : 'Aggiungi luogo'}</span>
+  </button>
+{/if}
 
 <style>
 /* HUD

@@ -4,6 +4,7 @@
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { store } from '../lib/store.svelte';
   import type { LocalPlace } from '../lib/types';
+  import { auth } from '../lib/auth.svelte';
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
   import Icon from './Icon.svelte';
@@ -84,8 +85,13 @@
     }),
   );
 
+  /*
+   * Gli indirizzi trovati fuori servono ad aggiungere un luogo nuovo: a chi
+   * non può aggiungerne non si mostrano, se no la ricerca offre una strada
+   * che finisce contro un no.
+   */
   const addressRows = $derived<Row[]>(
-    addresses.map((hit) => {
+    (auth.canAdd ? addresses : []).map((hit) => {
       const label = hit.name || hit.display_name.split(',')[0]!;
       return {
         name: label,

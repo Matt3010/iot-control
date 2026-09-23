@@ -148,6 +148,7 @@
           >
             <Icon name={store.shows(map.id) ? 'eye' : 'eyeOff'} />
           </Button>
+          {#if auth.canMaps}
           <Button
             look="icon"
             tone="danger"
@@ -164,6 +165,7 @@
           >
             <Icon name="trash" />
           </Button>
+          {/if}
         {/snippet}
 
         {#snippet under()}
@@ -211,16 +213,20 @@
     </section>
   {/each}
 
-  <PageCard dashed>
-    <span class="eyebrow">Un'altra mappa</span>
-    <AddRow
-      id="map-form"
-      placeholder="Nome mappa — es. Islanda"
-      title="Crea mappa"
-      bind:value={newName}
-      onadd={create}
-    />
-  </PageCard>
+  <!-- Una mappa nuova la fa solo chi l'indice ce l'ha: da ospite nascerebbe
+       fuori da quelle che ti hanno aperto, e il server la rifiuta. -->
+  {#if auth.canMaps}
+    <PageCard dashed>
+      <span class="eyebrow">Un'altra mappa</span>
+      <AddRow
+        id="map-form"
+        placeholder="Nome mappa — es. Islanda"
+        title="Crea mappa"
+        bind:value={newName}
+        onadd={create}
+      />
+    </PageCard>
+  {/if}
 
   {#if store.maps.some((map) => map.published)}
     <PageCard dashed>

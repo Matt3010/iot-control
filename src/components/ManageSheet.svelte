@@ -221,6 +221,10 @@
                     )}
                 ></button>
                 <span class="count">{store.countIn(category.id) || ''}</span>
+                <!-- Una categoria vale su tutte le mappe, anche quelle che a
+                     un ospite non sono state date: eliminarla è di chi
+                     l'indice ce l'ha, e il tasto sta con lui. -->
+                {#if atHome}
                 <Button
                   look="icon"
                   tone="danger"
@@ -238,6 +242,7 @@
                 >
                   <Icon name="trash" />
                 </Button>
+                {/if}
               {/snippet}
             </Row>
           </li>

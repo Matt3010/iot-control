@@ -54,6 +54,30 @@ class Auth {
   }
 
   /**
+   * E le mappe, posso farne e disfarne?
+   *
+   * Solo a casa mia. Una mappa nuova nascerebbe fuori da quelle che mi hanno
+   * aperto, e una eliminata porterebbe via i luoghi di qualcun altro: il
+   * server dice di no a tutti e due, e un tasto che porta a un no non si
+   * mostra.
+   */
+  get canMaps(): boolean {
+    return !this.account?.actingAs;
+  }
+
+  /**
+   * E un luogo nuovo?
+   *
+   * A casa mia sì, e da ospite solo se mi hanno aperto la mappa intera: chi
+   * è limitato a certi pin non ne crea, perché quello nuovo nascerebbe fuori
+   * dal suo elenco e non potrebbe nemmeno correggerlo un attimo dopo.
+   */
+  get canAdd(): boolean {
+    const acting = this.account?.actingAs;
+    return !acting || acting.places === null;
+  }
+
+  /**
    * Questo luogo, posso toccarlo?
    *
    * A casa mia sempre. In casa d'altri dipende da cosa mi hanno aperto: tutta
