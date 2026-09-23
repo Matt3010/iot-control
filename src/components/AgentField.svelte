@@ -195,7 +195,9 @@
 
   <!-- quelli che stanno qui: uno sotto l'altro, ognuno con i suoi comandi -->
   {#each mine as agent (agent.id)}
-    <AgentControls {agent}>
+    <!-- Senza quello che ci sta attaccato: qui si sistema un luogo, non si
+         aprono le tende. Chi vuole agire ha il link qui sopra. -->
+    <AgentControls {agent} things={false}>
       {#snippet trail()}{@render controls(agent, true)}{/snippet}
 
       {#snippet foot()}
@@ -209,11 +211,12 @@
     </AgentControls>
   {/each}
 
-  <!-- uno solo e libero: si mostra com'è fatto, invece di una pillola da
-       cliccare per scoprirlo. Il clic serve a metterlo qui, non a guardarlo. -->
+  <!-- uno solo e libero: si mostra di chi si tratta, invece di una pillola da
+       cliccare per scoprirlo. Anche qui senza i suoi dispositivi: prima lo si
+       mette su un luogo, e poi si va a premerli dove si premono. -->
   {#if !mine.length && free.length === 1 && free[0]}
     {@const only = free[0]}
-    <AgentControls agent={only}>
+    <AgentControls agent={only} things={false}>
       {#snippet trail()}{@render controls(only, false)}{/snippet}
       {#snippet foot()}
         <!-- collegare un account è cosa dell'agente, non del luogo: si può

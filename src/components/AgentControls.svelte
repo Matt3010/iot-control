@@ -16,10 +16,21 @@
     agent,
     trail,
     foot,
+    /**
+     * Se mostrare anche cosa c'è attaccato, e i suoi comandi.
+     *
+     * Nella scheda di un luogo no: lì si sta sistemando un posto — il nome,
+     * la categoria, dove sta — e in mezzo a quello una fila di tende da
+     * aprire e chiudere è un invito a premere per sbaglio mentre si scorre.
+     * Si dice a quale agente è appeso e lo si può staccare; per agire c'è la
+     * sua pagina, che è un clic e sta scritta lì sopra.
+     */
+    things = true,
   }: {
     agent: Agent;
     trail?: Snippet;
     foot?: Snippet;
+    things?: boolean;
   } = $props();
 
   const theirs = $derived(devices.ofAgent(agent.id));
@@ -70,18 +81,20 @@
     {#if trail}<span class="trail">{@render trail()}</span>{/if}
   </div>
 
-  {#if theirs.length}
-    <div class="list">
-      {#each theirs as device (device.id)}
-        <DeviceControls {device} />
-      {/each}
-    </div>
-  {:else}
-    <p class="empty">
-      {agent.online
-        ? 'Collegato, ma non ha ancora raccontato nessun dispositivo.'
-        : 'Appena si collega, quello che trova compare qui.'}
-    </p>
+  {#if things}
+    {#if theirs.length}
+      <div class="list">
+        {#each theirs as device (device.id)}
+          <DeviceControls {device} />
+        {/each}
+      </div>
+    {:else}
+      <p class="empty">
+        {agent.online
+          ? 'Collegato, ma non ha ancora raccontato nessun dispositivo.'
+          : 'Appena si collega, quello che trova compare qui.'}
+      </p>
+    {/if}
   {/if}
 
   {#if foot}
