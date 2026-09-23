@@ -55,7 +55,7 @@ export function saysWhen(when: Timing): string {
 }
 
 /** Il fuso di questo browser: «le sette» vuol dire le sette dove sei. */
-export const hereTz = (): string =>
+const hereTz = (): string =>
   Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome';
 
 /** Quello che si propone a chi accende l'orario la prima volta. */

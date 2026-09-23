@@ -5,7 +5,7 @@ import { logEntries } from '../persistence/schema.js';
 import type { LogEntry } from '../types.js';
 
 /** Quanto indietro si ricorda. Oltre, non serve più a nessuno. */
-export const KEEPS_MS = 24 * 60 * 60 * 1000;
+const KEEPS_MS = 24 * 60 * 60 * 1000;
 
 /**
  * E quante righe al massimo per agente, dentro quelle ventiquattr'ore.

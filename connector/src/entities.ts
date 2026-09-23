@@ -64,7 +64,7 @@ function dimmable(entity: HaEntity): boolean {
   return modes.some((mode) => mode !== 'onoff' && mode !== 'unknown');
 }
 
-export function capabilitiesOf(entity: HaEntity): Capability[] {
+function capabilitiesOf(entity: HaEntity): Capability[] {
   const domain = domainOf(entity.entity_id);
   const acceso: Capability = { code: 'power', kind: 'switch', label: 'Acceso' };
 
@@ -161,7 +161,7 @@ const numeric = (value: unknown): DeviceValue | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-export function stateOf(entity: HaEntity): Record<string, DeviceValue> {
+function stateOf(entity: HaEntity): Record<string, DeviceValue> {
   const domain = domainOf(entity.entity_id);
   const state: Record<string, DeviceValue> = {};
 

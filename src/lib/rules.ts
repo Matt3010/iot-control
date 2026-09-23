@@ -42,7 +42,7 @@ export function fraseDi(device: Device, code: string, becomes: string): string |
  * gradi — non si offre niente per ora: «sopra» e «sotto» sono un'altra cosa
  * da quella che c'è qui, e mezza cosa non si mette.
  */
-export function valoriDi(device: Device): Choice[] {
+function valoriDi(device: Device): Choice[] {
   return (device.capabilities as Capability[]).flatMap((capability) => {
     if (capability.kind === 'switch')
       return ['true', 'false'].map((value) => ({

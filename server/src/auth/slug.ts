@@ -1,5 +1,5 @@
 /** Un pezzo di URL: minuscolo, senza accenti, senza spazi. */
-export function slugify(text: string): string {
+function slugify(text: string): string {
   const bare = text
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
