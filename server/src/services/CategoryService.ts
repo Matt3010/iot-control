@@ -3,6 +3,7 @@ import type { CategoryView } from '../dto/views.js';
 import { toCategoryView } from '../dto/views.js';
 import { hub } from '../iot/hub.js';
 import { categoryManager } from '../managers/CategoryManager.js';
+import type { Scope } from '../types.js';
 
 /**
  * Use cases for categories. The manager owns the rules and the transaction;
@@ -26,9 +27,9 @@ export class CategoryService {
   }
 
   /** Come per le mappe: chi guarda sa che una categoria si porta via i suoi luoghi. */
-  async remove(ownerId: string, id: string): Promise<{ removedPlaces: number }> {
-    const done = await categoryManager.remove(ownerId, id);
-    hub.changed(ownerId, { kind: 'category', id, value: null });
+  async remove(scope: Scope, id: string): Promise<{ removedPlaces: number }> {
+    const done = await categoryManager.remove(scope, id);
+    hub.changed(scope.ownerId, { kind: 'category', id, value: null });
     return done;
   }
 }

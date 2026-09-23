@@ -31,7 +31,7 @@
 
 <ol class="rail">
   {#each steps as step, at (step.key)}
-    {@const pausa = at > 0 ? step.wait : 0}
+    {@const pausa = step.wait}
     <li
       class:is-first={at === 0}
       class:is-last={at === steps.length - 1}
@@ -39,8 +39,10 @@
       class:is-done={step.done}
     >
       {#if pausa}
-        <!-- il tempo che passa: la linea si allunga e si spezza, e in mezzo
-             c'è scritto quanto -->
+        <!-- Il tempo che passa: la linea si allunga e si spezza, e in mezzo
+             c'è scritto quanto. Anche sulla prima riga — lì non si disegnava,
+             ma il server quell'attesa la rispetta lo stesso, e una scena che
+             sta ferma mezzo minuto senza dirlo sembra non essere partita. -->
         <span class="attesa">{saysWait(pausa)}</span>
       {/if}
 

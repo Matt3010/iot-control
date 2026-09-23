@@ -5,6 +5,7 @@ import { hub } from '../iot/hub.js';
 import { store } from '../persistence/db.js';
 import { AgentRepository } from '../repositories/AgentRepository.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
+import { SceneRepository } from '../repositories/SceneRepository.js';
 import type { Agent, Place } from '../types.js';
 
 /**
@@ -70,16 +71,26 @@ export class AgentManager {
    * Un agente che se ne va porta via i suoi dispositivi. I luoghi che lo
    * tenevano restano dove sono: erano luoghi prima di essere interruttori.
    */
-  async remove(ownerId: string, id: string): Promise<Place[]> {
-    const { places } = await store.transaction(async (tx) => {
+  async remove(ownerId: string, id: string): Promise<{ places: Place[]; scenes: number }> {
+    const fatto = await store.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
       if (!(await agents.owns(ownerId, id))) throw notFound('agente inesistente');
+
       const gone = await new DeviceRepository(tx).deleteByAgent(id);
+      /*
+       * E le righe delle scene che comandavano quei dispositivi.
+       *
+       * Quando è l'inventario a perderne uno quelle righe cadono da sole, e
+       * di qua non cadevano: la scena restava con dentro un fantasma, poi
+       * partiva, diceva di essere andata bene e non muoveva niente. Un
+       * silenzio del genere lo scopri la mattina dopo.
+       */
+      const scenes = await new SceneRepository(tx).pruneDevices(ownerId, new Set(gone.devices));
       await agents.delete(id);
-      return gone;
+      return { ...gone, scenes };
     });
     hub.forget(id);
-    return places;
+    return { places: fatto.places, scenes: fatto.scenes };
   }
 
   /** Alla stretta di mano: chi è questo, e ha davvero questo token? */

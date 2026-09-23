@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ownerOf } from '../auth/owner.js';
+import { ownerOf, scopeOf } from '../auth/owner.js';
 import type { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import { categoryService } from '../services/CategoryService.js';
@@ -32,7 +32,7 @@ export class CategoryController {
 
   remove = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await categoryService.remove(ownerOf(req), req.params.id as string);
+      await categoryService.remove(scopeOf(req), req.params.id as string);
       res.status(204).end();
     } catch (error) {
       next(error);

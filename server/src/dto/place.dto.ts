@@ -57,10 +57,6 @@ export class CreatePlaceDto {
   @IsBoolean()
   private?: boolean;
 
-  /** Chiuso agli ospiti della mappa: lo vedono, non lo toccano. */
-  @IsOptional()
-  @IsBoolean()
-  locked?: boolean;
 
   /** Gli agenti che stanno a questo indirizzo: reti separate, agenti separati. */
   @IsOptional()
@@ -113,10 +109,6 @@ export class UpdatePlaceDto {
   @IsBoolean()
   private?: boolean;
 
-  /** Chiuso agli ospiti della mappa: lo vedono, non lo toccano. */
-  @IsOptional()
-  @IsBoolean()
-  locked?: boolean;
 
   /** Un elenco vuoto li stacca tutti: il luogo resta, i fili si tagliano. */
   @IsOptional()

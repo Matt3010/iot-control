@@ -3,7 +3,7 @@ import { notFound } from '../errors/HttpError.js';
 import { store } from '../persistence/db.js';
 import { CategoryRepository } from '../repositories/CategoryRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
-import type { Category } from '../types.js';
+import type { Category, Scope } from '../types.js';
 
 /**
  * Il segno di una categoria appena nata: la chiave di un disegno, non
@@ -38,13 +38,23 @@ export class CategoryManager {
   }
 
   /**
-   * A category owns its places, so both go in the same transaction: either the
-   * category and its places are gone, or nothing is.
+   * Una categoria si porta via i suoi luoghi, quindi vanno nella stessa
+   * transazione: o se ne vanno la categoria e i suoi luoghi, o non se ne va
+   * niente.
+   *
+   * E la fa solo chi l'indice ce l'ha, come per le mappe. Una categoria non
+   * appartiene a una mappa: vale su tutte, e i suoi luoghi stanno sparsi
+   * ovunque. Un ospite che ne cancellava una si portava via anche i luoghi
+   * delle mappe che non gli erano mai state date, e che nel suo elenco non
+   * comparivano nemmeno — passando accanto ai due limiti che la condivisione
+   * mette apposta, quello sulle mappe e quello sui singoli luoghi.
    */
-  remove(ownerId: string, id: string): Promise<{ removedPlaces: number }> {
+  remove(scope: Scope, id: string): Promise<{ removedPlaces: number }> {
+    if (scope.maps !== null) throw notFound('categoria inesistente');
+
     return store.transaction(async (tx) => {
       const categories = new CategoryRepository(tx);
-      if (!(await categories.owns(ownerId, id))) throw notFound('categoria inesistente');
+      if (!(await categories.owns(scope.ownerId, id))) throw notFound('categoria inesistente');
       const removedPlaces = await new PlaceRepository(tx).deleteByCategory(id);
       await categories.delete(id);
       return { removedPlaces };

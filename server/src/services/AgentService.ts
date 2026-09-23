@@ -84,7 +84,10 @@ export class AgentService {
    * pin con un pallino che non risponderà mai più.
    */
   async remove(ownerId: string, id: string): Promise<void> {
-    const places = await agentManager.remove(ownerId, id);
+    // Le scene che hanno perso delle righe si rileggono insieme ai
+    // dispositivi: di la' e' una lista sola, e chi la sta guardando da
+    // un'altra scheda deve vederla accorciarsi senza ricaricare.
+    const { places } = await agentManager.remove(ownerId, id);
     hub.changed(ownerId, { kind: 'agents' });
     hub.changed(ownerId, { kind: 'devices' });
     for (const place of places) {
