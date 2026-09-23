@@ -94,21 +94,7 @@
 
 <div id="panel" class="surface" class:is-collapsed={collapsed}>
   <div class="panel-head">
-    <!--
-      Il nome della mappa, e sotto con che utente sei entrato.
-      Chi sei stava solo nel titolo del tasto per uscire: cioè da nessuna
-      parte su un telefono, e «esci» senza sapere da cosa è una domanda senza
-      risposta — soprattutto in un'app dove si può stare dentro i dati di
-      qualcun altro. Accanto al nome della mappa non ci stava per intero, e
-      mezzo nome utente non dice niente; sotto, nella stessa colonna, ha la
-      riga tutta per sé.
-    -->
-    <span class="titled">
-      <MapSwitcher />
-      {#if auth.account}
-        <span class="whoami" title={auth.account.email}>@{auth.account.handle}</span>
-      {/if}
-    </span>
+    <MapSwitcher />
     <span class="panel-head-end">
       {#if !store.loading}
         <span
@@ -122,15 +108,6 @@
           {store.currentPlaces.length === 1 ? 'luogo' : 'luoghi'}
         </span>
       {/if}
-      <Button
-        look="icon"
-        tone="danger"
-          extra="leave-btn"
-        title={'Esci da ' + (auth.account?.email ?? '')}
-        onclick={() => auth.leave()}
-      >
-        <Icon name="logout" />
-      </Button>
       {#if viewport.narrow}
         <Button
           look="icon"
@@ -294,6 +271,29 @@
       {/if}
     {/if}
   {/if}
+
+  <!--
+    In fondo, chi sei e la porta.
+    Stavano tutte e due nel tasto rosso in testa: il nome solo nel suo titolo,
+    cioè da nessuna parte su un telefono. Ma «esci» senza sapere da cosa è una
+    domanda senza risposta — soprattutto in un'app dove si può stare dentro i
+    dati di qualcun altro — e le due cose vanno lette insieme. Qui hanno una
+    riga loro, allineata ai bordi del pannello come tutto il resto.
+  -->
+  {#if auth.account && !collapsed}
+    <div class="panel-foot">
+      <span class="whoami" title={auth.account.email}>@{auth.account.handle}</span>
+      <Button
+        look="link"
+        tone="danger"
+        extra="leave-btn"
+        title={'Esci da ' + auth.account.email}
+        onclick={() => auth.leave()}
+      >
+        Esci
+      </Button>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -404,17 +404,20 @@
    venti caratteri, e «@sca…» non dice con che utente sei entrato.
    Non si chiama «me»: quel nome è già del puntino blu di dove sei, sulla
    mappa, e due cose con lo stesso nome si vestono a vicenda. */
-.titled {
-  display: grid;
-  flex: 1 1 auto;
-  min-width: 0;
-  gap: 1px;
+/* la riga in fondo: chi sei a sinistra, la porta a destra, e il filo sopra
+   che la stacca dall'elenco come le altre sezioni */
+.panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 9px;
+  border-top: 1px solid var(--hairline-soft);
 }
 
 .whoami {
-  padding-left: 6px;
-  font-size: 11px;
-  letter-spacing: 0.01em;
+  min-width: 0;
+  font-size: 11.5px;
   color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
