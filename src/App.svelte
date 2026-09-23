@@ -2,6 +2,7 @@
   import { auth } from './lib/auth.svelte';
   import { devices } from './lib/devices.svelte';
   import { live } from './lib/live.svelte';
+  import { nav } from './lib/nav.svelte';
   import { readRoute } from './lib/routing';
   import { store } from './lib/store.svelte';
   import { toast } from './lib/toast.svelte';
@@ -27,8 +28,15 @@
   import GuestBar from './components/GuestBar.svelte';
   import Toast from './components/Toast.svelte';
 
+  /**
+   * Dove siamo adesso. Cambia mentre si guarda: fra le pagine di casa si
+   * passa senza ricaricare, e quello che sta già in memoria — chi sei,
+   * l'indice, il filo dei dispositivi — resta dov'è.
+   */
+  const route = $derived(nav.route);
+
   /** /m/<slug> e /u/<handle> sono pubblici: non chiedono nulla a nessuno. */
-  const route = readRoute();
+  const first = readRoute();
 
   /**
    * Le pagine che sono l'app: vogliono sapere chi sei prima di disegnare.
@@ -38,7 +46,7 @@
    * che ci si dimenticava di aggiungere si apriva sulla schermata d'ingresso
    * a chi era già entrato.
    */
-  const mine = route.kind !== 'map' && route.kind !== 'profile';
+  const mine = first.kind !== 'map' && first.kind !== 'profile';
 
   // Prima si vede chi c'è: l'indice si carica solo per chi è entrato, e si
   // ricarica se rientra con un altro account. Senza questo la pagina degli

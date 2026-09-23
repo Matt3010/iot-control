@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { nav } from '../lib/nav.svelte';
   import { AGENTS_PATH, ALERTS_PATH, SCENES_PATH } from '../lib/routing';
   import Icon from './Icon.svelte';
   import Tabs from './Tabs.svelte';
@@ -40,7 +41,7 @@
     { id: ALERTS_PATH, label: 'Avvisi', href: ALERTS_PATH },
   ];
 
-  const here = $derived(window.location.pathname.replace(/\/$/, ''));
+  const here = $derived(nav.path.replace(/\/$/, ''));
 </script>
 
 <div class="page">
