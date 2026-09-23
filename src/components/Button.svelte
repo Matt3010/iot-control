@@ -8,7 +8,7 @@
    * - `primary`: la cosa da fare, una per schermata
    * - `ghost`:   l'alternativa, con il suo contorno
    * - `icon`:    un'icona sola, nelle testate e nelle righe
-   * - `play`:    tondo e pieno, per la cosa che fa partire qualcosa
+   * - `round`:   un cerchio pieno, per l'azione principale di una testata
    * - `link`:    un comando scritto piccolo, in mezzo al testo
    * - `danger`:  quello che porta via qualcosa
    * - `danger-solid`: lo stesso, ma quando è lui la risposta a una domanda
@@ -25,7 +25,7 @@
    * ospita per decorarlo (la classe finisce sull'elemento, ma va raggiunta con
    * :global perché il markup è di questo componente).
    */
-  type Look = 'primary' | 'ghost' | 'icon' | 'play' | 'link' | 'danger' | 'danger-solid';
+  type Look = 'primary' | 'ghost' | 'icon' | 'round' | 'link' | 'danger' | 'danger-solid';
 
   let {
     look = 'ghost',
@@ -98,7 +98,7 @@
      si inventa la sua. Viene dopo le forme apposta: a parità di peso vince
      l'ultima, e `icon` resta fuori perché la sua misura ce l'ha già.
      `nowrap` perché il posto stretto è il motivo per cui esiste. */
-  .btn.is-sm:not(.icon) {
+  .btn.is-sm:not(.icon):not(.round) {
     padding: 7px 12px;
     font-size: 12.5px;
     white-space: nowrap;
@@ -152,11 +152,12 @@
 
   /* il tondo pieno ------------------------------------------------------- */
 
-  /* Un triangolo dentro un cerchio pieno: la forma che vuol dire «parte» in
-     ogni cosa che si sia mai premuta. Sta qui e non in un foglio di stile
-     accanto a chi lo usa, se no la prossima cosa che parte avrebbe un tondo
-     di un altro verde. */
-  .play {
+  /* Un cerchio pieno d'accento: in una testata dove gli altri tasti sono
+     smorti, questo è quello che fa succedere qualcosa. La forma non sa cosa
+     ha dentro — un triangolo per far partire una scena, ma domani una freccia
+     o un più — e sta qui e non in un foglio accanto a chi la usa, se no il
+     prossimo cerchio sarebbe di un altro verde. */
+  .round {
     display: grid;
     place-items: center;
     flex: none;
@@ -170,18 +171,17 @@
     transition: background 0.15s, filter 0.15s, transform 0.14s var(--ease);
   }
 
-  .play :global(.ico) {
-    width: 14px;
-    height: 14px;
-    /* la punta del triangolo tira a destra: al centro esatto sembra storto */
-    margin-left: 1px;
-    fill: currentColor;
-  }
+  .round :global(.ico) { width: 14px; height: 14px; }
 
-  .play:hover:not(:disabled) { filter: brightness(1.08); }
-  .play:active:not(:disabled) { transform: scale(0.94); }
+  /* quello piccolo, per le righe strette */
+  .round.is-sm { width: 24px; height: 24px; }
 
-  .play:disabled, .play[aria-disabled='true'] {
+  .round.is-sm :global(.ico) { width: 12px; height: 12px; }
+
+  .round:hover:not(:disabled) { filter: brightness(1.08); }
+  .round:active:not(:disabled) { transform: scale(0.94); }
+
+  .round:disabled, .round[aria-disabled='true'] {
     background: var(--sunken-hover);
     color: var(--ink-3);
   }

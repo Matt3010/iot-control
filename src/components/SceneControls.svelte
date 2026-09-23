@@ -85,7 +85,8 @@
     <!-- un triangolo e non la parola «parti»: quello che fa un tasto del
          genere si sa già, e scritto sembrava un'etichetta da leggere -->
     <Button
-      look="play"
+      look="round"
+      extra="go"
       title={busy ? 'Sta partendo' : `Fai partire «${scene.name}»`}
       disabled={!scene.steps.length || !live || busy}
       onclick={ask}
@@ -146,6 +147,10 @@
 
   /* cosa succede quando parte, riga per riga: una scena si legge per sapere
      cosa muove, e il nome di chi si muove va davanti */
+  /* il triangolo dentro al cerchio tira a destra: al centro esatto sembra
+     storto, ed e' l'unica cosa che questa scheda ha da dire sulla forma */
+  .set :global(.go .ico) { margin-left: 1px; fill: currentColor; }
+
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 
   .steps li {

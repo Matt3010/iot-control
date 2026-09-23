@@ -28,7 +28,7 @@
 <PageShell
   title="Scene"
   count={devices.scenes.length}
-  lead="Più cose che partono insieme, ognuna con la sua azione, così che «sera» chiuda le tende e accenda l'abat-jour. Una scena può toccare dispositivi di agenti diversi. Premerle a mano una per volta si vede — partono a mezzo secondo di distanza."
+  lead="Più cose che partono insieme, ognuna con la sua azione, così che «sera» chiuda le tende e accenda l'abat-jour. Una scena può toccare dispositivi di agenti diversi."
 >
   {#each devices.scenes as scene (scene.id)}
     <!-- il riquadro lo disegna gia' il comando della scena, come per gli

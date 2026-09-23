@@ -67,7 +67,7 @@ export class PushController {
     try {
       const esito = await pushManager.send([whoIs(req).id], {
         title: 'Gli avvisi funzionano',
-        body: 'Da adesso ti arrivano qui. Quando non li vuoi più, si spengono dallo stesso posto.',
+        body: 'Da adesso ti arrivano qui. Quando non li vuoi più, si spengono dalla stessa pagina.',
         tag: 'prova',
       });
       res.json(esito);

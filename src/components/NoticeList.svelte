@@ -95,7 +95,7 @@
 
       {#snippet empty()}
         <p class="say">
-          Non è ancora successo niente. Quando un posto smetterà di rispondere lo troverai scritto
+          Non è ancora successo niente. Quando un agente smetterà di rispondere lo troverai scritto
           qui, anche se la notifica non fosse arrivata.
         </p>
       {/snippet}
