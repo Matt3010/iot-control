@@ -406,9 +406,21 @@
     gap: 2px;
   }
 
-  .hud :global(.hud-btn) { color: rgb(255 255 255 / 0.8); }
+  /* Sotto ogni tasto un vetro scuro, sempre: un'icona bianca su
+     un'inquadratura di giorno sparisce, e quale sia il grigio dietro lo
+     decide quello che riprende la telecamera, non noi. Appena il dito o il
+     mouse arrivano sull'immagine si scurisce, perche' allora quei tasti
+     servono davvero. */
+  .hud :global(.hud-btn) {
+    background: rgb(0 0 0 / 0.3);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: rgb(255 255 255 / 0.85);
+  }
 
-  .hud :global(.hud-btn:hover) { background: rgb(255 255 255 / 0.16); color: #fff; }
+  .cam:hover .hud :global(.hud-btn) { background: rgb(0 0 0 / 0.5); color: #fff; }
+
+  .hud :global(.hud-btn:hover) { background: rgb(0 0 0 / 0.72); color: #fff; }
 
   .hud {
     position: absolute;
