@@ -35,6 +35,12 @@
     /* non si spezza fra due colonne: si sposta intera */
     break-inside: avoid;
     display: grid;
+    /* In riga le schede prendono tutte l'altezza della più alta, ed è giusto
+       cosi': il bordo di sotto dev'essere uno solo. Ma quell'altezza in più
+       è della scheda, non delle righe che ha dentro — senza questo lo spazio
+       che avanza si infilava fra un rigo e l'altro, e una levetta finiva a
+       mezz'aria fra la sua etichetta e la sua spiegazione. */
+    align-content: start;
     gap: 10px;
     min-width: 0;
     /* lo spazio sotto è suo, non della colonna */
