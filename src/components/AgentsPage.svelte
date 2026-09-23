@@ -101,6 +101,46 @@
           <Button look="icon" href={agentPath(agent.id)} title="Apri questo agente">
             <Icon name="full" />
           </Button>
+          <!-- Dove sta, si cambia da qui. Prima bisognava aprire la scheda
+               del luogo dove stava per staccarlo e poi quella dell'altro per
+               rimetterlo, e per farlo bisognava ricordarsi dove fosse. -->
+          {#if where}
+            <Button
+              look="icon"
+              title="Stacca dal luogo"
+              onclick={(event: MouseEvent) =>
+                ui.askSure(event.currentTarget as HTMLElement, {
+                  title: `Staccarlo da “${where.name}”?`,
+                  detail:
+                    "L'agente resta e continua a funzionare. Quel luogo smette solo di mostrarlo, e lo puoi rimettere lì o altrove.",
+                  verb: 'Stacca',
+                  tone: 'plain',
+                  no: 'Annulla',
+                  onYes: () => void move(agent, ''),
+                })}
+            >
+              <Icon name="logout" />
+            </Button>
+          {:else}
+            <Button
+              look="icon"
+              extra="pick-btn"
+              title="Mettilo su un luogo"
+              disabled={!store.places.length}
+              onclick={(event: MouseEvent) =>
+                ui.askPick(event.currentTarget as HTMLElement, {
+                  title: 'Su quale luogo?',
+                  options: store.places.map((place) => ({
+                    id: place.id,
+                    label: place.name,
+                    note: (place.agentIds ?? []).length ? 'ha già un agente' : undefined,
+                  })),
+                  onPick: (id: string) => void move(agent, id),
+                })}
+            >
+              <Icon name="pin" />
+            </Button>
+          {/if}
           <Button
             look="icon"
             title="Rigenera il token"
@@ -135,31 +175,13 @@
         {/snippet}
 
         {#snippet foot()}
-          <!-- Dove sta, e da qui si cambia. Prima bisognava aprire la scheda
-               del luogo dove stava per staccarlo e poi quella dell'altro per
-               rimetterlo, e per farlo bisognava ricordarsi dove fosse. -->
-          <div class="dove">
-            <span class="where">
-              {#if where}
-                Sta su <b>{where.name}</b>
-              {:else}
-                Non sta su nessun luogo
-              {/if}
-            </span>
-
-            <label class="scegli">
-              <span class="via">{where ? 'Spostalo' : 'Mettilo'}</span>
-              <select
-                value={where?.id ?? ''}
-                onchange={(event: Event) => move(agent, (event.currentTarget as HTMLSelectElement).value)}
-              >
-                <option value="">nessun luogo</option>
-                {#each store.places as place (place.id)}
-                  <option value={place.id}>{place.name}</option>
-                {/each}
-              </select>
-            </label>
-          </div>
+          <p class="where">
+            {#if where}
+              Sta su <b>{where.name}</b>
+            {:else}
+              Non sta su nessun luogo
+            {/if}
+          </p>
 
           {#if fresh?.id === agent.id}
             <div class="install">
@@ -218,29 +240,10 @@
     border: 1px dashed var(--hairline);
   }
 
-  .dove {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .where { font-size: 11.5px; color: var(--ink-3); }
+  .where { margin: 0; font-size: 11.5px; color: var(--ink-3); }
 
   .where b { font-weight: 560; color: var(--ink-2); }
 
-  /* il luogo si cambia da qui: l'elenco è quello dei luoghi, e «nessun luogo»
-     è la voce che lo stacca */
-  .scegli { display: flex; align-items: center; gap: 6px; }
-
-  .via { font-size: 11px; color: var(--ink-3); }
-
-  .scegli select {
-    max-width: 150px;
-    padding: 3px 6px;
-    font-size: 11.5px;
-  }
 
   .install { display: grid; gap: 6px; min-width: 0; }
 

@@ -11,6 +11,7 @@
   import AddButton from './components/AddButton.svelte';
   import ColorPopover from './components/ColorPopover.svelte';
   import MarkPopover from './components/MarkPopover.svelte';
+  import PickPopover from './components/PickPopover.svelte';
   import Hint from './components/Hint.svelte';
   import LoginScreen from './components/LoginScreen.svelte';
   import PublicMap from './components/PublicMap.svelte';
@@ -116,6 +117,7 @@
     if (ui.mark && !target.closest('#mark-popover') && !target.closest('.mark-btn')) ui.mark = null;
     if (ui.color && !target.closest('#color-popover') && !target.closest('.swatch')) ui.color = null;
     if (ui.sure && !target.closest('#sure-popover') && !target.closest('.kill')) ui.sure = null;
+    if (ui.pick && !target.closest('#pick-popover') && !target.closest('.pick-btn')) ui.pick = null;
   }
 </script>
 
@@ -180,5 +182,8 @@
      Stava dentro al ramo della mappa, e nella pagina degli agenti i tasti
      avrebbero chiesto conferma a nessuno. -->
 {#if ui.sure}<SurePopover />{/if}
+<!-- E la scelta fra cose che hai creato tu, che e' la stessa domanda con dei
+     nomi al posto del si' e del no. -->
+{#if ui.pick}<PickPopover />{/if}
 
 <Toast />

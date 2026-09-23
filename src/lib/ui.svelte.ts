@@ -18,6 +18,18 @@ export interface MarkRequest {
  * solo un bivio (`tone: 'plain'`): lì il rosso direbbe una cosa falsa, e le
  * due strade vanno avanti entrambe.
  */
+/** Scegliere una voce da un elenco corto, accanto al tasto che l'ha chiesto. */
+export interface PickRequest {
+  anchor: HTMLElement;
+  /** Cosa si sta scegliendo: «Su quale luogo?» */
+  title: string;
+  /** Le voci, già in ordine di come vanno lette. */
+  options: { id: string; label: string; note?: string }[];
+  /** Quella di adesso, che si segna e non si ripropone come novità. */
+  current?: string;
+  onPick: (id: string) => void;
+}
+
 export interface SureRequest {
   anchor: HTMLElement;
   /** Cosa succede, detto con il suo nome. */
@@ -72,6 +84,7 @@ class Ui {
   mark = $state<MarkRequest | null>(null);
   color = $state<ColorRequest | null>(null);
   sure = $state<SureRequest | null>(null);
+  pick = $state<PickRequest | null>(null);
   /**
    * Su schermo stretto il pannello e una scheda non ci stanno insieme:
    * 'auto' lo fa ridurre quando serve, le altre due sono scelte tue.
@@ -141,7 +154,16 @@ class Ui {
   askSure(anchor: HTMLElement, question: Omit<SureRequest, 'anchor'>): void {
     this.mark = null;
     this.color = null;
+    this.pick = null;
     this.sure = { anchor, ...question };
+  }
+
+  /** Fa scegliere una voce accanto al tasto che l'ha chiesta. */
+  askPick(anchor: HTMLElement, question: Omit<PickRequest, 'anchor'>): void {
+    this.mark = null;
+    this.color = null;
+    this.sure = null;
+    this.pick = { anchor, ...question };
   }
 
   /** Questo browser e basta: quale scheda era aperta, e su quale linguetta. */
@@ -152,6 +174,7 @@ class Ui {
   /** Esc unwinds the overlay one layer at a time, topmost first. */
   escape(): boolean {
     if (this.sure) return (this.sure = null), true;
+    if (this.pick) return (this.pick = null), true;
     if (this.paletteOpen) return (this.paletteOpen = false), true;
     if (this.color) return (this.color = null), true;
     if (this.mark) return (this.mark = null), true;
