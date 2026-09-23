@@ -1,4 +1,5 @@
 import type { Health, LinkedAccount, PairingStep } from '../../shared/protocol.js';
+import { WebSocket } from 'ws';
 import type { ConnectorConfig } from './config.js';
 import { EXTRAS, install, installed } from './extras.js';
 import { forget, sourceOf } from './go2rtc.js';
@@ -447,24 +448,64 @@ export async function startPairing(config: ConnectorConfig, handler: string): Pr
   return pictured(config, flow, translate(flow));
 }
 
+/**
+ * Le conversazioni rimaste aperte, chieste dal filo e non dall'indirizzo.
+ *
+ * Su HTTP l'elenco non c'e' — quell'indirizzo accetta solo POST, e a una GET
+ * risponde 405 — e infatti il primo tentativo di chiuderle falliva in
+ * silenzio. L'elenco si chiede dal filo aperto, che e' l'unico posto dove
+ * esiste: ci si collega, si dice chi siamo, si chiede e si chiude.
+ */
+function openFlows(config: ConnectorConfig): Promise<{ flow_id?: string; handler?: string }[]> {
+  const where = `${config.haUrl.replace(/^http/, 'ws')}/api/websocket`;
+
+  return new Promise((done) => {
+    const socket = new WebSocket(where);
+    // Se di la' non risponde non si resta appesi: quello che si voleva fare
+    // era una pulizia, non il lavoro.
+    const timer = setTimeout(() => (socket.close(), done([])), 5_000);
+
+    const finish = (list: { flow_id?: string; handler?: string }[]): void => {
+      clearTimeout(timer);
+      socket.close();
+      done(list);
+    };
+
+    socket.on('message', (raw) => {
+      let message: { type?: string; result?: unknown };
+      try {
+        message = JSON.parse(raw.toString()) as { type?: string; result?: unknown };
+      } catch {
+        return;
+      }
+
+      if (message.type === 'auth_required') {
+        socket.send(JSON.stringify({ type: 'auth', access_token: config.haToken }));
+        return;
+      }
+      if (message.type === 'auth_ok') {
+        socket.send(JSON.stringify({ id: 1, type: 'config_entries/flow/progress' }));
+        return;
+      }
+      if (message.type === 'result') {
+        finish(Array.isArray(message.result) ? (message.result as { flow_id?: string }[]) : []);
+      }
+      if (message.type === 'auth_invalid') finish([]);
+    });
+
+    socket.on('error', () => finish([]));
+    socket.on('close', () => (clearTimeout(timer), done([])));
+  });
+}
+
 /** Chiude le conversazioni rimaste aperte per quel servizio. */
 async function forgetOpen(config: ConnectorConfig, handler: string): Promise<void> {
-  try {
-    const response = await fetch(`${config.haUrl}${FLOWS}`, {
-      headers: { authorization: `Bearer ${config.haToken}` },
-    });
-    if (!response.ok) return;
-
-    const open = (await response.json()) as { flow_id?: string; handler?: string }[];
-    await Promise.all(
-      open
-        .filter((one) => one.handler === handler && one.flow_id)
-        .map((one) => cancelPairing(config, one.flow_id as string)),
-    );
-  } catch {
-    // Se non si riesce a guardare non si insiste: al massimo si sente dire
-    // che ce n'e' una in corso, ed e' quello che succedeva prima.
-  }
+  const open = await openFlows(config);
+  await Promise.all(
+    open
+      .filter((one) => one.handler === handler && one.flow_id)
+      .map((one) => cancelPairing(config, one.flow_id as string)),
+  );
 }
 
 export async function submitPairing(
