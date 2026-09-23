@@ -32,6 +32,17 @@
   const live = $derived(devices.reachable(scene));
   /** Quanti non rispondono: si dice, perché una scena può partire a metà. */
   const mute = $derived(members.filter((device) => !device.online).length);
+
+  /**
+   * Se quel dispositivo risponde adesso.
+   *
+   * In testa c'era un punto esclamativo che diceva che qualcosa non
+   * rispondeva, e non serviva a niente: la domanda vera è «quale?», e la
+   * risposta era in un suggerimento che su un telefono non si apre nemmeno.
+   * Si dice sulla riga di chi non risponde, che è dove si guarda.
+   */
+  const answers = (deviceId: string): boolean =>
+    devices.list.find((device) => device.id === deviceId)?.online !== false;
   const busy = $derived(devices.busy.includes(`scena:${scene.id}`));
 
   /**
@@ -55,11 +66,6 @@
 <div class="set" class:is-off={!live} class:is-busy={busy}>
   <div class="set-head">
     <span class="set-name">{scene.name}</span>
-    {#if mute}
-      <span class="set-away" title={`${mute} non rispond${mute === 1 ? 'e' : 'ono'}`}>
-        <Icon name="alert" />
-      </span>
-    {/if}
     {@render trail?.()}
 
     <!-- un triangolo e non la parola «parti»: quello che fa un tasto del
@@ -80,7 +86,10 @@
         {@const says = devices.saysOf(step)}
         <!-- di fila e non incolonnate a destra: l'azione staccata sul bordo
              sembrava un tasto da premere, e invece si legge e basta -->
-        <li>{says.who} · <b>{says.what}</b></li>
+        <li class:is-mute={!answers(step.deviceId)}>
+          {says.who} · <b>{says.what}</b>
+          {#if !answers(step.deviceId)}<span class="mute">non risponde</span>{/if}
+        </li>
       {/each}
     </ul>
   {:else}
@@ -115,10 +124,6 @@
     white-space: nowrap;
   }
 
-  .set-away { display: grid; place-items: center; flex: none; color: var(--danger); }
-
-  .set-away :global(.ico) { width: 14px; height: 14px; }
-
   /* cosa succede quando parte, riga per riga: una scena si legge per sapere
      cosa muove, e il nome di chi si muove va davanti */
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
@@ -133,6 +138,17 @@
   }
 
   .steps b { font-weight: 560; color: var(--ink-2); }
+
+  /* la riga di chi non risponde lo dice da sé: così si sa quale delle due
+     tende sta per non muoversi, che è l'unica cosa che si voleva sapere */
+  .steps li.is-mute, .steps li.is-mute b { color: var(--warn); }
+
+  .mute {
+    margin-left: 6px;
+    font-size: 11px;
+    color: var(--warn);
+    opacity: 0.85;
+  }
 
   .set-none { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
 </style>
