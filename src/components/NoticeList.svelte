@@ -21,10 +21,11 @@
   });
 
   const COLONNE: Column[] = [
-    { label: 'Quando', width: '96px' },
-    { label: 'Posto', width: '26%' },
+    { label: 'Quando', width: 'fit' },
+    { label: 'Posto', width: 'fit' },
+    // l'unica che ha da dire: lo spazio che avanza è suo
     { label: 'Cosa' },
-    { label: 'Consegna', width: '116px', align: 'end' },
+    { label: 'Consegna', width: 'fit', align: 'end' },
   ];
 
   /** Che ora era. Oggi basta l'ora; prima serve dire anche il giorno. */
@@ -61,15 +62,15 @@
     <Table columns={COLONNE} rows={alerts.rows} label="Gli avvisi avvenuti">
       {#snippet row(one: Notice)}
         {@const esito = delivery(one)}
-        <td class="quando">{when(one.at)}</td>
-        <td class="posto">
+        <td class="quando fit">{when(one.at)}</td>
+        <td class="posto fit">
           <!-- il pallino, come sui luoghi e sugli agenti: giallo quando c'e'
                qualcosa che non va, verde quando e' rientrato -->
           <span class="segno" class:is-back={one.kind === 'back'}></span>
           {one.who ?? '—'}
         </td>
         <td>{one.short ?? one.title}</td>
-        <td class="end">
+        <td class="end fit">
           <span class="esito" class:male={esito.bad}>{esito.what}</span>
         </td>
       {/snippet}
@@ -100,7 +101,7 @@
 
   .say { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-3); }
 
-  .quando { white-space: nowrap; color: var(--ink-3); }
+  .quando { color: var(--ink-3); }
 
   .posto { font-weight: 560; color: var(--ink); }
 

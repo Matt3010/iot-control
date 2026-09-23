@@ -7,8 +7,16 @@
  */
 export interface Column {
   label: string;
-  /** Quanto larga, quando deve essere ferma: `84px`, `26%`. */
-  width?: string;
+  /**
+   * Quanto larga: una misura (`84px`), oppure `fit` per stringersi a quello
+   * che c'è dentro.
+   *
+   * Le colonne corte vanno strette. Una colonna larga un quarto di pagina con
+   * dentro una parola sola lascia in mezzo alla riga un vuoto che l'occhio
+   * deve scavalcare, e lo spazio libero serve a quella che ha da dire. Chi
+   * non dichiara niente se lo divide con le altre.
+   */
+  width?: string | 'fit';
   /** I numeri e le date stanno a destra: si leggono in colonna. */
   align?: 'start' | 'end';
 }

@@ -47,14 +47,18 @@
   <table aria-label={label}>
     <colgroup>
       {#each columns as column, at (at)}
-        <col style={column.width ? `width: ${column.width}` : undefined} />
+        <!-- `1%` non è una larghezza: è il modo di dire a una tabella di
+             stringere quella colonna a quello che c'è dentro -->
+        <col style={column.width ? `width: ${column.width === 'fit' ? '1%' : column.width}` : undefined} />
       {/each}
     </colgroup>
 
     <thead>
       <tr>
         {#each columns as column, at (at)}
-          <th scope="col" class:end={column.align === 'end'}>{column.label}</th>
+          <th scope="col" class:end={column.align === 'end'} class:fit={column.width === 'fit'}>
+            {column.label}
+          </th>
         {/each}
       </tr>
     </thead>
@@ -126,4 +130,9 @@
 
   th.end,
   tbody :global(td.end) { text-align: right; }
+
+  /* una colonna stretta al contenuto non deve mandare a capo: sarebbe
+     stringerla fino alla parola più lunga e poi spezzare le altre */
+  th.fit,
+  tbody :global(td.fit) { white-space: nowrap; }
 </style>
