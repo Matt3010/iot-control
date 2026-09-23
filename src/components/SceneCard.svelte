@@ -8,6 +8,7 @@
   import Icon from './Icon.svelte';
   import SceneControls from './SceneControls.svelte';
   import Switch from './Switch.svelte';
+  import TimeField from './TimeField.svelte';
 
   /**
    * Una scena, tutta in una scheda.
@@ -195,12 +196,10 @@
 
       {#if scene.when}
         <div class="orario">
-          <input
-            class="ora"
-            type="time"
+          <TimeField
             value={scene.when.at}
-            aria-label="A che ora parte"
-            onchange={(event) => setWhen({ ...scene.when!, at: event.currentTarget.value })}
+            label="A che ora parte"
+            onchange={(at: string) => setWhen({ ...scene.when!, at })}
           />
           <!-- nessun giorno acceso vuol dire tutti: un elenco vuoto si legge
                male, e «ogni giorno» e' quello che si intende -->
@@ -326,13 +325,6 @@
   }
 
   .orario { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-
-  .ora {
-    width: auto;
-    padding: 5px 8px;
-    font-size: 12.5px;
-    font-variant-numeric: tabular-nums;
-  }
 
   .giorni { display: flex; flex-wrap: wrap; gap: 4px; }
 
