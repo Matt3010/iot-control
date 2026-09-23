@@ -84,6 +84,22 @@ export interface Scene {
   when?: Timing;
 }
 
+/**
+ * Una regola scritta su un dispositivo: «quando diventa così, dimmelo».
+ *
+ * `says` è come si legge, e la scrive il server quando la regola nasce: le
+ * parole di un dispositivo le sa lui, e riscriverle qui vorrebbe dire due
+ * frasi che possono divergere.
+ */
+export interface Rule {
+  id: string;
+  deviceId: string;
+  code: string;
+  becomes: string;
+  says: string;
+  off?: boolean;
+}
+
 /** Un agente appena creato: il token si vede una volta sola, e poi mai più. */
 export interface NewAgent {
   agent: Agent;
@@ -290,6 +306,50 @@ class Devices {
     if (capability.kind === 'enum') return { who, what: String(step.value) };
     if (capability.kind !== 'range') return { who, what: String(step.value) };
     return { who, what: `${capability.label} ${step.value}${capability.unit ?? ''}` };
+  }
+
+  /* ----------------------------------------------------------- le regole */
+
+  /** Le regole scritte sui dispositivi. Poche per definizione. */
+  rules = $state<Rule[]>([]);
+
+  async loadRules(): Promise<void> {
+    this.rules = await api.get<Rule[]>('/alerts/rules');
+  }
+
+  /** Quelle scritte su un dispositivo. */
+  rulesOf(deviceId: string): Rule[] {
+    return this.rules.filter((one) => one.deviceId === deviceId);
+  }
+
+  async addRule(deviceId: string, code: string, becomes: string): Promise<void> {
+    try {
+      this.rules = [...this.rules, await api.post<Rule>('/alerts/rules', { deviceId, code, becomes })];
+    } catch (error) {
+      toast.show((error as Error).message);
+    }
+  }
+
+  async flipRule(rule: Rule, off: boolean): Promise<void> {
+    const before = rule.off;
+    rule.off = off || undefined;
+    try {
+      await api.put(`/alerts/rules/${rule.id}`, { off });
+    } catch (error) {
+      rule.off = before;
+      toast.show((error as Error).message);
+    }
+  }
+
+  async removeRule(rule: Rule): Promise<void> {
+    const at = this.rules.indexOf(rule);
+    if (at >= 0) this.rules.splice(at, 1);
+    try {
+      await api.delete(`/alerts/rules/${rule.id}`);
+    } catch (error) {
+      if (at >= 0) this.rules.splice(at, 0, rule);
+      toast.show((error as Error).message);
+    }
   }
 
   /**

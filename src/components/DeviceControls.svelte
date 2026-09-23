@@ -40,6 +40,47 @@
         : 'Non si sa, perché l’agente non è collegato',
   );
 
+  /* ---------------------------------------------------------- le regole */
+
+  /** Le regole scritte su questo dispositivo, e le cose che potrebbe fare. */
+  const rules = $derived(devices.rulesOf(device.id));
+
+  /**
+   * I valori su cui si può scrivere una regola.
+   *
+   * Solo quelli che un dispositivo assume davvero: un interruttore ha acceso
+   * e spento, una tenda ha le sue tre posizioni. Su un numero — la
+   * luminosità, i gradi — non si offre niente per ora: «sopra» e «sotto»
+   * sono un'altra cosa da quella che c'è qui, e mezza cosa non si mette.
+   */
+  const watchable = $derived(
+    (device.capabilities as Capability[]).flatMap((capability) => {
+      if (capability.kind === 'switch') {
+        return [
+          { id: `${capability.code}:true`, label: `${capability.label} si accende` },
+          { id: `${capability.code}:false`, label: `${capability.label} si spegne` },
+        ];
+      }
+      if (capability.kind === 'enum') {
+        return capability.values.map((value) => ({
+          id: `${capability.code}:${value}`,
+          label: `diventa ${String(value).toLocaleLowerCase('it')}`,
+        }));
+      }
+      return [];
+    }),
+  );
+
+  /** Quelle che non sono già scritte: proporre due volte la stessa è rumore. */
+  const offrite = $derived(
+    watchable.filter((one) => !rules.some((rule) => `${rule.code}:${rule.becomes}` === one.id)),
+  );
+
+  function addRule(scelto: string): void {
+    const [code, becomes] = scelto.split(/:(.*)/s);
+    void devices.addRule(device.id, code as string, becomes as string);
+  }
+
   const numberOf = (value: DeviceValue | undefined): number => (typeof value === 'number' ? value : 0);
 
   /** Quello che si legge a destra dell'etichetta, mentre trascini. */
@@ -130,6 +171,54 @@
       <Icon name={device.watch ? 'bell' : 'alertOff'} />
     </Button>
   </div>
+
+  {#if rules.length || offrite.length}
+    <!-- Le regole stanno sotto il dispositivo di cui parlano: «quando la
+         porta si apre» si decide guardando la porta, non un elenco di regole
+         dall'altra parte dell'app. -->
+    <div class="dev-rules">
+      {#each rules as rule (rule.id)}
+        <div class="regola" class:is-off={rule.off}>
+          <span class="dice">{rule.says}</span>
+          <Button
+            look="icon"
+            size="sm"
+            extra="regola-btn"
+            title={rule.off ? 'Riaccendi questa regola' : 'Sospendi questa regola'}
+            onclick={() => void devices.flipRule(rule, !rule.off)}
+          >
+            <Icon name={rule.off ? 'alertOff' : 'bell'} />
+          </Button>
+          <Button
+            look="icon"
+            size="sm"
+            tone="danger"
+            extra="regola-btn kill"
+            title="Togli questa regola"
+            onclick={() => void devices.removeRule(rule)}
+          >
+            <Icon name="trash" />
+          </Button>
+        </div>
+      {/each}
+
+      {#if offrite.length}
+        <Button
+          look="link"
+          size="sm"
+          extra="pick-btn"
+          onclick={(event: MouseEvent) =>
+            ui.askPick(event.currentTarget as HTMLElement, {
+              title: 'Avvisami quando…',
+              options: offrite,
+              onPick: addRule,
+            })}
+        >
+          Avvisami quando…
+        </Button>
+      {/if}
+    </div>
+  {/if}
 
   <div class="dev-body">
     {#each device.capabilities as capability (capability.code)}
@@ -278,6 +367,36 @@
   .dev-head:hover :global(.dev-watch), .dev-head :global(.dev-watch:hover) { opacity: 1; }
 
   .dev-head :global(.dev-watch[aria-pressed='true']) { opacity: 1; color: var(--accent); }
+
+  /* le regole: una riga ciascuna, sotto il nome */
+  .dev-rules {
+    display: grid;
+    gap: 2px;
+    padding: 0 12px 8px;
+  }
+
+  .regola {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .regola.is-off .dice { opacity: 0.5; text-decoration: line-through; }
+
+  .dice {
+    flex: 1;
+    min-width: 0;
+    font-size: 11.5px;
+    color: var(--ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dev-rules :global(.regola-btn) { width: 24px; height: 24px; opacity: 0.4; transition: opacity 0.16s; }
+
+  .regola:hover :global(.regola-btn), .dev-rules :global(.regola-btn:hover) { opacity: 1; }
 
   .dev-away {
     margin-left: auto;

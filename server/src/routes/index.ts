@@ -3,6 +3,7 @@ import { resolveActing } from '../auth/acting.js';
 import { maybeUser, requireUser } from '../auth/strategy.js';
 import { agentController } from '../controllers/AgentController.js';
 import { alertController } from '../controllers/AlertController.js';
+import { AlertDto, AlertOffDto } from '../dto/alert.dto.js';
 import { authController } from '../controllers/AuthController.js';
 import { deviceController } from '../controllers/DeviceController.js';
 import { mapController } from '../controllers/MapController.js';
@@ -91,6 +92,17 @@ apiRouter
  */
 // quello che e' successo mentre non guardavi
 apiRouter.get('/alerts', alertController.list);
+
+// le regole scritte sui dispositivi: «quando questa cosa diventa cosi'»
+apiRouter
+  .route('/alerts/rules')
+  .get(alertController.rules)
+  .post(validateBody(AlertDto), alertController.add);
+
+apiRouter
+  .route('/alerts/rules/:id')
+  .put(validateBody(AlertOffDto), alertController.flip)
+  .delete(alertController.remove);
 
 apiRouter.get('/push/key', pushController.key);
 apiRouter.get('/push/mine', pushController.mine);

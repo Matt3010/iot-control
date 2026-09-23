@@ -66,6 +66,8 @@
     // da un filo aperto: gli interruttori, e anche i luoghi che cambi da
     // un'altra scheda.
     void devices.load();
+    // le regole sono poche e non cambiano da sole: si leggono una volta
+    void devices.loadRules();
     live.start();
     return () => live.stop();
   });

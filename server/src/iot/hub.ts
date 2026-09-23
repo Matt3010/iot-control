@@ -178,6 +178,18 @@ export class Hub {
      * coprirebbe tutto il resto. «Ha smesso di rispondere» invece succede una
      * volta, ed è la riga che serve la mattina dopo.
      */
+    /*
+     * Le regole scritte su questo dispositivo, se qualcosa e' cambiato
+     * davvero. Sul passaggio e non sullo stato: una sonda che ripete lo
+     * stesso grado ogni dieci secondi non ha fatto succedere niente.
+     */
+    if (deviceId && before) {
+      for (const [code, value] of Object.entries(live.state)) {
+        if (before.state[code] === value) continue;
+        this.#changed?.(deviceId, code, value);
+      }
+    }
+
     if (before && before.online !== live.online && this.#names.has(key)) {
       this.#noteLive?.({
         ownerId,
@@ -202,6 +214,19 @@ export class Hub {
 
   takesNote(write: (entry: LiveNote) => void): void {
     this.#noteLive = write;
+  }
+
+  /**
+   * Chi guarda i passaggi di stato, per le regole.
+   *
+   * Si passa da fuori come il registro, e per la stessa ragione: il hub sa
+   * cosa succede, non cosa farne. Legarlo alle regole vorrebbe dire che per
+   * provare un passaggio bisogna avere un archivio.
+   */
+  #changed: ((deviceId: string, code: string, value: DeviceValue) => void) | undefined;
+
+  watchesChanges(write: (deviceId: string, code: string, value: DeviceValue) => void): void {
+    this.#changed = write;
   }
 
   liveOf(agentId: string, externalId: string): Live | undefined {

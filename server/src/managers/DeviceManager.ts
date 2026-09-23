@@ -3,6 +3,7 @@ import { badRequest, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
 import { store } from '../persistence/JsonStore.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
+import { AlertRepository } from '../repositories/AlertRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { logManager } from './LogManager.js';
 import { says } from './says.js';
@@ -62,6 +63,9 @@ export class DeviceManager {
         // chi sparisce esce anche dagli insiemi che lo tenevano: un insieme
         // che prova a comandare un fantasma non si capisce perché non va
         scenes: lost.length ? new SceneRepository(tx).pruneDevices(new Set(lost)) : 0,
+        // e le regole che lo guardavano: una regola su un fantasma non
+        // scattera' mai, e resterebbe li' a far credere di essere coperti
+        rules: lost.length ? new AlertRepository(tx).pruneDevices(new Set(lost)) : 0,
         before: was,
       };
     });
