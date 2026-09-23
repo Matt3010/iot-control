@@ -263,10 +263,12 @@
 
   <!-- Il play sta sopra l'immagine, al centro: è il gesto che ci si aspetta
        davanti a una fotografia ferma, e dice anche che ferma lo è.
-       Solo quando c'è qualcosa sotto, però: sopra la scritta che dice «sto
-       chiedendo un fotogramma» si sovrapponeva alle parole, e un tasto in
-       mezzo a una frase non è né un tasto né una frase. -->
-  {#if !live && !noLive && (src || failing)}
+       Solo sopra un'immagine, però: sopra una frase — «sto chiedendo un
+       fotogramma», «questo agente non è collegato» — si sovrapponeva alle
+       parole, e un tasto in mezzo a una frase non è né un tasto né una
+       frase. Se non c'è niente da guardare non c'è niente da far partire, e
+       per riprovare c'è il tasto qui sotto. -->
+  {#if !live && !noLive && src}
     <button
       type="button"
       class="play"

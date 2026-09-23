@@ -9,6 +9,7 @@
   import AgentPairing from './AgentPairing.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
+  import PushSwitch from './PushSwitch.svelte';
   import SceneStack from './SceneStack.svelte';
 
   /**
@@ -159,6 +160,13 @@
          premono nello stesso posto. -->
     <section class="card is-new">
       <SceneStack />
+    </section>
+
+    <!-- Gli avvisi stanno qui e non fra le impostazioni: qui ci sono le cose
+         che parlano da sole — gli agenti, i dispositivi — ed è di loro che
+         gli avvisi raccontano. -->
+    <section class="card is-new">
+      <PushSwitch />
     </section>
 
     <section class="card is-new">

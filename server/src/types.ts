@@ -209,6 +209,56 @@ export interface LogEntry {
 }
 
 /** Everything the store holds, and the unit a transaction works on. */
+/**
+ * Un telefono iscritto agli avvisi.
+ *
+ * Non è una persona: è un browser su una macchina. La stessa persona che
+ * entra dal telefono e dal computer ne ha due, e spegnerne uno non spegne
+ * l'altro — che è giusto, perché «non voglio le notifiche sul portatile in
+ * ufficio» è una frase sensata.
+ */
+export interface PushSub {
+  id: string;
+  userId: string;
+  /** Dove consegnare: lo dà il servizio del telefono, ed è anche la sua chiave. */
+  endpoint: string;
+  /** Le due chiavi con cui si cifra il contenuto: senza, la notifica è vuota. */
+  p256dh: string;
+  auth: string;
+  /** Che macchina è, per farla riconoscere a chi la vuole spegnere. */
+  agent: string;
+  createdAt: string;
+  /** L'ultima volta che il servizio l'ha accettata: le morte si buttano. */
+  lastOkAt?: string;
+}
+
+/**
+ * Una regola che fa arrivare un avviso.
+ *
+ * Sta su un dispositivo e guarda una cosa sola: quando diventa così, dillo.
+ * I destinatari sono email e non identificatori, perché chi può ricevere si
+ * decide al momento dell'invio — se togli qualcuno dalla mappa smette di
+ * ricevere quel minuto, senza che nessuno debba ricordarsi di pulire.
+ */
+export interface Alert {
+  id: string;
+  ownerId: string;
+  deviceId: string;
+  /** Quale capacità si guarda: `power`, `state`, `value`. */
+  code: string;
+  /** E quale valore fa scattare la cosa. */
+  becomes: string;
+  /** Come si legge, scritto quando si crea: «La porta diventa aperta». */
+  says: string;
+  /** Oltre a te: le persone con cui hai condiviso, se le scegli. */
+  also: string[];
+  /** Spenta senza cancellarla: un avviso che dà fastidio d'estate. */
+  off?: boolean;
+  createdAt: string;
+  /** Quando è scattata l'ultima volta, per non ripeterla finché non rientra. */
+  firedAt?: string;
+}
+
 export interface Database {
   users: User[];
   maps: PlaceMap[];
@@ -219,4 +269,6 @@ export interface Database {
   devices: Device[];
   scenes: Scene[];
   log: LogEntry[];
+  pushes: PushSub[];
+  alerts: Alert[];
 }

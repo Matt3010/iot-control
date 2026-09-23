@@ -118,6 +118,8 @@ function migrateToMaps(data: Database): Database {
     devices: data.devices,
     scenes: data.scenes,
     log: data.log,
+    pushes: data.pushes,
+    alerts: data.alerts,
     maps: data.maps.length ? data.maps : [first],
     categories: data.categories.map((category: Category) => ({ ...category, ownerId: category.ownerId ?? owner })),
     groups: data.groups.map((group: Group & { mapId?: string }) => {
@@ -139,6 +141,8 @@ const empty = (): Database => ({
   devices: [],
   scenes: [],
   log: [],
+  pushes: [],
+  alerts: [],
 });
 
 /**
@@ -191,6 +195,10 @@ export class JsonStore {
         // Chi aveva l'indice prima che gli agenti esistessero: niente agenti, niente dispositivi.
         agents: Array.isArray(parsed.agents) ? parsed.agents : [],
         devices: Array.isArray(parsed.devices) ? parsed.devices : [],
+        // gli avvisi e i telefoni iscritti sono arrivati per ultimi: chi non
+        // li ha non ne ha, e non è un guasto
+        pushes: Array.isArray(parsed.pushes) ? parsed.pushes : [],
+        alerts: Array.isArray(parsed.alerts) ? parsed.alerts : [],
       });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;

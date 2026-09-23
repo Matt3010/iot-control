@@ -1,0 +1,141 @@
+import { api } from './api';
+
+/**
+ * Gli avvisi sul telefono, dal lato di chi li riceve.
+ *
+ * Fra «ho detto di sì» e «mi arriva davvero una notifica» ci sono sei cose
+ * che possono andare storte, e quasi tutte sono fuori dal nostro controllo:
+ * il browser che non le sa fare, il permesso negato, l'app che su iPhone deve
+ * stare nella schermata home. Qui si tiene il conto di dove siamo, perché
+ * l'interfaccia possa dire cosa manca invece di un «non funziona».
+ */
+
+/** Come si passa dalla chiave pubblica, che è testo, a quello che vuole il browser. */
+function bytesOf(base64: string): Uint8Array {
+  const dritto = (base64 + '='.repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(dritto);
+  return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
+}
+
+/** Che macchina è, in due parole: serve a riconoscerla in un elenco. */
+function whichMachine(): string {
+  const ua = navigator.userAgent;
+  const sistema = /iPhone|iPad/.test(ua)
+    ? 'iPhone'
+    : /Android/.test(ua)
+      ? 'Android'
+      : /Mac/.test(ua)
+        ? 'Mac'
+        : /Windows/.test(ua)
+          ? 'Windows'
+          : 'Computer';
+  const browser = /CriOS|Chrome/.test(ua) ? 'Chrome' : /Firefox/.test(ua) ? 'Firefox' : 'Safari';
+  return `${sistema} · ${browser}`;
+}
+
+class Push {
+  /** Se questo browser le sa fare. */
+  can = $state(false);
+  /** `default` non ha ancora deciso, `granted` sì, `denied` no e non si richiede. */
+  permission = $state<NotificationPermission>('default');
+  /** Se questa macchina è iscritta adesso. */
+  on = $state(false);
+  /** Mentre si accende o si spegne: il tasto non si preme due volte. */
+  busy = $state(false);
+  /**
+   * Su iPhone le notifiche arrivano solo a un'app aggiunta alla schermata
+   * home. Non è un nostro limite e non si può aggirare: si può solo dirlo.
+   */
+  needsInstall = $state(false);
+
+  async look(): Promise<void> {
+    this.can = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    if (!this.can) {
+      // Un iPhone col browser normale non ce l'ha: diventa capace appena
+      // l'app sta nella schermata home, e allora vale la pena dirglielo.
+      this.needsInstall = /iPhone|iPad/.test(navigator.userAgent) && !this.#standalone();
+      return;
+    }
+
+    this.permission = Notification.permission;
+    const reg = await navigator.serviceWorker.getRegistration();
+    this.on = !!(await reg?.pushManager.getSubscription());
+  }
+
+  /** Accendere: il permesso, l'iscrizione, e dirlo al server. */
+  async enable(): Promise<boolean> {
+    if (this.busy) return this.on;
+    this.busy = true;
+
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+
+      this.permission = await Notification.requestPermission();
+      if (this.permission !== 'granted') return false;
+
+      const { key } = await api.get<{ key: string }>('/push/key');
+      const sub =
+        (await reg.pushManager.getSubscription()) ??
+        (await reg.pushManager.subscribe({
+          // Senza questo la notifica arriverebbe senza poter essere letta da
+          // nessuno: è la chiave con cui il servizio di consegna sa che siamo
+          // noi, e con cui il browser cifra quello che riceve.
+          userVisibleOnly: true,
+          applicationServerKey: bytesOf(key) as BufferSource,
+        }));
+
+      const raw = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+      await api.post('/push/subscribe', {
+        endpoint: raw.endpoint,
+        p256dh: raw.keys?.p256dh,
+        auth: raw.keys?.auth,
+        agent: whichMachine(),
+      });
+
+      this.on = true;
+      return true;
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  /**
+   * Spegnere: qui e sul server.
+   *
+   * Il permesso del browser resta dato — quello non si può ritirare da
+   * codice, e va bene così: riaccenderle non deve richiedere di nuovo il
+   * permesso a chi l'aveva già dato.
+   */
+  async disable(): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = await reg?.pushManager.getSubscription();
+      if (sub) {
+        await api.post('/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => undefined);
+        await sub.unsubscribe();
+      }
+      this.on = false;
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  /** Una di prova a sé stessi: l'unico modo di sapere che arrivano davvero. */
+  async tryIt(): Promise<number> {
+    const { sent } = await api.post<{ sent: number }>('/push/test', {});
+    return sent;
+  }
+
+  #standalone(): boolean {
+    return (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as unknown as { standalone?: boolean }).standalone === true
+    );
+  }
+}
+
+export const push = new Push();

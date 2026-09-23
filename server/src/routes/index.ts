@@ -19,6 +19,8 @@ import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/group.dto.js';
 import { MapDto } from '../dto/map.dto.js';
 import { CreatePlaceDto, UpdatePlaceDto } from '../dto/place.dto.js';
+import { pushController } from '../controllers/PushController.js';
+import { SubscribeDto, UnsubscribeDto } from '../dto/push.dto.js';
 import { validateBody } from '../middleware/validateBody.js';
 
 export const apiRouter = Router();
@@ -81,6 +83,16 @@ apiRouter
   .route('/categories/:id')
   .put(validateBody(UpdateCategoryDto), categoryController.update)
   .delete(categoryController.remove);
+
+/*
+ * Gli avvisi sul telefono. Stanno sulla persona e non sul proprietario di
+ * turno: entrando in casa di qualcun altro, le notifiche restano le tue.
+ */
+apiRouter.get('/push/key', pushController.key);
+apiRouter.get('/push/mine', pushController.mine);
+apiRouter.post('/push/subscribe', validateBody(SubscribeDto), pushController.subscribe);
+apiRouter.post('/push/unsubscribe', validateBody(UnsubscribeDto), pushController.unsubscribe);
+apiRouter.post('/push/test', pushController.test);
 
 apiRouter
   .route('/groups')

@@ -24,6 +24,7 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
+    "web-push": "^3.6.7",
     "ws": "^8.18.3"
   },
   "devDependencies": {
@@ -37,6 +38,7 @@
     "@types/node": "^26.6.2",
     "@types/passport": "^1.0.17",
     "@types/passport-jwt": "^4.0.1",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1",
     "concurrently": "^9.1.2",
     "leaflet": "^1.9.4",
