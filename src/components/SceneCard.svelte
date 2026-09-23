@@ -340,7 +340,15 @@
       <div class="chips">
         <!-- l'unica azione che non riguarda una cosa in casa: sta con le
              altre perche' si aggiunge allo stesso modo -->
-        <Chip label="Un avviso" size="sm" look="off" title="Manda un avviso quando la scena arriva qui" onclick={addNotify} />
+        <!-- le altre pastiglie sono nomi di cose, questa e' quello che fa: dirlo
+             all'infinito la distingue da un dispositivo che si chiama «Avviso» -->
+        <Chip
+          label="Invia un avviso"
+          size="sm"
+          look="off"
+          title="Manda un avviso quando la scena arriva qui"
+          onclick={addNotify}
+        />
         {#each all as device (device.id)}
           <Chip
             label={device.name}
