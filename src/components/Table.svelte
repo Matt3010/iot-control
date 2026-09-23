@@ -44,38 +44,67 @@
 </script>
 
 {#if rows.length}
-  <table aria-label={label}>
-    <colgroup>
-      {#each columns as column, at (at)}
-        <!-- `1%` non è una larghezza: è il modo di dire a una tabella di
-             stringere quella colonna a quello che c'è dentro -->
-        <col style={column.width ? `width: ${column.width === 'fit' ? '1%' : column.width}` : undefined} />
-      {/each}
-    </colgroup>
-
-    <thead>
-      <tr>
+  <!-- Le colonne non si tolgono quando lo schermo è stretto: quella che
+       sparisce è sempre quella che a qualcuno serviva, e una tabella che
+       cambia forma va riletta ogni volta. Qui invece scorre di lato, e
+       quello che non ci sta resta raggiungibile invece che tagliato dal
+       bordo della scheda. -->
+  <div class="scorre">
+    <table aria-label={label}>
+      <colgroup>
         {#each columns as column, at (at)}
-          <th scope="col" class:end={column.align === 'end'} class:fit={column.width === 'fit'}>
-            {column.label}
-          </th>
+          <!-- `1%` non è una larghezza: è il modo di dire a una tabella di
+               stringere quella colonna a quello che c'è dentro -->
+          <col style={column.width ? `width: ${column.width === 'fit' ? '1%' : column.width}` : undefined} />
         {/each}
-      </tr>
-    </thead>
+      </colgroup>
 
-    <tbody>
-      {#each rows as one (one.id)}
-        <tr>{@render row(one)}</tr>
-      {/each}
-    </tbody>
-  </table>
+      <thead>
+        <tr>
+          {#each columns as column, at (at)}
+            <th scope="col" class:end={column.align === 'end'} class:fit={column.width === 'fit'}>
+              {column.label}
+            </th>
+          {/each}
+        </tr>
+      </thead>
 
+      <tbody>
+        {#each rows as one (one.id)}
+          <tr>{@render row(one)}</tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- le frecce restano ferme: scorrono le righe, non i comandi -->
   {@render foot?.()}
 {:else if empty}
   {@render empty()}
 {/if}
 
 <style>
+  /* La finestra da cui si guarda: quello che non ci sta si raggiunge
+     scorrendo, invece di restare tagliato dal bordo della scheda. */
+  .scorre {
+    overflow-x: auto;
+    /* lo slancio del dito, come in ogni altra cosa che scorre sul telefono */
+    -webkit-overflow-scrolling: touch;
+    /* la riga si ferma dove finisce una colonna, non a metà di una parola */
+    scroll-snap-type: x proximity;
+    /* il filo sotto le celle arriva fino in fondo anche quando si scorre */
+    padding-bottom: 1px;
+  }
+
+  /* su un telefono la barra ruba due righe di tabella: si vede mentre scorri
+     e poi se ne va, come fa il sistema da solo */
+  .scorre::-webkit-scrollbar { height: 4px; }
+
+  .scorre::-webkit-scrollbar-thumb {
+    border-radius: 99px;
+    background: color-mix(in srgb, var(--ink-3) 40%, transparent);
+  }
+
   table {
     width: 100%;
     border-collapse: separate;
@@ -102,6 +131,10 @@
 
   tbody :global(td) {
     padding: 10px;
+    /* Una riga sta su una riga. Da quando la tabella scorre, mandare a capo
+       non fa stare niente in più: stringe la colonna libera e spezza «ha
+       smesso di rispondere» su cinque righe, alzando la riga di quattro. */
+    white-space: nowrap;
     border-bottom: 1px solid var(--hairline-soft);
     color: var(--ink-2);
     line-height: 1.35;

@@ -1,10 +1,12 @@
 <script lang="ts">
   import { devices, type Device } from '../lib/devices.svelte';
   import { store } from '../lib/store.svelte';
+  import Button from './Button.svelte';
   import Chip from './Chip.svelte';
   import DeviceAlerts from './DeviceAlerts.svelte';
   import NoticeList from './NoticeList.svelte';
   import PageCard from './PageCard.svelte';
+  import Icon from './Icon.svelte';
   import PageShell from './PageShell.svelte';
   import PushSwitch from './PushSwitch.svelte';
 
@@ -66,10 +68,16 @@
     ),
   );
 
-  const mostrate = $derived([
-    ...sorvegliate,
-    ...ordinate(devices.list.filter((device) => aperte.includes(device.id) && !device.watch && !devices.rulesOf(device.id).length)),
-  ]);
+  /** Quelle aperte che ancora non dicono niente: restano finché le chiudi. */
+  const vuote = $derived(
+    ordinate(
+      devices.list.filter(
+        (device) => aperte.includes(device.id) && !device.watch && !devices.rulesOf(device.id).length,
+      ),
+    ),
+  );
+
+  const mostrate = $derived([...sorvegliate, ...vuote]);
 </script>
 
 <PageShell
@@ -105,6 +113,23 @@
             <div class="chi">
               <span class="nome">{device.name}</span>
               {#if qui}<span class="qui">{qui}</span>{/if}
+              {#if vuote.includes(device)}
+                <!-- Aperta per guardarci dentro e poi lasciata lì: senza
+                     questo resterebbe in elenco per sempre, in mezzo a quelle
+                     che qualcosa la dicono davvero. Chi è sorvegliata se ne
+                     va da sé quando spegni la levetta e togli le sue regole,
+                     e un tasto che facesse le due cose insieme cancellerebbe
+                     il lavoro di prima con un colpo solo. -->
+                <Button
+                  look="icon"
+                  size="sm"
+                  extra="chiudi"
+                  title="Togli dall’elenco"
+                  onclick={() => (aperte = aperte.filter((id) => id !== device.id))}
+                >
+                  <Icon name="close" />
+                </Button>
+              {/if}
             </div>
             <DeviceAlerts {device} />
           </li>
@@ -177,6 +202,12 @@
 
   /* dove sta, perché due case possono avere tutt'e due una «Tenda soggiorno» */
   .qui { flex: none; font-size: 11px; color: var(--ink-3); }
+
+  /* il tasto per chiuderla sta in fondo alla sua riga, dalla parte opposta
+     del nome: è l'unico comando che riguarda la riga intera */
+  .chi :global(.chiudi) { margin-left: auto; opacity: 0.45; transition: opacity 0.16s; }
+
+  .cosa:hover :global(.chiudi), .chi :global(.chiudi:hover) { opacity: 1; }
 
   .altre { display: grid; gap: 8px; margin-top: 4px; }
 
