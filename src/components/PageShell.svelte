@@ -23,6 +23,7 @@
     count,
     lead,
     siblings = true,
+    meta,
     back = { href: '/', label: 'Torna alla mappa' },
     layout = 'columns',
     children,
@@ -32,6 +33,14 @@
     count?: number;
     /** Una riga che dice a cosa serve la pagina. Sparisce se non serve. */
     lead?: string;
+    /**
+     * Una riga sotto il titolo, dentro la testata.
+     *
+     * È roba del titolo — come sta questo agente, dove sta — e messa fra le
+     * schede se ne staccava: sotto ci sono i ventidue pixel che separano la
+     * testata dal contenuto, e quella riga finiva dalla parte sbagliata.
+     */
+    meta?: Snippet;
     /** Se questa pagina sta nella fila delle altre. Le mappe no. */
     siblings?: boolean;
     /**
@@ -79,6 +88,7 @@
       {#if count}<span class="how-many">{count}</span>{/if}
     </div>
     {#if lead}<p class="lead">{lead}</p>{/if}
+    {@render meta?.()}
 
     <!-- Le altre stanze, sempre a portata: chi è venuto per gli agenti scopre
          che esistono le scene senza doverle cercare, e chi si è sbagliato di

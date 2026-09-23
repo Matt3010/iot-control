@@ -51,12 +51,16 @@
   layout="rows"
   lead={agent ? undefined : 'Questo agente non esiste più, o non è mai stato tuo.'}
 >
-  {#if agent}
-    <div class="stato">
-      <span class="mark {health}" title={says} role="img" aria-label={says}></span>
-      <span>{says}{place ? ` · ${place}` : ''}</span>
-    </div>
+  {#snippet meta()}
+    {#if agent}
+      <div class="stato">
+        <span class="mark {health}" title={says} role="img" aria-label={says}></span>
+        <span>{says}{place ? ` · ${place}` : ''}</span>
+      </div>
+    {/if}
+  {/snippet}
 
+  {#if agent}
     {#if eyes.length}
       <!-- le immagini prima di tutto: è quello per cui si apre questa pagina -->
       <div class="occhi" style={`--quante: ${Math.min(eyes.length, 2)}`}>
@@ -87,11 +91,9 @@
 
 <style>
   .stato {
-    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 14px;
     font-size: 12px;
     color: var(--ink-3);
   }

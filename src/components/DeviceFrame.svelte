@@ -338,10 +338,12 @@
 
 <style>
   .cam {
-    /* Il letto di un'immagine e' scuro in tutti e due i temi: una telecamera
-       riprende quello che c'e', e quello che c'e' di notte e' buio. Legarlo
-       al colore del testo voleva dire un riquadro bianco al buio. */
-    --shot-bed: #12161c;
+    /* Il letto di un'immagine e' nero in tutti e due i temi, come a tutto
+       schermo: una telecamera riprende quello che c'e', e quello che c'e' di
+       notte e' buio. Era un blu molto scuro, e accanto a una scheda blu molto
+       scura non si capiva dove finisse la scheda e cominciasse
+       l'inquadratura. */
+    --shot-bed: #000;
     position: relative;
     display: grid;
     gap: 4px;

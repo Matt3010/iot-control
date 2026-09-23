@@ -491,6 +491,36 @@ class Store {
 
   /* ----------------------------------------------------------------- places */
 
+  /**
+   * Sposta un agente da un luogo a un altro, o lo lascia senza.
+   *
+   * Un agente sta su un luogo solo, quindi «su questo» vuol dire anche «via
+   * da quell'altro»: farlo in un colpo evita di lasciarlo appeso a due, che
+   * è uno stato che non vuol dire niente.
+   */
+  async moveAgent(agentId: string, placeId: string | null): Promise<void> {
+    const prima = this.places.filter((place) => (place.agentIds ?? []).includes(agentId));
+    const dopo = placeId ? this.places.find((place) => place.id === placeId) : undefined;
+
+    for (const place of prima) {
+      if (place.id === placeId) return;
+      await this.#setAgents(place, (place.agentIds ?? []).filter((id) => id !== agentId));
+    }
+    if (dopo) await this.#setAgents(dopo, [...(dopo.agentIds ?? []), agentId]);
+  }
+
+  /** Il luogo si riscrive per intero: il server vuole la scheda, non la toppa. */
+  async #setAgents(place: Place, agentIds: string[]): Promise<void> {
+    const before = { ...place };
+    Object.assign(place, { agentIds });
+    try {
+      Object.assign(place, await api.put<Place>(`/places/${place.id}`, placePayload(place.mapId, { ...place, agentIds })));
+    } catch (error) {
+      Object.assign(place, before);
+      toast.show((error as Error).message);
+    }
+  }
+
   /** Shown immediately; the server's answer replaces it in place. */
   async savePlace(draft: Draft): Promise<void> {
     // se il posto c'era già resta dov'era: solo i nuovi nascono in quella selezionata

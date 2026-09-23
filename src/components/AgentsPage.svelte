@@ -29,6 +29,23 @@
   /** Su quale luogo sta un agente, se ce l'ha: è la domanda che viene subito. */
   const placeOf = (agent: Agent) => store.places.find((place) => (place.agentIds ?? []).includes(agent.id));
 
+  /**
+   * Spostarlo, o toglierlo da dove sta.
+   *
+   * Un agente sta su un luogo solo, quindi scegliere il nuovo vuol dire anche
+   * andarsene dal vecchio: il selettore dice dove sta adesso, e cambiarlo lo
+   * sposta.
+   */
+  async function move(agent: Agent, placeId: string) {
+    try {
+      await store.moveAgent(agent.id, placeId || null);
+      const dove = placeId ? store.places.find((place) => place.id === placeId)?.name : null;
+      toast.show(dove ? `«${agent.name}» sta su «${dove}»` : `«${agent.name}» non sta più su nessun luogo`);
+    } catch (error) {
+      toast.show((error as Error).message);
+    }
+  }
+
   async function copy(command: string) {
     try {
       await navigator.clipboard.writeText(command);
@@ -118,13 +135,31 @@
         {/snippet}
 
         {#snippet foot()}
-          <p class="where">
-            {#if where}
-              Sta su <b>{where.name}</b>
-            {:else}
-              Non è ancora su nessun luogo: lo metti dalla scheda di un luogo.
-            {/if}
-          </p>
+          <!-- Dove sta, e da qui si cambia. Prima bisognava aprire la scheda
+               del luogo dove stava per staccarlo e poi quella dell'altro per
+               rimetterlo, e per farlo bisognava ricordarsi dove fosse. -->
+          <div class="dove">
+            <span class="where">
+              {#if where}
+                Sta su <b>{where.name}</b>
+              {:else}
+                Non sta su nessun luogo
+              {/if}
+            </span>
+
+            <label class="scegli">
+              <span class="via">{where ? 'Spostalo' : 'Mettilo'}</span>
+              <select
+                value={where?.id ?? ''}
+                onchange={(event: Event) => move(agent, (event.currentTarget as HTMLSelectElement).value)}
+              >
+                <option value="">nessun luogo</option>
+                {#each store.places as place (place.id)}
+                  <option value={place.id}>{place.name}</option>
+                {/each}
+              </select>
+            </label>
+          </div>
 
           {#if fresh?.id === agent.id}
             <div class="install">
@@ -183,9 +218,29 @@
     border: 1px dashed var(--hairline);
   }
 
-  .where { margin: 0; font-size: 11.5px; color: var(--ink-3); }
+  .dove {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .where { font-size: 11.5px; color: var(--ink-3); }
 
   .where b { font-weight: 560; color: var(--ink-2); }
+
+  /* il luogo si cambia da qui: l'elenco è quello dei luoghi, e «nessun luogo»
+     è la voce che lo stacca */
+  .scegli { display: flex; align-items: center; gap: 6px; }
+
+  .via { font-size: 11px; color: var(--ink-3); }
+
+  .scegli select {
+    max-width: 150px;
+    padding: 3px 6px;
+    font-size: 11.5px;
+  }
 
   .install { display: grid; gap: 6px; min-width: 0; }
 
