@@ -119,23 +119,10 @@
 <PageShell
   title="Avvisi"
   layout="rows"
-  lead="Le cose che vuoi sapere senza aprire l'app, come un agente che smette di rispondere, una porta che resta aperta, una stanza che va sotto zero. Arrivano sul telefono, e li spegni da qui quando non li vuoi più."
+  lead="Le cose che vuoi sapere senza aprire l'app. Arrivano sul telefono, e li spegni da qui quando non li vuoi più."
 >
   <PageCard>
     <PushSwitch />
-  </PageCard>
-
-  <PageCard>
-    <span class="eyebrow">Quando un agente smette di rispondere</span>
-    <p class="say">
-      Se un agente non si fa vivo per un quarto d'ora te lo diciamo noi, senza che tu debba
-      chiedere niente, e te lo diciamo di nuovo quando riprende, con il nome del luogo dov'è
-      installato. È l'unico avviso che può darti solo chi sta fuori casa tua, perché se è saltata
-      la corrente di là non c'è più nessuno a segnalarlo.
-    </p>
-    <p class="say quiet">
-      Gli avvisi arrivano se c'è rete e se il telefono li accetta. Non è un sistema di sicurezza.
-    </p>
   </PageCard>
 
   <PageCard wide>
@@ -198,9 +185,6 @@
   .say { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-2); }
 
   .say b { font-weight: 600; color: var(--ink); }
-
-  /* la riga che mette le mani avanti: si legge, e non grida */
-  .quiet { color: var(--ink-3); }
 
   /* il titolo della scheda e il tasto che ci aggiunge, sulla stessa riga */
   .testa {
