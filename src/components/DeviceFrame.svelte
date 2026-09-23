@@ -73,6 +73,17 @@
    */
   let fullReady = $state(false);
 
+  /**
+   * Se la diretta è stata chiesta.
+   *
+   * Non parte da sola. Una telecamera che si accende perché sei passato di
+   * lì tiene aperto un flusso a casa e spinge due megabit al secondo su
+   * per l'upload di casa, per un'immagine che magari non stavi guardando.
+   * Quello che si vede senza chiedere niente è una fotografia sola, presa
+   * quando la carta è comparsa; il resto si preme.
+   */
+  let asked = $state(false);
+
   /** La diretta è aperta adesso. */
   let live = $state(false);
   /** Vero appena la diretta ha disegnato qualcosa: prima è solo una promessa. */
@@ -179,7 +190,7 @@
    * il flusso a casa.
    */
   $effect(() => {
-    if (!seen || noLive || fullReady) {
+    if (!asked || !seen || noLive || fullReady) {
       live = false;
       return;
     }
@@ -203,17 +214,17 @@
     };
   });
 
-  /** Le fotografie, ma solo quando la diretta non c'è. */
+  /**
+   * Una fotografia, non un battito.
+   *
+   * Quando la carta compare se ne chiede una, se quella che c'è è vecchia:
+   * serve a sapere cosa si sta guardando prima di decidere se guardarlo
+   * davvero. Poi basta — se ne vuoi un'altra c'è il tasto, e se vuoi vedere
+   * muoversi c'è il play.
+   */
   $effect(() => {
     if (!seen || live) return;
-
-    // Tornando a guardarla se ne chiede una subito, se l'ultima è vecchia:
-    // restare cinque secondi davanti a un'immagine di un minuto fa è peggio
-    // che non averla, perché sembra adesso e non lo è.
     if (Date.now() - lastMs >= OGNI_MS) void refresh();
-
-    const battito = setInterval(() => void refresh(), OGNI_MS);
-    return () => clearInterval(battito);
   });
 
   const quando = $derived(
@@ -247,7 +258,21 @@
       }}
     />
   {:else}
-    <span class="waiting">{failing || 'Un momento: sto aprendo la diretta…'}</span>
+    <span class="waiting">{failing || 'Un momento: sto chiedendo un fotogramma…'}</span>
+  {/if}
+
+  <!-- Il play sta sopra l'immagine, al centro: è il gesto che ci si aspetta
+       davanti a una fotografia ferma, e dice anche che ferma lo è. -->
+  {#if !live && !noLive}
+    <button
+      type="button"
+      class="play"
+      title="Guarda in diretta"
+      aria-label="Guarda in diretta"
+      onclick={() => (asked = true)}
+    >
+      <Icon name="play" />
+    </button>
   {/if}
 
   <div class="foot">
@@ -262,7 +287,13 @@
       {:else}&nbsp;{/if}
     </span>
     <span class="acts">
-      {#if !live}
+      {#if live}
+        <!-- Fermarla è quello che fa smettere di arrivare: finché scorre,
+             scorre anche l'upload di casa. -->
+        <Button look="icon" size="sm" title="Ferma la diretta" onclick={() => (asked = false)}>
+          <Icon name="pause" />
+        </Button>
+      {:else}
         <Button look="icon" size="sm" title="Aggiorna adesso" disabled={loading} onclick={refresh}>
           <Icon name="refresh" />
         </Button>
@@ -325,6 +356,32 @@
     text-align: center;
     padding: 0 12px;
   }
+
+  /* il play: grande abbastanza da premerlo col pollice, e scuro sotto, che
+     su un'inquadratura chiara un cerchio bianco sparisce */
+  .play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.5);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s var(--ease), background 0.2s;
+  }
+
+  .play:hover { background: rgb(0 0 0 / 0.65); transform: translate(-50%, -50%) scale(1.06); }
+
+  .play :global(.ico) { width: 20px; height: 20px; margin-left: 2px; fill: currentColor; }
 
   .acts {
     display: flex;

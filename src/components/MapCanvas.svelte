@@ -208,7 +208,7 @@
         } as L.PopupOptions);
       }
 
-      // The pin being edited steps aside for the draggable draft standing in for it.
+      // Il pin in modifica si fa da parte: al suo posto sta quello della bozza.
       const onMap = store.visible(place) && ui.draft?.key !== place.key;
       if (onMap && !clusters.hasLayer(marker)) clusters.addLayer(marker);
       if (!onMap && clusters.hasLayer(marker)) clusters.removeLayer(marker);
@@ -243,7 +243,15 @@
     document.body.classList.toggle('found-me', !!here.spot);
   });
 
-  /** The draft pin: draggable, and tinted like the category chosen in the form. */
+  /**
+   * Il pin della bozza: fermo dov'è, e del colore della categoria scelta.
+   *
+   * Non si trascina. Si trascinava, e nessuno l'ha mai chiesto: un pin che si
+   * sposta col dito si sposta anche mentre scorri la mappa, e un posto che si
+   * muove da solo di venti metri non si vede finché non ci torni sopra. Dove
+   * sta un luogo si decide quando lo si crea — toccando la mappa, o cercando
+   * l'indirizzo — e si cambia rifacendo quel gesto.
+   */
   $effect(() => {
     if (!map) return;
     const draft = ui.draft;
@@ -269,16 +277,8 @@
     if (!draftMarker) {
       draftMarker = L.marker([draft.lat, draft.lng], {
         icon: pinIcon(look),
-        draggable: true,
         zIndexOffset: 1000,
       }).addTo(map);
-      draftMarker.on('dragend', () => {
-        const { lat, lng } = draftMarker!.getLatLng();
-        if (ui.draft) {
-          ui.draft.lat = lat;
-          ui.draft.lng = lng;
-        }
-      });
     } else {
       draftMarker.setLatLng([draft.lat, draft.lng]);
       draftMarker.setIcon(pinIcon(look));
