@@ -58,7 +58,31 @@
     return out;
   }
 
-  const add = (step: SceneStep) => void devices.patchScene(scene, { steps: [...scene.steps, step] });
+  /**
+   * Aggiunge una riga, o cambia quella che c'era per la stessa cosa.
+   *
+   * «Apri» e «ferma» sulla stessa tenda sono una scena che non vuol dire
+   * niente: partirebbero a mezzo secondo l'una dall'altra e la tenda
+   * resterebbe dove capita. Due righe sullo stesso dispositivo restano
+   * legittime quando parlano di cose diverse — una lampadina che si accende e
+   * si porta al 30% — e quelle non si toccano.
+   */
+  function add(step: SceneStep): void {
+    const stessa = (one: SceneStep) => one.deviceId === step.deviceId && one.code === step.code;
+    // al suo posto e non in fondo: cambiare idea su una riga non deve
+    // rimescolare l'ordine in cui si legge la scena
+    const steps = scene.steps.some(stessa)
+      ? scene.steps.map((one) => (stessa(one) ? step : one))
+      : [...scene.steps, step];
+    void devices.patchScene(scene, { steps });
+  }
+
+  /** Cosa fa già quel dispositivo in questa scena, capacità per capacità. */
+  const already = (deviceId: string, code: string) =>
+    scene.steps.find((one) => one.deviceId === deviceId && one.code === code)?.value;
+
+  /** Se è già in scena: la pastiglia lo dice invece di farlo scoprire premendo. */
+  const inScene = (deviceId: string) => scene.steps.some((one) => one.deviceId === deviceId);
 
   const drop = (at: number) =>
     void devices.patchScene(scene, { steps: scene.steps.filter((_step, index) => index !== at) });
@@ -134,8 +158,8 @@
           <Chip
             label={device.name}
             size="sm"
-            look={picking === device.id ? 'sel' : 'off'}
-            title={device.online ? 'Risponde' : 'Adesso non risponde'}
+            look={picking === device.id ? 'sel' : inScene(device.id) ? 'on' : 'off'}
+            title={inScene(device.id) ? 'È già in questa scena' : device.online ? 'Risponde' : 'Adesso non risponde'}
             onclick={() => (picking = picking === device.id ? null : device.id)}
           />
         {/each}
@@ -148,7 +172,16 @@
           {#if able.length}
             <div class="chips is-what">
               {#each able as choice (choice.what)}
-                <Chip label={choice.what} size="sm" look="on" onclick={() => add(choice.step)} />
+                {@const scelta = already(choice.step.deviceId, choice.step.code) === choice.step.value}
+                <!-- quella già scelta si vede: premerne un'altra la sostituisce,
+                     invece di aggiungere una riga che la contraddice -->
+                <Chip
+                  label={choice.what}
+                  size="sm"
+                  look={scelta ? 'sel' : 'on'}
+                  title={scelta ? 'È quello che fa adesso' : undefined}
+                  onclick={() => add(choice.step)}
+                />
               {/each}
             </div>
           {:else}

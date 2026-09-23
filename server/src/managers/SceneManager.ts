@@ -137,12 +137,22 @@ export class SceneManager {
   /**
    * Ogni riga dev'essere possibile: il dispositivo è suo, quella cosa la sa
    * fare, e il valore ha senso. Un dispositivo può comparire più volte — una
-   * lampadina che si accende e si porta al 30% sono due righe, ed è giusto.
+   * lampadina che si accende e si porta al 30% sono due righe, ed è giusto —
+   * ma non due volte per la stessa cosa: «apri» e «ferma» sulla stessa tenda
+   * sono una scena che non vuol dire niente, e partirebbero a mezzo secondo
+   * l'una dall'altra lasciando la tenda dove capita. Vale l'ultima scritta,
+   * che è quella che si stava scegliendo.
    */
   #clean(tx: Transaction, ownerId: string, steps: SceneStepDto[]): SceneStep[] {
     const devices = new DeviceRepository(tx);
 
-    return steps.map((step) => {
+    // l'ultima parola su una stessa cosa cancella le precedenti, e l'ordine
+    // resta quello in cui sono state scritte
+    const ultima = new Map<string, SceneStepDto>();
+    for (const step of steps) ultima.set(`${step.deviceId}:${step.code}`, step);
+    const sole = steps.filter((step) => ultima.get(`${step.deviceId}:${step.code}`) === step);
+
+    return sole.map((step) => {
       const device = devices.findById(step.deviceId);
       if (!device || device.ownerId !== ownerId) throw badRequest('dispositivo inesistente');
 
