@@ -7,6 +7,7 @@
   import { ui } from '../lib/ui.svelte';
   import AddRow from './AddRow.svelte';
   import Button from './Button.svelte';
+  import TextField from './TextField.svelte';
   import Icon from './Icon.svelte';
   import LinkRow from './LinkRow.svelte';
   import PageCard from './PageCard.svelte';
@@ -126,11 +127,11 @@
           </button>
         {/snippet}
 
-        <input
-          type="text"
-          maxlength="40"
+        <TextField
+          maxlength={40}
           value={map.name}
-          onchange={(event) => store.patchMap(map, { name: event.currentTarget.value })}
+          label="Nome della mappa"
+          onchange={(nome: string) => store.patchMap(map, { name: nome })}
         />
 
         {#snippet trail()}

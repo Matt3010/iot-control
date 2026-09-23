@@ -31,6 +31,3 @@
   <PickList options={request.options} current={request.current} title={request.title} onpick={choose} />
 </Popover>
 
-<style>
-  :global(#pick-popover) { padding: 9px; }
-</style>

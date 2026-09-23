@@ -3,6 +3,7 @@
   import { toast } from '../lib/toast.svelte';
   import type { MapEditor } from '../lib/types';
   import Button from './Button.svelte';
+  import TextField from './TextField.svelte';
   import Chip from './Chip.svelte';
   import Icon from './Icon.svelte';
 
@@ -149,9 +150,9 @@
   {/each}
 
   <div class="add">
-    <input
-      type="email"
-      maxlength="120"
+    <TextField
+      kind="email"
+      maxlength={120}
       placeholder="nome@esempio.it"
       autocomplete="off"
       bind:value={fresh}
@@ -275,7 +276,7 @@
     box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--accent) 10%, transparent);
   }
 
-  .add input {
+  .add :global(.text-field) {
     flex: 1;
     min-width: 0;
     padding: 6px 8px;
@@ -285,7 +286,7 @@
     font-size: 12.5px;
   }
 
-  .add input:hover, .add input:focus { background: none; box-shadow: none; }
+  .add :global(.text-field):hover, .add :global(.text-field):focus { background: none; box-shadow: none; }
 
   .add :global(.add-go) { color: var(--ink-3); }
 

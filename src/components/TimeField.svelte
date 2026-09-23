@@ -109,8 +109,6 @@
 
   .time-btn :global(.ico) { width: 12px; height: 12px; color: var(--ink-3); }
 
-  :global(#time-pop) { padding: 8px; }
-
   .colonne { display: flex; align-items: stretch; gap: 6px; }
 
   /* lo scatto: una colonna di numeri che si ferma dove capita si rilegge tre

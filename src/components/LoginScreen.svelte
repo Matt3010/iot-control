@@ -4,6 +4,7 @@
   import Icon from './Icon.svelte';
   import MapBackdrop from './MapBackdrop.svelte';
   import Stop from './Stop.svelte';
+  import TextField from './TextField.svelte';
   import Button from './Button.svelte';
 
   let email = $state('');
@@ -74,8 +75,8 @@
 
     <div class="stops">
       <Stop icon="mail" color="#2f6fed" label="Email">
-        <input
-          type="email"
+        <TextField
+          kind="email"
           name="email"
           autocomplete="username"
           placeholder="tu@esempio.it"
@@ -86,8 +87,8 @@
 
       <Stop icon="lock" color="#6a4c93" label="Password">
         <span class="peek">
-          <input
-            type={mostra ? 'text' : 'password'}
+          <TextField
+            kind={mostra ? 'text' : 'password'}
             name="password"
             autocomplete={creating ? 'new-password' : 'current-password'}
             placeholder={creating ? 'Almeno 8 caratteri' : '••••••••'}
@@ -111,13 +112,13 @@
       {#if creating}
         <Stop icon="check" color="#6a4c93" label="Conferma password">
           <span class="peek">
-            <input
-              type={mostra ? 'text' : 'password'}
+            <TextField
+              kind={mostra ? 'text' : 'password'}
               name="conferma"
               autocomplete="new-password"
               placeholder="La stessa di sopra"
               required
-              minlength="8"
+              minlength={8}
               bind:value={conferma}
             />
             <button
@@ -139,19 +140,20 @@
 
       {#if creating}
         <Stop icon="handle" color="#1f7a5c" label="Nome utente">
-          <input
-            type="text"
+          <!-- quello che si scrive diventa subito un nome utente valido: le
+               maiuscole e gli spazi si tolgono mentre si batte, invece di
+               farlo scoprire dopo con un rifiuto -->
+          <TextField
             name="handle"
             autocomplete="username"
             placeholder="nome-utente"
             required
-            minlength="3"
-            maxlength="20"
+            minlength={3}
+            maxlength={20}
             value={chosenHandle}
-            oninput={(event) => {
+            oninput={(scritto: string) => {
               chosen = true;
-              handle = toHandle(event.currentTarget.value);
-              event.currentTarget.value = handle;
+              handle = toHandle(scritto);
             }}
           />
           <span class="stop-hint">
@@ -270,7 +272,7 @@
   /* l'occhiolino sta dentro al campo, all'altezza del testo */
   .peek { position: relative; display: block; }
 
-  .peek input { width: 100%; padding-right: 40px; }
+  .peek :global(.text-field) { width: 100%; padding-right: 40px; }
 
   .peek-btn {
     position: absolute;

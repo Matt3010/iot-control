@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TextField from './TextField.svelte';
   import { toast } from '../lib/toast.svelte';
   import Icon from './Icon.svelte';
   import Button from './Button.svelte';
@@ -40,12 +41,11 @@
 <div class="link-row">
   <span class="link-prefix">{prefix}</span>
   {#if onchange}
-    <input
-      class="link-slug"
-      type="text"
-      maxlength="40"
+    <TextField
+      extra="link-slug"
+      maxlength={40}
       {value}
-      onchange={(event) => onchange(event.currentTarget.value)}
+      onchange={(scritto: string) => onchange(scritto)}
     />
   {:else}
     <span class="link-value">{value}</span>
@@ -83,7 +83,7 @@
     white-space: nowrap;
   }
 
-  .link-slug {
+  :global(.link-slug) {
     flex: 1;
     min-width: 0;
     padding: 5px 4px;
@@ -92,5 +92,5 @@
     font-size: 12px;
   }
 
-  .link-slug:hover, .link-slug:focus { background: var(--sunken); box-shadow: none; }
+  :global(.link-slug):hover, :global(.link-slug):focus { background: var(--sunken); box-shadow: none; }
 </style>

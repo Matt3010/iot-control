@@ -9,6 +9,7 @@
   import Switch from './Switch.svelte';
   import Tabs from './Tabs.svelte';
   import Button from './Button.svelte';
+  import TextField from './TextField.svelte';
 
   // Closing the sheet clears the draft a beat before this component goes away,
   // so every read of it has to survive the gap.
@@ -134,13 +135,13 @@
         <!-- svelte-ignore a11y_autofocus -->
         <!-- binding a funzione: chiudendo la scheda la bozza sparisce un attimo
              prima del componente, e una lettura secca solleverebbe -->
-        <input
+        <TextField
           name="name"
           required
-          maxlength="80"
+          maxlength={80}
           placeholder="Es. Trattoria da Nonna"
           autofocus
-          bind:value={() => draft?.name ?? '', (value) => draft && (draft.name = value)}
+          bind:value={() => draft?.name ?? '', (value: string) => draft && (draft.name = value)}
         />
       </label>
 

@@ -111,6 +111,9 @@
   .pop {
     position: fixed;
     z-index: var(--z-popover);
+    /* lo spazio intorno a quello che ci sta dentro lo mette il guscio: un
+       foglietto senza un nome suo non deve restare senza */
+    padding: 9px;
     animation: rise 0.16s var(--ease);
   }
 </style>

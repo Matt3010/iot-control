@@ -7,6 +7,7 @@
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
   import Icon from './Icon.svelte';
+  import TextField from './TextField.svelte';
   import Mark from './Mark.svelte';
 
   interface Hit {
@@ -187,13 +188,12 @@
   <div class="palette-card surface">
     <div class="palette-field">
       <Icon name="search" />
-      <input
+      <TextField
         id="palette-input"
-        type="text"
-        autocomplete="off"
+        kind="search"
         spellcheck="false"
         placeholder="Cerca tra i tuoi luoghi, o un indirizzo"
-        bind:this={input}
+        bind:element={input}
         bind:value={query}
         onkeydown={onKeydown}
       />
@@ -291,7 +291,7 @@
 
 .palette-field > :global(.ico) { color: var(--ink-3); }
 
-.palette-field input {
+.palette-field :global(.text-field) {
   flex: 1;
   min-width: 0;
   padding: 0;
@@ -301,7 +301,7 @@
   letter-spacing: -0.012em;
 }
 
-.palette-field input:hover, .palette-field input:focus {
+.palette-field :global(.text-field):hover, .palette-field :global(.text-field):focus {
   background: none;
   box-shadow: none;
   outline: 0;

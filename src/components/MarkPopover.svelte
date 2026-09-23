@@ -3,6 +3,7 @@
   import { MARKS, marksLike } from '../lib/marks';
   import { ui } from '../lib/ui.svelte';
   import Popover from './Popover.svelte';
+  import TextField from './TextField.svelte';
 
   /**
    * Scegliere il segno di una categoria.
@@ -45,13 +46,13 @@
   onclose={() => (ui.mark = null)}
 >
   <!-- svelte-ignore a11y_autofocus -->
-  <input
-    class="mark-search"
-    type="text"
+  <TextField
+    extra="mark-search"
+    kind="search"
     autofocus
     placeholder="Cerca fra casa, mangiare, treno…"
     bind:value={query}
-    onkeydown={(event) => {
+    onkeydown={(event: KeyboardEvent) => {
       // invio prende il primo: con la ricerca in mano è il gesto naturale
       if (event.key === 'Enter' && shown[0]) choose(shown[0].key);
     }}
@@ -80,7 +81,7 @@
 <style>
   :global(#mark-popover) { padding: 10px; display: grid; gap: 9px; }
 
-  .mark-search {
+  :global(.mark-search) {
     font: inherit;
     width: 100%;
     padding: 8px 10px;
@@ -91,7 +92,7 @@
     font-size: 12.5px;
   }
 
-  .mark-search:focus {
+  :global(.mark-search):focus {
     outline: 0;
     background: var(--glass-strong);
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);

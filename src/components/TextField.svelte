@@ -37,6 +37,7 @@
      * normale.
      */
     shy = false,
+    extra = '',
     element = $bindable(),
     ...rest
   }: {
@@ -56,6 +57,14 @@
     required?: boolean;
     autofocus?: boolean;
     shy?: boolean;
+    /**
+     * Una classe in più per chi lo ospita.
+     *
+     * Si aggiunge, non sostituisce: passandola come `class` avrebbe cancellato
+     * quella del componente, e il campo sarebbe rimasto senza la sua misura.
+     * Va raggiunta con `:global`, perché il markup è di qui.
+     */
+    extra?: string;
     /** Per chi deve metterci il fuoco da fuori. */
     element?: HTMLInputElement;
     [key: string]: unknown;
@@ -67,7 +76,7 @@
 <!-- svelte-ignore a11y_autofocus -->
 <input
   type={kind}
-  class="text-field"
+  class={extra ? `text-field ${extra}` : 'text-field'}
   class:is-sm={size === 'sm'}
   bind:this={element}
   bind:value

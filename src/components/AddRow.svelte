@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
   import Button from './Button.svelte';
+  import TextField from './TextField.svelte';
   import Row from './Row.svelte';
 
   /**
@@ -44,7 +45,14 @@
   <Row dashed {id} class={value.trim() ? 'is-ready' : ''}>
     {#snippet lead()}{@render before?.()}{/snippet}
 
-    <input name="name" required maxlength="40" {placeholder} bind:this={field} bind:value />
+    <TextField
+      name="name"
+      required
+      maxlength={40}
+      {placeholder}
+      bind:element={field}
+      bind:value
+    />
 
     {#snippet trail()}
       {@render after?.()}

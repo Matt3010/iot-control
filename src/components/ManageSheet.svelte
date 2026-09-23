@@ -18,6 +18,7 @@
   import Tabs from './Tabs.svelte';
   import ShareField from './ShareField.svelte';
   import Button from './Button.svelte';
+  import TextField from './TextField.svelte';
 
   /** Una volta sola, perché le domande parlino tutte la stessa lingua. */
   const conta = (n: number): string => (n === 1 ? 'un luogo' : `${n} luoghi`);
@@ -180,7 +181,7 @@
   {#if ui.manageTab === 'categories'}
     <div class="tab-panel">
       {#if store.categories.length > MANY}
-        <input class="list-filter" type="search" placeholder="Cerca categoria" bind:value={categoryFilter} />
+        <TextField extra="list-filter" kind="search" placeholder="Cerca categoria" bind:value={categoryFilter} />
       {/if}
       <ul id="category-list" data-fade="none" use:fadeEdges>
         {#each visibleCategories as category (category.id)}
@@ -200,11 +201,11 @@
                 </button>
               {/snippet}
 
-              <input
-                type="text"
-                maxlength="40"
+              <TextField
+                maxlength={40}
                 value={category.name}
-                onchange={(event) => store.patchCategory(category, { name: event.currentTarget.value })}
+                label="Nome della categoria"
+                onchange={(nome: string) => store.patchCategory(category, { name: nome })}
               />
 
               {#snippet trail()}
@@ -282,7 +283,7 @@
   {:else}
     <div class="tab-panel">
       {#if mapGroups.length > MANY}
-        <input class="list-filter" type="search" placeholder="Cerca gruppo" bind:value={groupFilter} />
+        <TextField extra="list-filter" kind="search" placeholder="Cerca gruppo" bind:value={groupFilter} />
       {/if}
       <ul id="group-list" data-fade="none" use:fadeEdges>
         {#each visibleGroups as group (group.id)}
@@ -292,11 +293,11 @@
                 <span class="group-mark" aria-hidden="true"><Icon name="tag" /></span>
               {/snippet}
 
-              <input
-                type="text"
-                maxlength="40"
+              <TextField
+                maxlength={40}
                 value={group.name}
-                onchange={(event) => store.patchGroup(group, { name: event.currentTarget.value })}
+                label="Nome del gruppo"
+                onchange={(nome: string) => store.patchGroup(group, { name: nome })}
               />
 
               {#snippet trail()}
@@ -433,7 +434,7 @@
   mask-image: linear-gradient(180deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
 }
 
-.list-filter {
+:global(.list-filter) {
   margin-bottom: 8px;
   font-size: 13px;
 }

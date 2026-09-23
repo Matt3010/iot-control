@@ -209,13 +209,11 @@
 
 {#if open}
   <div class="pick">
-    <input
-      class="rename"
-      type="text"
-      maxlength="40"
+    <TextField
       value={scene.name}
-      aria-label="Nome della scena"
-      onchange={(event) => void devices.patchScene(scene, { name: event.currentTarget.value })}
+      label="Nome della scena"
+      maxlength={40}
+      onchange={(nome: string) => void devices.patchScene(scene, { name: nome })}
     />
 
     {#if scene.steps.length}

@@ -4,6 +4,7 @@
   import { toast } from '../lib/toast.svelte';
   import type { PairingStep } from '../lib/types';
   import Button from './Button.svelte';
+  import TextField from './TextField.svelte';
   import Switch from './Switch.svelte';
   import Qr from './Qr.svelte';
 
@@ -331,21 +332,23 @@
               {/each}
             </select>
           {:else}
-            <input
-              type={field.secret ? 'password' : 'text'}
-              readonly={!touched[field.name]}
-              onfocus={() => (touched = { ...touched, [field.name]: true })}
+            <!-- sorda finché non la tocchi: i gestori di password riempiono
+                 qualunque campo somigli a un accesso, e qui dentro ci
+                 finirebbe l'email di qualcun altro al posto dell'indirizzo di
+                 una telecamera -->
+            <TextField
+              kind={field.secret ? 'password' : 'text'}
+              shy
               autocomplete={field.secret ? 'new-password' : 'off'}
-              data-lpignore="true"
-              data-1p-ignore
               spellcheck="false"
               autocapitalize="off"
               autocorrect="off"
+              maxlength={200}
               bind:value={
-                () => answers[field.name] ?? '',
-                (value) => (answers = { ...answers, [field.name]: value })
+                () => String(answers[field.name] ?? ''),
+                (value: string) => (answers = { ...answers, [field.name]: value })
               }
-              onkeydown={(event) => event.key === 'Enter' && submit()}
+              onkeydown={(event: KeyboardEvent) => event.key === 'Enter' && submit()}
             />
           {/if}
         </label>
