@@ -11,6 +11,12 @@
    * - `text`: due parole in maiuscoletto separate da un punto. Quella accesa
    *   fa da titolo della sezione, l'altra sta lì pronta — nel pannello è
    *   l'intestazione stessa, e una pastiglia lì peserebbe troppo
+   *
+   * Se le voci hanno un `href` diventano collegamenti dentro un `nav`: le
+   * pagine di servizio sono indirizzi veri, e un indirizzo si deve poter
+   * aprire in un'altra scheda, copiare, mettere fra i preferiti. Il vestito
+   * resta questo — una barra che cambia pagina e una che cambia sezione non
+   * hanno motivo di essere due disegni diversi.
    */
   type Look = 'pill' | 'text';
 
@@ -22,17 +28,28 @@
     look = 'pill',
   }: {
     value: T;
-    options: { id: T; label: string; title?: string }[];
-    onpick: (id: T) => void;
+    options: { id: T; label: string; title?: string; href?: string }[];
+    /** Non serve se le voci sono collegamenti: ci pensa il browser. */
+    onpick?: (id: T) => void;
     /** Come si chiama questo gruppo di linguette, per chi non lo vede. */
     label?: string;
     look?: Look;
   } = $props();
 </script>
 
-<div class="tabs {look}" role="tablist" aria-label={label}>
-  {#each options as option, at (option.id)}
-    {#if look === 'text' && at > 0}<span class="split" aria-hidden="true"></span>{/if}
+{#snippet tab(option: { id: T; label: string; title?: string; href?: string })}
+  {#if option.href}
+    <!-- niente `role="tab"`: qui non si scopre un pannello, si cambia pagina -->
+    <a
+      class="tab"
+      class:is-on={value === option.id}
+      href={option.href}
+      title={option.title}
+      aria-current={value === option.id ? 'page' : undefined}
+    >
+      {option.label}
+    </a>
+  {:else}
     <button
       class="tab"
       class:is-on={value === option.id}
@@ -40,12 +57,25 @@
       role="tab"
       aria-selected={value === option.id}
       title={option.title}
-      onclick={() => onpick(option.id)}
+      onclick={() => onpick?.(option.id)}
     >
       {option.label}
     </button>
-  {/each}
-</div>
+  {/if}
+{/snippet}
+
+{#if options.some((one) => one.href)}
+  <nav class="tabs {look} is-nav" aria-label={label}>
+    {#each options as option (option.id)}{@render tab(option)}{/each}
+  </nav>
+{:else}
+  <div class="tabs {look}" role="tablist" aria-label={label}>
+    {#each options as option, at (option.id)}
+      {#if look === 'text' && at > 0}<span class="split" aria-hidden="true"></span>{/if}
+      {@render tab(option)}
+    {/each}
+  </div>
+{/if}
 
 <style>
   .tabs { display: flex; align-items: center; }
@@ -53,6 +83,7 @@
   .tab {
     border: 0;
     background: none;
+    text-decoration: none;
     transition: background 0.16s, color 0.16s, box-shadow 0.16s, opacity 0.16s;
   }
 
@@ -78,6 +109,12 @@
   }
 
   .tabs.pill .tab:hover { color: var(--ink-2); }
+
+  /* quando sono indirizzi stanno larghe quanto la parola: in testa a una
+     pagina una barra tirata per tutta la riga sembrerebbe la pagina stessa */
+  .tabs.pill.is-nav { justify-self: start; align-self: start; margin-bottom: 0; }
+
+  .tabs.pill.is-nav .tab { flex: none; }
 
   .tabs.pill .tab.is-on {
     background: var(--glass-strong);

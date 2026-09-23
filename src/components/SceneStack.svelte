@@ -76,17 +76,6 @@
 </script>
 
 <section class="stack">
-  <div class="head">
-    <span class="eyebrow">Scene</span>
-    {#if devices.scenes.length}
-      <span class="how-many">{devices.scenes.length}</span>
-    {/if}
-  </div>
-  <p class="lead">
-    Più cose che partono insieme, ognuna con la sua azione: «sera» chiude le tende e accende
-    l’abat-jour. Premerle a mano una per volta si vede — partono a mezzo secondo di distanza.
-  </p>
-
   {#each devices.scenes as scene (scene.id)}
     <div class="one">
       <SceneControls {scene} />
@@ -204,10 +193,6 @@
 
 <style>
   .stack { display: grid; gap: 10px; min-width: 0; }
-
-  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-
-  .how-many { font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--ink-3); }
 
   .lead { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-3); }
 

@@ -9,6 +9,7 @@
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
   import LinkRow from './LinkRow.svelte';
+  import PageShell from './PageShell.svelte';
   import Row from './Row.svelte';
   import ShareField from './ShareField.svelte';
   import Switch from './Switch.svelte';
@@ -100,242 +101,174 @@
   }
 </script>
 
-<div class="page">
-  <header>
-    <a class="back" href="/">
-      <Icon name="collapse" />
-      Torna alla mappa
-    </a>
-    <h1>Mappe</h1>
-    <p class="lead">
-      Ogni mappa tiene i suoi luoghi. Categorie e gruppi invece sono tuoi e valgono su tutte, quindi
-      eliminarne una porta via soltanto i luoghi che ci stavano dentro. Quella che pubblichi la vede
-      chi ha il link, tranne i luoghi segnati come privati.
-    </p>
-  </header>
+<PageShell
+  title="Mappe"
+  siblings={false}
+  lead="Ogni mappa tiene i suoi luoghi. Categorie e gruppi invece sono tuoi e valgono su tutte, quindi eliminarne una porta via soltanto i luoghi che ci stavano dentro. Quella che pubblichi la vede chi ha il link, tranne i luoghi segnati come privati."
+>
 
-  <div class="grid">
-    {#each store.maps as map (map.id)}
-      {@const open = map.id === store.activeMap?.id}
-      {@const places = store.places.filter((place) => place.mapId === map.id).length}
-      {@const url = mapUrl(handle, map.slug)}
-      <section class="card">
-        <Row active={open} class={map.published ? 'is-public' : ''}>
-          {#snippet lead()}
-            <button
-              type="button"
-              class="map-open"
-              title={open ? 'Mappa selezionata' : 'Seleziona mappa'}
-              aria-pressed={open}
-              onclick={() => store.openMap(map.id)}
-            >
-              <Icon name="pin" />
-            </button>
-          {/snippet}
+  {#each store.maps as map (map.id)}
+    {@const open = map.id === store.activeMap?.id}
+    {@const places = store.places.filter((place) => place.mapId === map.id).length}
+    {@const url = mapUrl(handle, map.slug)}
+    <section class="card">
+      <Row active={open} class={map.published ? 'is-public' : ''}>
+        {#snippet lead()}
+          <button
+            type="button"
+            class="map-open"
+            title={open ? 'Mappa selezionata' : 'Seleziona mappa'}
+            aria-pressed={open}
+            onclick={() => store.openMap(map.id)}
+          >
+            <Icon name="pin" />
+          </button>
+        {/snippet}
 
-          <input
-            type="text"
-            maxlength="40"
-            value={map.name}
-            onchange={(event) => store.patchMap(map, { name: event.currentTarget.value })}
-          />
+        <input
+          type="text"
+          maxlength="40"
+          value={map.name}
+          onchange={(event) => store.patchMap(map, { name: event.currentTarget.value })}
+        />
 
-          {#snippet trail()}
-            <Button
-              look="icon"
-              extra={'map-eye' + (store.shows(map.id) ? ' is-shown' : '')}
-              disabled={open}
-              title={open
-                ? 'Sempre in vista'
+        {#snippet trail()}
+          <Button
+            look="icon"
+            extra={'map-eye' + (store.shows(map.id) ? ' is-shown' : '')}
+            disabled={open}
+            title={open
+              ? 'Sempre in vista'
+              : store.shows(map.id)
+                ? 'Togli dalla vista'
+                : 'Mostra anche questa'}
+            onclick={() => store.toggleShown(map.id)}
+          >
+            <Icon name={store.shows(map.id) ? 'eye' : 'eyeOff'} />
+          </Button>
+          <Button
+            look="icon"
+            tone="danger"
+            extra="kill"
+            title="Elimina mappa"
+            disabled={store.maps.length <= 1}
+            onclick={(event: MouseEvent) =>
+              ui.askSure(event.currentTarget as HTMLElement, {
+                title: `Eliminare “${map.name}”?`,
+                detail: takesAway(map.id) ?? 'È vuota: non porta via niente.',
+                verb: 'Elimina',
+                onYes: () => store.deleteMap(map),
+              })}
+          >
+            <Icon name="trash" />
+          </Button>
+        {/snippet}
+
+        {#snippet under()}
+          <div class="map-foot">
+            <span class="map-meta">
+              {places}
+              {places === 1 ? 'luogo' : 'luoghi'}{open
+                ? ' · selezionata'
                 : store.shows(map.id)
-                  ? 'Togli dalla vista'
-                  : 'Mostra anche questa'}
-              onclick={() => store.toggleShown(map.id)}
-            >
-              <Icon name={store.shows(map.id) ? 'eye' : 'eyeOff'} />
-            </Button>
-            <Button
-              look="icon"
-              tone="danger"
-              extra="kill"
-              title="Elimina mappa"
-              disabled={store.maps.length <= 1}
-              onclick={(event: MouseEvent) =>
-                ui.askSure(event.currentTarget as HTMLElement, {
-                  title: `Eliminare “${map.name}”?`,
-                  detail: takesAway(map.id) ?? 'È vuota: non porta via niente.',
-                  verb: 'Elimina',
-                  onYes: () => store.deleteMap(map),
-                })}
-            >
-              <Icon name="trash" />
-            </Button>
-          {/snippet}
+                  ? ' · in vista'
+                  : ''}
+            </span>
+            <Switch
+              checked={map.published}
+              onchange={(published) => store.patchMap(map, { published })}
+              label={map.published ? 'Mappa pubblica' : 'Mappa privata'}
+              title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}
+              side="end"
+            />
+          </div>
 
-          {#snippet under()}
-            <div class="map-foot">
-              <span class="map-meta">
-                {places}
-                {places === 1 ? 'luogo' : 'luoghi'}{open
-                  ? ' · selezionata'
-                  : store.shows(map.id)
-                    ? ' · in vista'
-                    : ''}
-              </span>
-              <Switch
-                checked={map.published}
-                onchange={(published) => store.patchMap(map, { published })}
-                label={map.published ? 'Mappa pubblica' : 'Mappa privata'}
-                title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}
-                side="end"
+          {#if map.published}
+            <LinkRow
+              prefix={'/u/' + handle + '/'}
+              value={map.slug}
+              {url}
+              onchange={(slug) => store.patchMap(map, { slug })}
+            />
+            <p class="visits" title={COUNT_NOTE}>{visitsOfMap(map)}</p>
+          {/if}
+
+          <!-- Le chiavi stanno sotto la mappa che aprono. Un ospite non le
+               passa avanti, quindi da ospite il riquadro non c'è. -->
+          {#if atHome}
+            <div class="map-keys">
+              <ShareField
+                mapId={map.id}
+                editors={map.editors ?? []}
+                onchange={(editors) => store.patchMap(map, { editors })}
               />
             </div>
-
-            {#if map.published}
-              <LinkRow
-                prefix={'/u/' + handle + '/'}
-                value={map.slug}
-                {url}
-                onchange={(slug) => store.patchMap(map, { slug })}
-              />
-              <p class="visits" title={COUNT_NOTE}>{visitsOfMap(map)}</p>
-            {/if}
-
-            <!-- Le chiavi stanno sotto la mappa che aprono. Un ospite non le
-                 passa avanti, quindi da ospite il riquadro non c'è. -->
-            {#if atHome}
-              <div class="map-keys">
-                <ShareField
-                  mapId={map.id}
-                  editors={map.editors ?? []}
-                  onchange={(editors) => store.patchMap(map, { editors })}
-                />
-              </div>
-            {/if}
-          {/snippet}
-        </Row>
-      </section>
-    {/each}
-
-    <section class="card is-new">
-      <span class="eyebrow">Un'altra mappa</span>
-      <AddRow
-        id="map-form"
-        placeholder="Nome mappa — es. Islanda"
-        title="Crea mappa"
-        bind:value={newName}
-        onadd={create}
-      />
+          {/if}
+        {/snippet}
+      </Row>
     </section>
+  {/each}
 
-    {#if store.maps.some((map) => map.published)}
-      <section class="card is-new">
-        <span class="eyebrow">Link del profilo</span>
-        <p class="note">Raccoglie tutte le mappe che hai pubblicato. È l'indirizzo da mettere in bio.</p>
-        <LinkRow prefix="/u/" value={handle} url={profileUrl(handle)} title="Copia link" />
-        {#if atHome}
-          <p class="visits" title={COUNT_NOTE}>{visitsOfProfile()}</p>
-        {/if}
-      </section>
-    {/if}
+  <section class="card is-new">
+    <span class="eyebrow">Un'altra mappa</span>
+    <AddRow
+      id="map-form"
+      placeholder="Nome mappa — es. Islanda"
+      title="Crea mappa"
+      bind:value={newName}
+      onadd={create}
+    />
+  </section>
 
-    {#if auth.account?.actingAs}
-      <section class="card is-new">
-        <span class="eyebrow">Non sei a casa tua</span>
-        <p class="note">
-          Stai lavorando nelle mappe di <b>{auth.account.actingAs.handle}</b>: quello che cambi qui
-          è suo. Le chiavi delle <i>tue</i> mappe le dai dal tuo.
-        </p>
-      </section>
-    {/if}
+  {#if store.maps.some((map) => map.published)}
+    <section class="card is-new">
+      <span class="eyebrow">Link del profilo</span>
+      <p class="note">Raccoglie tutte le mappe che hai pubblicato. È l'indirizzo da mettere in bio.</p>
+      <LinkRow prefix="/u/" value={handle} url={profileUrl(handle)} title="Copia link" />
+      {#if atHome}
+        <p class="visits" title={COUNT_NOTE}>{visitsOfProfile()}</p>
+      {/if}
+    </section>
+  {/if}
 
-    {#if (auth.account?.keys ?? []).length}
-      <section class="card is-new">
-        <span class="eyebrow">Mappe aperte a te</span>
-        <p class="note">Ci entri e ci lavori come se fossero tue. Con la fascia in alto sai sempre dove sei.</p>
-        <ul class="theirs">
-          {#each auth.account?.keys ?? [] as key (key.mapId)}
-            <li>
-              <Row active={auth.account?.actingAs?.ownerId === key.ownerId}>
-                {#snippet lead()}
-                  <span class="keys-mark" aria-hidden="true"><Icon name="key" /></span>
-                {/snippet}
-                <span class="theirs-name">{key.mapName}<em>di {key.handle}</em></span>
-                {#snippet trail()}
-                  {#if auth.account?.actingAs?.ownerId === key.ownerId}
-                    <span class="here">ci sei</span>
-                  {:else}
-                    <Button size="sm" onclick={() => void goInto(key.handle)}>Apri</Button>
-                  {/if}
-                {/snippet}
-              </Row>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/if}
-  </div>
-</div>
+  {#if auth.account?.actingAs}
+    <section class="card is-new">
+      <span class="eyebrow">Non sei a casa tua</span>
+      <p class="note">
+        Stai lavorando nelle mappe di <b>{auth.account.actingAs.handle}</b>: quello che cambi qui
+        è suo. Le chiavi delle <i>tue</i> mappe le dai dal tuo.
+      </p>
+    </section>
+  {/if}
+
+  {#if (auth.account?.keys ?? []).length}
+    <section class="card is-new">
+      <span class="eyebrow">Mappe aperte a te</span>
+      <p class="note">Ci entri e ci lavori come se fossero tue. Con la fascia in alto sai sempre dove sei.</p>
+      <ul class="theirs">
+        {#each auth.account?.keys ?? [] as key (key.mapId)}
+          <li>
+            <Row active={auth.account?.actingAs?.ownerId === key.ownerId}>
+              {#snippet lead()}
+                <span class="keys-mark" aria-hidden="true"><Icon name="key" /></span>
+              {/snippet}
+              <span class="theirs-name">{key.mapName}<em>di {key.handle}</em></span>
+              {#snippet trail()}
+                {#if auth.account?.actingAs?.ownerId === key.ownerId}
+                  <span class="here">ci sei</span>
+                {:else}
+                  <Button size="sm" onclick={() => void goInto(key.handle)}>Apri</Button>
+                {/if}
+              {/snippet}
+            </Row>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
+</PageShell>
 
 <style>
-  .page {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-sheet);
-    overflow: auto;
-    padding: 28px 20px 48px;
-    background: rgb(var(--base));
-  }
-
-  header {
-    max-width: 960px;
-    margin: 0 auto 22px;
-    display: grid;
-    gap: 6px;
-  }
-
-  .back {
-    justify-self: start;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 6px;
-    font-size: 12.5px;
-    color: var(--ink-3);
-    text-decoration: none;
-    transition: color 0.16s;
-  }
-
-  .back:hover { color: var(--ink); }
-
-  /* la freccia guarda a sinistra: è un ritorno, non un pannello che si chiude */
-  .back :global(.ico) { width: 14px; height: 14px; transform: rotate(-90deg); }
-
-  h1 {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 620;
-    letter-spacing: -0.022em;
-    color: var(--ink);
-  }
-
-  .lead {
-    margin: 0;
-    max-width: 62ch;
-    font-size: 12.5px;
-    line-height: 1.5;
-    color: var(--ink-3);
-  }
-
-  /* a colonne, come gli agenti: una mappa condivisa è alta, una privata sono
-     tre righe, e in una griglia la riga prende l'altezza della più alta */
-  .grid {
-    max-width: 960px;
-    margin: 0 auto;
-    columns: 380px;
-    column-gap: 14px;
-  }
-
   .card {
     break-inside: avoid;
     margin-bottom: 14px;

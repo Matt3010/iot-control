@@ -16,6 +16,8 @@
   import PublicProfile from './components/PublicProfile.svelte';
   import AgentsPage from './components/AgentsPage.svelte';
   import MapsPage from './components/MapsPage.svelte';
+  import ScenesPage from './components/ScenesPage.svelte';
+  import AlertsPage from './components/AlertsPage.svelte';
   import ManageSheet from './components/ManageSheet.svelte';
   import MapCanvas from './components/MapCanvas.svelte';
   import Palette from './components/Palette.svelte';
@@ -28,8 +30,15 @@
   /** /m/<slug> e /u/<handle> sono pubblici: non chiedono nulla a nessuno. */
   const route = readRoute();
 
-  /** Le pagine che sono l'app: vogliono sapere chi sei prima di disegnare. */
-  const mine = route.kind === 'app' || route.kind === 'agents' || route.kind === 'maps';
+  /**
+   * Le pagine che sono l'app: vogliono sapere chi sei prima di disegnare.
+   *
+   * Per esclusione, non per elenco: di pubblico c'è la mappa di qualcuno e il
+   * suo profilo, tutto il resto è casa tua. Con l'elenco, ogni pagina nuova
+   * che ci si dimenticava di aggiungere si apriva sulla schermata d'ingresso
+   * a chi era già entrato.
+   */
+  const mine = route.kind !== 'map' && route.kind !== 'profile';
 
   // Prima si vede chi c'è: l'indice si carica solo per chi è entrato, e si
   // ricarica se rientra con un altro account. Senza questo la pagina degli
@@ -117,6 +126,12 @@
 {:else if route.kind === 'maps'}
   <GuestBar />
   <MapsPage />
+{:else if route.kind === 'scenes'}
+  <GuestBar />
+  <ScenesPage />
+{:else if route.kind === 'alerts'}
+  <GuestBar />
+  <AlertsPage />
 {:else}
   <GuestBar />
   <!--

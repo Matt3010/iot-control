@@ -6,7 +6,11 @@ export type Route =
   /** La stanza degli agenti: installarli e collegarli vuole spazio. */
   | { kind: 'agents' }
   /** E quella delle mappe: indirizzi pubblici, conteggi, e chi può modificarle. */
-  | { kind: 'maps' };
+  | { kind: 'maps' }
+  /** Le scene: più cose che partono insieme, ognuna con la sua azione. */
+  | { kind: 'scenes' }
+  /** E gli avvisi: cosa farsi dire, e su quali macchine. */
+  | { kind: 'alerts' };
 
 /** Nessun router: le mappe stanno sotto chi le ha fatte, il resto è l'app. */
 export function readRoute(path = window.location.pathname): Route {
@@ -26,12 +30,20 @@ export function readRoute(path = window.location.pathname): Route {
 
   if (/^\/maps\/?$/i.test(path)) return { kind: 'maps' };
 
+  if (/^\/scene\/?$/i.test(path)) return { kind: 'scenes' };
+
+  if (/^\/avvisi\/?$/i.test(path)) return { kind: 'alerts' };
+
   return { kind: 'app' };
 }
 
 export const AGENTS_PATH = '/agents';
 
 export const MAPS_PATH = '/maps';
+
+export const SCENES_PATH = '/scene';
+
+export const ALERTS_PATH = '/avvisi';
 
 export const mapPath = (handle: string, slug: string): string => `/u/${handle}/${slug}`;
 
