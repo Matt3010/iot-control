@@ -280,11 +280,12 @@
     </button>
   {/if}
 
-  <!-- La fascia sta dentro l'inquadratura, in alto.
-       Sotto rubava una riga a ogni telecamera, e in una colonna di quattro
+  <!-- La fascia sta dentro l'inquadratura, in fondo.
+       Fuori rubava una riga a ogni telecamera, e in una colonna di quattro
        erano quattro righe di cornice per due tasti che si premono di rado.
-       Sopra l'immagine non tolgono niente: l'alto di un'inquadratura e' cielo
-       o soffitto, ed e' il posto che gia' guardano le telecamere vere. -->
+       In fondo all'immagine e non in cima, perche' in cima ci finisce il
+       cielo o il soffitto — cioe' il poco che si vede di una stanza — mentre
+       in basso c'e' il pavimento, e perche' e' dove il pollice arriva. -->
   <div class="hud" class:is-bare={!src && !live}>
     <!-- Il motivo si scrive una volta sola: se non c'è ancora nessuna
          immagine lo dice il riquadro, e ripeterlo qui sarebbe la stessa frase
@@ -300,17 +301,16 @@
       {#if live}
         <!-- Fermarla è quello che fa smettere di arrivare: finché scorre,
              scorre anche l'upload di casa. -->
-        <Button look="icon" size="sm" extra="hud-btn" title="Ferma la diretta" onclick={() => (asked = false)}>
+        <Button look="glass" extra="hud-btn" title="Ferma la diretta" onclick={() => (asked = false)}>
           <Icon name="pause" />
         </Button>
       {:else}
-        <Button look="icon" size="sm" extra="hud-btn" title="Aggiorna adesso" disabled={loading} onclick={refresh}>
+        <Button look="glass" extra="hud-btn" title="Aggiorna adesso" disabled={loading} onclick={refresh}>
           <Icon name="refresh" />
         </Button>
       {/if}
       <Button
-        look="icon"
-        size="sm"
+        look="glass"
         extra="hud-btn"
         title="A tutto schermo"
         onclick={() => {
@@ -406,37 +406,25 @@
     gap: 2px;
   }
 
-  /* Sotto ogni tasto un vetro scuro, sempre: un'icona bianca su
-     un'inquadratura di giorno sparisce, e quale sia il grigio dietro lo
-     decide quello che riprende la telecamera, non noi. Appena il dito o il
-     mouse arrivano sull'immagine si scurisce, perche' allora quei tasti
-     servono davvero. */
-  .hud :global(.hud-btn) {
-    background: rgb(0 0 0 / 0.3);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    color: rgb(255 255 255 / 0.85);
-  }
-
+  /* il vetro sotto i tasti ce l'hanno loro; qui si dice solo che, quando il
+     mouse arriva sull'immagine, si scuriscono: e' allora che servono */
   .cam:hover .hud :global(.hud-btn) { background: rgb(0 0 0 / 0.5); color: #fff; }
-
-  .hud :global(.hud-btn:hover) { background: rgb(0 0 0 / 0.72); color: #fff; }
 
   .hud {
     position: absolute;
-    top: 0;
     left: 0;
     right: 0;
+    bottom: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
     min-width: 0;
-    padding: 5px 5px 14px;
-    border-radius: var(--r-sm) var(--r-sm) 0 0;
+    padding: 16px 5px 5px;
+    border-radius: 0 0 var(--r-sm) var(--r-sm);
     /* una velatura che sfuma, non una barra: sotto c'e' un'immagine, e una
        striscia piena la taglierebbe in due */
-    background: linear-gradient(to bottom, rgb(0 0 0 / 0.55), transparent);
+    background: linear-gradient(to top, rgb(0 0 0 / 0.55), transparent);
     pointer-events: none;
   }
 

@@ -9,6 +9,7 @@
    * - `ghost`:   l'alternativa, con il suo contorno
    * - `icon`:    un'icona sola, nelle testate e nelle righe
    * - `round`:   un cerchio pieno, per l'azione principale di una testata
+   * - `glass`:   un'icona sopra un'immagine, con il suo vetro scuro sotto
    * - `link`:    un comando scritto piccolo, in mezzo al testo
    * - `danger`:  quello che porta via qualcosa
    * - `danger-solid`: lo stesso, ma quando è lui la risposta a una domanda
@@ -25,7 +26,7 @@
    * ospita per decorarlo (la classe finisce sull'elemento, ma va raggiunta con
    * :global perché il markup è di questo componente).
    */
-  type Look = 'primary' | 'ghost' | 'icon' | 'round' | 'link' | 'danger' | 'danger-solid';
+  type Look = 'primary' | 'ghost' | 'icon' | 'round' | 'glass' | 'link' | 'danger' | 'danger-solid';
 
   let {
     look = 'ghost',
@@ -149,6 +150,36 @@
 
   .icon:hover { background: var(--sunken-hover); color: var(--ink); }
   .icon:disabled, .icon[aria-disabled='true'] { opacity: 0.3; }
+
+  /* il vetro sopra un'immagine ------------------------------------------- */
+
+  /* Come `icon`, ma sopra qualcosa che non sappiamo di che colore sia: quale
+     grigio ci sia dietro lo decide quello che riprende una telecamera, non
+     noi, e un'icona bianca su un'inquadratura di giorno sparisce. Quindi ogni
+     tasto si porta il suo fondo scuro. Il fondo c'e' sempre e non solo al
+     passaggio del mouse, perche' su un telefono un mouse non c'e' e un tasto
+     che si vede solo passandoci sopra li' non si vede mai. */
+  .glass {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: rgb(0 0 0 / 0.3);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: rgb(255 255 255 / 0.85);
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .glass :global(.ico) { width: 13px; height: 13px; }
+
+  .glass:hover:not(:disabled) { background: rgb(0 0 0 / 0.72); color: #fff; }
+
+  .glass:disabled, .glass[aria-disabled='true'] { opacity: 0.45; }
 
   /* il tondo pieno ------------------------------------------------------- */
 
