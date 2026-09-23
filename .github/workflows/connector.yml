@@ -40,12 +40,26 @@ jobs:
             type=match,pattern=connector-v(\d+\.\d+\.\d+),group=1
             type=match,pattern=connector-v(\d+),group=1
 
+      # Il tag e il package.json devono dire lo stesso numero: se qualcuno si
+      # dimentica di uno dei due, meglio saperlo qui che scoprirlo dai log di
+      # una casa.
+      - name: il numero combacia
+        run: |
+          scritto=$(node -p "require('./connector/package.json').version")
+          taggato="${{ steps.meta.outputs.version }}"
+          if [ "$scritto" != "$taggato" ]; then
+            echo "package.json dice $scritto, il tag dice $taggato"
+            exit 1
+          fi
+
       - uses: docker/build-push-action@v6
         with:
           # La radice del repo, perché serve anche shared/: il contratto.
           context: .
           file: connector/Dockerfile
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

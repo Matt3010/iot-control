@@ -10,6 +10,9 @@ COPY connector/src ./src
 RUN npm run build
 
 FROM node:22-alpine
+# Il numero di versione lo passa chi costruisce, e viene dal tag di rilascio.
+ARG VERSION=dev
+ENV CONNECTOR_VERSION=$VERSION
 ENV NODE_ENV=production
 ENV STATE_DIR=/data
 WORKDIR /app

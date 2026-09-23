@@ -16,7 +16,16 @@ import { blind, look } from './live.js';
 import { ensureToken } from './onboarding.js';
 import { cancelPairing, listLinked, startPairing, submitPairing, titled, unlink } from './pairing.js';
 
-const VERSION = '1.7.0';
+/**
+ * Chi e', per il server e per chi guarda i log.
+ *
+ * Arriva dall'etichetta con cui l'immagine e' stata costruita, non da un
+ * numero scritto qui: erano tre posti a dire la stessa cosa — questa riga,
+ * il package.json e il tag di rilascio — e il primo che si dimentica fa
+ * raccontare una bugia a tutte le case del mondo. Fuori da un'immagine, in
+ * sviluppo, si chiama `dev`, che e' esattamente quello che e'.
+ */
+const VERSION = process.env.CONNECTOR_VERSION || 'dev';
 /** All'avvio le entità arrivano a centinaia: si aspetta un attimo e si manda una lista sola. */
 const COALESCE_MS = 500;
 
