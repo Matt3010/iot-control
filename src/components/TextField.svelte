@@ -37,6 +37,7 @@
      * normale.
      */
     shy = false,
+    readonly,
     extra = '',
     element = $bindable(),
     ...rest
@@ -67,10 +68,21 @@
     extra?: string;
     /** Per chi deve metterci il fuoco da fuori. */
     element?: HTMLInputElement;
+    /** Si legge e non si scrive. Senza, decide `shy`. */
+    readonly?: boolean;
     [key: string]: unknown;
   } = $props();
 
   let touched = $state(false);
+
+  /*
+   * Sola lettura per davvero, quando chi lo usa lo chiede.
+   *
+   * Senza questo l'unico modo di ottenerla era passarla fra gli attributi in
+   * coda, e funzionava solo finche' nessuno cambiava l'ordine in cui sono
+   * scritti qui sotto: una cosa che regge per caso.
+   */
+  const chiuso = $derived(readonly ?? (shy && !touched));
 </script>
 
 <!-- svelte-ignore a11y_autofocus -->
@@ -85,7 +97,7 @@
   {required}
   {autofocus}
   autocomplete={autocomplete ?? (kind === 'search' ? ('off' as AutoFill) : undefined)}
-  readonly={shy && !touched}
+  readonly={chiuso}
   aria-label={label}
   onfocus={() => (touched = true)}
   oninput={(event) => oninput?.(event.currentTarget.value)}

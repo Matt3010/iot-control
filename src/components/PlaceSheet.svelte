@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { auth } from '../lib/auth.svelte';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { swipeToClose } from '../lib/swipe';
@@ -15,6 +16,19 @@
   // so every read of it has to survive the gap.
   const draft = $derived(ui.draft);
   const editing = $derived(Boolean(draft?.id));
+
+  /**
+   * Un luogo che si guarda e basta.
+   *
+   * In casa d'altri si arriva fin dove ti hanno aperto. Sulla mappa grande il
+   * tasto «Modifica» già non c'era, ma dal telefono la mappa non c'è: si
+   * arriva qui dall'elenco, e la scheda si apriva con i campi pronti e il
+   * tasto per eliminare — tutte cose che il server avrebbe rifiutato.
+   *
+   * La scheda resta, perché vedere un luogo non è toccarlo e dall'elenco non
+   * c'è altro modo di leggerne la nota: è che non si scrive niente.
+   */
+  const mine = $derived(!draft?.id || auth.canTouch(draft.id));
 
   /**
    * La bozza deve puntare solo a cose che esistono. Vale all'apertura — un
@@ -48,7 +62,7 @@
 
   function save(event: SubmitEvent) {
     event.preventDefault();
-    if (!draft) return;
+    if (!draft || !mine) return;
     if (!draft.categoryId) {
       toast.show('Scegli una categoria prima di salvare');
       return;
@@ -87,6 +101,7 @@
   }
 
   function remove() {
+    if (!mine) return;
     const place = store.currentPlaces.find((candidate) => candidate.key === draft?.key);
     ui.closePlace();
     if (place) store.deletePlace(place);
@@ -108,7 +123,7 @@
   <aside id="place-sheet" class="surface" use:swipeToClose={() => ui.closePlace()}>
     <header>
       <span class="head-text">
-        <h2 id="place-title">{editing ? 'Modifica luogo' : 'Nuovo luogo'}</h2>
+        <h2 id="place-title">{!mine ? 'Luogo' : editing ? 'Modifica luogo' : 'Nuovo luogo'}</h2>
         {#if store.shownMaps.length > 1}
           <span class="head-where">in {store.maps.find((m) => m.id === (draft.mapId ?? store.activeMap?.id))?.name}</span>
         {/if}
@@ -118,18 +133,23 @@
       </Button>
     </header>
 
-    <Tabs
-      value={tab}
-      onpick={(id) => (tab = id)}
-      options={[
-        { id: 'edit', label: 'Modifica' },
-        { id: 'agent', label: 'Agenti' },
-      ]}
-      label="Cosa stai modificando"
-    />
+    <!-- Le due linguette dicono «cosa stai modificando», e chi non modifica
+         niente non ha niente da scegliere: appendere un agente a un luogo è
+         un modo di cambiarlo come un altro. -->
+    {#if mine}
+      <Tabs
+        value={tab}
+        onpick={(id) => (tab = id)}
+        options={[
+          { id: 'edit', label: 'Modifica' },
+          { id: 'agent', label: 'Agenti' },
+        ]}
+        label="Cosa stai modificando"
+      />
+    {/if}
 
     <form id="place-form" onsubmit={save}>
-      {#if tab === 'edit'}
+      {#if tab === 'edit' || !mine}
       <label class="field">
         <span class="eyebrow">Nome del luogo</span>
         <!-- svelte-ignore a11y_autofocus -->
@@ -140,7 +160,8 @@
           required
           maxlength={80}
           placeholder="Es. Trattoria da Nonna"
-          autofocus
+          autofocus={mine}
+          readonly={!mine}
           bind:value={() => draft?.name ?? '', (value: string) => draft && (draft.name = value)}
         />
       </label>
@@ -159,6 +180,7 @@
                 emoji={category.emoji}
                 label={category.name}
                 look={draft.categoryId === category.id ? 'on' : 'off'}
+                disabled={!mine}
                 onclick={() => (draft.categoryId = category.id)}
               />
             {/each}
@@ -173,12 +195,14 @@
           <Chip
             label="Nessun gruppo"
             look={draft.groupIds?.length ? 'off' : 'sel'}
+            disabled={!mine}
             onclick={() => (draft.groupIds = [])}
           />
           {#each groupsHere as group (group.id)}
             <Chip
               label={group.name}
               look={draft.groupIds?.includes(group.id) ? 'sel' : 'off'}
+              disabled={!mine}
               onclick={() => toggleGroup(group.id)}
             />
           {/each}
@@ -188,6 +212,7 @@
 
     <Switch
       checked={draft.private ?? false}
+      disabled={!mine}
       onchange={(value) => draft && (draft.private = value)}
       label="Luogo privato"
       note="Non compare nella mappa pubblica."
@@ -199,7 +224,8 @@
         name="note"
         maxlength="500"
         rows="3"
-        placeholder="Es. indirizzo, cosa ordinare, con chi ci sei stato"
+        readonly={!mine}
+        placeholder={mine ? 'Es. indirizzo, cosa ordinare, con chi ci sei stato' : ''}
         bind:value={() => draft?.note ?? '', (value) => draft && (draft.note = value)}
       ></textarea>
     </label>
@@ -216,7 +242,7 @@
     <!-- i tasti restano sotto tutt'e due: una casa scelta e non salvata
          sarebbe una casa persa -->
     <div class="actions">
-      {#if editing}
+      {#if editing && mine}
         <Button
           look="danger"
           extra="kill"
@@ -230,8 +256,12 @@
           <Icon name="trash" /> Elimina luogo
         </Button>
       {/if}
-      <Button look="ghost" onclick={() => ui.closePlace()}>Annulla</Button>
-      <Button look="primary" type="submit" extra="save-go">Salva</Button>
+      {#if mine}
+        <Button look="ghost" onclick={() => ui.closePlace()}>Annulla</Button>
+        <Button look="primary" type="submit" extra="save-go">Salva</Button>
+      {:else}
+        <Button look="primary" extra="save-go" onclick={() => ui.closePlace()}>Chiudi</Button>
+      {/if}
     </div>
   </form>
   </aside>
