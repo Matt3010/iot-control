@@ -87,6 +87,16 @@ export interface PairingStep {
   error?: string;
 }
 
+/**
+ * Come sta una cosa che parla con noi. Gli stessi quattro stati per tutti —
+ * un agente, un collegamento — perché chi guarda impari un colore solo.
+ *
+ * `live` parla e risponde, `degraded` parla ma qualcosa sotto no o ci sta
+ * riprovando, `lost` parlava e non parla piu', `new` non ha mai parlato: e
+ * quello non e' un guasto, e' una cosa da fare.
+ */
+export type Health = 'live' | 'degraded' | 'lost' | 'new';
+
 /** Un account già collegato a quell'agente, e come si fa a staccarlo. */
 export interface LinkedAccount {
   /** Chi è: `tuya`, `sonoff`. */
@@ -95,6 +105,14 @@ export interface LinkedAccount {
   title: string;
   /** Serve a scollegarlo. */
   entryId: string;
+  /**
+   * Come sta questo collegamento adesso.
+   *
+   * Un account scade, una password cambia, una telecamera si sposta: da
+   * quel momento il collegamento c'e' ancora ma non porta piu' niente, e un
+   * pallino verde direbbe una cosa falsa. Chi sta di la' lo sa, e lo dice.
+   */
+  health?: Health;
 }
 
 /** Sale l'inventario intero: alla connessione, e ogni volta che cambia. */

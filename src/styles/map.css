@@ -73,8 +73,8 @@
   background: var(--ink-3);
 }
 
-.pin-health.is-live { background: #2f9e5e; }
-.pin-health.is-degraded { background: #d98613; }
+.pin-health.is-live { background: var(--ok); }
+.pin-health.is-degraded { background: var(--warn); }
 .pin-health.is-lost { background: var(--danger); }
 .pin-health.is-new { background: var(--ink-3); }
 

@@ -1,6 +1,7 @@
+import { healthOf } from './health';
 import { api } from './api';
 import { toast } from './toast.svelte';
-import type { Capability, DeviceValue, LinkedAccount, PairingStep } from './types';
+import type { Capability, DeviceValue, Health, LinkedAccount, PairingStep } from './types';
 
 /** Un agente, per come lo vede il sito: il servizio installato in quel posto. */
 export interface Agent {
@@ -146,17 +147,16 @@ class Devices {
    * - `lost`     un agente che si era collegato adesso non c'è più
    * - `new`      mai collegato: non è un guasto, è da installare
    */
-  health(agentIds: string[] | undefined): 'live' | 'degraded' | 'lost' | 'new' | null {
+  health(agentIds: string[] | undefined): Health | null {
     const mine = (agentIds ?? []).map((id) => this.agents.find((agent) => agent.id === id)).filter((a) => !!a);
-    if (!mine.length) return null;
+    // La regola sta in un file suo, senza rune: un colore che si guarda tutti
+    // i giorni dev'essere verificabile senza aprire un browser.
+    return healthOf(mine, this.list);
+  }
 
-    // uno caduto è la cosa più grave: vince su tutto il resto
-    if (mine.some((agent) => !agent.online && agent.lastSeenAt)) return 'lost';
-    if (mine.every((agent) => !agent.online)) return 'new';
-    if (mine.some((agent) => !agent.online)) return 'lost';
-
-    const theirs = this.list.filter((device) => agentIds!.includes(device.agentId));
-    return theirs.some((device) => !device.online) ? 'degraded' : 'live';
+  /** Se l'agente di un dispositivo è collegato adesso. */
+  agentUp(agentId: string): boolean {
+    return this.agents.find((agent) => agent.id === agentId)?.online ?? false;
   }
 
   /** Quanti ne sono accesi su quanti se ne possono accendere. */

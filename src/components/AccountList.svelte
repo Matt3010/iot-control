@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Agent } from '../lib/devices.svelte';
-  import type { Account, LinkedAccount } from '../lib/types';
+  import type { Account, Health, LinkedAccount } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
 
@@ -35,6 +35,18 @@
 
   const joined = (handler: string) => linked.filter((one) => one.handler === handler);
 
+  /** Il colore da solo non basta a chi non lo distingue: la parola sta qui. */
+  const says = (health: Health | undefined): string =>
+    health === 'live'
+      ? 'Collegato'
+      : health === 'degraded'
+        ? 'Collegato, ma ci sta riprovando'
+        : health === 'lost'
+          ? 'Non riesce a collegarsi'
+          : health === 'new'
+            ? 'Spento'
+            : 'Non collegato';
+
   /** Niente parte prima di un sì: collegare un account non è un clic qualunque. */
   function ask(event: MouseEvent, account: Account) {
     ui.askSure(event.currentTarget as HTMLElement, {
@@ -53,8 +65,12 @@
   e scritti una volta sola. Due copie della stessa riga diventano due righe
   diverse alla prima correzione fatta di fretta su una sola.
 -->
-{#snippet segno(label: string, as: string)}
-  <span class="mark" aria-hidden="true"></span>
+{#snippet segno(label: string, as: string, health: Health | undefined)}
+  <!-- Lo stesso pallino dell'agente, con lo stesso significato: verde parla e
+       risponde, arancione ci sta riprovando, rosso non ce la fa, grigio non
+       c'è. Un verde che resta verde mentre l'account è scaduto è una bugia
+       che si guarda tutti i giorni. -->
+  <span class="mark {health ?? 'none'}" title={says(health)} role="img" aria-label={says(health)}></span>
   <span class="who">
     <b>{label}</b>
     {#if as}<span class="as">{as}</span>{/if}
@@ -67,7 +83,7 @@
 
     {#each mine as joint (joint.entryId)}
       <div class="account is-joined">
-        {@render segno(account.label, joint.title)}
+        {@render segno(account.label, joint.title, joint.health ?? 'live')}
 
         <Button
           look="link"
@@ -90,7 +106,7 @@
     <!-- E la riga per aggiungerne: sempre, dove se ne può avere più d'una. -->
     {#if !mine.length || account.many}
       <div class="account">
-        {@render segno(mine.length ? account.more : account.label, '')}
+        {@render segno(mine.length ? account.more : account.label, '', undefined)}
 
         <!-- stessa misura di «Scollega»: in questo elenco ogni azione è un
              comando scritto piccolo, e due misure diverse sulla stessa
@@ -118,7 +134,7 @@
     min-width: 0;
   }
 
-  /* collegato o no, si vede dal pallino prima ancora di leggere */
+  /* come sta, si vede dal pallino prima ancora di leggere */
   .mark {
     flex: none;
     width: 6px;
@@ -128,7 +144,17 @@
     opacity: 0.5;
   }
 
-  .account.is-joined .mark { background: #2f9e5e; opacity: 1; }
+  /* collegato e funzionante */
+  .mark.live { background: var(--ok); opacity: 1; }
+
+  /* collegato, ma ci sta riprovando: c'è, e non porta */
+  .mark.degraded { background: var(--warn); opacity: 1; }
+
+  /* c'era e non ce la fa più: un account scaduto, una password cambiata */
+  .mark.lost { background: var(--danger); opacity: 1; }
+
+  /* spento di là: non è un guasto, è una cosa da riaccendere */
+  .mark.new { background: var(--ink-3); opacity: 1; }
 
   .who {
     flex: 1;

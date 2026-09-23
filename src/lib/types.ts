@@ -1,4 +1,4 @@
-export type { Capability, DeviceValue, LinkedAccount, PairingStep } from '../../shared/protocol';
+export type { Capability, DeviceValue, Health, LinkedAccount, PairingStep } from '../../shared/protocol';
 
 /**
  * Uno che può modificare una mappa, e fin dove.

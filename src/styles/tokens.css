@@ -28,6 +28,11 @@
   --accent: #0e1116;
   --accent-grad: linear-gradient(180deg, #232932 0%, #0e1116 100%);
   --danger: #c0372b;
+  /* come sta una cosa che parla con noi: gli stessi quattro colori ovunque —
+     sul pin, sull'agente, su un collegamento. Il quarto e' --ink-3, che vuol
+     dire «non ha mai parlato», e il quinto non esiste. */
+  --ok: #2f9e5e;
+  --warn: #d98613;
 
   /* elevation */
   --shadow-1: 0 1px 2px rgb(10 13 18 / 0.05), 0 2px 8px rgb(10 13 18 / 0.05);

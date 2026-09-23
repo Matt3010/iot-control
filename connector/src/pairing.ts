@@ -1,4 +1,4 @@
-import type { LinkedAccount, PairingStep } from '../../shared/protocol.js';
+import type { Health, LinkedAccount, PairingStep } from '../../shared/protocol.js';
 import type { ConnectorConfig } from './config.js';
 import { EXTRAS, install, installed } from './extras.js';
 import { forget, sourceOf } from './go2rtc.js';
@@ -432,7 +432,12 @@ export async function listLinked(config: ConnectorConfig): Promise<LinkedAccount
   });
   if (!response.ok) return [];
 
-  const entries = (await response.json()) as { entry_id: string; domain: string; title: string }[];
+  const entries = (await response.json()) as {
+    entry_id: string;
+    domain: string;
+    title: string;
+    state?: string;
+  }[];
   // «generic» sono le telecamere: una per canale, e ognuna si stacca per conto
   // suo. Senza di loro nell'elenco, una telecamera si poteva collegare e non
   // scollegare piu' — e sbagliare canale capita al primo tentativo.
@@ -440,7 +445,12 @@ export async function listLinked(config: ConnectorConfig): Promise<LinkedAccount
 
   return entries
     .filter((entry) => ours.has(entry.domain))
-    .map((entry) => ({ handler: entry.domain, title: entry.title, entryId: entry.entry_id }));
+    .map((entry) => ({
+      handler: entry.domain,
+      title: entry.title,
+      entryId: entry.entry_id,
+      health: howIs(entry.state),
+    }));
 }
 
 /**
@@ -479,6 +489,20 @@ export async function titled(
       }
     }),
   );
+}
+
+/**
+ * Come sta un collegamento, detto con le parole di qui.
+ *
+ * Di la' gli stati sono sei e hanno nomi loro. A chi guarda servono quattro
+ * colori: va, ci sta riprovando, non ce la fa, e' spento. Il resto e'
+ * vocabolario di casa d'altri.
+ */
+function howIs(state: string | undefined): Health {
+  if (state === 'loaded') return 'live';
+  if (state === 'setup_retry') return 'degraded';
+  if (state === 'not_loaded' || !state) return 'new';
+  return 'lost';
 }
 
 /**

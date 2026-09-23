@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { thingHealth } from '../lib/health';
   import { devices, type Device } from '../lib/devices.svelte';
   import type { Capability, DeviceValue } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
@@ -19,6 +20,24 @@
   let { device }: { device: Device } = $props();
 
   const lit = $derived(devices.isOn(device));
+
+  /**
+   * Di un dispositivo si sanno tre cose, non due.
+   *
+   * Verde risponde. Rosso non risponde, e quello è un guasto vero: l'agente
+   * c'è, gli ha chiesto di questo, e questo non c'è. Grigio invece vuol dire
+   * che non si sa: l'agente non è collegato, e da qui non si può dire niente
+   * di una tenda a trenta chilometri. Dipingerla di rosso manda a cercare un
+   * guasto in casa quando il filo è caduto per strada.
+   */
+  const how = $derived(thingHealth(devices.agentUp(device.agentId), device.online));
+  const says = $derived(
+    how === 'live'
+      ? 'Raggiungibile'
+      : how === 'lost'
+        ? 'Non risponde'
+        : 'Non si sa: l’agente non è collegato',
+  );
 
   const numberOf = (value: DeviceValue | undefined): number => (typeof value === 'number' ? value : 0);
 
@@ -81,17 +100,15 @@
 
 <div class="dev" class:is-lit={lit} class:is-off={!device.online}>
   <div class="dev-head">
-    <!-- verde o rosso: qui il pallino dice se la cosa risponde, non se è
-         accesa — quello lo dicono la riga che si scalda e il suo interruttore -->
-    <span
-      class="dev-dot"
-      role="img"
-      aria-label={device.online ? 'Raggiungibile' : 'Non raggiungibile'}
-      title={device.online ? 'Raggiungibile' : 'Non raggiungibile'}
-    ></span>
+    <!-- il pallino dice se la cosa risponde, non se è accesa: quello lo
+         dicono la riga che si scalda e il suo interruttore -->
+    <span class="dev-dot is-{how}" role="img" aria-label={says} title={says}></span>
     <span class="dev-name">{device.name}</span>
-    {#if !device.online}
-      <span class="dev-away" title="Non raggiungibile"><Icon name="alert" /></span>
+    <!-- l'avviso solo per un guasto vero: se è l'agente a mancare, quello lo
+         dice già il suo pallino qui sopra, e ripeterlo su ogni riga sarebbe
+         una colonna di allarmi per una cosa sola -->
+    {#if how === 'lost'}
+      <span class="dev-away" title={says}><Icon name="alert" /></span>
     {/if}
   </div>
 
@@ -211,13 +228,19 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #2f9e5e;
+    background: var(--ok);
     transition: background 0.22s, box-shadow 0.22s;
   }
 
   /* non risponde: rosso, e accanto al nome ci finisce anche un'icona —
      il colore da solo non basta a chi non lo distingue */
-  .dev.is-off .dev-dot { background: var(--danger); }
+  .dev-dot.is-lost { background: var(--danger); }
+
+  /* non si sa: l'agente non è collegato, e di qui non si vede niente */
+  .dev-dot.is-unknown {
+    background: var(--ink-3);
+    opacity: 0.55;
+  }
 
   .dev-name {
     font-size: 12.5px;

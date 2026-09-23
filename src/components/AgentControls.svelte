@@ -136,10 +136,10 @@
     box-shadow: inset 0 0 0 1px var(--hairline);
   }
 
-  .mark.live { background: #2f9e5e; box-shadow: 0 0 0 3px rgb(47 158 94 / 0.16); }
+  .mark.live { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 16%, transparent); }
 
   /* parla, ma non tutto quello che ha sotto risponde */
-  .mark.degraded { background: #d98613; box-shadow: 0 0 0 3px rgb(217 134 19 / 0.18); }
+  .mark.degraded { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 18%, transparent); }
 
   /* parlava e non parla più: quello sì che è successo qualcosa */
   .mark.lost {
@@ -177,6 +177,22 @@
     overflow: auto;
     overscroll-behavior: contain;
     border-top: 1px solid var(--hairline-soft);
+    /*
+     * Lo scorrimento si ferma sui dispositivi, non a metà di uno.
+     *
+     * Qui dentro le righe non sono tutte alte uguali: una luce è una riga,
+     * una telecamera è un riquadro sedici a nove. Senza aggancio ci si ferma
+     * sempre con mezza telecamera fuori, e si corregge a mano ogni volta.
+     * `proximity` e non `mandatory`: aggancia se stai già finendo lì vicino,
+     * e non strappa lo scorrimento dalle mani a chi sta cercando altro.
+     */
+    scroll-snap-type: y proximity;
+  }
+
+  /* ognuno si presenta dall'alto, sotto il bordo di quello prima */
+  .list :global(.dev) {
+    scroll-snap-align: start;
+    scroll-margin-top: 1px;
   }
 
 
