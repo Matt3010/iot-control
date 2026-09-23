@@ -106,7 +106,7 @@ export async function tick(): Promise<void> {
       // Una scena che parte da sola e trova una tenda muta non è un guasto
       // del server: nel registro della casa c'è già scritto cosa non ha
       // risposto, e qui si tira avanti con le altre.
-      .catch((error: Error) => console.warn(`«${scene.name}» non è partita tutta: ${error.message}`));
+      .catch((error: Error) => console.warn(`la scena «${scene.name}» non è andata fino in fondo: ${error.message}`));
   }
 }
 

@@ -148,10 +148,20 @@ export interface MapEditor {
 }
 
 /** Una riga di una scena: a chi, cosa, e con che valore. */
+/**
+ * Una riga di una scena.
+ *
+ * Quasi sempre muove un dispositivo. Puo' invece mandare un avviso — «il
+ * riscaldamento e' acceso da un'ora», «la scena della sera e' partita» — e
+ * allora non tocca niente in casa: porta solo delle parole. Le due cose
+ * stanno nello stesso elenco perche' l'ordine fra loro conta.
+ */
 export interface SceneStep {
-  deviceId: string;
-  code: string;
-  value: DeviceValue;
+  deviceId?: string;
+  code?: string;
+  value?: DeviceValue;
+  /** Il testo di un avviso. Le righe che ce l'hanno non muovono niente. */
+  notify?: string;
   /**
    * Quanti secondi aspettare prima di questa riga.
    *
@@ -318,8 +328,11 @@ export interface Alert {
 export interface Notice {
   id: string;
   ownerId: string;
-  /** `silent`: un posto ha smesso di rispondere. `back`: e' tornato. */
-  kind: 'silent' | 'back';
+  /**
+   * `silent`: un agente ha smesso di rispondere. `back`: ha ripreso.
+   * `scene`: l'ha detto una scena, perche' gliel'hai scritto tu.
+   */
+  kind: 'silent' | 'back' | 'scene';
   /** Di chi si parla, se e' un agente. */
   agentId?: string;
   /** Come si legge: le stesse parole arrivate sul telefono. */

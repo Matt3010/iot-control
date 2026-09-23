@@ -38,9 +38,11 @@ export interface LogEntry {
 
 /** Una riga di una scena: a chi, cosa, e con che valore. */
 export interface SceneStep {
-  deviceId: string;
-  code: string;
-  value: DeviceValue;
+  deviceId?: string;
+  code?: string;
+  value?: DeviceValue;
+  /** Le parole di un avviso. Le righe che ce le hanno non muovono niente. */
+  notify?: string;
   /** Secondi da aspettare prima di questa riga. Zero: insieme alla precedente. */
   after?: number;
 }
@@ -232,7 +234,8 @@ class Devices {
     const seen = new Set<string>();
     const out: Device[] = [];
     for (const step of scene.steps) {
-      if (seen.has(step.deviceId)) continue;
+      // le righe che mandano un avviso non nominano nessuno
+      if (!step.deviceId || seen.has(step.deviceId)) continue;
       const device = this.list.find((one) => one.id === step.deviceId);
       if (!device) continue;
       seen.add(step.deviceId);
@@ -249,6 +252,9 @@ class Devices {
    * comando — non `power=true`, che è come lo dice il protocollo.
    */
   saysOf(step: SceneStep): { who: string; what: string } {
+    // una riga che manda un avviso non ha un chi: ha delle parole
+    if (step.notify) return { who: 'Avviso', what: step.notify };
+
     const device = this.list.find((one) => one.id === step.deviceId);
     const capability = device?.capabilities.find((entry) => entry.code === step.code);
     const who = device?.name ?? 'Sparito';

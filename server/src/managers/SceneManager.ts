@@ -2,6 +2,7 @@ import type { Capability, DeviceValue } from '../../../shared/protocol.js';
 import type { SceneDto, SceneStepDto } from '../dto/scene.dto.js';
 import { badGateway, badRequest, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
+import { noticeManager } from './NoticeManager.js';
 import type { Transaction } from '../persistence/JsonStore.js';
 import { store } from '../persistence/JsonStore.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
@@ -104,14 +105,19 @@ export class SceneManager {
       const found = new SceneRepository(tx).findById(id);
       if (!found || found.ownerId !== ownerId) throw notFound('scena inesistente');
 
+      /*
+       * Le righe che mandano un avviso non hanno un dispositivo, e non per
+       * questo sono da buttare: restano in fila con le altre, perche' l'ordine
+       * fra un comando e un avviso e' quello che si e' scritto.
+       */
       const devices = new DeviceRepository(tx).findAllOf(ownerId);
       const ready = found.steps
         .map((step) => ({ step, device: devices.find((one) => one.id === step.deviceId) }))
-        .filter((pair): pair is { step: SceneStep; device: Device } => !!pair.device);
-      return { scene: found, steps: ready };
+        .filter((pair) => !!pair.device || !!pair.step.notify);
+      return { scene: found, steps: ready as { step: SceneStep; device?: Device }[] };
     });
 
-    if (!steps.length) throw badRequest(`«${scene.name}» è vuota e non c'è niente da fare`);
+    if (!steps.length) throw badRequest(`La scena «${scene.name}» è vuota, non c'è niente da fare`);
 
     /*
      * A momenti, non tutto in una volta.
@@ -149,7 +155,20 @@ export class SceneManager {
 
       const esiti = await Promise.allSettled(
         momento.quali.map(({ step, device }) =>
-          hub.command(device.agentId, device.externalId, step.code, step.value),
+          step.notify
+            ? noticeManager.tell(ownerId, {
+                kind: 'scene',
+                who: scene.name,
+                short: step.notify,
+                title: scene.name,
+                body: step.notify,
+              })
+            : hub.command(
+                (device as Device).agentId,
+                (device as Device).externalId,
+                step.code as string,
+                step.value as DeviceValue,
+              ),
         ),
       );
       momento.quali.forEach((pair, at) => {
@@ -163,16 +182,20 @@ export class SceneManager {
        * se ne muove sei, e sei righe uguali nel registro sono rumore. Ma se la
        * scena tocca due case, ognuna deve poter leggere che è passata di lì.
        */
-      for (const agentId of new Set(steps.map(({ device }) => device.agentId))) {
-        const suoi = steps.filter(({ device }) => device.agentId === agentId);
-        const zitti = mute.filter(({ device }) => device.agentId === agentId).length;
+      const case_ = new Set(steps.map(({ device }) => device?.agentId).filter((id): id is string => !!id));
+      for (const agentId of case_) {
+        const suoi = steps.filter(({ device }) => device?.agentId === agentId);
+        const zitti = mute.filter(({ device }) => device?.agentId === agentId).length;
         logManager.note({
           ownerId,
           agentId,
           kind: 'scene',
           subject: scene.name,
+          // il singolare vale anche dentro a «su»: «1 dispositivi su 2» e'
+          // il genere di dettaglio che fa sembrare tutto il resto scritto
+          // male
           detail: zitti
-            ? `${suoi.length - zitti} dispositivi su ${suoi.length}`
+            ? `${suoi.length - zitti} ${suoi.length - zitti === 1 ? 'dispositivo' : 'dispositivi'} su ${suoi.length}`
             : `${suoi.length} ${suoi.length === 1 ? 'dispositivo' : 'dispositivi'}`,
           ok: zitti === 0,
           ...(who ? { who } : {}),
@@ -213,7 +236,7 @@ export class SceneManager {
 
     if (!mute.length) return;
 
-    const names = [...new Set(mute.map(({ device }) => `«${device.name}»`))].join(', ');
+    const names = [...new Set(mute.map(({ device }) => `«${device?.name ?? 'una riga'}»`))].join(', ');
     throw badGateway(
       mute.length === steps.length
         ? `Nessun dispositivo di «${scene.name}» ha risposto`
@@ -242,7 +265,19 @@ export class SceneManager {
     const gia = new Map<string, number>();
 
     return steps.map((step) => {
-      const device = devices.findById(step.deviceId);
+      const after = Math.max(0, Math.round(step.after ?? 0));
+
+      /*
+       * Una riga che manda un avviso non tocca niente in casa: non c'e' un
+       * dispositivo da controllare, e due avvisi nello stesso momento sono
+       * legittimi — sono due frasi, non due ordini contrari.
+       */
+      if (step.notify) {
+        if (after > 0) momento += 1;
+        return { notify: step.notify, ...(after ? { after } : {}) };
+      }
+
+      const device = step.deviceId ? devices.findById(step.deviceId) : undefined;
       if (!device || device.ownerId !== ownerId) throw badRequest('dispositivo inesistente');
 
       const capability = device.capabilities.find((entry) => entry.code === step.code);
@@ -250,9 +285,8 @@ export class SceneManager {
 
       const kind = typeof step.value;
       if (kind !== 'string' && kind !== 'number' && kind !== 'boolean') throw badRequest('valore non valido');
-      check(capability, step.value);
+      check(capability, step.value as DeviceValue);
 
-      const after = Math.max(0, Math.round(step.after ?? 0));
       if (after > 0) momento += 1;
 
       const chiave = `${step.deviceId}:${step.code}`;
@@ -263,7 +297,12 @@ export class SceneManager {
       }
       gia.set(chiave, momento);
 
-      return { deviceId: step.deviceId, code: step.code, value: step.value, ...(after ? { after } : {}) };
+      return {
+        deviceId: step.deviceId,
+        code: step.code,
+        value: step.value as DeviceValue,
+        ...(after ? { after } : {}),
+      };
     });
   }
 }

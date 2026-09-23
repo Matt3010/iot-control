@@ -170,7 +170,7 @@
       touched = {};
 
       if (next?.kind === 'done') {
-        toast.show(`${label} collegato, i dispositivi stanno arrivando`);
+        toast.show(`${label} si collega, i dispositivi stanno arrivando`);
         ondone();
       }
     } catch (error) {

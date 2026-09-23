@@ -79,7 +79,7 @@
     busy = true;
     try {
       linked = await devices.unlink(agent, joint.entryId);
-      toast.show(`${label} scollegato, i suoi dispositivi se ne vanno con lui`);
+      toast.show(`${label} si scollega, e i suoi dispositivi se ne vanno`);
     } catch (error) {
       toast.show((error as Error).message);
     } finally {

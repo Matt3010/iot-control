@@ -24,18 +24,26 @@ const trim = () => Transform(({ value }: { value: unknown }) => (typeof value ==
  * cosa sa fare lui, e quello lo sa il manager.
  */
 export class SceneStepDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'serve il dispositivo' })
   @MaxLength(80)
-  deviceId!: string;
+  deviceId?: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: "serve l'azione" })
   @MaxLength(80)
-  code!: string;
+  code?: string;
 
-  @IsDefined({ message: 'serve il valore' })
-  value!: string | number | boolean;
+  @IsOptional()
+  value?: string | number | boolean;
+
+  /** Le parole di un avviso. Una riga che ce le ha non muove niente. */
+  @trim()
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty({ message: 'un avviso senza parole non avvisa nessuno' })
+  @MaxLength(140, { message: "un avviso si legge sulla schermata bloccata: al massimo 140 caratteri" })
+  notify?: string;
 
   /** Quanti secondi aspettare prima di questa riga. Zero vuol dire insieme alla precedente. */
   @IsOptional()

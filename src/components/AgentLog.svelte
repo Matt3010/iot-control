@@ -35,9 +35,20 @@
    * La riga, in italiano. Il soggetto davanti quando c'è — «Tenda 1» — perché
    * un registro si scorre cercando un nome, non un tipo di evento.
    */
-  /** Le righe vecchie dicevano solo «collegato»: il verbo si mette qui. */
+  /**
+   * Le righe vecchie dicevano solo «collegato», e il verbo si mette qui.
+   *
+   * Al presente, e non al passato: «collegato» si accorda con chi lo
+   * precede, e chi lo precede è un nome che hai scelto tu — «Telecamera è
+   * stato collegato» è sbagliato, e non c'è modo di sapere il genere di una
+   * parola qualsiasi. «Si collega» vale per tutti.
+   */
   const legge = (detail: string | undefined): string =>
-    detail === 'collegato' || detail === 'scollegato' ? `è stato ${detail}` : (detail ?? '');
+    detail === 'collegato' || detail === 'è stato collegato'
+      ? 'si collega'
+      : detail === 'scollegato' || detail === 'è stato scollegato'
+        ? 'si scollega'
+        : (detail ?? '');
 
   function says(entry: LogEntry): { what: string; who: string } {
     const chi = entry.subject ?? '';
@@ -48,10 +59,15 @@
        * registro dove ogni altra riga comincia con un nome, una riga senza
        * soggetto se lo fa cercare a chi legge.
        */
+      /*
+       * Al presente, per la stessa ragione: «Casa si è collegato» ha il genere
+       * sbagliato e «collegata» ce l'ha per metà degli altri nomi. In un
+       * registro con l'ora davanti il presente si legge bene lo stesso.
+       */
       case 'up':
-        return { what: 'si è collegato', who: agent.name };
+        return { what: 'si collega', who: agent.name };
       case 'down':
-        return { what: 'si è scollegato', who: agent.name };
+        return { what: 'si scollega', who: agent.name };
       case 'inventory':
         return { what: entry.detail ?? '', who: agent.name };
       case 'device-up':
@@ -67,7 +83,7 @@
         return { what: legge(entry.detail), who: chi || 'Un account' };
       case 'scene':
         return {
-          what: entry.ok ? `è partita: ${entry.detail}` : `è partita a metà: ${entry.detail}`,
+          what: entry.ok ? `parte — ${entry.detail}` : `parte a metà — ${entry.detail}`,
           who: chi,
         };
       /*

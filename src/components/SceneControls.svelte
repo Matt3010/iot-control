@@ -6,6 +6,7 @@
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
+  import StepRail from './StepRail.svelte';
 
   /**
    * Una scena: più cose che partono insieme, ognuna con la sua.
@@ -45,6 +46,25 @@
    * Si dice sulla riga, che è dove si guarda — e si dice come altrove, se no
    * la stessa cosa avrebbe due facce a seconda della pagina.
    */
+  /** Le righe come le vuole la linea del tempo: chi, cosa, come sta, e l'attesa. */
+  const rails = $derived(
+    scene.steps.map((step, at) => {
+      const says = devices.saysOf(step);
+      const sta = step.notify
+        ? { state: 'live' as const, says: 'Manda un avviso' }
+        : how(step.deviceId as string);
+      return {
+        key: `${step.deviceId ?? 'avviso'}:${step.code ?? ''}:${at}`,
+        who: says.who,
+        what: says.what,
+        talk: !!step.notify,
+        wait: step.after,
+        state: sta.state,
+        says: sta.says,
+      };
+    }),
+  );
+
   function how(deviceId: string): { state: 'live' | 'lost' | 'unknown'; says: string } {
     const device = devices.list.find((one) => one.id === deviceId);
     const state = thingHealth(device ? devices.agentUp(device.agentId) : false, device?.online ?? false);
@@ -119,26 +139,17 @@
   {/if}
 
   {#if scene.steps.length}
-    <ul class="steps">
-      {#each scene.steps as step, at (`${step.deviceId}:${step.code}:${at}`)}
-        {@const says = devices.saysOf(step)}
-        <!-- di fila e non incolonnate a destra: l'azione staccata sul bordo
-             sembrava un tasto da premere, e invece si legge e basta -->
-        {@const sta = how(step.deviceId)}
-        <li>
-          <!-- l'attesa si legge come parte della frase: «dopo un minuto,
-               Tenda 1 chiudi» — e su una scena tutta insieme non si vede -->
-          {#if step.after}<span class="poi">{saysWait(step.after)},</span>{/if}
-          <!-- lo stesso pallino della scheda del dispositivo: verde risponde,
-               rosso non risponde, grigio non si sa -->
-          <span class="dot is-{sta.state}" role="img" aria-label={sta.says} title={sta.says}></span>
-          {says.who} · <b>{says.what}</b>
-          <!-- per il guasto vero anche l'icona, come nella scheda del
-               dispositivo: il colore da solo non basta a chi non lo distingue -->
-          {#if sta.state === 'lost'}<span class="away" title={sta.says}><Icon name="alert" /></span>{/if}
-        </li>
-      {/each}
-    </ul>
+    <StepRail steps={rails}>
+      {#snippet row(step: (typeof rails)[number])}
+        {#if step.talk}
+          <!-- niente icona: che sia una riga diversa lo dice gia' il nodo
+               vuoto sulla linea, e che siano parole lo dicono le virgolette -->
+          <span class="riga">«{step.what}»</span>
+        {:else}
+          <span class="riga">{step.who} · <b>{step.what}</b></span>
+        {/if}
+      {/snippet}
+    </StepRail>
   {:else}
     <p class="set-none">Non c’è ancora niente dentro. Aggiungi una riga qui sotto.</p>
   {/if}
@@ -171,55 +182,10 @@
     white-space: nowrap;
   }
 
-  /* cosa succede quando parte, riga per riga: una scena si legge per sapere
-     cosa muove, e il nome di chi si muove va davanti */
-  /* il triangolo dentro al cerchio tira a destra: al centro esatto sembra
-     storto, ed e' l'unica cosa che questa scheda ha da dire sulla forma */
-  .set :global(.go .ico) { margin-left: 1px; fill: currentColor; }
-
-  /* mentre parte: un punto che pulsa e a che passo e' arrivata */
-  .corre {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: -2px 0 0;
-    font-size: 11.5px;
-    color: var(--accent);
-  }
-
-  .battito {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    animation: battito 1.1s ease-in-out infinite;
-  }
-
-  @keyframes battito {
-    0%, 100% { opacity: 0.35; transform: scale(0.85); }
-    50% { opacity: 1; transform: scale(1); }
-  }
-
-  /* l'orario: piccolo, sotto il nome, e smorto quando e' sospeso */
-  .auto {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin: -2px 0 0;
-    font-size: 11.5px;
-    color: var(--ink-3);
-  }
-
-  .auto :global(.ico) { width: 12px; height: 12px; }
-
-  .auto.is-off { opacity: 0.55; text-decoration: line-through; }
-
-  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-
-  .steps li {
-    display: flex;
-    align-items: baseline;
-    gap: 7px;
+  /* la riga di una scena: il nome di chi si muove davanti, l'azione in
+     chiaro */
+  .riga {
+    display: block;
     min-width: 0;
     font-size: 12px;
     color: var(--ink-3);
@@ -228,27 +194,8 @@
     white-space: nowrap;
   }
 
-  .dot {
-    flex: none;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--ok);
-  }
+  .riga b { font-weight: 560; color: var(--ink-2); }
 
-  .dot.is-lost { background: var(--danger); }
-
-  /* non si sa, perche' l'agente non e' collegato: da qui non si puo' dire
-     niente di una tenda a trenta chilometri */
-  .dot.is-unknown { background: var(--ink-3); opacity: 0.55; }
-
-  .away { display: inline-grid; place-items: center; flex: none; color: var(--danger); }
-
-  .away :global(.ico) { width: 12px; height: 12px; }
-
-  .steps b { font-weight: 560; color: var(--ink-2); }
-
-  .poi { color: var(--accent); font-variant-numeric: tabular-nums; }
 
 
   .set-none { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }

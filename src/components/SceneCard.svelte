@@ -101,6 +101,30 @@
     });
   }
 
+  /**
+   * Una riga che non muove niente: manda un avviso.
+   *
+   * È l'unica azione che non riguarda una cosa in casa, e per ora l'unica
+   * che non sia un comando. Nasce con delle parole già dentro, perché un
+   * campo vuoto in mezzo a una sequenza non dice cosa farsene.
+   */
+  function addNotify(): void {
+    void devices.patchScene(scene, {
+      /*
+       * «La scena» davanti, e il nome fra virgolette. Se la frase si
+       * appoggiasse al nome — ««Luci accese» è partita» — bisognerebbe
+       * sapere genere e numero di una parola che hai scelto tu, e non si può.
+       */
+      steps: [...scene.steps, { notify: `La scena «${scene.name}» è partita` }],
+    });
+  }
+
+  /** Le parole di quell'avviso, cambiate mentre si scrivono. */
+  function setNotify(at: number, testo: string): void {
+    const steps = scene.steps.map((one, index) => (index === at ? { ...one, notify: testo } : one));
+    void devices.patchScene(scene, { steps });
+  }
+
   /** Quanto si aspetta prima di quella riga. Zero vuol dire insieme alla precedente. */
   function setWait(at: number, seconds: number): void {
     const steps = scene.steps.map((one, index) =>
@@ -113,7 +137,7 @@
   const attese = ATTESE.map((seconds) => ({ id: String(seconds), label: saysWait(seconds) }));
 
   /** Cosa fa già quel dispositivo in questa scena, capacità per capacità. */
-  const already = (deviceId: string, code: string) =>
+  const already = (deviceId: string | undefined, code: string | undefined) =>
     scene.steps.find((one) => one.deviceId === deviceId && one.code === code)?.value;
 
   /** Se è già in scena: la pastiglia lo dice invece di farlo scoprire premendo. */
@@ -196,7 +220,7 @@
       <ul class="written">
         {#each scene.steps as step, at (`${step.deviceId}:${step.code}:${at}`)}
           {@const says = devices.saysOf(step)}
-          <li>
+          <li class:is-talk={!!step.notify}>
             <!-- l'attesa prima di questa riga: la prima non ha un «prima» -->
             {#if at > 0}
               <Button
@@ -215,7 +239,20 @@
                 {saysWait(step.after)}
               </Button>
             {/if}
-            <span class="line">{says.who} · <b>{says.what}</b></span>
+            {#if step.notify}
+              <!-- le parole si scrivono qui: un avviso senza le sue parole
+                   non si puo' nemmeno immaginare -->
+              <input
+                class="parole"
+                type="text"
+                maxlength="140"
+                value={step.notify}
+                aria-label="Cosa dice l'avviso"
+                onchange={(event) => setNotify(at, event.currentTarget.value)}
+              />
+            {:else}
+              <span class="line">{says.who} · <b>{says.what}</b></span>
+            {/if}
             <button
               type="button"
               class="drop"
@@ -300,6 +337,9 @@
            quanto tutti i dispositivi per tutte le loro azioni -->
       <span class="eyebrow">Aggiungi una riga</span>
       <div class="chips">
+        <!-- l'unica azione che non riguarda una cosa in casa: sta con le
+             altre perche' si aggiunge allo stesso modo -->
+        <Chip label="Un avviso" size="sm" look="off" title="Manda un avviso quando la scena arriva qui" onclick={addNotify} />
         {#each all as device (device.id)}
           <Chip
             label={device.name}
@@ -358,6 +398,13 @@
   .written { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 
   .written li { display: flex; align-items: center; gap: 4px; min-width: 0; }
+
+  .parole {
+    flex: 1;
+    min-width: 0;
+    padding: 3px 7px;
+    font-size: 11.5px;
+  }
 
   /* l'attesa sta davanti alla riga e non in una colonna sua: si legge come
      una frase — «dopo 30s, Tenda 1 chiudi» */

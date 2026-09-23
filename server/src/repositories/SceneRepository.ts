@@ -80,7 +80,8 @@ export class SceneRepository {
   pruneDevices(gone: Set<string>): number {
     let touched = 0;
     for (const scene of this.tx.data.scenes) {
-      const kept = scene.steps.filter((step) => !gone.has(step.deviceId));
+      // le righe che mandano un avviso non nominano nessun dispositivo
+      const kept = scene.steps.filter((step) => !step.deviceId || !gone.has(step.deviceId));
       if (kept.length === scene.steps.length) continue;
       scene.steps = kept;
       touched += 1;
