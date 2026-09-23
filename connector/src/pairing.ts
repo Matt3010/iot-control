@@ -515,10 +515,20 @@ export async function submitPairing(
   // niente da chiudere la prossima volta.
   if (step.kind === 'done' || step.kind === 'failed') scorda(config, flowId);
 
-  // Se si e' lamentato, nel registro finisce anche di cosa era fatto il
-  // passo: un rifiuto su un campo che non si vede si capisce solo vedendo
-  // quali campi c'erano e cosa proponevano.
-  if (step.error) console.warn(`passo ${flowId}: ${listed(schema)}`);
+  /*
+   * Se si e' lamentato, nel registro finisce tutto quello che ha detto: di
+   * cosa era fatto il passo — un rifiuto su un campo che non si vede si
+   * capisce solo sapendo quali campi c'erano — e le parole esatte del
+   * guasto, comprese quelle che a chi guarda non si mostrano.
+   *
+   * Certe integrazioni infilano l'eccezione dentro i segnaposti: sullo
+   * schermo sarebbe rumore, ma qui e' l'unica cosa che dice cosa e'
+   * successo davvero. Ed e' su una macchina di casa, non in giro.
+   */
+  if (step.error) {
+    console.warn(`passo ${flowId}: ${listed(schema)}`);
+    console.warn(`passo ${flowId}, com'e' andata: ${JSON.stringify(flow.errors ?? {})} ${JSON.stringify(flow.description_placeholders ?? {})}`);
+  }
   return ourShot(await pictured(config, flow, step), input);
 }
 
