@@ -3,6 +3,7 @@ import http from 'node:http';
 import { createApp } from './app.js';
 import { config } from './config.js';
 import { attachAgentLink } from './iot/link.js';
+import { watchLog } from './managers/LogManager.js';
 import { closeDb, migrateUp } from './persistence/db.js';
 import { watchClock } from './services/SceneClock.js';
 import { watchSilence } from './services/SilenceWatch.js';
@@ -28,6 +29,8 @@ attachAgentLink(server);
 watchSilence();
 // e qualcuno guarda l'orologio, per le scene che partono da sole
 watchClock();
+// e qualcuno porta fuori le righe di registro scadute
+watchLog();
 
 server.listen(config.port, () => {
   console.log(`place-index in ascolto su http://localhost:${config.port} (archivio ${where(config.db.url)})`);

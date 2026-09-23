@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { iso, when, type Transaction } from '../persistence/db.js';
-import { agents } from '../persistence/schema.js';
+import { agents, placeAgents, places } from '../persistence/schema.js';
 import type { Agent } from '../types.js';
 
 type Row = typeof agents.$inferSelect;
@@ -25,14 +25,40 @@ export class AgentRepository {
   }
 
   /**
-   * Tutti, di tutti.
+   * Tutti, con il nome del luogo dove stanno.
    *
-   * La usa chi si accorge dei silenzi, che non lavora per nessuno in
-   * particolare: gira ogni minuto e deve guardare ogni casa.
+   * Una domanda sola invece di una per agente. La usa chi si accorge dei
+   * silenzi, che gira ogni minuto e deve guardare ogni casa: chiedere «e
+   * questo dove sta?» una riga per volta vuol dire tante domande quante sono
+   * le case, sessanta volte all'ora, per una risposta che il database sa
+   * dare tutta insieme.
+   *
+   * Un agente sta su un luogo solo, ma il legame non lo vieta: se ne trovasse
+   * due si tiene il primo, che è quello che faceva anche prima.
    */
-  async findAll(): Promise<Agent[]> {
-    const rows = await this.tx.db.select().from(agents);
-    return rows.map(toAgent);
+  async findAllWithPlace(): Promise<{ agent: Agent; luogo?: string }[]> {
+    const rows = await this.tx.db
+      .select({ agent: agents, luogo: places.name })
+      .from(agents)
+      .leftJoin(placeAgents, eq(placeAgents.agentId, agents.id))
+      .leftJoin(places, eq(places.id, placeAgents.placeId));
+
+    const visti = new Map<string, { agent: Agent; luogo?: string }>();
+    for (const row of rows) {
+      if (visti.has(row.agent.id)) continue;
+      visti.set(row.agent.id, { agent: toAgent(row.agent), ...(row.luogo ? { luogo: row.luogo } : {}) });
+    }
+    return [...visti.values()];
+  }
+
+  /** Quanti di questi sono suoi: serve a controllarne tanti in un colpo. */
+  async countOwned(ownerId: string, ids: string[]): Promise<number> {
+    if (!ids.length) return 0;
+    const [row] = await this.tx.db
+      .select({ quanti: sql<number>`count(*)::int` })
+      .from(agents)
+      .where(and(eq(agents.ownerId, ownerId), inArray(agents.id, ids)));
+    return row?.quanti ?? 0;
   }
 
   async findById(id: string): Promise<Agent | undefined> {

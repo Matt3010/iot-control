@@ -34,6 +34,29 @@ export class LogManager {
 
 export const logManager = new LogManager();
 
+/** Ogni quanto si buttano le righe scadute. Un'ora: non è un lavoro urgente. */
+const SWEEP_MS = 60 * 60 * 1000;
+
+/**
+ * Chi porta fuori il vecchio.
+ *
+ * Il registro tiene ventiquattr'ore. Fino a ieri a controllarlo era chi
+ * scriveva — cioè chi stava premendo un interruttore e aspettava di sapere
+ * com'era andata — e per un lavoro che può benissimo succedere fra un'ora.
+ */
+export function watchLog(): void {
+  const giro = (): void => {
+    void store
+      .transaction((tx) => new LogRepository(tx).sweepOld())
+      .then((quante) => quante && console.log(`registro: ${quante} righe scadute buttate`))
+      .catch((error: unknown) => console.warn(`pulizia del registro: ${(error as Error).message}`));
+  };
+
+  setInterval(giro, SWEEP_MS).unref();
+  // e una passata all'avvio, per quello che si è accumulato mentre era spento
+  giro();
+}
+
 /**
  * Il hub si accorge dei dispositivi che spariscono e che tornano, ma non deve
  * sapere che esiste un registro: gli basta che qualcuno ascolti. Glielo si

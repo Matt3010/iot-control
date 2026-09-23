@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import type { Capability } from '../../../shared/protocol.js';
 import { iso, type Transaction } from '../persistence/db.js';
-import { devices } from '../persistence/schema.js';
+import { devices, placeAgents, places } from '../persistence/schema.js';
 import type { Device, Place } from '../types.js';
 import { PlaceRepository } from './PlaceRepository.js';
 
@@ -48,10 +48,27 @@ export class DeviceRepository {
     return rows.map(toDevice);
   }
 
-  /** Quelli su cui qualcuno vuole essere avvisato se tacciono. */
-  async findWatched(): Promise<Device[]> {
-    const rows = await this.tx.db.select().from(devices).where(eq(devices.watch, true));
-    return rows.map(toDevice);
+  /**
+   * Quelli su cui qualcuno vuole essere avvisato se tacciono, con il nome del
+   * luogo dove stanno.
+   *
+   * Una domanda sola invece di una per agente: quattro cose guardate nella
+   * stessa casa chiedevano quattro volte lo stesso luogo, ogni minuto.
+   */
+  async findWatchedWithPlace(): Promise<{ device: Device; luogo?: string }[]> {
+    const rows = await this.tx.db
+      .select({ device: devices, luogo: places.name })
+      .from(devices)
+      .leftJoin(placeAgents, eq(placeAgents.agentId, devices.agentId))
+      .leftJoin(places, eq(places.id, placeAgents.placeId))
+      .where(eq(devices.watch, true));
+
+    const visti = new Map<string, { device: Device; luogo?: string }>();
+    for (const row of rows) {
+      if (visti.has(row.device.id)) continue;
+      visti.set(row.device.id, { device: toDevice(row.device), ...(row.luogo ? { luogo: row.luogo } : {}) });
+    }
+    return [...visti.values()];
   }
 
   /** Accende o spegne l'avviso su un dispositivo. */

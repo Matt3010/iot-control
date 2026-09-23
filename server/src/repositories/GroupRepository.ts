@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Transaction } from '../persistence/db.js';
 import { groups } from '../persistence/schema.js';
 import type { Group } from '../types.js';
@@ -19,6 +19,16 @@ export class GroupRepository {
 
   async owns(ownerId: string, id: string): Promise<boolean> {
     return (await this.findById(id))?.ownerId === ownerId;
+  }
+
+  /** Quanti di questi sono suoi: serve a controllarne tanti in un colpo. */
+  async countOwned(ownerId: string, ids: string[]): Promise<number> {
+    if (!ids.length) return 0;
+    const [row] = await this.tx.db
+      .select({ quanti: sql<number>`count(*)::int` })
+      .from(groups)
+      .where(and(eq(groups.ownerId, ownerId), inArray(groups.id, ids)));
+    return row?.quanti ?? 0;
   }
 
   async insert(ownerId: string, name: string): Promise<Group> {

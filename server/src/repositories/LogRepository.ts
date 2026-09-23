@@ -70,20 +70,37 @@ export class LogRepository {
       })
       .returning();
 
-    await this.#prune(entry.agentId);
+    await this.#cap(entry.agentId);
     return toEntry(row as Row);
   }
 
   /**
-   * Il vecchio se ne va in due colpi soli.
+   * Le righe scadute, buttate via una volta ogni tanto.
    *
-   * Prima si rileggeva il registro di tutti per riscriverlo senza le righe da
-   * buttare, a ogni riga scritta. Adesso sono due cancellazioni mirate:
-   * quelle scadute, e quelle che stanno oltre il tetto di questo agente.
+   * Stava sulla strada di ogni riga scritta: premi un interruttore e il
+   * database ripassa tutto il registro per vedere se c'è qualcosa di ieri.
+   * Non è un lavoro che debba essere fatto adesso — una riga vecchia di
+   * ventiquattr'ore e un minuto non fa male a nessuno — quindi lo fa
+   * l'orologio, fuori dal momento in cui qualcuno sta aspettando.
    */
-  async #prune(agentId: string): Promise<void> {
-    await this.tx.db.delete(logEntries).where(lt(logEntries.at, new Date(Date.now() - KEEPS_MS)));
+  async sweepOld(): Promise<number> {
+    const rows = await this.tx.db
+      .delete(logEntries)
+      .where(lt(logEntries.at, new Date(Date.now() - KEEPS_MS)))
+      .returning({ id: logEntries.id });
+    return rows.length;
+  }
 
+  /**
+   * Il tetto di questo agente, qui e adesso.
+   *
+   * Questo resta sulla strada della scrittura perché è mirato — guarda le
+   * righe di un agente solo, e va sull'indice che c'è già — e perché un
+   * tetto ha senso solo se vale subito: un dispositivo che va e viene ogni
+   * dieci secondi deve trovare la porta chiusa mentre sta bussando, non un
+   * minuto dopo.
+   */
+  async #cap(agentId: string): Promise<void> {
     // si tengono le più recenti: quelle vecchie le ha già lette chi doveva
     await this.tx.db.execute(sql`
       delete from ${logEntries}

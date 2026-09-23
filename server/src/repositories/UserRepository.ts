@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { uniqueSlug } from '../auth/slug.js';
 import { iso, type Transaction } from '../persistence/db.js';
 import { users } from '../persistence/schema.js';
@@ -40,6 +40,13 @@ export class UserRepository {
   async findByHandle(handle: string): Promise<User | undefined> {
     const [row] = await this.tx.db.select().from(users).where(eq(users.handle, handle)).limit(1);
     return row ? toUser(row) : undefined;
+  }
+
+  /** Più persone in un colpo, per chi ne ha un elenco in mano. */
+  async findMany(ids: string[]): Promise<Map<string, User>> {
+    if (!ids.length) return new Map();
+    const rows = await this.tx.db.select().from(users).where(inArray(users.id, [...new Set(ids)]));
+    return new Map(rows.map((row) => [row.id, toUser(row)]));
   }
 
   /** Chi è `who`: il suo id o il suo handle, come capita di averlo sottomano. */

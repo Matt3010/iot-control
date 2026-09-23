@@ -99,11 +99,22 @@ export class PlaceManager {
     if (!(await new CategoryRepository(tx).owns(ownerId, categoryId)))
       throw badRequest('categoria inesistente');
 
-    const groups = new GroupRepository(tx);
-    for (const id of groupIds) if (!(await groups.owns(ownerId, id))) throw badRequest('gruppo inesistente');
+    /*
+     * Gli elenchi si controllano contandoli, non uno per uno.
+     *
+     * Se ne chiedi tre e ne tornano due, uno non è tuo — ed è esattamente lo
+     * stesso no di prima, detto con una domanda invece che con tre. Chi
+     * salva un luogo con venti gruppi ne faceva venti.
+     */
+    const quali = [...new Set(groupIds)];
+    if ((await new GroupRepository(tx).countOwned(ownerId, quali)) !== quali.length) {
+      throw badRequest('gruppo inesistente');
+    }
 
-    const agents = new AgentRepository(tx);
-    for (const id of agentIds) if (!(await agents.owns(ownerId, id))) throw badRequest('agente inesistente');
+    const chi = [...new Set(agentIds)];
+    if ((await new AgentRepository(tx).countOwned(ownerId, chi)) !== chi.length) {
+      throw badRequest('agente inesistente');
+    }
   }
 }
 

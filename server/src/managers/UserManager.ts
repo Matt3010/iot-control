@@ -22,14 +22,14 @@ export class UserManager {
    */
   keysOf(email: string): Promise<{ owner: User; map: PlaceMap }[]> {
     return store.transaction(async (tx) => {
-      const users = new UserRepository(tx);
-      const out: { owner: User; map: PlaceMap }[] = [];
+      const maps = await new MapRepository(tx).findEditableBy(email);
+      // i padroni tutti insieme: erano una domanda per mappa aperta
+      const chi = await new UserRepository(tx).findMany(maps.map((map) => map.ownerId));
 
-      for (const map of await new MapRepository(tx).findEditableBy(email)) {
-        const owner = await users.findById(map.ownerId);
-        if (owner) out.push({ owner, map });
-      }
-      return out;
+      return maps.flatMap((map) => {
+        const owner = chi.get(map.ownerId);
+        return owner ? [{ owner, map }] : [];
+      });
     });
   }
 
@@ -55,14 +55,14 @@ export class UserManager {
       const aperte = regole.some(({ rule }) => !rule?.only);
       if (aperte) return { ownerId: owner.id, maps: mie.map((map) => map.id), places: null };
 
-      const places = new PlaceRepository(tx);
-      const dentro = new Set<string>();
-      for (const { map, rule } of regole) {
-        for (const place of await places.findAllOfMaps([map.id])) {
-          if (rule?.only?.includes(place.id)) dentro.add(place.id);
-        }
-      }
-      return { ownerId: owner.id, maps: mie.map((map) => map.id), places: [...dentro] };
+      // i luoghi di tutte le mappe in una domanda, e poi si smistano
+      const tutti = await new PlaceRepository(tx).findAllOfMaps(mie.map((map) => map.id));
+      const regoleDi = new Map(regole.map(({ map, rule }) => [map.id, rule]));
+
+      const dentro = tutti
+        .filter((place) => regoleDi.get(place.mapId)?.only?.includes(place.id))
+        .map((place) => place.id);
+      return { ownerId: owner.id, maps: mie.map((map) => map.id), places: [...new Set(dentro)] };
     });
   }
 
