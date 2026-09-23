@@ -43,12 +43,17 @@ export class SceneStepDto {
   @MaxLength(80)
   scene?: string;
 
-  /** Le parole di un avviso. Una riga che ce le ha non muove niente. */
+  /**
+   * Le parole di un avviso. Una riga che ce le ha non muove niente.
+   *
+   * Può essere vuota: una riga appena aggiunta non ha ancora niente da dire,
+   * e rifiutarla vorrebbe dire non poterla nemmeno creare. Quando la scena
+   * parte, una riga senza parole non avvisa nessuno e si salta.
+   */
   @trim()
   @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'un avviso senza parole non avvisa nessuno' })
-  @MaxLength(140, { message: "un avviso si legge sulla schermata bloccata, quindi al massimo 140 caratteri" })
+  @MaxLength(140, { message: 'un avviso si legge sulla schermata bloccata, quindi al massimo 140 caratteri' })
   notify?: string;
 
   /** Quanti secondi aspettare prima di questa riga. Zero vuol dire insieme alla precedente. */

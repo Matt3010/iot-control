@@ -111,14 +111,15 @@
    * campo vuoto in mezzo a una sequenza non dice cosa farsene.
    */
   function addNotify(): void {
-    void devices.patchScene(scene, {
-      /*
-       * «La scena» davanti, e il nome fra virgolette. Se la frase si
-       * appoggiasse al nome — ««Luci accese» è partita» — bisognerebbe
-       * sapere genere e numero di una parola che hai scelto tu, e non si può.
-       */
-      steps: [...scene.steps, { notify: `La scena «${scene.name}» è partita` }],
-    });
+    /*
+     * Nasce senza parole.
+     *
+     * Una frase scritta da noi — «la scena «X» è partita» — è una frase
+     * nostra messa in bocca a qualcun altro: la meta' delle volte non è
+     * quello che voleva dire, e cancellarla prima di scrivere la sua è
+     * lavoro in più. Il campo vuoto con scritto cosa farci è più onesto.
+     */
+    void devices.patchScene(scene, { steps: [...scene.steps, { notify: '' }] });
   }
 
   /** Le altre scene che si possono chiamare da qui. */
@@ -278,6 +279,7 @@
                 value={step.notify}
                 size="sm"
                 label="Cosa dice l'avviso"
+                placeholder="Cosa vuoi che dica"
                 onchange={(testo: string) => setNotify(at, testo)}
               />
             {:else}

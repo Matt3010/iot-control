@@ -24,6 +24,27 @@ I due punti restano leciti solo dove introducono davvero un elenco («Ci
 entrano e ci lavorano come te: luoghi, categorie, gruppi») o una cosa
 riportata parola per parola.
 
+**Mai far accordare una frase con un nome scelto da chi legge.** Di una
+parola scritta da qualcun altro non si sa né il genere né se è una o tante:
+«Casa si è collegato» ha il genere sbagliato, «collegata» ce l'ha per metà
+degli altri nomi, e ««Luci accese» è partita» sbaglia anche il numero. O il
+verbo resta invariabile, o davanti al nome c'è un sostantivo nostro che regge
+la frase.
+
+```
+NO   {nome} si è collegato          «{nome}» è partita
+SÌ   {nome} si collega              La scena «{nome}» è partita
+```
+
+Vale anche per i numeri: «1 dispositivi su 2» fa sembrare scritto male tutto
+il resto, e quando non ha risposto nessuno la scena non è «partita a metà».
+
+**Mai mettere parole in bocca a chi usa l'app.** Un campo dove si scrive un
+testo nasce vuoto, con scritto cosa farci: una frase pensata da noi — «la
+scena «{nome}» è partita» — la metà delle volte non è quello che voleva
+dire, e cancellarla prima di scrivere la sua è lavoro in più. Un segnaposto
+non finisce mai salvato; un valore proposto sì.
+
 Il resto dello stile, che vale quanto la regola qui sopra:
 
 - **Italiano, sempre.** Le parole che si leggono, i commenti, i messaggi di
@@ -32,6 +53,11 @@ Il resto dello stile, che vale quanto la regola qui sopra:
   dopo due ore» e non «è tornato», che non dice tornato dove.
 - **Quando qualcosa non funziona si dice quale pezzo manca**, non «errore».
   Una riga in più qui vale un supporto tecnico in meno.
+
+Le prime due regole hanno un controllo automatico, `npm run frasi`, che passa
+su tutte le frasi del progetto e si ferma se trova due punti in mezzo a una
+frase o un verbo che si appoggia a un nome. Si lancia prima di dire che una
+cosa è fatta.
 
 ## Le parole del prodotto
 
@@ -61,5 +87,6 @@ sposterebbe su di lui il compito di capirlo.
 ## Prima di dire che è fatto
 
 Il lavoro si vede girare. `npx svelte-check`, `npx tsc -p server/tsconfig.json
---noEmit` e `npm run build:web` passano, e quello che si vede si guarda per
-davvero — con Playwright, o chiedendolo a chi sta davanti allo schermo.
+--noEmit`, `npm run build:web` e `npm run frasi` passano, e quello che si vede
+si guarda per davvero — con Playwright, o chiedendolo a chi sta davanti allo
+schermo.

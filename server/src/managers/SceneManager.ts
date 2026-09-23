@@ -328,7 +328,7 @@ export class SceneManager {
        * dispositivo da controllare, e due avvisi nello stesso momento sono
        * legittimi — sono due frasi, non due ordini contrari.
        */
-      if (step.notify) {
+      if (step.notify !== undefined) {
         if (after > 0) momento += 1;
         return { notify: step.notify, ...(after ? { after } : {}) };
       }

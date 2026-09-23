@@ -48,7 +48,11 @@
    */
   /** Le righe come le vuole la linea del tempo: chi, cosa, come sta, e l'attesa. */
   const rails = $derived(
-    scene.steps.map((step, at) => {
+    scene.steps
+      // una riga che deve ancora dire qualcosa non si mostra: quando parte
+      // non avvisa nessuno, e qui sembrerebbe una riga vuota
+      .filter((step) => step.notify === undefined || step.notify !== '')
+      .map((step, at) => {
       const says = devices.saysOf(step);
       const sta =
         step.notify || step.scene

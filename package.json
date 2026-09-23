@@ -13,7 +13,8 @@
     "typecheck": "npm run typecheck:web && npm run typecheck:api",
     "start": "node server/dist/index.js",
     "typecheck:web": "tsc -p tsconfig.json --noEmit",
-    "typecheck:api": "tsc -p server/tsconfig.json --noEmit"
+    "typecheck:api": "tsc -p server/tsconfig.json --noEmit",
+    "frasi": "node scripts/controlla-frasi.mjs"
   },
   "dependencies": {
     "class-transformer": "^0.5.1",
