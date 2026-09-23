@@ -119,7 +119,7 @@
 <PageShell
   title="Avvisi"
   layout="rows"
-  lead="Le cose che vuoi sapere senza aprire l'app. Arrivano sul telefono, e li spegni da qui quando non li vuoi più."
+  lead="Le cose che vuoi sapere senza aprire l'app. Arrivano sulle macchine dove li hai accesi, e si spengono da qui."
 >
   <PageCard>
     <PushSwitch />

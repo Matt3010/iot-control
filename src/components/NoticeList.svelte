@@ -49,12 +49,19 @@
     return `${then.toLocaleDateString('it', { day: 'numeric', month: 'short' })}, ${ore}`;
   }
 
-  /** Com'è andata la consegna, in due parole. */
+  /**
+   * Com'è andata la consegna, in due parole.
+   *
+   * «Macchine» e non «telefoni»: un'iscrizione è un browser su una macchina, e
+   * fra le tre che ricevono qui dentro ce n'è una che è un Mac. È anche la
+   * parola che usa la levetta — «mandameli su questa macchina» — e due nomi
+   * per la stessa cosa fanno chiedere se siano due cose.
+   */
   function delivery(row: Notice): { what: string; bad: boolean } {
     if (row.failed && !row.sent) return { what: 'respinto', bad: true };
     if (row.failed) return { what: `${row.sent} sì, ${row.failed} no`, bad: true };
-    if (!row.sent) return { what: 'nessun telefono', bad: false };
-    return { what: row.sent === 1 ? 'consegnato' : `${row.sent} telefoni`, bad: false };
+    if (!row.sent) return { what: 'nessuna macchina', bad: false };
+    return { what: row.sent === 1 ? 'consegnato' : `${row.sent} macchine`, bad: false };
   }
 </script>
 
