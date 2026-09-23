@@ -1,6 +1,6 @@
 import type { Health, LinkedAccount, PairingStep } from '../../shared/protocol.js';
-import { WebSocket } from 'ws';
-import type { ConnectorConfig } from './config.js';
+import fs from 'node:fs';
+import { stateFile, type ConnectorConfig } from './config.js';
 import { EXTRAS, install, installed } from './extras.js';
 import { forget, sourceOf } from './go2rtc.js';
 import { frameFrom } from './homeassistant.js';
@@ -445,67 +445,60 @@ export async function startPairing(config: ConnectorConfig, handler: string): Pr
     method: 'POST',
     body: JSON.stringify({ handler, show_advanced_options: false }),
   });
+  if (flow.flow_id && flow.type === 'form') ricorda(config, flow.flow_id, handler);
   return pictured(config, flow, translate(flow));
 }
 
 /**
- * Le conversazioni rimaste aperte, chieste dal filo e non dall'indirizzo.
+ * Le conversazioni che abbiamo aperto noi e che non si sono chiuse.
  *
- * Su HTTP l'elenco non c'e' — quell'indirizzo accetta solo POST, e a una GET
- * risponde 405 — e infatti il primo tentativo di chiuderle falliva in
- * silenzio. L'elenco si chiede dal filo aperto, che e' l'unico posto dove
- * esiste: ci si collega, si dice chi siamo, si chiede e si chiude.
+ * Una lasciata a meta' resta aperta di la' con dentro il nome dell'account, e
+ * al tentativo dopo ci si sente rispondere che ce n'e' gia' una in corso —
+ * per sempre, finche' non si riavvia tutto. Quindi si chiude prima di
+ * cominciarne un'altra.
+ *
+ * Si tiene l'elenco da soli perche' non c'e' altro modo: l'indirizzo HTTP che
+ * le elencherebbe accetta solo POST, e il filo aperto elenca solo quelle che
+ * nascono da sole, non quelle che apre qualcuno. Sta anche su un file, se no
+ * un aggiornamento del connettore nel mezzo di un collegamento lascerebbe
+ * quella conversazione aperta per sempre.
  */
-function openFlows(config: ConnectorConfig): Promise<{ flow_id?: string; handler?: string }[]> {
-  const where = `${config.haUrl.replace(/^http/, 'ws')}/api/websocket`;
+const APERTE = new Map<string, string>();
 
-  return new Promise((done) => {
-    const socket = new WebSocket(where);
-    // Se di la' non risponde non si resta appesi: quello che si voleva fare
-    // era una pulizia, non il lavoro.
-    const timer = setTimeout(() => (socket.close(), done([])), 5_000);
-
-    const finish = (list: { flow_id?: string; handler?: string }[]): void => {
-      clearTimeout(timer);
-      socket.close();
-      done(list);
-    };
-
-    socket.on('message', (raw) => {
-      let message: { type?: string; result?: unknown };
-      try {
-        message = JSON.parse(raw.toString()) as { type?: string; result?: unknown };
-      } catch {
-        return;
-      }
-
-      if (message.type === 'auth_required') {
-        socket.send(JSON.stringify({ type: 'auth', access_token: config.haToken }));
-        return;
-      }
-      if (message.type === 'auth_ok') {
-        socket.send(JSON.stringify({ id: 1, type: 'config_entries/flow/progress' }));
-        return;
-      }
-      if (message.type === 'result') {
-        finish(Array.isArray(message.result) ? (message.result as { flow_id?: string }[]) : []);
-      }
-      if (message.type === 'auth_invalid') finish([]);
-    });
-
-    socket.on('error', () => finish([]));
-    socket.on('close', () => (clearTimeout(timer), done([])));
-  });
+function ricorda(config: ConnectorConfig, flowId: string, handler: string): void {
+  APERTE.set(flowId, handler);
+  salva(config);
 }
 
-/** Chiude le conversazioni rimaste aperte per quel servizio. */
+function scorda(config: ConnectorConfig, flowId: string): void {
+  if (APERTE.delete(flowId)) salva(config);
+}
+
+function salva(config: ConnectorConfig): void {
+  try {
+    fs.writeFileSync(stateFile(config, 'aperte.json'), JSON.stringify([...APERTE]), 'utf8');
+  } catch {
+    // Se non si riesce a scrivere si va avanti lo stesso: e' un promemoria,
+    // non un dato.
+  }
+}
+
+function rileggi(config: ConnectorConfig): void {
+  if (APERTE.size) return;
+  try {
+    const righe = JSON.parse(fs.readFileSync(stateFile(config, 'aperte.json'), 'utf8')) as [string, string][];
+    for (const [flowId, handler] of righe) APERTE.set(flowId, handler);
+  } catch {
+    // niente file, niente da ricordare
+  }
+}
+
+/** Chiude quelle rimaste aperte per quel servizio. */
 async function forgetOpen(config: ConnectorConfig, handler: string): Promise<void> {
-  const open = await openFlows(config);
-  await Promise.all(
-    open
-      .filter((one) => one.handler === handler && one.flow_id)
-      .map((one) => cancelPairing(config, one.flow_id as string)),
-  );
+  rileggi(config);
+  const sue = [...APERTE].filter(([, chi]) => chi === handler).map(([flowId]) => flowId);
+  await Promise.all(sue.map((flowId) => cancelPairing(config, flowId)));
+  for (const flowId of sue) scorda(config, flowId);
 }
 
 export async function submitPairing(
@@ -517,6 +510,10 @@ export async function submitPairing(
   const body = JSON.stringify(withDefaults(schema, input));
   const flow = await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body });
   const step = translate(flow, { flowId, schema });
+
+  // Finita o andata storta, quella conversazione non e' piu' aperta: non c'e'
+  // niente da chiudere la prossima volta.
+  if (step.kind === 'done' || step.kind === 'failed') scorda(config, flowId);
 
   // Se si e' lamentato, nel registro finisce anche di cosa era fatto il
   // passo: un rifiuto su un campo che non si vede si capisce solo vedendo
@@ -625,6 +622,7 @@ export async function unlink(config: ConnectorConfig, entryId: string): Promise<
 /** Lasciare a metà una conversazione la lascia aperta in HA: meglio chiuderla. */
 export async function cancelPairing(config: ConnectorConfig, flowId: string): Promise<void> {
   SCHEMAS.delete(flowId);
+  APERTE.delete(flowId);
   await fetch(`${config.haUrl}${FLOWS}/${flowId}`, {
     method: 'DELETE',
     headers: { authorization: `Bearer ${config.haToken}` },
