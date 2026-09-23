@@ -5,6 +5,7 @@ import { store } from '../persistence/db.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { AlertRepository } from '../repositories/AlertRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
+import { check } from './check.js';
 import { logManager } from './LogManager.js';
 import { says } from './says.js';
 import type { Device } from '../types.js';
@@ -146,11 +147,9 @@ export class DeviceManager {
     const device = await this.find(ownerId, id);
     const capability = device.capabilities.find((entry) => entry.code === code);
     if (!capability) throw badRequest('questo dispositivo non sa fare questa cosa');
-    if (capability.kind === 'sensor') throw badRequest('un sensore si legge, non si comanda');
-    if (capability.kind === 'image') throw badRequest('una telecamera si guarda, non si comanda');
-
-    const kind = typeof value;
-    if (kind !== 'string' && kind !== 'number' && kind !== 'boolean') throw badRequest('valore non valido');
+    // lo stesso controllo che passano le righe di una scena: un comando che
+    // arriva da solo non è meno comando di uno che arriva in fila
+    check(capability, value);
 
     /*
      * Nel registro ci va comunque, riuscito o no. Anzi: quello che non è

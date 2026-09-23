@@ -1,4 +1,5 @@
 import webpush from 'web-push';
+import { badRequest } from '../errors/HttpError.js';
 import { store } from '../persistence/db.js';
 import { PushRepository } from '../repositories/PushRepository.js';
 import { pushKeys, subject } from '../push/keys.js';
@@ -32,11 +33,23 @@ export class PushManager {
     return (await pushKeys()).publicKey;
   }
 
-  subscribe(userId: string, sub: Omit<PushSub, 'id' | 'userId' | 'createdAt'>): Promise<PushSub> {
-    return store.transaction((tx) => new PushRepository(tx).save(userId, sub));
+  async subscribe(userId: string, sub: Omit<PushSub, 'id' | 'userId' | 'createdAt'>): Promise<PushSub> {
+    const fatto = await store.transaction((tx) => new PushRepository(tx).save(userId, sub));
+    // quell'indirizzo è già di un altro telefono, e non è tuo
+    if (!fatto) throw badRequest('questa iscrizione non è tua');
+    return fatto;
   }
 
-  forget(endpoint: string): Promise<boolean> {
+  /** Il proprio, e solo il proprio. */
+  forget(userId: string, endpoint: string): Promise<boolean> {
+    return store.transaction((tx) => new PushRepository(tx).delete(endpoint, userId));
+  }
+
+  /**
+   * E quello che il servizio di consegna dichiara morto, di chiunque sia:
+   * non lo sta spegnendo una persona, lo sta dicendo il postino.
+   */
+  #drop(endpoint: string): Promise<boolean> {
     return store.transaction((tx) => new PushRepository(tx).delete(endpoint));
   }
 
@@ -107,7 +120,7 @@ export class PushManager {
   async #maybeDead(sub: PushSub, error: unknown): Promise<void> {
     const status = (error as { statusCode?: number }).statusCode;
     if (status === 404 || status === 410) {
-      await this.forget(sub.endpoint);
+      await this.#drop(sub.endpoint);
       return;
     }
     console.warn(`avviso non consegnato (${status ?? '?'}): ${(error as Error).message}`);

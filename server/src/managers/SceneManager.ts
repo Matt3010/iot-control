@@ -5,39 +5,11 @@ import { hub } from '../iot/hub.js';
 import { noticeManager } from './NoticeManager.js';
 import type { Transaction } from '../persistence/db.js';
 import { store } from '../persistence/db.js';
+import { check } from './check.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { logManager } from './LogManager.js';
 import type { Device, Scene, SceneStep } from '../types.js';
-
-/**
- * Un valore va bene per quella capacità? Non è pignoleria: una scena si
- * scrive una volta e si preme per mesi, e un valore storto dentro si scopre
- * la sera che serviva.
- */
-function check(capability: Capability, value: DeviceValue): void {
-  if (capability.kind === 'sensor') throw badRequest('un sensore si legge, non si comanda');
-  if (capability.kind === 'image') throw badRequest('una telecamera si guarda, non si comanda');
-
-  if (capability.kind === 'switch') {
-    if (typeof value !== 'boolean') throw badRequest(`«${capability.label}» si accende o si spegne`);
-    return;
-  }
-
-  if (capability.kind === 'enum') {
-    if (typeof value !== 'string' || !capability.values.includes(value)) {
-      throw badRequest(`«${capability.label}» non sa fare «${String(value)}»`);
-    }
-    return;
-  }
-
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    throw badRequest(`«${capability.label}» vuole un numero`);
-  }
-  if (value < capability.min || value > capability.max) {
-    throw badRequest(`«${capability.label}» sta fra ${capability.min} e ${capability.max}`);
-  }
-}
 
 /**
  * Se partendo da una scena si arriva a un'altra, anche passando per altre.

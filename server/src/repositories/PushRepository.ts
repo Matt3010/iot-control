@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { iso, type Transaction } from '../persistence/db.js';
 import { pushes } from '../persistence/schema.js';
 import type { PushSub } from '../types.js';
@@ -47,7 +47,16 @@ export class PushRepository {
     return rows.map(toSub);
   }
 
-  async save(userId: string, sub: Omit<PushSub, 'id' | 'userId' | 'createdAt'>): Promise<PushSub> {
+  /**
+   * Lo stesso telefono che si riscrive aggiorna la sua riga. Quello di un
+   * altro no: l'indirizzo di consegna è la chiave di un telefono vero, e
+   * riscriverlo a nome proprio vorrebbe dire far suonare i propri avvisi
+   * sullo schermo di qualcun altro. Torna vuoto, e chi chiama lo dice.
+   */
+  async save(
+    userId: string,
+    sub: Omit<PushSub, 'id' | 'userId' | 'createdAt'>,
+  ): Promise<PushSub | undefined> {
     const [row] = await this.tx.db
       .insert(pushes)
       .values({
@@ -60,10 +69,11 @@ export class PushRepository {
       })
       .onConflictDoUpdate({
         target: pushes.endpoint,
-        set: { userId, p256dh: sub.p256dh, auth: sub.auth, agent: sub.agent },
+        set: { p256dh: sub.p256dh, auth: sub.auth, agent: sub.agent },
+        setWhere: eq(pushes.userId, userId),
       })
       .returning();
-    return toSub(row as Row);
+    return row ? toSub(row) : undefined;
   }
 
   async touch(endpoint: string): Promise<void> {
@@ -75,10 +85,10 @@ export class PushRepository {
    * quando il servizio risponde che quell'indirizzo non esiste più: un
    * telefono che ha disinstallato l'app non si cancella da solo.
    */
-  async delete(endpoint: string): Promise<boolean> {
+  async delete(endpoint: string, userId?: string): Promise<boolean> {
     const rows = await this.tx.db
       .delete(pushes)
-      .where(eq(pushes.endpoint, endpoint))
+      .where(userId ? and(eq(pushes.endpoint, endpoint), eq(pushes.userId, userId)) : eq(pushes.endpoint, endpoint))
       .returning({ id: pushes.id });
     return rows.length > 0;
   }

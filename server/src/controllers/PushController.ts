@@ -49,7 +49,7 @@ export class PushController {
 
   unsubscribe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await pushManager.forget(dtoOf<UnsubscribeDto>(req).endpoint);
+      await pushManager.forget(whoIs(req).id, dtoOf<UnsubscribeDto>(req).endpoint);
       res.status(204).end();
     } catch (error) {
       next(error);
