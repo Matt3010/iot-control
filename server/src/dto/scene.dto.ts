@@ -50,6 +50,12 @@ export class TimingDto {
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: "l'ora va scritta come 07:30" })
   at!: string;
 
+  /** Un giorno solo, e poi basta. Con questo i giorni della settimana tacciono. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'la data va scritta come 2026-09-25' })
+  on?: string;
+
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(7)

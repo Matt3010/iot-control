@@ -176,6 +176,15 @@ export interface SceneStep {
 export interface Timing {
   /** L'ora del giorno, come la si legge su un orologio: `07:30`. */
   at: string;
+  /**
+   * Un giorno solo, e poi basta: `2026-09-25`.
+   *
+   * Quando c'e' questo i giorni della settimana non contano: e' una cosa che
+   * si fa una volta — la sera che parti, il giorno che arriva qualcuno — e
+   * dopo l'orario si toglie da solo, perche' un appuntamento passato non e'
+   * un appuntamento.
+   */
+  on?: string;
   /** I giorni in cui vale, da domenica (0) a sabato (6). Vuoto vuol dire tutti. */
   days: number[];
   /** Dove sono quelle lancette: `Europe/Rome`. */

@@ -1,12 +1,13 @@
 <script lang="ts">
   import { devices, type Device, type Scene, type SceneStep, type Timing } from '../lib/devices.svelte';
-  import { defaultWhen, GIORNI } from '../lib/timing';
+  import { defaultWhen, GIORNI, today } from '../lib/timing';
   import type { Capability } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Chip from './Chip.svelte';
   import Icon from './Icon.svelte';
   import SceneControls from './SceneControls.svelte';
+  import DateField from './DateField.svelte';
   import Switch from './Switch.svelte';
   import TimeField from './TimeField.svelte';
 
@@ -188,31 +189,59 @@
         checked={!!scene.when && !scene.when.off}
         label="Parte da sola"
         note={scene.when
-          ? 'Se l’ora è quella, parte anche se non sei in casa.'
+          ? scene.when.on
+            ? 'Parte una volta sola, e poi l’orario se ne va.'
+            : 'Se l’ora è quella, parte anche se non sei in casa.'
           : 'Adesso parte solo quando la premi.'}
         onchange={(acceso: boolean) =>
           setWhen(acceso ? (scene.when ? { ...scene.when, off: false } : defaultWhen()) : scene.when ? { ...scene.when, off: true } : null)}
       />
 
       {#if scene.when}
+        <!-- Ogni settimana o una volta sola sono due cose diverse, non due
+             sfumature della stessa: o si ripete o no, e quello che si sceglie
+             sotto cambia di conseguenza. -->
+        <div class="modo">
+          <Chip
+            label="Ogni settimana"
+            size="sm"
+            look={scene.when.on ? 'off' : 'sel'}
+            onclick={() => setWhen({ ...scene.when!, on: undefined })}
+          />
+          <Chip
+            label="Una volta"
+            size="sm"
+            look={scene.when.on ? 'sel' : 'off'}
+            onclick={() => setWhen({ ...scene.when!, on: scene.when!.on ?? today() })}
+          />
+        </div>
+
         <div class="orario">
           <TimeField
             value={scene.when.at}
             label="A che ora parte"
             onchange={(at: string) => setWhen({ ...scene.when!, at })}
           />
-          <!-- nessun giorno acceso vuol dire tutti: un elenco vuoto si legge
-               male, e «ogni giorno» e' quello che si intende -->
-          <div class="giorni">
-            {#each GIORNI as label, day (day)}
-              <Chip
-                label={label}
-                size="sm"
-                look={!scene.when.days.length || scene.when.days.includes(day) ? 'on' : 'off'}
-                onclick={() => flipDay(day)}
-              />
-            {/each}
-          </div>
+          {#if scene.when.on}
+            <DateField
+              value={scene.when.on}
+              label="In che giorno parte"
+              onchange={(on: string) => setWhen({ ...scene.when!, on })}
+            />
+          {:else}
+            <!-- nessun giorno acceso vuol dire tutti: un elenco vuoto si legge
+                 male, e «ogni giorno» e' quello che si intende -->
+            <div class="giorni">
+              {#each GIORNI as label, day (day)}
+                <Chip
+                  label={label}
+                  size="sm"
+                  look={!scene.when.days.length || scene.when.days.includes(day) ? 'on' : 'off'}
+                  onclick={() => flipDay(day)}
+                />
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -323,6 +352,8 @@
     padding-bottom: 8px;
     border-bottom: 1px solid var(--hairline-soft);
   }
+
+  .modo { display: flex; gap: 6px; }
 
   .orario { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 

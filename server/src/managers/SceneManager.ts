@@ -70,6 +70,7 @@ export class SceneManager {
               at: dto.when.at,
               days: dto.when.days ?? [],
               tz: dto.when.tz || 'Europe/Rome',
+              ...(dto.when.on ? { on: dto.when.on } : {}),
               ...(dto.when.off ? { off: true } : {}),
             }
           : undefined;

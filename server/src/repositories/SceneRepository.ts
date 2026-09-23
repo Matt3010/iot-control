@@ -51,6 +51,15 @@ export class SceneRepository {
     return true;
   }
 
+  /** Toglie l'orario a una scena: un appuntamento passato non e' un appuntamento. */
+  forgetWhen(id: string): void {
+    const scene = this.findById(id);
+    if (!scene?.when) return;
+
+    delete scene.when;
+    this.tx.markDirty();
+  }
+
   delete(id: string): boolean {
     const at = this.tx.data.scenes.findIndex((scene) => scene.id === id);
     if (at < 0) return false;

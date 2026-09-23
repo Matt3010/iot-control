@@ -44,10 +44,11 @@ function localNow(tz: string): { minute: string; day: number; clock: string } {
   };
 }
 
-/** Se è il suo momento, adesso. */
-function due(scene: Scene): { yes: boolean; minute: string } {
+/** Se è il suo momento, adesso. E se quel momento è già passato per sempre. */
+function due(scene: Scene): { yes: boolean; minute: string; over: boolean } {
   const when = scene.when;
-  if (!when || when.off || !scene.steps.length) return { yes: false, minute: '' };
+  const niente = { yes: false, minute: '', over: false };
+  if (!when || when.off || !scene.steps.length) return niente;
 
   let now: ReturnType<typeof localNow>;
   try {
@@ -55,11 +56,22 @@ function due(scene: Scene): { yes: boolean; minute: string } {
   } catch {
     // Un fuso che non esiste — scritto a mano, o sparito da una versione di
     // node all'altra — non deve fermare l'orologio di tutti gli altri.
-    return { yes: false, minute: '' };
+    return niente;
+  }
+
+  /*
+   * Una volta sola: conta la data, non il giorno della settimana. E se quel
+   * giorno e' passato — la macchina era spenta, o l'ora non e' mai arrivata
+   * — l'orario si toglie invece di restare li' a indicare l'anno scorso.
+   */
+  if (when.on) {
+    const oggi = now.minute.slice(0, 10);
+    if (when.on < oggi) return { ...niente, over: true };
+    return { yes: when.on === oggi && now.clock === when.at, minute: now.minute, over: false };
   }
 
   const oggi = !when.days.length || when.days.includes(now.day);
-  return { yes: oggi && now.clock === when.at, minute: now.minute };
+  return { yes: oggi && now.clock === when.at, minute: now.minute, over: false };
 }
 
 /** Un giro solo. Esportato perché si possa provare senza aspettare un minuto. */
@@ -67,7 +79,12 @@ export async function tick(): Promise<void> {
   const scenes = await store.transaction((tx) => tx.data.scenes.slice());
 
   for (const scene of scenes) {
-    const { yes, minute } = due(scene);
+    const { yes, minute, over } = due(scene);
+
+    if (over) {
+      await store.transaction((tx) => new SceneRepository(tx).forgetWhen(scene.id));
+      continue;
+    }
     if (!yes) continue;
 
     /*
@@ -77,6 +94,10 @@ export async function tick(): Promise<void> {
      */
     const mio = await store.transaction((tx) => new SceneRepository(tx).claim(scene.id, minute));
     if (!mio) continue;
+
+    // Una volta sola vuol dire una volta sola: l'orario se ne va appena
+    // servito, anche se la scena e' partita a meta'.
+    if (scene.when?.on) await store.transaction((tx) => new SceneRepository(tx).forgetWhen(scene.id));
 
     await sceneManager
       .run(scene.ownerId, scene.id)

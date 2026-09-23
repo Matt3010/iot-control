@@ -60,6 +60,8 @@ export interface SceneStep {
  */
 export interface Timing {
   at: string;
+  /** Un giorno solo, e poi basta: `2026-09-25`. Con questo i giorni tacciono. */
+  on?: string;
   /** Da domenica (0) a sabato (6). Vuoto vuol dire tutti i giorni. */
   days: number[];
   tz: string;
