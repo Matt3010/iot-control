@@ -10,7 +10,7 @@ import type {
 } from '../../shared/protocol.js';
 import { ConfigError, loadConfig } from './config.js';
 import { toServiceCall, translate } from './entities.js';
-import { forgetDoors, lastSeen, noticed, reachable, watchEyes } from './eyes.js';
+import { forgetDoors, lastSeen, look as guardala, noticed, watchEyes } from './eyes.js';
 import { channelOf } from './go2rtc.js';
 import { HomeAssistant } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
@@ -47,12 +47,28 @@ async function main(): Promise<void> {
    */
   let real = new Map<string, { deviceId: string; deviceName: string }>();
 
+  /**
+   * Un dispositivo come esce di qui.
+   *
+   * Nella mappa `devices` resta quello che dice Home Assistant, sempre e
+   * solo quello. Il sapere in più sulle telecamere si applica qui, in
+   * uscita, e non si scrive mai dentro: scrivercelo voleva dire perdere la
+   * verità di HA, e da lì in poi ogni conto successivo si moltiplicava per
+   * un falso rimasto appiccicato. Una telecamera tornata a funzionare
+   * restava rossa finché HA non si ricordava di mandare un aggiornamento
+   * suo, che può voler dire fra un minuto o domani.
+   */
+  const fuori = (device: DeviceSnapshot): DeviceSnapshot => ({
+    ...device,
+    online: vero(device.externalId, device.online),
+  });
+
   const hello = (): HelloMessage => ({
     type: 'hello',
     protocol: PROTOCOL,
     name: config.name,
     version: VERSION,
-    devices: [...devices.values()],
+    devices: [...devices.values()].map(fuori),
   });
 
   const link = new Link(config, hello, (message) => void listen(message));
@@ -64,7 +80,7 @@ async function main(): Promise<void> {
     if (pending) return;
     pending = setTimeout(() => {
       pending = null;
-      link.send({ type: 'devices', devices: [...devices.values()] });
+      link.send({ type: 'devices', devices: [...devices.values()].map(fuori) });
     }, COALESCE_MS);
     pending.unref?.();
   };
@@ -172,28 +188,24 @@ async function main(): Promise<void> {
   const visto = (externalId: string, ok: boolean): void => {
     if (!noticed(externalId, ok)) return;
     const device = devices.get(externalId);
-    if (!device) return;
+    if (device) dillo(device);
+  };
 
-    const adesso = { ...device, online: vero(externalId, ok || device.online) };
-    devices.set(externalId, adesso);
+  /** Lo stato di adesso, detto a chi guarda. */
+  const dillo = (device: DeviceSnapshot): void => {
+    const detto = fuori(device);
     link.send({
       type: 'state',
-      externalId,
-      online: adesso.online,
-      state: adesso.state,
+      externalId: detto.externalId,
+      online: detto.online,
+      state: detto.state,
       at: new Date().toISOString(),
     });
   };
 
-  /** Un giro di bussate su tutte, e l'inventario si allinea. */
+  /** Un giro su tutte le telecamere, prima di raccontare l'inventario. */
   const bussa = async (): Promise<void> => {
-    for (const externalId of occhi()) {
-      const device = devices.get(externalId);
-      if (!device) continue;
-      const risponde = await reachable(externalId);
-      if (risponde === undefined) continue;
-      devices.set(externalId, { ...device, online: device.online && risponde });
-    }
+    for (const externalId of occhi()) await guardala(externalId);
   };
 
   const ha = new HomeAssistant(
@@ -207,18 +219,17 @@ async function main(): Promise<void> {
       const known = devices.get(fresh.externalId);
       // il nome accorciato non si perde a ogni cambio di stato: quello buono
       // lo ha deciso l'ultimo giro d'inventario, questo porta solo i valori
-      const device = {
-        ...fresh,
-        name: known?.name ?? fresh.name,
-        online: vero(fresh.externalId, fresh.online),
-      };
+      const device = { ...fresh, name: known?.name ?? fresh.name };
       devices.set(device.externalId, device);
 
       // Se cambia solo quanto è accesa una luce non serve rimandare l'inventario:
       // basta dire il valore nuovo. È la via stretta, quella di tutto il giorno.
       const shape = !known || known.name !== device.name || JSON.stringify(known.capabilities) !== JSON.stringify(device.capabilities);
       if (shape) announceAll();
-      else link.send({ type: 'state', externalId: device.externalId, online: device.online, state: device.state, at: new Date().toISOString() });
+      else {
+        const detto = fuori(device);
+        link.send({ type: 'state', externalId: detto.externalId, online: detto.online, state: detto.state, at: new Date().toISOString() });
+      }
     },
     () => {
       // L'anagrafe è cambiata: qualcuno ha aggiunto Tuya, o staccato una presa.
@@ -377,17 +388,8 @@ async function main(): Promise<void> {
   watchEyes(occhi, (externalId, up) => {
     const device = devices.get(externalId);
     if (!device) return;
-
-    const adesso = { ...device, online: up && device.online };
-    devices.set(externalId, adesso);
-    console.log(`${externalId}: ${up ? 'risponde di nuovo' : 'non risponde'}`);
-    link.send({
-      type: 'state',
-      externalId,
-      online: adesso.online,
-      state: adesso.state,
-      at: new Date().toISOString(),
-    });
+    console.log(`${externalId}: ${up ? "l'immagine arriva di nuovo" : 'non manda immagini'}`);
+    dillo(device);
   });
 
   process.on('SIGINT', shutdown);

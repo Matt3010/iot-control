@@ -1,5 +1,6 @@
 import net from 'node:net';
 import { sourceOf } from './go2rtc.js';
+import { frameFrom } from './homeassistant.js';
 
 /**
  * Se una telecamera c'è davvero.
@@ -9,22 +10,22 @@ import { sourceOf } from './go2rtc.js';
  * `unavailable` e noi lo ripetiamo. Per una telecamera generica no. Lui non
  * va a bussare — tiene l'entità ferma su `idle` e scopre che il video non
  * c'è solo quando qualcuno chiede un'immagine — quindi un registratore
- * staccato dalla rete restava verde per giorni, e l'avviso «dimmi se smette
- * di rispondere» non sarebbe scattato mai: da qui non aveva mai smesso.
+ * staccato restava verde per giorni, e l'avviso «dimmi se smette di
+ * rispondere» non sarebbe scattato mai: da qui non aveva mai smesso.
  *
- * Qui si bussa. Non si chiede un fotogramma, che vuol dire accendere un
- * ffmpeg per ognuna e aspettare un fotogramma chiave: si apre un
- * collegamento alla porta da cui esce il video e si guarda se qualcuno
- * risponde. È la stessa domanda che si fa a mano con un telnet, costa un
- * pacchetto, e distingue le due cose che contano — il registratore c'è, il
- * registratore non c'è.
+ * Qui si guarda davvero, in due modi che costano due prezzi diversi:
+ *
+ * - **si bussa** alla porta da cui esce il video, che costa un pacchetto. Se
+ *   non risponde nessuno la telecamera non c'è, e non serve altro.
+ * - **si chiede un fotogramma**, che costa un ffmpeg e l'attesa di un
+ *   fotogramma chiave. Serve perché bussare non basta: un registratore può
+ *   tenere la porta aperta e non mandare niente, e quello è il caso in cui
+ *   sullo schermo compare il nero. Si chiede solo a quelle che risultano
+ *   rotte, cioè quasi mai.
  */
 
-/** Quanto si aspetta una risposta. È in casa: o risponde subito o non c'è. */
+/** Quanto si aspetta una risposta alla porta. È in casa: o risponde subito o non c'è. */
 const KNOCK_MS = 3_000;
-
-/** Ogni quanto si ribussa. Un minuto: l'avviso può tardare un minuto. */
-const EVERY_MS = 60_000;
 
 /** Da dove esce il video di ognuna, per non richiederlo a ogni giro. */
 const doors = new Map<string, { host: string; port: number } | null>();
@@ -57,34 +58,28 @@ function knock(host: string, port: number): Promise<boolean> {
   });
 }
 
-/**
- * Se questa telecamera risponde adesso.
- *
- * Senza il suo indirizzo non si sa, e non sapere non è la stessa cosa che
- * sapere di no: in quel caso si lascia dire ad Home Assistant quello che
- * pensa lui, invece di spegnere una cosa che magari sta benissimo.
- */
-export async function reachable(entityId: string): Promise<boolean | undefined> {
+/** L'indirizzo da cui esce il video, chiesto una volta e tenuto da parte. */
+async function doorFor(entityId: string): Promise<{ host: string; port: number } | null> {
   if (!doors.has(entityId)) {
     const raw = await sourceOf(entityId);
     doors.set(entityId, raw ? doorOf(raw) : null);
   }
-
-  const door = doors.get(entityId);
-  if (!door) return undefined;
-
-  const risponde = await knock(door.host, door.port);
-  seen.set(entityId, risponde);
-  return risponde;
+  return doors.get(entityId) ?? null;
 }
 
-/** Quello che si sa adesso, senza bussare di nuovo. */
+/**
+ * Cosa ne sappiamo adesso.
+ *
+ * `undefined` vuol dire che non si sa — una telecamera di cui non si conosce
+ * l'indirizzo, o a cui non si è ancora bussato. Non sapere non è sapere di
+ * no: in quel caso si lascia dire a Home Assistant quello che pensa lui,
+ * invece di spegnere una cosa che magari sta benissimo.
+ */
 export const lastSeen = (entityId: string): boolean | undefined => seen.get(entityId);
 
 /**
- * Quando una richiesta di immagine fallisce lo sappiamo senza bussare: è la
- * prova più forte che ci sia, e arriva gratis. Al contrario, un fotogramma
- * arrivato dice che c'è.
+ * Un fotogramma appena chiesto da una persona: è la prova più forte che ci
+ * sia e arriva gratis. Torna vero se cambia quello che sapevamo.
  */
 export function noticed(entityId: string, ok: boolean): boolean {
   const prima = seen.get(entityId);
@@ -98,8 +93,43 @@ export function forgetDoors(): void {
 }
 
 /**
- * Il giro: bussa a tutte e dice a chi di dovere quali hanno cambiato idea.
- * Parte dopo il primo minuto e non subito — appena acceso si sta ancora
+ * Il controllo di una telecamera, e la regola fra i due modi di guardare.
+ *
+ * Si bussa sempre, perché costa niente. Se non risponde nessuno è rossa, e
+ * finisce lì. Se invece risponde ma l'ultima immagine non era arrivata, si
+ * chiede un fotogramma vero: è l'unico modo di sapere se è tornata davvero,
+ * e senza di lui una telecamera che tiene la porta aperta e non manda niente
+ * resterebbe verde per sempre — o, peggio, una che si è ripresa resterebbe
+ * rossa perché nessuno le chiede più niente.
+ */
+export async function look(entityId: string): Promise<boolean | undefined> {
+  const door = await doorFor(entityId);
+  if (!door) return undefined;
+
+  const risponde = await knock(door.host, door.port);
+  if (!risponde) {
+    seen.set(entityId, false);
+    return false;
+  }
+
+  // la porta è aperta e l'ultima volta l'immagine arrivava: non si disturba
+  // il registratore per chiedergli una cosa che sappiamo già
+  if (seen.get(entityId) === true) return true;
+
+  const raw = await sourceOf(entityId);
+  const jpeg = raw ? await frameFrom(raw, `prova-${entityId}`) : undefined;
+  const up = !!jpeg?.length;
+  seen.set(entityId, up);
+  return up;
+}
+
+/** Ogni quanto si guarda. Un minuto: l'avviso può tardare un minuto. */
+const EVERY_MS = 60_000;
+
+/**
+ * Il giro, e chi ha cambiato idea.
+ *
+ * Parte dopo il primo minuto e non subito: appena acceso si sta ancora
  * collegando tutto, e dire «non risponde» di qualcosa che sta rispondendo
  * adesso sarebbe la bugia peggiore.
  */
@@ -108,7 +138,7 @@ export function watchEyes(which: () => string[], changed: (entityId: string, up:
     void (async () => {
       for (const entityId of which()) {
         const prima = seen.get(entityId);
-        const adesso = await reachable(entityId);
+        const adesso = await look(entityId);
         if (adesso !== undefined && adesso !== prima) changed(entityId, adesso);
       }
     })().catch((error: Error) => console.warn(`giro delle telecamere: ${error.message}`));

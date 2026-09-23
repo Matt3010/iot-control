@@ -2,6 +2,7 @@ import type { Health, LinkedAccount, PairingStep } from '../../shared/protocol.j
 import fs from 'node:fs';
 import { stateFile, type ConnectorConfig } from './config.js';
 import { EXTRAS, install, installed } from './extras.js';
+import { lastSeen } from './eyes.js';
 import { channelOf, forget } from './go2rtc.js';
 import { frameFrom } from './homeassistant.js';
 
@@ -651,8 +652,23 @@ export async function titled(
       if (one.handler !== 'generic') return one;
 
       const eye = eyes.get(one.entryId);
-      const canale = eye ? await channelOf(eye) : undefined;
-      return canale ? { ...one, title: canale } : one;
+      if (!eye) return one;
+
+      const canale = await channelOf(eye);
+      /*
+       * E come sta, con lo stesso metro del pallino sul dispositivo.
+       *
+       * Qui sotto arrivava lo stato dell'integrazione: «caricata», che resta
+       * vera anche col registratore morto. Ma ognuna di queste righe è una
+       * telecamera — una per canale — e due pallini sulla stessa cosa che
+       * dicono il contrario tolgono valore a tutti e due.
+       */
+      const visto = lastSeen(eye);
+      return {
+        ...one,
+        ...(canale ? { title: canale } : {}),
+        ...(visto === undefined ? {} : { health: visto ? ('live' as Health) : ('lost' as Health) }),
+      };
     }),
   );
 }
