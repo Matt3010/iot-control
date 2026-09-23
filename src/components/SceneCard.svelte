@@ -64,35 +64,35 @@
     void devices.patchScene(scene, { steps: scene.steps.filter((_step, index) => index !== at) });
 </script>
 
-<SceneControls {scene} />
-
-<div class="feet">
-  <Button
-    look="link"
-    size="sm"
-    onclick={() => {
-      open = !open;
-      picking = null;
-    }}
-  >
-    {open ? 'Chiudi' : 'Cosa fa'}
-  </Button>
-  <Button
-    look="icon"
-    tone="danger"
-    extra="kill"
-    title="Elimina scena"
-    onclick={(event: MouseEvent) =>
-      ui.askSure(event.currentTarget as HTMLElement, {
-        title: `Eliminare “${scene.name}”?`,
-        detail: takesAway(),
-        verb: 'Elimina',
-        onYes: () => void devices.removeScene(scene),
-      })}
-  >
-    <Icon name="trash" />
-  </Button>
-</div>
+<SceneControls {scene}>
+  {#snippet trail()}
+    <Button
+      look="icon"
+      title={open ? 'Chiudi la modifica' : 'Modifica la scena'}
+      onclick={() => {
+        open = !open;
+        picking = null;
+      }}
+    >
+      <Icon name={open ? 'close' : 'edit'} />
+    </Button>
+    <Button
+      look="icon"
+      tone="danger"
+      extra="kill"
+      title="Elimina scena"
+      onclick={(event: MouseEvent) =>
+        ui.askSure(event.currentTarget as HTMLElement, {
+          title: `Eliminare “${scene.name}”?`,
+          detail: takesAway(),
+          verb: 'Elimina',
+          onYes: () => void devices.removeScene(scene),
+        })}
+    >
+      <Icon name="trash" />
+    </Button>
+  {/snippet}
+</SceneControls>
 
 {#if open}
   <div class="pick">
@@ -165,10 +165,6 @@
 <style>
 
   .lead { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-3); }
-
-  /* i comandi della scena stanno sotto quello che si preme tutti i giorni,
-     perche' scriverla e buttarla via sono cose che si fanno una volta */
-  .feet { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
   .pick {
     display: grid;

@@ -42,8 +42,8 @@
     <span class="eyebrow">Un'altra scena</span>
     <AddRow placeholder="Nome scena — es. Sera" title="Crea scena" bind:value={newName} onadd={create} />
     <p class="once">
-      Nasce vuota. Da «Cosa fa» le dici quali dispositivi muovere, e quella riga vale per tutti gli
-      agenti che hai.
+      Nasce vuota. Con la matita le dici quali dispositivi muovere, e una sola scena può toccarne
+      di agenti diversi.
     </p>
   </section>
 </PageShell>

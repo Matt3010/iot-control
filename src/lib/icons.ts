@@ -28,6 +28,7 @@ import {
   Tag,
   Trash2,
   Undo2,
+  Wand2,
   X,
 } from 'lucide';
 
@@ -57,6 +58,8 @@ export const ICONS = {
   alert: AlertCircle,
   eye: Eye,
   layers: Layers,
+  // le scene: una cosa premuta, tante che si muovono
+  scene: Wand2,
   tag: Tag,
   locate: LocateFixed,
   eyeOff: EyeOff,
