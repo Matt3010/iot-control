@@ -5,7 +5,12 @@ import { CategoryRepository } from '../repositories/CategoryRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import type { Category } from '../types.js';
 
-const DEFAULT_EMOJI = '📍';
+/**
+ * Il segno di una categoria appena nata: la chiave di un disegno, non
+ * un'emoji. Quelle di prima restano come sono — il campo è lo stesso, e chi
+ * lo legge sa riconoscere le due cose.
+ */
+const DEFAULT_EMOJI = 'pin';
 const DEFAULT_COLOR = '#2274a5';
 
 /** Business rules for categories; every method is one transaction. */

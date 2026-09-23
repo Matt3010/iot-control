@@ -7,6 +7,7 @@
   import { store } from '../lib/store.svelte';
   import type { LocalPlace } from '../lib/types';
   import Icon from './Icon.svelte';
+  import Mark from './Mark.svelte';
 
   let {
     rows,
@@ -56,7 +57,7 @@
             ui.openPlace(place);
           }}
         >
-          <span class="row-dot">{category?.emoji ?? '📍'}</span>
+          <span class="row-dot"><Mark value={category?.emoji} size={15} /></span>
           <span class="row-body">
             <span class="row-name">{place.name}</span>
             <span class="row-note">

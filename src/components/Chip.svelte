@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Mark from './Mark.svelte';
   type Look = 'on' | 'off' | 'sel';
 
   let {
@@ -34,7 +35,7 @@
   {onclick}
   {...rest}
 >
-  {#if emoji}<span class="emo">{emoji}</span>{/if}
+  {#if emoji}<span class="emo"><Mark value={emoji} size={14} /></span>{/if}
   <span class="name">{label}</span>
   {#if count !== undefined}<span class="count">{count}</span>{/if}
 </button>
@@ -69,7 +70,9 @@
    inventa la sua e poi divergono di un pixel per volta. */
 .chip.is-sm { height: 26px; padding: 0 10px 0 9px; font-size: 11.5px; }
 
-.chip .emo { font-family: var(--emoji); font-size: 13.5px; line-height: 1; }
+/* il segno dentro alla pillola: un disegno prende il colore del testo, e
+   un'emoji di quelle vecchie si porta ancora i suoi */
+.chip .emo { display: inline-grid; place-items: center; line-height: 1; }
 
 .chip .count {
   font-size: 11px;

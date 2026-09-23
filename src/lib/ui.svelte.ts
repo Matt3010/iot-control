@@ -4,9 +4,12 @@ import type { Draft } from './types';
 export type Sheet = 'none' | 'place' | 'manage';
 export type ManageTab = 'categories' | 'groups';
 
-export interface EmojiRequest {
+/** Si chiede quale segno dare a una categoria: un disegno, o quello che c'era. */
+export interface MarkRequest {
   anchor: HTMLElement;
-  onPick: (emoji: string) => void;
+  /** Quello che c'è adesso, per mostrarlo scelto. */
+  current?: string;
+  onPick: (mark: string) => void;
 }
 
 /**
@@ -66,7 +69,7 @@ class Ui {
   }
   picking = $state(false);
   paletteOpen = $state(false);
-  emoji = $state<EmojiRequest | null>(null);
+  mark = $state<MarkRequest | null>(null);
   color = $state<ColorRequest | null>(null);
   sure = $state<SureRequest | null>(null);
   /**
@@ -107,7 +110,7 @@ class Ui {
   }
 
   closeManage(): void {
-    this.emoji = null;
+    this.mark = null;
     this.color = null;
     this.sheet = this.#placePaused && this.draft ? 'place' : 'none';
     this.#placePaused = false;
@@ -124,19 +127,19 @@ class Ui {
     if (on) this.closePlace();
   }
 
-  askEmoji(anchor: HTMLElement, onPick: (emoji: string) => void): void {
+  askMark(anchor: HTMLElement, current: string | undefined, onPick: (mark: string) => void): void {
     this.color = null;
-    this.emoji = { anchor, onPick };
+    this.mark = { anchor, current, onPick };
   }
 
   askColor(anchor: HTMLElement, current: string, onPick: (color: string) => void): void {
-    this.emoji = null;
+    this.mark = null;
     this.color = { anchor, current, onPick };
   }
 
   /** Chiede conferma accanto al tasto che l'ha chiesta. */
   askSure(anchor: HTMLElement, question: Omit<SureRequest, 'anchor'>): void {
-    this.emoji = null;
+    this.mark = null;
     this.color = null;
     this.sure = { anchor, ...question };
   }
@@ -151,7 +154,7 @@ class Ui {
     if (this.sure) return (this.sure = null), true;
     if (this.paletteOpen) return (this.paletteOpen = false), true;
     if (this.color) return (this.color = null), true;
-    if (this.emoji) return (this.emoji = null), true;
+    if (this.mark) return (this.mark = null), true;
     if (this.picking) return (this.picking = false), true;
     if (this.sheet === 'place') return this.closePlace(), true;
     if (this.sheet === 'manage') return this.closeManage(), true;

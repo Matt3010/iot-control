@@ -29,4 +29,12 @@ export const COLORS = [
 /** The full row: what a new category is offered, one after the other. */
 export const SUGGESTED = COLORS.slice(20, 30);
 
-export const DEFAULT_EMOJI = '📍';
+/**
+ * Il segno di una categoria appena nata.
+ *
+ * È la chiave di un disegno, non più un'emoji: «pin» sta per il segnaposto,
+ * che è il modo più onesto di dire «un luogo» finché non scegli tu. Le
+ * categorie di prima hanno ancora la loro emoji nel campo, e restano come
+ * sono: il campo è lo stesso, e chi lo legge sa riconoscere le due cose.
+ */
+export const DEFAULT_MARK = 'pin';

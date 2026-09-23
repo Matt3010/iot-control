@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Indice personale di posti su mappa: marker per categoria con emoji",
+  "description": "Indice personale di posti su mappa: marker per categoria, con il suo segno e il suo colore",
   "scripts": {
     "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev:api\" \"vite\"",
     "dev:api": "tsx watch --tsconfig server/tsconfig.json server/src/index.ts",
@@ -39,8 +39,6 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/ws": "^8.18.1",
     "concurrently": "^9.1.2",
-    "emoji-picker-element": "^1.22.8",
-    "emoji-picker-element-data": "^1.8.0",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "lucide": "^1.47.0",

@@ -283,12 +283,22 @@
   {#if auth.account && !collapsed}
     <div class="panel-foot">
       <span class="whoami" title={auth.account.email}>@{auth.account.handle}</span>
+      <!-- Uscire è un clic solo e si rientra scrivendo la password: chiedere
+           prima costa mezzo secondo, e un tasto rosso accanto a un elenco che
+           si scorre col dito si preme per sbaglio. -->
       <Button
         look="link"
         tone="danger"
         extra="leave-btn"
         title={'Esci da ' + auth.account.email}
-        onclick={() => auth.leave()}
+        onclick={(event: MouseEvent) =>
+          ui.askSure(event.currentTarget as HTMLElement, {
+            title: `Uscire da @${auth.account?.handle ?? ''}?`,
+            detail: 'Le tue mappe restano dove sono: si rientra quando vuoi.',
+            verb: 'Esci',
+            no: 'Resto',
+            onYes: () => auth.leave(),
+          })}
       >
         Esci
       </Button>

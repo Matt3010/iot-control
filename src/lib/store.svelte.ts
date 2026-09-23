@@ -1,5 +1,5 @@
 import { api } from './api';
-import { DEFAULT_EMOJI, SUGGESTED } from './format';
+import { DEFAULT_MARK, SUGGESTED } from './format';
 import { forgetJSON, readJSON, writeJSON } from './storage';
 import { toast, UNDO_MS } from './toast.svelte';
 import type { Category, Draft, Group, LocalPlace, MapEditor, Place, PlaceMap, Snapshot } from './types';
@@ -405,7 +405,7 @@ class Store {
     // the server has never seen.
     const created = await api.post<Category>('/categories', {
       name,
-      emoji: emoji || DEFAULT_EMOJI,
+      emoji: emoji || DEFAULT_MARK,
       color: color || SUGGESTED[0]!,
     });
     return absorb(this.categories, created);

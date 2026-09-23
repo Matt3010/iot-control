@@ -1,6 +1,6 @@
 <script lang="ts">
   import { auth } from '../lib/auth.svelte';
-  import { DEFAULT_EMOJI, normalise, SUGGESTED } from '../lib/format';
+  import { DEFAULT_MARK, normalise, SUGGESTED } from '../lib/format';
   import { mapUrl, profileUrl } from '../lib/routing';
   import { fadeEdges } from '../lib/overflow';
   import { store } from '../lib/store.svelte';
@@ -12,6 +12,7 @@
   import AddRow from './AddRow.svelte';
   import Icon from './Icon.svelte';
   import LinkRow from './LinkRow.svelte';
+  import Mark from './Mark.svelte';
   import Row from './Row.svelte';
   import Switch from './Switch.svelte';
   import Tabs from './Tabs.svelte';
@@ -32,7 +33,7 @@
     return `Se ne ${luoghi === 1 ? 'va' : 'vanno'} con lei ${conta(luoghi)}. Categorie e gruppi restano.`;
   }
 
-  let newEmoji = $state(DEFAULT_EMOJI);
+  let newEmoji = $state(DEFAULT_MARK);
   let newColor = $state<string>(SUGGESTED[0]!);
   let newCategoryName = $state('');
   let newGroupName = $state('');
@@ -118,7 +119,7 @@
     try {
       const created = await store.createCategory(name, newEmoji, newColor);
       newCategoryName = '';
-      newEmoji = DEFAULT_EMOJI;
+      newEmoji = DEFAULT_MARK;
       // leave the next colour ready instead of offering the same one again
       newColor = SUGGESTED[(SUGGESTED.indexOf(newColor as never) + 1) % SUGGESTED.length]!;
       if (ui.draft) ui.draft.categoryId = created.id;
@@ -188,12 +189,14 @@
               {#snippet lead()}
                 <button
                   type="button"
-                  class="emoji-btn"
-                  title="Cambia emoji"
+                  class="mark-btn"
+                  title="Cambia il segno"
                   onclick={(event) =>
-                    ui.askEmoji(event.currentTarget, (emoji) => store.patchCategory(category, { emoji }))}
+                    ui.askMark(event.currentTarget, category.emoji, (mark) =>
+                      store.patchCategory(category, { emoji: mark }),
+                    )}
                 >
-                  {category.emoji}
+                  <Mark value={category.emoji} size={17} />
                 </button>
               {/snippet}
 
@@ -254,11 +257,11 @@
         {#snippet before()}
           <button
             type="button"
-            class="emoji-btn"
-            title="Scegli emoji"
-            onclick={(event) => ui.askEmoji(event.currentTarget, (emoji) => (newEmoji = emoji))}
+            class="mark-btn"
+            title="Scegli il segno"
+            onclick={(event) => ui.askMark(event.currentTarget, newEmoji, (mark) => (newEmoji = mark))}
           >
-            {newEmoji}
+            <Mark value={newEmoji} size={17} />
           </button>
         {/snippet}
         {#snippet after()}
@@ -345,7 +348,7 @@
 <style>
 /* emoji button and colour swatch ------------------------------------------ */
 
-.emoji-btn {
+.mark-btn {
   display: grid;
   place-items: center;
   flex: none;
@@ -361,7 +364,7 @@
   transition: background 0.15s, border-color 0.15s, transform 0.14s var(--ease);
 }
 
-.emoji-btn:hover { background: var(--sunken-hover); transform: translateY(-1px); }
+.mark-btn:hover { background: var(--sunken-hover); transform: translateY(-1px); }
 
 /* the colour of a category, as a button that opens the palette */
 .swatch {
@@ -385,7 +388,7 @@
 /* the row that adds one more ----------------------------------------------- */
 
 /* la riga è di AddRow: qui si vestono solo i pezzi che ci mettiamo dentro */
-:global(.row.is-dashed) .emoji-btn { width: 28px; height: 28px; font-size: 16px; }
+:global(.row.is-dashed) .mark-btn { width: 28px; height: 28px; font-size: 16px; }
 
 :global(.row.is-dashed) .swatch { width: 22px; height: 22px; margin: 0 3px; }
 
@@ -454,7 +457,7 @@
 /* l'emoji della categoria è il suo ritratto: sta in un bollo come il pin
    della mappa, non in un tasto qualsiasi; nella riga che aggiunge è lo stesso
    bollo, se no la colonna si sposta all'ultima riga */
-#category-list .emoji-btn {
+#category-list .mark-btn {
   width: 28px;
   height: 28px;
   border: 0;
@@ -463,7 +466,7 @@
   font-size: 16px;
 }
 
-#category-list .emoji-btn:hover { background: var(--glass-strong); transform: none; }
+#category-list .mark-btn:hover { background: var(--glass-strong); transform: none; }
 
 #category-list .swatch { width: 22px; height: 22px; margin: 0 3px; }
 

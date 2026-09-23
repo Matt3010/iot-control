@@ -1,6 +1,7 @@
 <script lang="ts">
   import { publicApi, type PublicProfilePayload } from '../lib/publicApi';
   import { mapPath } from '../lib/routing';
+  import Mark from './Mark.svelte';
   import Icon from './Icon.svelte';
   import MapBackdrop from './MapBackdrop.svelte';
   import Button from './Button.svelte';
@@ -48,7 +49,7 @@
                 <!-- le prime categorie che ci stanno dentro: si capisce al volo -->
                 <span class="taste" aria-hidden="true">
                   {#each map.emojis as emoji, at (emoji)}
-                    <span class="taste-one" style:--at={at}>{emoji}</span>
+                    <span class="taste-one" style:--at={at}><Mark value={emoji} size={14} /></span>
                   {/each}
                 </span>
                 <span class="row-text">

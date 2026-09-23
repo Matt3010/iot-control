@@ -262,8 +262,11 @@
   {/if}
 
   <!-- Il play sta sopra l'immagine, al centro: è il gesto che ci si aspetta
-       davanti a una fotografia ferma, e dice anche che ferma lo è. -->
-  {#if !live && !noLive}
+       davanti a una fotografia ferma, e dice anche che ferma lo è.
+       Solo quando c'è qualcosa sotto, però: sopra la scritta che dice «sto
+       chiedendo un fotogramma» si sovrapponeva alle parole, e un tasto in
+       mezzo a una frase non è né un tasto né una frase. -->
+  {#if !live && !noLive && (src || failing)}
     <button
       type="button"
       class="play"

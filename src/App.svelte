@@ -9,7 +9,7 @@
   import { viewport } from './lib/viewport.svelte';
   import AddButton from './components/AddButton.svelte';
   import ColorPopover from './components/ColorPopover.svelte';
-  import EmojiPopover from './components/EmojiPopover.svelte';
+  import MarkPopover from './components/MarkPopover.svelte';
   import Hint from './components/Hint.svelte';
   import LoginScreen from './components/LoginScreen.svelte';
   import PublicMap from './components/PublicMap.svelte';
@@ -78,16 +78,6 @@
     return () => observer.disconnect();
   });
 
-  /**
-   * Il picker emoji carica e indicizza 440KB di dati: crearlo alla prima
-   * apertura evita il costo a chi non lo usa, e non distruggerlo più evita
-   * di rifarlo ogni volta.
-   */
-  let emojiEverOpened = $state(false);
-  $effect(() => {
-    if (ui.emoji) emojiEverOpened = true;
-  });
-
   function onKeydown(event: KeyboardEvent) {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault();
@@ -105,7 +95,7 @@
   /** A click anywhere else closes whichever popover is open. */
   function onPointerdown(event: PointerEvent) {
     const target = event.target as HTMLElement;
-    if (ui.emoji && !target.closest('#emoji-popover') && !target.closest('.emoji-btn')) ui.emoji = null;
+    if (ui.mark && !target.closest('#mark-popover') && !target.closest('.mark-btn')) ui.mark = null;
     if (ui.color && !target.closest('#color-popover') && !target.closest('.swatch')) ui.color = null;
     if (ui.sure && !target.closest('#sure-popover') && !target.closest('.kill')) ui.sure = null;
   }
@@ -153,7 +143,9 @@
   {/if}
 
   {#if ui.paletteOpen}<Palette />{/if}
-  {#if emojiEverOpened}<EmojiPopover />{/if}
+  <!-- Il selettore dei segni si monta quando serve e sparisce quando no: è
+       una griglia di cinquanta disegni, non c'è niente da tenere in caldo. -->
+  {#if ui.mark}<MarkPopover />{/if}
   {#if ui.color}<ColorPopover />{/if}
 {/if}
 

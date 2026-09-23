@@ -7,6 +7,7 @@
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
   import Icon from './Icon.svelte';
+  import Mark from './Mark.svelte';
 
   interface Hit {
     lat: string;
@@ -64,7 +65,7 @@
       const groups = place.groupIds.map((id) => store.groupOf(id)?.name).filter(Boolean);
       return {
         color: category?.color,
-        emoji: category?.emoji ?? '📍',
+        emoji: category?.emoji,
         name: place.name,
         note: [groups.join(', '), place.note || category?.name].filter(Boolean).join(' · '),
         // Una distanza si scrive solo se si sa da dove: senza mappa e senza
@@ -226,7 +227,7 @@
           onclick={row.pick}
         >
           <span class="palette-dot">
-            {#if row.emoji}{row.emoji}{:else}<Icon name="pin" />{/if}
+            <Mark value={row.emoji} size={16} />
           </span>
           <span class="palette-body">
             <span class="palette-name">{row.name}</span>

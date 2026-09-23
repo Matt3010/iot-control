@@ -8,6 +8,7 @@
   import { toast } from '../lib/toast.svelte';
   import { mapPath, profileUrl } from '../lib/routing';
   import Icon from './Icon.svelte';
+  import Mark from './Mark.svelte';
   import Button from './Button.svelte';
 
   let { handle, slug }: { handle?: string; slug: string } = $props();
@@ -221,7 +222,7 @@
               onclick={() => reveal(place.id)}
             >
               <span class="dot" style:--c={categoryOf(place.categoryId)?.color ?? '#6b7280'}>
-                {categoryOf(place.categoryId)?.emoji ?? '📍'}
+                <Mark value={categoryOf(place.categoryId)?.emoji} size={15} />
               </span>
               <span class="row-text">
                 <span class="row-name">{place.name}</span>
