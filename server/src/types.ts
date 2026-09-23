@@ -278,8 +278,15 @@ export interface Notice {
   /** Come si legge: le stesse parole arrivate sul telefono. */
   title: string;
   body: string;
-  /** Di chi si parla, per esteso: «Padova». Per una riga di tabella. */
+  /** Di chi si parla, per esteso: il nome dell'agente. */
   who?: string;
+  /**
+   * E su quale luogo stava, se ne aveva uno.
+   *
+   * Scritto qui e non cercato dopo: un luogo si puo' rinominare o eliminare,
+   * e un avviso racconta com'erano le cose quando e' successo.
+   */
+  where?: string;
   /** E cosa gli e' successo, in tre parole: «non risponde da 20 minuti». */
   short?: string;
   /**

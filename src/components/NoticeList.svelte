@@ -20,9 +20,15 @@
     void alerts.load(0);
   });
 
+  /*
+   * L'agente e il luogo sono due colonne perché sono due cose: quello che
+   * tace è l'agente — è lui che ha il filo — ma quello che dice se vale la
+   * pena alzarsi è dove stava. E un agente può non stare da nessuna parte.
+   */
   const COLONNE: Column[] = [
     { label: 'Quando', width: 'fit' },
-    { label: 'Posto', width: 'fit' },
+    { label: 'Agente', width: 'fit' },
+    { label: 'Luogo', width: 'fit' },
     // l'unica che ha da dire: lo spazio che avanza è suo
     { label: 'Cosa' },
     { label: 'Consegna', width: 'fit', align: 'end' },
@@ -63,12 +69,13 @@
       {#snippet row(one: Notice)}
         {@const esito = delivery(one)}
         <td class="quando fit">{when(one.at)}</td>
-        <td class="posto fit">
+        <td class="chi fit">
           <!-- il pallino, come sui luoghi e sugli agenti: giallo quando c'e'
                qualcosa che non va, verde quando e' rientrato -->
           <span class="segno" class:is-back={one.kind === 'back'}></span>
           {one.who ?? '—'}
         </td>
+        <td class="dove fit">{one.where ?? 'nessun luogo'}</td>
         <td>{one.short ?? one.title}</td>
         <td class="end fit">
           <span class="esito" class:male={esito.bad}>{esito.what}</span>
@@ -103,7 +110,10 @@
 
   .quando { color: var(--ink-3); }
 
-  .posto { font-weight: 560; color: var(--ink); }
+  .chi { font-weight: 560; color: var(--ink); }
+
+  /* il luogo è un'informazione di contorno: si legge, non si urla */
+  .dove { color: var(--ink-3); }
 
   .segno {
     display: inline-block;

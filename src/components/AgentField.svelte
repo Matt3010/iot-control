@@ -283,7 +283,7 @@
 
   {#if !mine.length}
     <p class="hint">
-      Un agente è il servizio che installi su una macchina in quel posto: trova i dispositivi
+      Un agente è il servizio che installi su una macchina in quel luogo: trova i dispositivi
       sulla rete e si collega qui da solo. Appena creato si attacca a questo luogo, e ti diamo il
       comando da lanciare là sopra. Ne servono due quando le reti sono separate.
     </p>

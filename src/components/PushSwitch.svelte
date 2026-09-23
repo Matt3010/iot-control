@@ -79,8 +79,8 @@
       disabled={push.busy}
       label="Mandameli su questa macchina"
       note={push.on
-        ? 'Quando un posto smette di rispondere, o quando succede qualcosa che hai chiesto di sapere.'
-        : 'Spenti: qui non arriva niente, nemmeno quando un posto smette di rispondere.'}
+        ? 'Quando un agente smette di rispondere, o quando succede qualcosa che hai chiesto di sapere.'
+        : 'Spenti: qui non arriva niente, nemmeno quando un agente smette di rispondere.'}
       onchange={(value: boolean) => void flip(value)}
     />
 

@@ -8,7 +8,9 @@ export interface Notice {
   title: string;
   body: string;
   /** Il posto e cosa gli è successo, già divisi: una riga di tabella. */
+  /** L'agente di cui si parla, e su quale luogo stava allora. */
   who?: string;
+  where?: string;
   short?: string;
   since?: string;
   at: string;

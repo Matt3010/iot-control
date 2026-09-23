@@ -71,7 +71,7 @@
 
 <PageShell
   title="Agenti"
-  lead="Un agente è il servizio che installi su una macchina accesa in un posto: trova i dispositivi sulla rete di casa e si collega qui da solo. Ne servono due quando le reti sono separate."
+  lead="Un agente è il servizio che installi su una macchina accesa in un luogo: trova i dispositivi sulla rete di casa e si collega qui da solo. Ne servono due quando le reti sono separate."
 >
   {#each devices.agents as agent (agent.id)}
     {@const where = placeOf(agent)}

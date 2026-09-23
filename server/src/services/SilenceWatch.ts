@@ -4,7 +4,7 @@ import { store } from '../persistence/JsonStore.js';
 import type { Agent } from '../types.js';
 
 /**
- * Chi si accorge che un posto ha smesso di parlare.
+ * Chi si accorge che un agente ha smesso di parlare.
  *
  * È l'avviso che solo noi possiamo dare. Un impianto in casa può dirti che la
  * porta si è aperta, ma se salta la corrente o cade la linea non c'è più
@@ -42,9 +42,20 @@ function howLong(from: string): string {
 
 /** Un giro solo. Esportato perche' si possa provare senza aspettare un minuto. */
 export async function sweep(): Promise<void> {
-  const agents = await store.transaction((tx) => tx.data.agents.slice());
+  /*
+   * Un agente e un luogo non sono la stessa cosa e qui servono tutti e due:
+   * quello che tace e' l'agente — e' lui che ha il filo — ma sapere che e'
+   * quello di Via Panigale e' l'unica informazione che serve davvero per
+   * decidere se alzarsi. Un agente puo' anche non stare su nessun luogo.
+   */
+  const agents = await store.transaction((tx) =>
+    tx.data.agents.map((agent) => ({
+      agent,
+      luogo: tx.data.places.find((place) => (place.agentIds ?? []).includes(agent.id))?.name,
+    })),
+  );
 
-  for (const agent of agents) {
+  for (const { agent, luogo } of agents) {
     const tace = quiet(agent);
     const detto = await noticeManager.lastAbout(agent.id);
 
@@ -58,10 +69,11 @@ export async function sweep(): Promise<void> {
         kind: 'silent',
         agentId: agent.id,
         who: agent.name,
+        ...(luogo ? { where: luogo } : {}),
         since: agent.lastSeenAt as string,
         short: `ha smesso di rispondere da ${muto}`,
         title: `${agent.name} non risponde`,
-        body: `Quel posto non si fa vivo da ${muto}. Se è saltata la corrente o la linea, di là non c'è più nessuno a dirlo.`,
+        body: `L'agente ${luogo ? `su «${luogo}» ` : ''}non si fa vivo da ${muto}. Se è saltata la corrente o la linea, di là non c'è più nessuno a dirlo.`,
       });
       continue;
     }
@@ -79,9 +91,10 @@ export async function sweep(): Promise<void> {
       kind: 'back',
       agentId: agent.id,
       who: agent.name,
+      ...(luogo ? { where: luogo } : {}),
       short: `ha ripreso a rispondere dopo ${muto}`,
       title: `${agent.name} risponde di nuovo`,
-      body: `Ha ripreso a farsi vivo dopo ${muto} di silenzio: da qui si vede di nuovo quello che c’è dentro.`,
+      body: `L'agente ${luogo ? `su «${luogo}» ` : ''}ha ripreso a farsi vivo dopo ${muto} di silenzio.`,
     });
   }
 }
