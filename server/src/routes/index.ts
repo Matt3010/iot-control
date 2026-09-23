@@ -14,7 +14,7 @@ import { sceneController } from '../controllers/SceneController.js';
 import { stateController } from '../controllers/StateController.js';
 import { AgentDto, PairDto } from '../dto/agent.dto.js';
 import { ActDto, CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
-import { CommandDto } from '../dto/device.dto.js';
+import { CommandDto, WatchDto } from '../dto/device.dto.js';
 import { SceneDto } from '../dto/scene.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/group.dto.js';
@@ -165,3 +165,5 @@ apiRouter.get('/devices', deviceController.list);
 apiRouter.get('/devices/:id/frame', deviceController.frame);
 apiRouter.get('/devices/:id/live', deviceController.live);
 apiRouter.post('/devices/:id/command', validateBody(CommandDto), deviceController.command);
+// «avvisami se questo smette di rispondere», acceso o spento
+apiRouter.put('/devices/:id/watch', validateBody(WatchDto), deviceController.watch);

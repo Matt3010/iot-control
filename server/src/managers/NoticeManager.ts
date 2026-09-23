@@ -24,6 +24,11 @@ export class NoticeManager {
     return store.transaction((tx) => new NoticeRepository(tx).lastAbout(agentId));
   }
 
+  /** E l'ultimo detto su un dispositivo. */
+  lastAboutDevice(deviceId: string): Promise<Notice | undefined> {
+    return store.transaction((tx) => new NoticeRepository(tx).lastAboutDevice(deviceId));
+  }
+
   /**
    * Scrive l'avviso e poi lo manda. Torna la riga con l'esito già dentro.
    *
@@ -41,7 +46,7 @@ export class NoticeManager {
       body: what.body,
       goto: '/alerts',
       // due avvisi sullo stesso posto si sostituiscono invece di impilarsi
-      tag: what.agentId ? `posto-${what.agentId}` : riga.id,
+      tag: what.deviceId ? `cosa-${what.deviceId}` : what.agentId ? `posto-${what.agentId}` : riga.id,
     };
 
     const { sent, failed } = await pushManager.send([ownerId], note);

@@ -22,10 +22,24 @@ export class NoticeRepository {
       .sort((a, b) => b.at.localeCompare(a.at));
   }
 
-  /** L'ultimo detto su un agente: serve a non ripetersi. */
+  /**
+   * L'ultimo detto su un agente, e solo su di lui.
+   *
+   * Anche gli avvisi di un dispositivo portano il nome del suo agente — serve
+   * a sapere di quale casa si parla — ma non sono avvisi *sull'agente*:
+   * contarli faceva credere di aver gia' detto che era tornato, e l'avviso
+   * vero partiva due volte.
+   */
   lastAbout(agentId: string): Notice | undefined {
     return this.tx.data.notices
-      .filter((one) => one.agentId === agentId)
+      .filter((one) => one.agentId === agentId && !one.deviceId)
+      .sort((a, b) => b.at.localeCompare(a.at))[0];
+  }
+
+  /** E l'ultimo detto su un dispositivo, per la stessa ragione. */
+  lastAboutDevice(deviceId: string): Notice | undefined {
+    return this.tx.data.notices
+      .filter((one) => one.deviceId === deviceId)
       .sort((a, b) => b.at.localeCompare(a.at))[0];
   }
 

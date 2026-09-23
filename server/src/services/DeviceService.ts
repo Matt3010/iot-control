@@ -26,6 +26,13 @@ export class DeviceService {
     return visti.map((device) => toDeviceView(device, hub.liveOf(device.agentId, device.externalId)));
   }
 
+  /** Accende o spegne l'avviso su un dispositivo, e lo dice a chi guarda. */
+  async watch(ownerId: string, id: string, wanted: boolean): Promise<DeviceView> {
+    const device = await deviceManager.watch(ownerId, id, wanted);
+    hub.changed(ownerId, { kind: 'devices' });
+    return toDeviceView(device, hub.liveOf(device.agentId, device.externalId));
+  }
+
   /**
    * Un fotogramma. Come per un comando, un agente che non risponde è un
    * guasto fra noi e lui, non una richiesta sbagliata.

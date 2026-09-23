@@ -91,6 +91,8 @@ export interface DeviceView {
   online: boolean;
   state: Record<string, DeviceValue>;
   lastSeenAt: string;
+  /** Se vuoi essere avvisato quando smette di rispondere. */
+  watch?: boolean;
 }
 
 /** Una scena come esce di qui: il nome, le righe, e quando parte da sola. */
@@ -181,6 +183,8 @@ export const toDeviceView = (device: Device, live: { online: boolean; state: Rec
   online: live?.online ?? false,
   state: live?.state ?? {},
   lastSeenAt: device.lastSeenAt,
+  // se vuoi che ti si dica quando tace: spento non si scrive
+  ...(device.watch ? { watch: true } : {}),
 });
 
 export const toStateView = ({ maps, categories, groups, places }: OwnerState): StateView => ({

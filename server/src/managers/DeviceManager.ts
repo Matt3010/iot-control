@@ -23,6 +23,17 @@ export class DeviceManager {
     return store.transaction((tx) => new DeviceRepository(tx).findAllOf(ownerId));
   }
 
+  /** Accende o spegne l'avviso su un dispositivo. */
+  watch(ownerId: string, id: string, wanted: boolean): Promise<Device> {
+    return store.transaction((tx) => {
+      const devices = new DeviceRepository(tx);
+      const device = devices.findById(id);
+      if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
+
+      return devices.watch(id, wanted) as Device;
+    });
+  }
+
   find(ownerId: string, id: string): Promise<Device> {
     return store.transaction((tx) => {
       const device = new DeviceRepository(tx).findById(id);

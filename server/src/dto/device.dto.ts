@@ -1,4 +1,4 @@
-import { Allow, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { Allow, IsBoolean, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import type { DeviceValue } from '../../../shared/protocol.js';
 
 export class CommandDto {
@@ -14,4 +14,10 @@ export class CommandDto {
    */
   @Allow()
   value!: DeviceValue;
+}
+
+/** Accendere o spegnere l'avviso su un dispositivo. */
+export class WatchDto {
+  @IsBoolean({ message: 'acceso o spento, non altro' })
+  watch!: boolean;
 }

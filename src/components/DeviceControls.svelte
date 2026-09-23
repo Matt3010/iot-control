@@ -5,6 +5,7 @@
   import { ui } from '../lib/ui.svelte';
   import Chip from './Chip.svelte';
   import DeviceFrame from './DeviceFrame.svelte';
+  import Button from './Button.svelte';
   import Icon from './Icon.svelte';
   import Switch from './Switch.svelte';
 
@@ -110,6 +111,24 @@
     {#if how === 'lost'}
       <span class="dev-away" title={says}><Icon name="alert" /></span>
     {/if}
+
+    <!-- «Avvisami se questo smette di rispondere».
+         Sta qui e non in un elenco di regole altrove, perche' si decide
+         guardando la cosa di cui si parla. Spento di sua natura: una casa ha
+         venti cose attaccate e quasi tutte possono tacere un pomeriggio
+         senza che importi a nessuno. -->
+    <Button
+      look="icon"
+      size="sm"
+      extra="dev-watch"
+      title={device.watch
+        ? 'Ti avviso se smette di rispondere. Premi per smettere.'
+        : 'Avvisami se smette di rispondere'}
+      aria-pressed={!!device.watch}
+      onclick={() => void devices.watch(device, !device.watch)}
+    >
+      <Icon name={device.watch ? 'bell' : 'alertOff'} />
+    </Button>
   </div>
 
   <div class="dev-body">
@@ -251,6 +270,14 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* l'interruttore dell'avviso: smorto finche' e' spento, acceso quando
+     qualcuno sta guardando per te */
+  .dev-head :global(.dev-watch) { margin-left: auto; opacity: 0.35; transition: opacity 0.16s; }
+
+  .dev-head:hover :global(.dev-watch), .dev-head :global(.dev-watch:hover) { opacity: 1; }
+
+  .dev-head :global(.dev-watch[aria-pressed='true']) { opacity: 1; color: var(--accent); }
 
   .dev-away {
     margin-left: auto;

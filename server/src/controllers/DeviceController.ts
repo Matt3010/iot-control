@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { isGuest, ownerOf, whoIs } from '../auth/owner.js';
-import type { CommandDto } from '../dto/device.dto.js';
+import type { CommandDto, WatchDto } from '../dto/device.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import { liveHub } from '../iot/live.js';
 import { deviceService } from '../services/DeviceService.js';
@@ -9,6 +9,21 @@ export class DeviceController {
   list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       res.json(await deviceService.list(ownerOf(req), isGuest(req)));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * «Avvisami se questo smette di rispondere», acceso o spento.
+   *
+   * Sta sul dispositivo e non in un elenco di regole altrove: si decide
+   * guardando la cosa di cui si parla.
+   */
+  watch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const dto = dtoOf<WatchDto>(req);
+      res.json(await deviceService.watch(ownerOf(req), req.params.id as string, dto.watch));
     } catch (error) {
       next(error);
     }

@@ -26,6 +26,17 @@ export class DeviceRepository {
    * Un dispositivo che torna non è un dispositivo nuovo: si riconosce dal suo
    * id dentro il suo agente, e conserva quello che i luoghi già puntano.
    */
+  /** Accende o spegne l'avviso su un dispositivo. */
+  watch(id: string, wanted: boolean): Device | undefined {
+    const device = this.findById(id);
+    if (!device) return undefined;
+
+    if (wanted) device.watch = true;
+    else delete device.watch;
+    this.tx.markDirty();
+    return device;
+  }
+
   upsert(ownerId: string, agentId: string, externalId: string, name: string, capabilities: Capability[]): Device {
     const found = this.tx.data.devices.find((device) => device.agentId === agentId && device.externalId === externalId);
     const lastSeenAt = new Date().toISOString();

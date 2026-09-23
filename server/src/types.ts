@@ -124,6 +124,16 @@ export interface Agent {
  * — quello vale solo adesso, e vive in memoria.
  */
 export interface Device {
+  /**
+   * Se vuoi essere avvisato quando questo smette di rispondere.
+   *
+   * Spento di sua natura. Una casa ha venti cose attaccate e quasi tutte
+   * possono tacere per un pomeriggio senza che importi a nessuno: ricevere
+   * un avviso per ognuna vorrebbe dire spegnerli tutti dopo due giorni. Lo
+   * si accende sulle tre o quattro che contano davvero — il congelatore, la
+   * telecamera del cancello.
+   */
+  watch?: boolean;
   id: string;
   ownerId: string;
   agentId: string;
@@ -343,6 +353,8 @@ export interface Notice {
   kind: 'silent' | 'back' | 'scene';
   /** Di chi si parla, se e' un agente. */
   agentId?: string;
+  /** O quale dispositivo, quando l'avviso riguarda una cosa sola in casa. */
+  deviceId?: string;
   /** Come si legge: le stesse parole arrivate sul telefono. */
   title: string;
   body: string;

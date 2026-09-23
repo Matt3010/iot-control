@@ -15,6 +15,8 @@ export interface Agent {
 }
 
 export interface Device {
+  /** Se vuoi essere avvisato quando questo smette di rispondere. */
+  watch?: boolean;
   id: string;
   agentId: string;
   name: string;
@@ -288,6 +290,23 @@ class Devices {
     if (capability.kind === 'enum') return { who, what: String(step.value) };
     if (capability.kind !== 'range') return { who, what: String(step.value) };
     return { who, what: `${capability.label} ${step.value}${capability.unit ?? ''}` };
+  }
+
+  /**
+   * Accende o spegne l'avviso su un dispositivo.
+   *
+   * Si vede subito e si corregge se il server dice di no, come per tutto il
+   * resto: una levetta che aspetta la rete per muoversi sembra rotta.
+   */
+  async watch(device: Device, wanted: boolean): Promise<void> {
+    const before = device.watch;
+    device.watch = wanted || undefined;
+    try {
+      await api.put(`/devices/${device.id}/watch`, { watch: wanted });
+    } catch (error) {
+      device.watch = before;
+      toast.show((error as Error).message);
+    }
   }
 
   /** Se almeno uno risponde: una scena tutta spenta non parte. */

@@ -1,5 +1,7 @@
 import {
   AlertCircle,
+  BellOff,
+  BellRing,
   ArrowRight,
   AtSign,
   Check,
@@ -55,6 +57,9 @@ export const ICONS = {
   link: Link2,
   handle: AtSign,
   alert: AlertCircle,
+  // l'avviso su una cosa sola: acceso, o spento
+  bell: BellRing,
+  alertOff: BellOff,
   eye: Eye,
   layers: Layers,
   tag: Tag,
