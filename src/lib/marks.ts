@@ -53,6 +53,7 @@ import {
   Waves,
   Wine,
   Wrench,
+  createElement,
 } from 'lucide';
 import type { IconNode } from 'lucide';
 
@@ -164,4 +165,25 @@ export function marksLike(query: string): readonly Mark[] {
       mark.key.includes(needle) ||
       (mark.also ?? '').includes(needle),
   );
+}
+
+/** Il segno di chi non ne ha scelto uno. */
+export const DEFAULT_MARK = 'pin';
+
+/**
+ * Il segno come pezzo di markup, per dove non c'è Svelte a disegnarlo — il
+ * pin sulla mappa, che Leaflet costruisce da sé.
+ *
+ * Prima la chiave di un disegno. Poi, se c'è scritto qualcos'altro, è
+ * un'emoji di quelle di prima e si lascia com'è: una categoria che non hai
+ * mai toccato non deve cambiarti faccia sulla mappa. Solo se non c'è niente
+ * si mette il segnaposto.
+ */
+export function signOf(value: string | undefined): string {
+  const mark = markOf(value) ?? (value ? undefined : markOf(DEFAULT_MARK));
+  if (!mark) return value ?? '';
+
+  const svg = createElement(mark.icon);
+  svg.setAttribute('class', 'ico');
+  return svg.outerHTML;
 }

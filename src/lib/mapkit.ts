@@ -2,7 +2,7 @@ import L, { type Marker, type MarkerCluster } from 'leaflet';
 import 'leaflet.markercluster';
 import { createElement } from 'lucide';
 import { ICONS, type IconName } from './icons';
-import { markOf } from './marks';
+import { signOf } from './marks';
 
 /**
  * Quello che serve per avere *questa* mappa e non una qualsiasi: gli stessi
@@ -16,27 +16,6 @@ const ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 export const DEFAULT_COLOR = '#6b7280';
-/** Il segno di chi non ne ha scelto uno. */
-export const DEFAULT_MARK = 'pin';
-
-/**
- * Il segno dentro al pin, come pezzo di markup.
- *
- * Nel campo ci può stare la chiave di un disegno o un'emoji di quelle di
- * prima: si guarda cosa c'è e si disegna di conseguenza. Un disegno prende il
- * colore del pin — è a tratto e non ha colori suoi — e a quattordici pixel si
- * riconosce, che è l'unica misura che conta qui dentro.
- */
-function signOf(value: string | undefined): string {
-  const mark = markOf(value ?? DEFAULT_MARK) ?? markOf(DEFAULT_MARK);
-  if (mark) {
-    const svg = createElement(mark.icon);
-    svg.setAttribute('class', 'ico');
-    return svg.outerHTML;
-  }
-  return value ?? '';
-}
-
 /** Oltre questo zoom ogni marker sta per sé, quindi un popup può aprirsi. */
 export const CLUSTER_OFF_AT = 17;
 

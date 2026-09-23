@@ -10,9 +10,15 @@ export class CreateCategoryDto {
   @MaxLength(40)
   name!: string;
 
+  /**
+   * Il segno della categoria: la chiave di un disegno — «restaurant» — o
+   * un'emoji, che è quello che ci finiva prima. Otto caratteri bastavano a
+   * un'emoji e non a una parola, e una regola fatta per il contenuto di ieri
+   * rifiuta quello di oggi senza spiegare perché.
+   */
   @IsOptional()
   @IsString()
-  @MaxLength(8)
+  @MaxLength(24)
   emoji?: string;
 
   @IsOptional()
@@ -28,9 +34,15 @@ export class UpdateCategoryDto {
   @MaxLength(40)
   name?: string;
 
+  /**
+   * Il segno della categoria: la chiave di un disegno — «restaurant» — o
+   * un'emoji, che è quello che ci finiva prima. Otto caratteri bastavano a
+   * un'emoji e non a una parola, e una regola fatta per il contenuto di ieri
+   * rifiuta quello di oggi senza spiegare perché.
+   */
   @IsOptional()
   @IsString()
-  @MaxLength(8)
+  @MaxLength(24)
   emoji?: string;
 
   @IsOptional()
