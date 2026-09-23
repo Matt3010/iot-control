@@ -112,16 +112,9 @@
   }
 
   /** A click anywhere else closes whichever popover is open. */
-  function onPointerdown(event: PointerEvent) {
-    const target = event.target as HTMLElement;
-    if (ui.mark && !target.closest('#mark-popover') && !target.closest('.mark-btn')) ui.mark = null;
-    if (ui.color && !target.closest('#color-popover') && !target.closest('.swatch')) ui.color = null;
-    if (ui.sure && !target.closest('#sure-popover') && !target.closest('.kill')) ui.sure = null;
-    if (ui.pick && !target.closest('#pick-popover') && !target.closest('.pick-btn')) ui.pick = null;
-  }
 </script>
 
-<svelte:window onkeydown={onKeydown} onpointerdown={onPointerdown} />
+<svelte:window onkeydown={onKeydown} />
 
 {#if route.kind === 'map'}
   <PublicMap handle={route.handle} slug={route.slug} />

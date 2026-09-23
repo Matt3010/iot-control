@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { placeAnchored } from '../lib/popover';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
+  import Popover from './Popover.svelte';
 
   /**
    * La domanda attaccata al tasto che l'ha fatta nascere. Dice per nome cosa
@@ -20,31 +20,6 @@
    * l'aveva fatta nascere. Adesso lo segue; e se quel tasto esce di vista, la
    * domanda si chiude, perché una domanda senza il suo oggetto non si capisce.
    */
-  let follows = $state(0);
-  const at = $derived.by(() => {
-    follows;
-    return placeAnchored(request.anchor, 264, request.detail ? 132 : 108);
-  });
-
-  $effect(() => {
-    const anchor = request.anchor;
-
-    const follow = (): void => {
-      const box = anchor.getBoundingClientRect();
-      const gone = !anchor.isConnected || box.bottom < 0 || box.top > window.innerHeight;
-      if (gone) ui.sure = null;
-      else follows += 1;
-    };
-
-    // in cattura, se no gli scorrimenti dentro a un elenco non si sentono
-    window.addEventListener('scroll', follow, true);
-    window.addEventListener('resize', follow);
-    return () => {
-      window.removeEventListener('scroll', follow, true);
-      window.removeEventListener('resize', follow);
-    };
-  });
-
   function yes() {
     const run = request.onYes;
     ui.sure = null;
@@ -59,13 +34,14 @@
   }
 </script>
 
-<div
+<Popover
+  anchor={request.anchor}
+  width={264}
+  height={request.detail ? 132 : 108}
   id="sure-popover"
-  class="surface"
   role="alertdialog"
-  aria-label={request.title}
-  style:left="{at.left}px"
-  style:top="{at.top}px"
+  label={request.title}
+  onclose={() => (ui.sure = null)}
 >
   <p class="sure-what">{request.title}</p>
   {#if request.detail}<p class="sure-detail">{request.detail}</p>{/if}
@@ -75,19 +51,11 @@
       {request.verb}
     </Button>
   </div>
-</div>
+</Popover>
 
 <style>
-  #sure-popover {
-    position: absolute;
-    z-index: var(--z-popover);
-    width: 264px;
-    padding: 14px;
-    border-radius: var(--r-lg);
-    background: var(--glass-strong);
-    box-shadow: var(--shadow-3), inset 0 1px 0 var(--highlight);
-    animation: rise 0.18s var(--ease);
-  }
+  /* il vetro, la posizione e l'entrata li mette il foglietto */
+  :global(#sure-popover) { padding: 14px; }
 
   .sure-what {
     margin: 0;

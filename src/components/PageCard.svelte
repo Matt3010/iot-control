@@ -12,6 +12,7 @@
    */
   let {
     wide = false,
+    dashed = false,
     children,
   }: {
     /**
@@ -22,11 +23,20 @@
      * più — tanto vale un elenco. Chi ha bisogno di larghezza la chiede.
      */
     wide?: boolean;
+    /**
+     * Tratteggiata invece che piena.
+     *
+     * È il vestito di quello che non è ancora niente — il campo per creare
+     * un altro agente, un'altra mappa — e di quello che sta di contorno:
+     * una nota, un elenco di cose altrui. Il tratteggio dice «qui non c'è
+     * una cosa tua, c'è un posto per farla».
+     */
+    dashed?: boolean;
     children: Snippet;
   } = $props();
 </script>
 
-<section class="card" class:wide>
+<section class="card" class:wide class:dashed>
   {@render children()}
 </section>
 
@@ -55,5 +65,12 @@
   .card.wide {
     column-span: all;
     grid-column: 1 / -1;
+  }
+
+  .card.dashed {
+    padding: 14px;
+    border-style: dashed;
+    border-radius: var(--r-md);
+    background: none;
   }
 </style>

@@ -2,6 +2,7 @@
   import { devices } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
   import AddRow from './AddRow.svelte';
+  import PageCard from './PageCard.svelte';
   import PageShell from './PageShell.svelte';
   import SceneCard from './SceneCard.svelte';
 
@@ -38,14 +39,14 @@
     </section>
   {/each}
 
-  <section class="card is-new">
+  <PageCard dashed>
     <span class="eyebrow">Un'altra scena</span>
     <AddRow placeholder="Nome scena — es. Sera" title="Crea scena" bind:value={newName} onadd={create} />
     <p class="once">
       Nasce vuota. Con la matita le dici quali dispositivi muovere, e una sola scena può toccarne
       di agenti diversi.
     </p>
-  </section>
+  </PageCard>
 </PageShell>
 
 <style>
@@ -60,13 +61,6 @@
     margin: 0 0 14px;
   }
 
-  /* quella del «creane un'altra» è tratteggiata come per gli agenti e per le
-     mappe, perché è un posto vuoto da riempire e non una cosa che c'è già */
-  .card.is-new {
-    padding: 14px;
-    border-radius: var(--r-md);
-    border: 1px dashed var(--hairline);
-  }
 
   .once { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
 </style>

@@ -1,13 +1,12 @@
 <script lang="ts">
   import { COLORS } from '../lib/format';
-  import { placeAnchored } from '../lib/popover';
   import { ui } from '../lib/ui.svelte';
+  import Popover from './Popover.svelte';
 
   const request = $derived(ui.color!);
-  const at = $derived(placeAnchored(request.anchor, 309, 135));
 </script>
 
-<div id="color-popover" class="surface" style:left="{at.left}px" style:top="{at.top}px">
+<Popover anchor={request.anchor} width={309} height={135} id="color-popover" onclose={() => (ui.color = null)}>
   <div id="swatches" class="swatches">
     {#each COLORS as color (color)}
       <button
@@ -25,7 +24,7 @@
       ></button>
     {/each}
   </div>
-</div>
+</Popover>
 
 <style>
 /* the palette that opens from it */
@@ -57,15 +56,7 @@
     0 0 0 3.5px var(--c);
 }
 
-/* colour picker ------------------------------------------------------------ */
-
-#color-popover {
-  position: absolute;
-  z-index: var(--z-popover);
-  padding: 0;
-  border-radius: var(--r-lg);
-  background: var(--glass-strong);
-  box-shadow: var(--shadow-3), inset 0 1px 0 var(--highlight);
-  animation: rise 0.18s var(--ease);
-}
+/* il vetro e la posizione li mette il foglietto: qui resta la sola cosa che
+   riguarda i colori, cioe' che stanno attaccati al bordo */
+:global(#color-popover) { padding: 0; }
 </style>

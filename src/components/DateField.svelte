@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { placeAnchored } from '../lib/popover';
   import { nextDays, saysDay } from '../lib/timing';
   import Icon from './Icon.svelte';
+  import Popover from './Popover.svelte';
 
   /**
    * Un giorno, scelto da un elenco corto.
@@ -29,7 +29,6 @@
 
   let open = $state(false);
   let anchor = $state<HTMLButtonElement | null>(null);
-  const at = $derived(open && anchor ? placeAnchored(anchor, 210, 248) : { left: 0, top: 0 });
 
   function choose(day: string): void {
     open = false;
@@ -41,14 +40,6 @@
     node.querySelector('.is-on')?.scrollIntoView({ block: 'center' });
   }
 </script>
-
-<svelte:window
-  onkeydown={(event) => event.key === 'Escape' && open && (open = false)}
-  onpointerdown={(event) => {
-    const target = event.target as HTMLElement;
-    if (open && !target.closest('#day-pop') && !target.closest('.day-btn')) open = false;
-  }}
-/>
 
 <button
   type="button"
@@ -63,8 +54,8 @@
   <Icon name="expand" />
 </button>
 
-{#if open}
-  <div id="day-pop" class="surface" style:left="{at.left}px" style:top="{at.top}px">
+{#if open && anchor}
+  <Popover {anchor} width={210} height={248} id="day-pop" onclose={() => (open = false)}>
     <div class="elenco" use:reveal>
       {#each GIORNI as day (day)}
         <button type="button" class="voce" class:is-on={day === value} onclick={() => choose(day)}>
@@ -72,7 +63,7 @@
         </button>
       {/each}
     </div>
-  </div>
+  </Popover>
 {/if}
 
 <style>
@@ -98,13 +89,7 @@
 
   .day-btn :global(.ico) { width: 12px; height: 12px; color: var(--ink-3); }
 
-  #day-pop {
-    position: fixed;
-    z-index: var(--z-popover);
-    width: 210px;
-    padding: 8px;
-    animation: rise 0.16s var(--ease);
-  }
+  :global(#day-pop) { padding: 8px; }
 
   .elenco {
     display: grid;

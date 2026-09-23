@@ -4,6 +4,7 @@
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui } from '../lib/ui.svelte';
+  import PageCard from './PageCard.svelte';
   import PageShell from './PageShell.svelte';
   import AddRow from './AddRow.svelte';
   import AgentControls from './AgentControls.svelte';
@@ -207,7 +208,7 @@
     </section>
   {/each}
 
-  <section class="card is-new">
+  <PageCard dashed>
     <span class="eyebrow">Un altro agente</span>
     <AddRow
       placeholder="Nome agente — es. Padova"
@@ -219,7 +220,7 @@
       Appena creato ti diamo il comando da lanciare su quella macchina. Poi lo metti su un luogo
       dalla sua scheda.
     </p>
-  </section>
+  </PageCard>
 </PageShell>
 
 <style>
@@ -234,11 +235,6 @@
     min-width: 0;
   }
 
-  .card.is-new {
-    padding: 14px;
-    border-radius: var(--r-md);
-    border: 1px dashed var(--hairline);
-  }
 
   .where { margin: 0; font-size: 11.5px; color: var(--ink-3); }
 

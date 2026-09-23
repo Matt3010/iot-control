@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { placeAnchored } from '../lib/popover';
   import Icon from './Icon.svelte';
+  import Popover from './Popover.svelte';
 
   /**
    * Un'ora, scelta a mano.
@@ -34,7 +34,6 @@
 
   let open = $state(false);
   let anchor = $state<HTMLButtonElement | null>(null);
-  const at = $derived(open && anchor ? placeAnchored(anchor, 188, 248) : { left: 0, top: 0 });
 
   const set = (h: string, m: string) => onchange(`${h}:${m}`);
 
@@ -46,14 +45,6 @@
     node.querySelectorAll('.is-on').forEach((one) => one.scrollIntoView({ block: 'center' }));
   }
 </script>
-
-<svelte:window
-  onkeydown={(event) => event.key === 'Escape' && open && (open = false)}
-  onpointerdown={(event) => {
-    const target = event.target as HTMLElement;
-    if (open && !target.closest('#time-pop') && !target.closest('.time-btn')) open = false;
-  }}
-/>
 
 <button
   type="button"
@@ -68,8 +59,8 @@
   <Icon name="expand" />
 </button>
 
-{#if open}
-  <div id="time-pop" class="surface" style:left="{at.left}px" style:top="{at.top}px">
+{#if open && anchor}
+  <Popover {anchor} width={188} height={248} id="time-pop" onclose={() => (open = false)}>
     <div class="colonne">
       <div class="colonna" use:reveal>
         {#each ORE as one (one)}
@@ -89,7 +80,7 @@
         {/each}
       </div>
     </div>
-  </div>
+  </Popover>
 {/if}
 
 <style>
@@ -118,13 +109,7 @@
 
   .time-btn :global(.ico) { width: 12px; height: 12px; color: var(--ink-3); }
 
-  #time-pop {
-    position: fixed;
-    z-index: var(--z-popover);
-    width: 188px;
-    padding: 8px;
-    animation: rise 0.16s var(--ease);
-  }
+  :global(#time-pop) { padding: 8px; }
 
   .colonne { display: flex; align-items: stretch; gap: 6px; }
 

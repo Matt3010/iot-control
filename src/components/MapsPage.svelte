@@ -9,6 +9,7 @@
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
   import LinkRow from './LinkRow.svelte';
+  import PageCard from './PageCard.svelte';
   import PageShell from './PageShell.svelte';
   import Row from './Row.svelte';
   import ShareField from './ShareField.svelte';
@@ -209,7 +210,7 @@
     </section>
   {/each}
 
-  <section class="card is-new">
+  <PageCard dashed>
     <span class="eyebrow">Un'altra mappa</span>
     <AddRow
       id="map-form"
@@ -218,31 +219,31 @@
       bind:value={newName}
       onadd={create}
     />
-  </section>
+  </PageCard>
 
   {#if store.maps.some((map) => map.published)}
-    <section class="card is-new">
+    <PageCard dashed>
       <span class="eyebrow">Link del profilo</span>
       <p class="note">Raccoglie tutte le mappe che hai pubblicato. È l'indirizzo da mettere in bio.</p>
       <LinkRow prefix="/u/" value={handle} url={profileUrl(handle)} title="Copia link" />
       {#if atHome}
         <p class="visits" title={COUNT_NOTE}>{visitsOfProfile()}</p>
       {/if}
-    </section>
+    </PageCard>
   {/if}
 
   {#if auth.account?.actingAs}
-    <section class="card is-new">
+    <PageCard dashed>
       <span class="eyebrow">Non sei a casa tua</span>
       <p class="note">
         Stai lavorando nelle mappe di <b>{auth.account.actingAs.handle}</b>: quello che cambi qui
         è suo. Le chiavi delle <i>tue</i> mappe le dai dal tuo.
       </p>
-    </section>
+    </PageCard>
   {/if}
 
   {#if (auth.account?.keys ?? []).length}
-    <section class="card is-new">
+    <PageCard dashed>
       <span class="eyebrow">Mappe aperte a te</span>
       <p class="note">Ci entri e ci lavori come se fossero tue. Con la fascia in alto sai sempre dove sei.</p>
       <ul class="theirs">
@@ -264,7 +265,7 @@
           </li>
         {/each}
       </ul>
-    </section>
+    </PageCard>
   {/if}
 </PageShell>
 
@@ -277,11 +278,6 @@
     min-width: 0;
   }
 
-  .card.is-new {
-    padding: 14px;
-    border-radius: var(--r-md);
-    border: 1px dashed var(--hairline);
-  }
 
   .note { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
 

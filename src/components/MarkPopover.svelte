@@ -1,8 +1,8 @@
 <script lang="ts">
   import { createElement } from 'lucide';
   import { MARKS, marksLike } from '../lib/marks';
-  import { placeBeside } from '../lib/popover';
   import { ui } from '../lib/ui.svelte';
+  import Popover from './Popover.svelte';
 
   /**
    * Scegliere il segno di una categoria.
@@ -17,7 +17,6 @@
    * proprio telefono.
    */
   const request = $derived(ui.mark!);
-  const at = $derived(placeBeside(request.anchor, 296, 320));
 
   let query = $state('');
   const shown = $derived(marksLike(query));
@@ -37,7 +36,14 @@
   }
 </script>
 
-<div id="mark-popover" class="surface" style:left="{at.left}px" style:top="{at.top}px">
+<Popover
+  anchor={request.anchor}
+  width={296}
+  height={320}
+  place="beside"
+  id="mark-popover"
+  onclose={() => (ui.mark = null)}
+>
   <!-- svelte-ignore a11y_autofocus -->
   <input
     class="mark-search"
@@ -69,18 +75,10 @@
   {:else}
     <p class="none">Nessun segno con questo nome. Prova con una parola più corta.</p>
   {/if}
-</div>
+</Popover>
 
 <style>
-  #mark-popover {
-    position: fixed;
-    z-index: var(--z-popover);
-    width: 296px;
-    padding: 10px;
-    display: grid;
-    gap: 9px;
-    animation: rise 0.16s var(--ease);
-  }
+  :global(#mark-popover) { padding: 10px; display: grid; gap: 9px; }
 
   .mark-search {
     font: inherit;

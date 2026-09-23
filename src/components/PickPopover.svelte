@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { placeBeside } from '../lib/popover';
   import { ui } from '../lib/ui.svelte';
+  import Popover from './Popover.svelte';
 
   /**
    * Scegliere una voce da un elenco corto, accanto al tasto che l'ha chiesto.
@@ -11,7 +11,6 @@
    * selettore a tendina sarebbe un pezzo di modulo in mezzo a una scheda.
    */
   const request = $derived(ui.pick!);
-  const at = $derived(placeBeside(request.anchor, 240, 300));
 
   function choose(id: string): void {
     const pick = request.onPick;
@@ -20,7 +19,14 @@
   }
 </script>
 
-<div id="pick-popover" class="surface" style:left="{at.left}px" style:top="{at.top}px">
+<Popover
+  anchor={request.anchor}
+  width={240}
+  height={300}
+  place="beside"
+  id="pick-popover"
+  onclose={() => (ui.pick = null)}
+>
   <p class="what">{request.title}</p>
 
   <div class="list">
@@ -36,18 +42,10 @@
       </button>
     {/each}
   </div>
-</div>
+</Popover>
 
 <style>
-  #pick-popover {
-    position: fixed;
-    z-index: var(--z-popover);
-    width: 240px;
-    padding: 9px;
-    display: grid;
-    gap: 7px;
-    animation: rise 0.16s var(--ease);
-  }
+  :global(#pick-popover) { padding: 9px; display: grid; gap: 7px; }
 
   .what {
     margin: 0 2px;
