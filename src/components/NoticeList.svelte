@@ -21,13 +21,14 @@
   });
 
   /*
-   * L'agente e il luogo sono due colonne perché sono due cose: quello che
-   * tace è l'agente — è lui che ha il filo — ma quello che dice se vale la
-   * pena alzarsi è dove stava. E un agente può non stare da nessuna parte.
+   * «Chi» e non «agente»: qui ci finisce anche il nome di una scena o di un
+   * dispositivo, e chiamarli agente era dire una cosa falsa su due righe su
+   * tre. Il luogo resta una colonna a parte perché è un'altra domanda — chi
+   * lo dice, e dove — e chi lo dice può non stare da nessuna parte.
    */
   const COLONNE: Column[] = [
     { label: 'Quando', width: 'fit' },
-    { label: 'Agente', width: 'fit' },
+    { label: 'Chi', width: 'fit' },
     { label: 'Luogo', width: 'fit' },
     // l'unica che ha da dire: lo spazio che avanza è suo
     { label: 'Cosa' },

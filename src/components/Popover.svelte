@@ -103,6 +103,7 @@
   style:left="{at.left}px"
   style:top="{at.top}px"
   style:width="{width}px"
+  style:max-height="{at.max}px"
 >
   {@render children()}
 </div>
@@ -114,6 +115,8 @@
     /* lo spazio intorno a quello che ci sta dentro lo mette il guscio: un
        foglietto senza un nome suo non deve restare senza */
     padding: 9px;
+    /* più alto di quello che ha non diventa: scorre */
+    overflow-y: auto;
     animation: rise 0.16s var(--ease);
   }
 </style>

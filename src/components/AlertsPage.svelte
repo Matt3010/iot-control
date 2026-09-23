@@ -1,83 +1,119 @@
 <script lang="ts">
-  import { devices, type Device } from '../lib/devices.svelte';
+  import { devices, type Device, type Rule } from '../lib/devices.svelte';
+  import { fraseDi, restaDa, SILENZIO, TACE } from '../lib/rules';
   import { store } from '../lib/store.svelte';
+  import type { Column } from '../lib/table';
+  import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
-  import Chip from './Chip.svelte';
-  import DeviceAlerts from './DeviceAlerts.svelte';
+  import Icon from './Icon.svelte';
   import NoticeList from './NoticeList.svelte';
   import PageCard from './PageCard.svelte';
-  import Icon from './Icon.svelte';
   import PageShell from './PageShell.svelte';
   import PushSwitch from './PushSwitch.svelte';
+  import Table from './Table.svelte';
 
   /**
    * Gli avvisi, in una pagina loro.
    *
-   * Qui c'è l'elenco delle regole — «quando la porta si apre», «quando smette
-   * di rispondere» — e la cosa senza la quale nessuna regola serve a niente:
-   * le notifiche accese su questa macchina.
-   *
-   * Stavano sulla riga di ogni dispositivo, dentro la scheda del suo agente.
-   * Là si va per accendere e per aprire, e ogni riga portava dietro una
-   * campana e una sezione che quasi sempre restava chiusa: venti cose
-   * attaccate facevano venti campane per una decisione che si prende una
-   * volta sola. E per sapere cosa fosse sorvegliato bisognava aprirle tutte.
+   * Un avviso per riga, come gli avvisi avvenuti qui sotto: la stessa cosa
+   * letta prima e dopo si legge allo stesso modo. Prima era un blocco per
+   * dispositivo — una levetta, le sue regole, e un muro di pillole con tutte
+   * le altre cose di casa — e cinque dispositivi facevano una pagina che non
+   * finiva, dove per sapere cosa ti avvisa davvero bisognava leggerla tutta.
    */
-  const dove = (device: Device): string | undefined => {
+  const rules = $derived(devices.rules);
+
+  /** Su quale luogo sta, o almeno su quale agente. */
+  function dove(device: Device): string {
     const agent = devices.agentOf(device);
-    if (!agent) return undefined;
+    if (!agent) return '—';
     const luogo = store.places.find((place) => (place.agentIds ?? []).includes(agent.id));
-    return luogo ? `Su «${luogo.name}»` : `Agente «${agent.name}»`;
-  };
-
-  const ordinate = (list: Device[]) =>
-    [...list].sort((a, b) => a.name.localeCompare(b.name, 'it'));
-
-  /** Quelle che dicono già qualcosa: la levetta accesa, o una regola scritta. */
-  const sorvegliate = $derived(
-    ordinate(devices.list.filter((device) => device.watch || devices.rulesOf(device.id).length)),
-  );
+    return luogo ? luogo.name : agent.name;
+  }
 
   /**
-   * Quelle aperte a mano, che ancora non dicono niente.
+   * Una riga per avviso.
    *
-   * Finché non si accende la levetta o non si preme una scelta, il server non
-   * sa niente di questa cosa: l'elenco qui sopra la mostrerebbe solo dopo. È
-   * questo a tenerla sullo schermo il tempo di decidere.
+   * Il silenzio sta in fila con gli altri anche se dentro è un'altra cosa —
+   * una levetta sul dispositivo invece di una regola scritta: chi guarda
+   * vuole sapere cosa gli arriverà, non com'è fatto di dentro.
    */
-  let aperte = $state<string[]>([]);
+  interface Riga {
+    id: string;
+    device: Device;
+    quando: string;
+    rule?: Rule;
+    off: boolean;
+  }
+
+  const righe = $derived(
+    [...devices.list]
+      .sort((a, b) => a.name.localeCompare(b.name, 'it'))
+      .flatMap((device): Riga[] => [
+        ...(device.watch ? [{ id: `tace:${device.id}`, device, quando: TACE, off: false }] : []),
+        ...rules
+          .filter((rule) => rule.deviceId === device.id)
+          .map((rule) => ({
+            id: rule.id,
+            device,
+            quando: fraseDi(device, rule.code, rule.becomes) ?? rule.says,
+            rule,
+            off: !!rule.off,
+          })),
+      ]),
+  );
+
+  /*
+   * Il luogo viene dopo la frase, non prima. Su un telefono la tabella scorre
+   * di lato, e quello che si vede senza scorrere sono le prime due colonne:
+   * il nome e cosa ti arriverà. Dove sta è la domanda dopo.
+   */
+  const COLONNE: Column[] = [
+    { label: 'Cosa', width: 'fit' },
+    // l'unica che ha da dire: lo spazio che avanza è suo
+    { label: 'Ti avviso quando' },
+    { label: 'Dove', width: 'fit' },
+    { label: '', width: 'fit', align: 'end' },
+  ];
 
   /**
-   * Le altre, raccolte sotto il posto dove stanno.
+   * Aggiungerne uno: prima quale cosa, poi cosa vuoi sapere.
    *
-   * Due case hanno tutt'e due una «Mansarda», e un elenco di nomi soli
-   * costringerebbe a indovinare quale. Il gruppo lo dice una volta per tutte
-   * invece di ripeterlo su ogni nome.
+   * Due domande corte una dopo l'altra invece di un elenco di tutte le
+   * combinazioni: una casa con venti dispositivi ne farebbe sessanta, e
+   * cercare la propria in sessanta righe è più lungo che rispondere due
+   * volte.
    */
-  const altre = $derived(
-    Object.values(
-      ordinate(
-        devices.list.filter(
-          (device) => !device.watch && !devices.rulesOf(device.id).length && !aperte.includes(device.id),
-        ),
-      ).reduce<Record<string, { dove: string; cose: Device[] }>>((gruppi, device) => {
-        const qui = dove(device) ?? 'Senza agente';
-        (gruppi[qui] ??= { dove: qui, cose: [] }).cose.push(device);
-        return gruppi;
-      }, {}),
-    ),
-  );
+  function aggiungi(event: MouseEvent): void {
+    const tasto = event.currentTarget as HTMLElement;
+    const libere = devices.list.filter((device) => restaDa(device, rules).length);
+    ui.askPick(tasto, {
+      title: 'Di quale cosa?',
+      options: [...libere]
+        .sort((a, b) => a.name.localeCompare(b.name, 'it'))
+        .map((device) => ({ id: device.id, label: device.name, note: dove(device) })),
+      onPick: (id: string) => chiedi(tasto, id),
+    });
+  }
 
-  /** Quelle aperte che ancora non dicono niente: restano finché le chiudi. */
-  const vuote = $derived(
-    ordinate(
-      devices.list.filter(
-        (device) => aperte.includes(device.id) && !device.watch && !devices.rulesOf(device.id).length,
-      ),
-    ),
-  );
+  function chiedi(tasto: HTMLElement, deviceId: string): void {
+    const device = devices.list.find((one) => one.id === deviceId);
+    if (!device) return;
+    ui.askPick(tasto, {
+      title: `Cosa vuoi sapere di «${device.name}»?`,
+      options: restaDa(device, rules),
+      onPick: (scelto: string) => {
+        if (scelto === SILENZIO) return void devices.watch(device, true);
+        const [code, becomes] = scelto.split(/:(.*)/s);
+        void devices.addRule(device.id, code as string, becomes as string);
+      },
+    });
+  }
 
-  const mostrate = $derived([...sorvegliate, ...vuote]);
+  function togli(riga: Riga): void {
+    if (riga.rule) void devices.removeRule(riga.rule);
+    else void devices.watch(riga.device, false);
+  }
 </script>
 
 <PageShell
@@ -103,71 +139,54 @@
   </PageCard>
 
   <PageCard wide>
-    <span class="eyebrow">Le cose che ti avvisano</span>
+    <div class="testa">
+      <span class="eyebrow">Le cose che ti avvisano</span>
+      <Button look="link" extra="pick-btn" disabled={!devices.list.length} onclick={aggiungi}>
+        Aggiungi
+      </Button>
+    </div>
 
-    {#if mostrate.length}
-      <ul class="cose">
-        {#each mostrate as device (device.id)}
-          {@const qui = dove(device)}
-          <li class="cosa">
-            <div class="chi">
-              <span class="nome">{device.name}</span>
-              {#if qui}<span class="qui">{qui}</span>{/if}
-              {#if vuote.includes(device)}
-                <!-- Aperta per guardarci dentro e poi lasciata lì: senza
-                     questo resterebbe in elenco per sempre, in mezzo a quelle
-                     che qualcosa la dicono davvero. Chi è sorvegliata se ne
-                     va da sé quando spegni la levetta e togli le sue regole,
-                     e un tasto che facesse le due cose insieme cancellerebbe
-                     il lavoro di prima con un colpo solo. -->
-                <Button
-                  look="icon"
-                  size="sm"
-                  extra="chiudi"
-                  title="Togli dall’elenco"
-                  onclick={() => (aperte = aperte.filter((id) => id !== device.id))}
-                >
-                  <Icon name="close" />
-                </Button>
-              {/if}
-            </div>
-            <DeviceAlerts {device} />
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="say">
-        Non ne sorvegli nessuna. Scegline una qui sotto e dì cosa vuoi sapere.
-      </p>
-    {/if}
+    <Table columns={COLONNE} rows={righe} label="Gli avvisi che hai chiesto">
+      {#snippet row(riga: Riga)}
+        <td class="chi fit" class:is-off={riga.off}>{riga.device.name}</td>
+        <td class="quando" class:is-off={riga.off}>{riga.quando}</td>
+        <td class="dove fit">{dove(riga.device)}</td>
+        <td class="end fit">
+          <span class="mani">
+            {#if riga.rule}
+              <!-- Sospendere vale solo per una regola: il silenzio è una
+                   levetta sola, e spegnerla è già toglierlo. -->
+              <Button
+                look="icon"
+                size="sm"
+                extra="mano"
+                title={riga.off ? 'Riaccendi questo avviso' : 'Sospendi questo avviso'}
+                onclick={() => void devices.flipRule(riga.rule!, !riga.off)}
+              >
+                <Icon name={riga.off ? 'alertOff' : 'bell'} />
+              </Button>
+            {/if}
+            <Button
+              look="icon"
+              size="sm"
+              tone="danger"
+              extra="mano kill"
+              title="Togli questo avviso"
+              onclick={() => togli(riga)}
+            >
+              <Icon name="trash" />
+            </Button>
+          </span>
+        </td>
+      {/snippet}
 
-    {#if altre.length}
-      <!-- L'elenco per esteso e non una domanda che si apre: su un telefono
-           un foglietto che compare in cima allo schermo è lontano dalla cosa
-           di cui parla, e qui i nomi si leggono tutti insieme. -->
-      <div class="altre">
-        <span class="eyebrow">Un'altra cosa da sorvegliare</span>
-        {#each altre as gruppo (gruppo.dove)}
-          <div class="gruppo">
-            <span class="qui">{gruppo.dove}</span>
-            <div class="nomi">
-              {#each gruppo.cose as device (device.id)}
-                <Chip
-                  label={device.name}
-                  size="sm"
-                  look="off"
-                  onclick={() => (aperte = [...aperte, device.id])}
-                />
-              {/each}
-            </div>
-          </div>
-        {/each}
-      </div>
-    {:else if !devices.list.length}
-      <p class="say quiet">
-        Nessun dispositivo, per ora. Compaiono qui appena un agente li racconta.
-      </p>
-    {/if}
+      {#snippet empty()}
+        <p class="say">
+          Non hai ancora chiesto niente. Da <b>Aggiungi</b> scegli una cosa di casa e cosa vuoi
+          sapere di lei.
+        </p>
+      {/snippet}
+    </Table>
   </PageCard>
 
   <PageCard wide>
@@ -178,40 +197,34 @@
 <style>
   .say { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-2); }
 
+  .say b { font-weight: 600; color: var(--ink); }
+
   /* la riga che mette le mani avanti: si legge, e non grida */
   .quiet { color: var(--ink-3); }
 
-  .cose { list-style: none; margin: 0; padding: 0; display: grid; }
-
-  /* Una riga per cosa, divisa dalla successiva come i dispositivi dentro la
-     scheda di un agente: la stessa cosa si divide allo stesso modo. */
-  .cosa { display: grid; gap: 9px; padding: 11px 0; }
-
-  .cosa + .cosa { border-top: 1px solid var(--hairline-soft); }
-
-  .chi { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
-
-  .nome {
-    font-size: 12.5px;
-    font-weight: 560;
-    color: var(--ink);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* il titolo della scheda e il tasto che ci aggiunge, sulla stessa riga */
+  .testa {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
 
-  /* dove sta, perché due case possono avere tutt'e due una «Tenda soggiorno» */
-  .qui { flex: none; font-size: 11px; color: var(--ink-3); }
+  .chi { font-weight: 560; color: var(--ink); }
 
-  /* il tasto per chiuderla sta in fondo alla sua riga, dalla parte opposta
-     del nome: è l'unico comando che riguarda la riga intera */
-  .chi :global(.chiudi) { margin-left: auto; opacity: 0.45; transition: opacity 0.16s; }
+  /* il luogo è un'informazione di contorno: si legge, non si urla */
+  .dove { color: var(--ink-3); }
 
-  .cosa:hover :global(.chiudi), .chi :global(.chiudi:hover) { opacity: 1; }
+  .quando { color: var(--ink-2); }
 
-  .altre { display: grid; gap: 8px; margin-top: 4px; }
+  /* sospeso: resta scritto, ma si vede che adesso non dice niente */
+  .is-off { opacity: 0.45; text-decoration: line-through; }
 
-  .gruppo { display: grid; gap: 5px; }
+  /* i comandi si accendono quando ci passi sopra: da fermi sarebbero due
+     icone per ogni riga, e le righe sono tante */
+  .mani { display: inline-flex; gap: 2px; }
 
-  .nomi { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mani :global(.mano) { width: 24px; height: 24px; opacity: 0.4; transition: opacity 0.16s; }
+
+  :global(tbody tr:hover) .mani :global(.mano), .mani :global(.mano:hover) { opacity: 1; }
 </style>
