@@ -123,7 +123,13 @@ export class AlertManager {
     if (!capability) return `è ${value}`;
 
     if (capability.kind === 'switch') return value === 'true' ? 'si accende' : 'si spegne';
-    return `diventa ${says(capability, value).toLocaleLowerCase('it')}`;
+    /*
+     * Il valore fra virgolette e com'e' scritto. Smontato in minuscolo
+     * diventava «diventa apri», che non e' italiano: quelle parole le
+     * sceglie il dispositivo, e sono stati dove una porta dice aperta e
+     * comandi dove una tenda dice apri.
+     */
+    return `diventa «${says(capability, value)}»`;
   }
 }
 
