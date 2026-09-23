@@ -163,6 +163,14 @@ export interface SceneStep {
   /** Il testo di un avviso. Le righe che ce l'hanno non muovono niente. */
   notify?: string;
   /**
+   * Un'altra scena da far partire da qui.
+   *
+   * «Buonanotte» può chiamare «chiudi tutto» e aggiungerci due cose sue,
+   * invece di ricopiarne le righe: quando «chiudi tutto» cambia, cambia
+   * anche dentro l'altra.
+   */
+  scene?: string;
+  /**
    * Quanti secondi aspettare prima di questa riga.
    *
    * Zero, o niente, vuol dire «insieme a quella sopra»: una scena che accende

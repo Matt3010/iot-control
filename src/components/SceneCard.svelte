@@ -121,6 +121,23 @@
     });
   }
 
+  /** Le altre scene che si possono chiamare da qui. */
+  const altre = $derived(
+    devices.scenes.filter((one) => one.id !== scene.id).map((one) => ({ id: one.id, label: one.name })),
+  );
+
+  /**
+   * Una riga che fa partire un'altra scena.
+   *
+   * «Buonanotte» può chiamare «chiudi tutto» e aggiungerci due cose sue,
+   * invece di ricopiarne le righe: quando «chiudi tutto» cambia, cambia
+   * anche dentro l'altra. Se l'anello si chiude — quella riporta a questa —
+   * il server rifiuta, e qui si vede il perché.
+   */
+  function addScene(id: string): void {
+    void devices.patchScene(scene, { steps: [...scene.steps, { scene: id }] });
+  }
+
   /** Le parole di quell'avviso, cambiate mentre si scrivono. */
   function setNotify(at: number, testo: string): void {
     const steps = scene.steps.map((one, index) => (index === at ? { ...one, notify: testo } : one));
@@ -343,6 +360,21 @@
           title="Manda un avviso quando la scena arriva qui"
           onclick={addNotify}
         />
+        {#if altre.length}
+          <Chip
+            label="Fai partire una scena"
+            size="sm"
+            look="off"
+            extra="pick-btn"
+            title="Fa partire un'altra scena, da qui"
+            onclick={(event: MouseEvent) =>
+              ui.askPick(event.currentTarget as HTMLElement, {
+                title: 'Quale scena?',
+                options: altre,
+                onPick: addScene,
+              })}
+          />
+        {/if}
         {#each all as device (device.id)}
           <Chip
             label={device.name}

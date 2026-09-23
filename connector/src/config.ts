@@ -80,7 +80,7 @@ export function loadConfig(): ConnectorConfig {
   // Chi non cifra lo sappia: un token in chiaro su una rete che non è la tua
   // è un token regalato.
   if (config.backendUrl.startsWith('ws://') && !/^ws:\/\/(localhost|127\.|192\.168\.|10\.)/.test(config.backendUrl)) {
-    console.warn('attenzione: ws:// fuori dalla rete locale manda il token in chiaro');
+    console.warn('attenzione, ws:// fuori dalla rete locale manda il token in chiaro');
   }
 
   fs.mkdirSync(config.stateDir, { recursive: true, mode: 0o700 });

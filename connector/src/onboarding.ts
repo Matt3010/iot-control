@@ -110,7 +110,7 @@ async function finishSteps(config: ConnectorConfig, access: string, steps: Step[
       await ask(`${config.haUrl}/api/onboarding/${step}`, { method: 'POST', headers, body });
     } catch {
       // Un passo di benvenuto che non va non è un motivo per non partire.
-      console.warn(`passo "${step}" del benvenuto non riuscito: si tira avanti`);
+      console.warn(`passo "${step}" del benvenuto non riuscito, si tira avanti`);
     }
   }
 }
@@ -185,7 +185,7 @@ export async function ensureToken(config: ConnectorConfig): Promise<string> {
     );
   }
 
-  console.log('home assistant è nuovo: faccio io il primo avvio');
+  console.log('home assistant è nuovo, faccio io il primo avvio');
   const access = await exchange(config, await createOwner(config));
   await finishSteps(config, access, steps);
 

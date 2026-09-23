@@ -39,6 +39,31 @@ function check(capability: Capability, value: DeviceValue): void {
   }
 }
 
+/**
+ * Se partendo da una scena si arriva a un'altra, anche passando per altre.
+ *
+ * Serve a non chiudere un anello: «A chiama B» si puo', «A chiama B e B
+ * chiama A» girerebbe per sempre, e accorgersene mentre le tende vanno su e
+ * giu' e' tardi. Si guarda in avanti prima di scrivere, non dopo.
+ */
+function leadsTo(tx: Transaction, from: string, target: string): boolean {
+  const scenes = new SceneRepository(tx);
+  const visti = new Set<string>();
+  const da = [from];
+
+  while (da.length) {
+    const qui = da.pop() as string;
+    if (qui === target) return true;
+    if (visti.has(qui)) continue;
+    visti.add(qui);
+
+    for (const step of scenes.findById(qui)?.steps ?? []) {
+      if (step.scene) da.push(step.scene);
+    }
+  }
+  return false;
+}
+
 export class SceneManager {
   list(ownerId: string): Promise<Scene[]> {
     return store.transaction((tx) => new SceneRepository(tx).findAllOf(ownerId));
@@ -57,7 +82,7 @@ export class SceneManager {
       if (!scenes.owns(ownerId, id)) throw notFound('scena inesistente');
 
       const patch: Partial<Scene> = { name: dto.name };
-      if (dto.steps) patch.steps = this.#clean(tx, ownerId, dto.steps);
+      if (dto.steps) patch.steps = this.#clean(tx, ownerId, dto.steps, id);
 
       /*
        * `null` vuol dire «non parte piu' da sola», che e' diverso da «non ne
@@ -100,7 +125,15 @@ export class SceneManager {
    * ha risposto nessuno è un guasto; se è partita a metà, la scena non si
    * riavvolge — quello che si è mosso resta mosso, e si dice cosa manca.
    */
-  async run(ownerId: string, id: string, who?: string): Promise<void> {
+  /**
+   * Fa partire una scena.
+   *
+   * `chiamanti` sono le scene che l'hanno chiamata: il controllo sugli anelli
+   * si fa quando si scrive, ma qui si tiene lo stesso — due modifiche fatte
+   * nello stesso istante da due finestre diverse potrebbero infilarne uno, e
+   * un giro senza fine muove le tende per sempre.
+   */
+  async run(ownerId: string, id: string, who?: string, chiamanti: string[] = []): Promise<void> {
     const { scene, steps } = await store.transaction((tx) => {
       const found = new SceneRepository(tx).findById(id);
       if (!found || found.ownerId !== ownerId) throw notFound('scena inesistente');
@@ -113,11 +146,20 @@ export class SceneManager {
       const devices = new DeviceRepository(tx).findAllOf(ownerId);
       const ready = found.steps
         .map((step) => ({ step, device: devices.find((one) => one.id === step.deviceId) }))
-        .filter((pair) => !!pair.device || !!pair.step.notify);
+        .filter((pair) => !!pair.device || !!pair.step.notify || !!pair.step.scene);
       return { scene: found, steps: ready as { step: SceneStep; device?: Device }[] };
     });
 
     if (!steps.length) throw badRequest(`La scena «${scene.name}» è vuota, non c'è niente da fare`);
+
+    /*
+     * Se questa scena è gia' nella catena di chi l'ha chiamata, il giro si
+     * chiude: si ferma qui e lo si scrive, invece di girare per sempre.
+     */
+    if (chiamanti.includes(id)) {
+      console.warn(`la scena «${scene.name}» si richiama da sola, giro fermato`);
+      return;
+    }
 
     /*
      * A momenti, non tutto in una volta.
@@ -155,7 +197,9 @@ export class SceneManager {
 
       const esiti = await Promise.allSettled(
         momento.quali.map(({ step, device }) =>
-          step.notify
+          step.scene
+            ? this.run(ownerId, step.scene, who, [...chiamanti, id])
+            : step.notify
             ? noticeManager.tell(ownerId, {
                 kind: 'scene',
                 who: scene.name,
@@ -264,7 +308,7 @@ export class SceneManager {
    * momenti diversi: «apri, aspetta un minuto, richiudi» è una scena sensata,
    * «apri e chiudi nello stesso istante» no.
    */
-  #clean(tx: Transaction, ownerId: string, steps: SceneStepDto[]): SceneStep[] {
+  #clean(tx: Transaction, ownerId: string, steps: SceneStepDto[], id?: string): SceneStep[] {
     const devices = new DeviceRepository(tx);
 
     /*
@@ -289,6 +333,24 @@ export class SceneManager {
         return { notify: step.notify, ...(after ? { after } : {}) };
       }
 
+      /*
+       * Una scena che ne chiama un'altra: quella deve esistere, essere tua, e
+       * non riportare qui. Un anello — «A chiama B, B chiama A» — girerebbe
+       * per sempre, e accorgersene mentre le tende vanno su e giù e' tardi.
+       */
+      if (step.scene) {
+        const altra = new SceneRepository(tx).findById(step.scene);
+        if (!altra || altra.ownerId !== ownerId) throw badRequest('scena inesistente');
+        if (step.scene === id) throw badRequest('una scena non può chiamare se stessa');
+        // in creazione un id ancora non c'è, e un anello non può esistere
+        if (id && leadsTo(tx, step.scene, id)) {
+          throw badRequest(`«${altra.name}» riporta a questa, e sarebbe un giro senza fine`);
+        }
+
+        if (after > 0) momento += 1;
+        return { scene: step.scene, ...(after ? { after } : {}) };
+      }
+
       const device = step.deviceId ? devices.findById(step.deviceId) : undefined;
       if (!device || device.ownerId !== ownerId) throw badRequest('dispositivo inesistente');
 
@@ -304,7 +366,7 @@ export class SceneManager {
       const chiave = `${step.deviceId}:${step.code}`;
       if (gia.get(chiave) === momento) {
         throw badRequest(
-          `«${device.name}» compare due volte nello stesso momento: mettici un'attesa in mezzo, o togline una`,
+          `«${device.name}» compare due volte nello stesso momento, mettici un'attesa in mezzo o togline una`,
         );
       }
       gia.set(chiave, momento);

@@ -129,7 +129,7 @@ export class Link {
     this.#stopHeartbeat();
     this.#heartbeat = setInterval(() => {
       if (!this.#alive) {
-        console.warn('il backend non risponde al ping: si ricomincia');
+        console.warn('il backend non risponde al ping, si ricomincia');
         this.#socket?.terminate();
         return;
       }

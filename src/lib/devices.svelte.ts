@@ -43,6 +43,8 @@ export interface SceneStep {
   value?: DeviceValue;
   /** Le parole di un avviso. Le righe che ce le hanno non muovono niente. */
   notify?: string;
+  /** Un'altra scena da far partire da qui. */
+  scene?: string;
   /** Secondi da aspettare prima di questa riga. Zero: insieme alla precedente. */
   after?: number;
 }
@@ -254,6 +256,12 @@ class Devices {
   saysOf(step: SceneStep): { who: string; what: string } {
     // una riga che manda un avviso non ha un chi: ha delle parole
     if (step.notify) return { who: 'Avviso', what: step.notify };
+
+    // e una che ne chiama un'altra ha un nome, che e' quello dell'altra
+    if (step.scene) {
+      const altra = this.scenes.find((one) => one.id === step.scene);
+      return { who: 'Scena', what: altra?.name ?? 'sparita' };
+    }
 
     const device = this.list.find((one) => one.id === step.deviceId);
     const capability = device?.capabilities.find((entry) => entry.code === step.code);

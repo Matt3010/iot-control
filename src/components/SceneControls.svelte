@@ -50,14 +50,16 @@
   const rails = $derived(
     scene.steps.map((step, at) => {
       const says = devices.saysOf(step);
-      const sta = step.notify
-        ? { state: 'live' as const, says: 'Manda un avviso' }
-        : how(step.deviceId as string);
+      const sta =
+        step.notify || step.scene
+          ? { state: 'live' as const, says: step.scene ? 'Fa partire un’altra scena' : 'Manda un avviso' }
+          : how(step.deviceId as string);
       return {
-        key: `${step.deviceId ?? 'avviso'}:${step.code ?? ''}:${at}`,
+        key: `${step.deviceId ?? step.scene ?? 'avviso'}:${step.code ?? ''}:${at}`,
         who: says.who,
         what: says.what,
-        talk: !!step.notify,
+        talk: !!step.notify || !!step.scene,
+        call: !!step.scene,
         wait: step.after,
         state: sta.state,
         says: sta.says,
@@ -143,7 +145,11 @@
   {#if scene.steps.length}
     <StepRail steps={rails}>
       {#snippet row(step: (typeof rails)[number])}
-        {#if step.talk}
+        {#if step.call}
+          <!-- una riga che ne chiama un'altra: il nome della scena in chiaro,
+               che e' l'unica cosa che serve sapere -->
+          <span class="riga">poi <b>{step.what}</b></span>
+        {:else if step.talk}
           <!-- niente icona: che sia una riga diversa lo dice gia' il nodo
                vuoto sulla linea, e che siano parole lo dicono le virgolette -->
           <span class="riga">«{step.what}»</span>

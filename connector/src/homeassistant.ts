@@ -288,7 +288,7 @@ export class HomeAssistant {
 
       case 'auth_invalid':
         // Riprovare non cambia niente: il token va rifatto a mano.
-        console.error('home assistant rifiuta il token: rigeneralo dal tuo profilo in HA');
+        console.error('home assistant rifiuta il token, rigeneralo dal tuo profilo in HA');
         this.#socket?.close();
         return;
 
