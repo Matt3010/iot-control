@@ -15,11 +15,11 @@ const QUANTI = 200;
 export class NoticeRepository {
   constructor(private readonly tx: Transaction) {}
 
-  findAllOf(ownerId: string, limit = 50): Notice[] {
+  /** Tutti i suoi, dal piu' recente. Il pezzo da mostrare lo taglia chi chiede. */
+  findAllOf(ownerId: string): Notice[] {
     return this.tx.data.notices
       .filter((one) => one.ownerId === ownerId)
-      .sort((a, b) => b.at.localeCompare(a.at))
-      .slice(0, limit);
+      .sort((a, b) => b.at.localeCompare(a.at));
   }
 
   /** L'ultimo detto su un agente: serve a non ripetersi. */

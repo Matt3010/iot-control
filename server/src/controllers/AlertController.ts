@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { whoIs } from '../auth/owner.js';
 import { noticeManager } from '../managers/NoticeManager.js';
+import { askOf } from '../persistence/page.js';
 
 /**
  * Gli avvisi avvenuti.
@@ -12,7 +13,7 @@ import { noticeManager } from '../managers/NoticeManager.js';
 export class AlertController {
   list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await noticeManager.mine(whoIs(req).id, 50));
+      res.json(await noticeManager.mine(whoIs(req).id, askOf(req, 8)));
     } catch (error) {
       next(error);
     }

@@ -10,10 +10,23 @@
    * tratteggiata del «creane un altro» — se la disegnano da sé: è un'altra
    * cosa, e fingere che sia la stessa costerebbe più di quanto risparmia.
    */
-  let { children }: { children: Snippet } = $props();
+  let {
+    wide = false,
+    children,
+  }: {
+    /**
+     * Attraverso tutte le colonne invece che dentro una.
+     *
+     * Una tabella è fatta di righe che si leggono per intero: in trecento
+     * pixel ogni riga va a capo due volte e le colonne non si incolonnano
+     * più — tanto vale un elenco. Chi ha bisogno di larghezza la chiede.
+     */
+    wide?: boolean;
+    children: Snippet;
+  } = $props();
 </script>
 
-<section class="card">
+<section class="card" class:wide>
   {@render children()}
 </section>
 
@@ -31,4 +44,6 @@
     border-radius: var(--r-lg);
     background: var(--glass-strong);
   }
+
+  .card.wide { column-span: all; }
 </style>

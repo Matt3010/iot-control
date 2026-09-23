@@ -278,6 +278,10 @@ export interface Notice {
   /** Come si legge: le stesse parole arrivate sul telefono. */
   title: string;
   body: string;
+  /** Di chi si parla, per esteso: «Padova». Per una riga di tabella. */
+  who?: string;
+  /** E cosa gli e' successo, in tre parole: «non risponde da 20 minuti». */
+  short?: string;
   at: string;
   /** Quante macchine l'hanno ricevuta e quante l'hanno respinta. */
   sent: number;

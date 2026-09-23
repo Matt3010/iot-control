@@ -1,18 +1,31 @@
 <script lang="ts">
-  import { alerts } from '../lib/alerts.svelte';
-  import Icon from './Icon.svelte';
+  import { alerts, type Notice } from '../lib/alerts.svelte';
+  import Pager from './Pager.svelte';
+  import type { Column } from '../lib/table';
+  import Table from './Table.svelte';
 
   /**
    * Gli avvisi avvenuti, dal più recente.
    *
-   * La riga dice anche se è arrivata davvero, e non per pignoleria: una
-   * notifica può essere respinta — telefono spento, senza rete, notifiche
-   * negate — e questa pagina è l'unico posto dove uno che non è arrivato
-   * esiste lo stesso. «Te l'avevo detto» vale solo se si vede dove.
+   * A righe e non a schede: ognuno dice tre cose — quando, quale posto, cosa
+   * — e cinque schede alte mezza pagina per quindici parole l'una sono un
+   * elenco che non si scorre. In colonna si legge dall'alto e le ore si
+   * incolonnano da sole.
+   *
+   * La colonna della consegna non è pignoleria: una notifica può essere
+   * respinta, e questa pagina è l'unico posto dove un avviso che non è
+   * arrivato esiste lo stesso.
    */
   $effect(() => {
-    void alerts.load();
+    void alerts.load(0);
   });
+
+  const COLONNE: Column[] = [
+    { label: 'Quando', width: '96px' },
+    { label: 'Posto', width: '26%' },
+    { label: 'Cosa' },
+    { label: 'Consegna', width: '116px', align: 'end' },
+  ];
 
   /** Che ora era. Oggi basta l'ora; prima serve dire anche il giorno. */
   function when(at: string): string {
@@ -25,15 +38,15 @@
     ieri.setDate(ieri.getDate() - 1);
     if (ieri.toDateString() === then.toDateString()) return `ieri ${ore}`;
 
-    return `${then.toLocaleDateString('it', { day: 'numeric', month: 'short' })} ${ore}`;
+    return `${then.toLocaleDateString('it', { day: 'numeric', month: 'short' })}, ${ore}`;
   }
 
-  /** Com'è andata la consegna. Detto solo quando c'è qualcosa da dire. */
-  function delivery(sent: number, failed: number): string {
-    if (failed && !sent) return 'non consegnato';
-    if (failed) return `consegnato a ${sent}, respinto da ${failed}`;
-    if (!sent) return 'nessuna macchina iscritta';
-    return '';
+  /** Com'è andata la consegna, in due parole. */
+  function delivery(row: Notice): { what: string; bad: boolean } {
+    if (row.failed && !row.sent) return { what: 'respinto', bad: true };
+    if (row.failed) return { what: `${row.sent} sì, ${row.failed} no`, bad: true };
+    if (!row.sent) return { what: 'nessun telefono', bad: false };
+    return { what: row.sent === 1 ? 'consegnato' : `${row.sent} telefoni`, bad: false };
   }
 </script>
 
@@ -43,87 +56,82 @@
   {#if !alerts.loaded}
     <!-- prima di sapere non si dice niente: «non è successo niente» detto
          mentre si sta ancora chiedendo è una bugia che dura un secondo -->
-    <p class="say quiet">Un momento…</p>
-  {:else if !alerts.rows.length}
-    <p class="say quiet">
-      Non è ancora successo niente. Quando un posto smetterà di rispondere lo troverai scritto qui,
-      anche se la notifica non fosse arrivata.
-    </p>
+    <p class="say">Un momento…</p>
   {:else}
-    <ul>
-      {#each alerts.rows as row (row.id)}
-        {@const male = delivery(row.sent, row.failed)}
-        <li>
-          <span class="segno" class:is-back={row.kind === 'back'}>
-            <Icon name={row.kind === 'back' ? 'check' : 'alert'} />
-          </span>
+    <Table columns={COLONNE} rows={alerts.rows} label="Gli avvisi avvenuti">
+      {#snippet row(one: Notice)}
+        {@const esito = delivery(one)}
+        <td class="quando">{when(one.at)}</td>
+        <td class="posto">
+          <!-- il pallino, come sui luoghi e sugli agenti: giallo quando c'e'
+               qualcosa che non va, verde quando e' rientrato -->
+          <span class="segno" class:is-back={one.kind === 'back'}></span>
+          {one.who ?? '—'}
+        </td>
+        <td>{one.short ?? one.title}</td>
+        <td class="end">
+          <span class="esito" class:male={esito.bad}>{esito.what}</span>
+        </td>
+      {/snippet}
 
-          <div class="detto">
-            <p class="title">{row.title}</p>
-            <p class="body">{row.body}</p>
-            <!-- la consegna mancata va sotto le parole e non accanto all'ora:
-                 è una frase, e in colonna stretta si spezzava in tre righe
-                 rubando metà riga a quello che l'avviso diceva -->
-            {#if male}<p class="male">{male}</p>{/if}
-          </div>
+      {#snippet foot()}
+        <Pager
+          total={alerts.total}
+          offset={alerts.offset}
+          limit={alerts.limit}
+          busy={alerts.busy}
+          what="avvisi"
+          onpick={(offset: number) => void alerts.load(offset)}
+        />
+      {/snippet}
 
-          <time datetime={row.at}>{when(row.at)}</time>
-        </li>
-      {/each}
-    </ul>
+      {#snippet empty()}
+        <p class="say">
+          Non è ancora successo niente. Quando un posto smetterà di rispondere lo troverai scritto
+          qui, anche se la notifica non fosse arrivata.
+        </p>
+      {/snippet}
+    </Table>
   {/if}
 </div>
 
 <style>
   .avvenuti { display: grid; gap: 9px; min-width: 0; }
 
-  .say { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-2); }
+  .say { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-3); }
 
-  .quiet { color: var(--ink-3); }
+  .quando { white-space: nowrap; color: var(--ink-3); }
 
-  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-
-  li {
-    display: grid;
-    /* segno, quello che dice, quando: il tempo a destra si legge in colonna */
-    grid-template-columns: auto 1fr auto;
-    align-items: start;
-    gap: 9px;
-    padding: 8px 2px;
-    border-top: 1px solid var(--hairline-soft);
-  }
-
-  li:first-child { border-top: 0; }
+  .posto { font-weight: 560; color: var(--ink); }
 
   .segno {
-    display: inline-flex;
-    margin-top: 1px;
-    color: var(--warn);
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 7px;
+    vertical-align: 1px;
+    border-radius: 50%;
+    background: var(--warn);
   }
 
   /* il ritorno non è un allarme: stesso posto, colore diverso */
-  .segno.is-back { color: var(--ok); }
+  .segno.is-back { background: var(--ok); }
 
-  .segno :global(.ico) { width: 14px; height: 14px; }
-
-  .detto { min-width: 0; display: grid; gap: 2px; }
-
-  .title {
-    margin: 0;
-    font-size: 12.5px;
-    font-weight: 560;
-    letter-spacing: -0.008em;
-    color: var(--ink);
-  }
-
-  .body { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
-
-  time {
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
+  /* l'esito è un dato, non una frase: sta in una pastiglia e non compete con
+     quello che l'avviso diceva */
+  .esito {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: var(--sunken-hover);
+    font-size: 10.5px;
+    letter-spacing: 0.005em;
     color: var(--ink-3);
     white-space: nowrap;
   }
 
-  .male { margin: 0; font-size: 11px; color: var(--warn); }
+  .esito.male {
+    background: color-mix(in oklab, var(--warn) 16%, transparent);
+    color: var(--warn);
+  }
 </style>

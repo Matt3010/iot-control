@@ -22,10 +22,6 @@
   </PageCard>
 
   <PageCard>
-    <NoticeList />
-  </PageCard>
-
-  <PageCard>
     <span class="eyebrow">Quando un posto tace</span>
     <p class="say">
       Se un posto sta zitto per un quarto d'ora te lo diciamo noi, senza che tu debba chiedere
@@ -35,6 +31,10 @@
     <p class="say quiet">
       Gli avvisi arrivano se c'è rete e se il telefono li accetta. Non è un sistema di sicurezza.
     </p>
+  </PageCard>
+
+  <PageCard wide>
+    <NoticeList />
   </PageCard>
 </PageShell>
 

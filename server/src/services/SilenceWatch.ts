@@ -54,6 +54,8 @@ export async function sweep(): Promise<void> {
       await noticeManager.tell(agent.ownerId, {
         kind: 'silent',
         agentId: agent.id,
+        who: agent.name,
+        short: `non risponde ${since(agent.lastSeenAt as string)}`,
         title: `${agent.name} non risponde`,
         body: `Quel posto non si fa vivo ${since(agent.lastSeenAt as string)}. Se è saltata la corrente o la linea, di là non c'è più nessuno a dirlo.`,
       });
@@ -66,6 +68,8 @@ export async function sweep(): Promise<void> {
     await noticeManager.tell(agent.ownerId, {
       kind: 'back',
       agentId: agent.id,
+      who: agent.name,
+      short: 'è tornato',
       title: `${agent.name} è tornato`,
       body: 'Quel posto si è ricollegato: da qui si vede di nuovo quello che c\u2019è dentro.',
     });

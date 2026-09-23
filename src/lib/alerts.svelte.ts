@@ -7,11 +7,24 @@ export interface Notice {
   agentId?: string;
   title: string;
   body: string;
+  /** Il posto e cosa gli è successo, già divisi: una riga di tabella. */
+  who?: string;
+  short?: string;
   at: string;
   /** Quante macchine l'hanno ricevuto e quante l'hanno respinto. */
   sent: number;
   failed: number;
 }
+
+/** Un pezzo di elenco, con il conto di quanto è lungo. */
+interface Page<T> {
+  rows: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+const QUANTI = 8;
 
 /**
  * Quello che è successo mentre non guardavi.
@@ -21,16 +34,28 @@ export interface Notice {
  * attraversa i posti, e soprattutto può non essere arrivato — telefono
  * spento, senza rete, notifiche negate. Senza questo elenco un avviso che non
  * è arrivato non sarebbe mai esistito.
+ *
+ * Arrivano otto per volta: sono duecento, e nessuno li scorre tutti. Il conto
+ * però arriva sempre, se no «avanti» sarebbe un salto nel buio.
  */
 class Alerts {
   rows = $state<Notice[]>([]);
+  total = $state(0);
+  offset = $state(0);
+  limit = $state(QUANTI);
   /** Prima di sapere: l'elenco vuoto e «non è successo niente» non sono uguali. */
   loaded = $state(false);
+  busy = $state(false);
 
-  async load(): Promise<void> {
+  async load(offset = this.offset): Promise<void> {
+    this.busy = true;
     try {
-      this.rows = await api.get<Notice[]>('/alerts');
+      const page = await api.get<Page<Notice>>(`/alerts?offset=${offset}&limit=${this.limit}`);
+      this.rows = page.rows;
+      this.total = page.total;
+      this.offset = page.offset;
     } finally {
+      this.busy = false;
       this.loaded = true;
     }
   }

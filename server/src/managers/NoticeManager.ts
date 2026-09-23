@@ -1,4 +1,5 @@
 import { store } from '../persistence/JsonStore.js';
+import { pageOf, type Ask, type Page } from '../persistence/page.js';
 import { NoticeRepository } from '../repositories/NoticeRepository.js';
 import { pushManager, type Note } from './PushManager.js';
 import type { Notice } from '../types.js';
@@ -13,8 +14,8 @@ import type { Notice } from '../types.js';
  * schermo e non c'era niente.
  */
 export class NoticeManager {
-  mine(ownerId: string, limit?: number): Promise<Notice[]> {
-    return store.transaction((tx) => new NoticeRepository(tx).findAllOf(ownerId, limit));
+  mine(ownerId: string, ask: Ask): Promise<Page<Notice>> {
+    return store.transaction((tx) => pageOf(new NoticeRepository(tx).findAllOf(ownerId), ask));
   }
 
   /** L'ultimo detto su un agente: serve a non ripetere la stessa cosa. */
