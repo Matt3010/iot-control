@@ -266,12 +266,24 @@ const PAROLE: Record<string, string> = {
  * dentro il testo dell'eccezione. Si guarda li' dentro, invece di dire
  * sempre la stessa cosa a tutti.
  */
+const CASTIGO = 'Quel servizio ha messo in pausa gli accessi. Riprova fra qualche minuto.';
+
 function dentro(testo: string): string | undefined {
   for (const chiave of Object.keys(PAROLE)) {
     if (testo.includes(chiave)) return PAROLE[chiave];
   }
-  if (/(401|403|invalid.?password|wrong.?password)/i.test(testo)) return PAROLE.invalid_auth;
-  if (/(429|too many|limit)/i.test(testo)) return 'Quel servizio ha messo in pausa gli accessi. Riprova fra qualche minuto.';
+  /*
+   * I numeri si riconoscono solo nella forma in cui arrivano davvero —
+   * `'error': 401` — e non dovunque compaiano. Un 401 dentro al numero di
+   * serie di una presa non vuol dire che la password sia sbagliata, e dire a
+   * qualcuno una cosa falsa con sicurezza e' peggio che dirgli che non si sa.
+   */
+  const numero = /["']?(error|code|status|errno)["']?\s*[:=]\s*["']?(\d{3,5})/i.exec(testo);
+  const quale = numero ? Number(numero[2]) : 0;
+  if (quale === 401 || quale === 403) return PAROLE.invalid_auth;
+  if (quale === 429) return CASTIGO;
+  if (/too many requests|rate limit/i.test(testo)) return CASTIGO;
+
   return undefined;
 }
 
