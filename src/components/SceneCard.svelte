@@ -144,6 +144,28 @@
     void devices.patchScene(scene, { steps });
   }
 
+  /**
+   * Sposta una riga di un posto, su o giù.
+   *
+   * L'attesa viaggia con la riga, perché è sua: «parte cinque secondi dopo
+   * quella sopra» resta vero anche se sopra c'è un'altra riga. La prima però
+   * non ha un «prima», quindi chi finisce in cima perde la sua attesa.
+   */
+  function move(at: number, verso: -1 | 1): void {
+    const dove = at + verso;
+    if (dove < 0 || dove >= scene.steps.length) return;
+
+    const steps = [...scene.steps];
+    const preso = steps[at] as SceneStep;
+    steps[at] = steps[dove] as SceneStep;
+    steps[dove] = preso;
+
+    const primo = steps[0] as SceneStep;
+    if (primo.after) steps[0] = { ...primo, after: undefined };
+
+    void devices.patchScene(scene, { steps });
+  }
+
   /** Quanto si aspetta prima di quella riga. Zero vuol dire insieme alla precedente. */
   function setWait(at: number, seconds: number): void {
     const steps = scene.steps.map((one, index) =>
@@ -261,6 +283,28 @@
             {:else}
               <span class="line">{says.who} · <b>{says.what}</b></span>
             {/if}
+            <!-- su e giù: l'ordine di una sequenza e' la sequenza, e senza
+                 questi per spostare una riga bisognava rifare le altre -->
+            <Button
+              look="icon"
+              size="sm"
+              extra="sposta"
+              title="Spostala su"
+              disabled={at === 0}
+              onclick={() => move(at, -1)}
+            >
+              <Icon name="collapse" />
+            </Button>
+            <Button
+              look="icon"
+              size="sm"
+              extra="sposta"
+              title="Spostala giù"
+              disabled={at === scene.steps.length - 1}
+              onclick={() => move(at, 1)}
+            >
+              <Icon name="expand" />
+            </Button>
             <Button
               look="icon"
               size="sm"
@@ -451,14 +495,21 @@
 
   /* la crocetta sta sempre, smorta: un comando che si scopre solo passandoci
      sopra non si scopre */
-  .written :global(.drop) {
-    width: 26px;
+  .written :global(.drop), .written :global(.sposta) {
+    width: 24px;
     height: 26px;
-    opacity: 0.45;
+    opacity: 0.4;
     transition: opacity 0.16s;
   }
 
-  .written li:hover :global(.drop), .written :global(.drop:hover) { opacity: 1; }
+  .written li:hover :global(.drop),
+  .written li:hover :global(.sposta),
+  .written :global(.drop:hover),
+  .written :global(.sposta:hover) { opacity: 1; }
+
+  .written :global(.sposta:disabled) { opacity: 0.12; }
+
+  .written :global(.sposta .ico) { width: 12px; height: 12px; }
 
   /* Il pannello sono tre cose diverse una sotto l'altra: quello che la scena
      fa, quando parte da sola, e cosa aggiungerci. Senza una riga che le
