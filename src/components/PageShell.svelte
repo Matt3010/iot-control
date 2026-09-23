@@ -40,12 +40,12 @@
      * giornale, e va bene dove sono alte in modo imprevedibile — un agente
      * collegato è lungo una pagina, uno appena creato sono tre righe.
      *
-     * `grid` le mette in riga vere: stessa altezza e stesso stacco fra tutte.
-     * Serve dove sotto c'è qualcosa di largo, perché a colonne il bordo di
-     * sotto resta frastagliato e il vuoto prima della tabella viene di due
-     * misure diverse a seconda di dove guardi.
+     * `rows` le mette in riga vere, con la stessa altezza e lo stesso stacco
+     * fra tutte. Serve dove sotto c'è qualcosa di largo, perché a colonne il
+     * bordo di sotto resta frastagliato e il vuoto prima della tabella viene
+     * di due misure diverse a seconda di dove guardi.
      */
-    layout?: 'columns' | 'grid';
+    layout?: 'columns' | 'rows';
     children: Snippet;
   } = $props();
 
@@ -81,7 +81,7 @@
   <!-- A colonne, non a griglia: una scheda collegata e' alta, una appena
        creata sono tre righe, e in una griglia la riga prende l'altezza della
        piu' alta lasciando accanto un buco grande come mezza pagina. -->
-  <div class="grid {layout}">
+  <div class="cards {layout}">
     {@render children()}
   </div>
 </div>
@@ -148,19 +148,19 @@
     color: var(--ink-3);
   }
 
-  .grid {
+  .cards {
     max-width: 960px;
     margin: 0 auto;
   }
 
-  .grid.columns {
+  .cards.columns {
     columns: 380px;
     column-gap: 14px;
   }
 
   /* lo stacco fra le righe lo tiene la scheda, come a colonne: qui il vuoto
      è zero, se no le due misure si sommerebbero */
-  .grid.grid {
+  .cards.rows {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     column-gap: 14px;
