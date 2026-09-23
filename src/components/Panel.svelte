@@ -108,6 +108,13 @@
           {store.currentPlaces.length === 1 ? 'luogo' : 'luoghi'}
         </span>
       {/if}
+      <!-- Chi sei. Stava solo nel titolo del tasto per uscire, cioè da nessuna
+           parte su un telefono: e «esci» senza sapere da cosa è una domanda
+           senza risposta. Il nome per esteso resta lì sotto, a portata di
+           passaggio del mouse. -->
+      {#if auth.account}
+        <span class="me" title={auth.account.email}>@{auth.account.handle}</span>
+      {/if}
       <Button
         look="icon"
         tone="danger"
@@ -386,6 +393,18 @@
 
 #filters, #group-filters { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* chi sei: piccolo e smorto, ma scritto */
+.me {
+  min-width: 0;
+  max-width: 11ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 600px) {
   /* Senza la mappa dietro non c'è niente da lasciar vedere: l'elenco prende
      tutto lo schermo, meno il posto del tasto in fondo. Un pannello alto
@@ -397,5 +416,10 @@
     width: auto;
     max-height: calc(100dvh - 96px - env(safe-area-inset-bottom));
   }
+
+  /* Su uno schermo stretto in testa non ci stanno tutti: il conteggio se ne
+     va, perché lo stesso numero è scritto due righe più sotto, accanto a
+     «Tutti». Chi sei invece non è scritto da nessun'altra parte. */
+  :global(#place-count) { display: none; }
 }
 </style>
