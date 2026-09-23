@@ -65,12 +65,12 @@ export class PushController {
    */
   test = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const partite = await pushManager.send([whoIs(req).id], {
+      const esito = await pushManager.send([whoIs(req).id], {
         title: 'Gli avvisi funzionano',
         body: 'Da adesso ti arrivano qui. Quando non li vuoi più, si spengono dallo stesso posto.',
         tag: 'prova',
       });
-      res.json({ sent: partite });
+      res.json(esito);
     } catch (error) {
       next(error);
     }

@@ -1,7 +1,7 @@
 import webpush from 'web-push';
 import { store } from '../persistence/JsonStore.js';
 import { PushRepository } from '../repositories/PushRepository.js';
-import { pushKeys } from '../push/keys.js';
+import { pushKeys, subject } from '../push/keys.js';
 import type { PushSub } from '../types.js';
 
 /** Quello che arriva sul telefono: poche parole, e dove portano. */
@@ -49,18 +49,31 @@ export class PushManager {
    *
    * Non aspetta e non si lamenta: un avviso è una cortesia, e far cadere
    * quello che stava succedendo perché un telefono spento non ha risposto
-   * sarebbe il mondo al contrario. Quello che torna è quante ne sono partite,
-   * che serve solo a chi sta provando.
+   * sarebbe il mondo al contrario.
+   *
+   * Torna quante ne sono partite e quante sono state rifiutate, e i due
+   * numeri non sono la stessa cosa detta al contrario: zero e zero vuol dire
+   * che non c'è nessun telefono iscritto, zero e due che ce ne sono e la
+   * consegna è stata respinta. Il primo si risolve riaccendendo la levetta,
+   * il secondo no.
    */
-  async send(userIds: string[], note: Note): Promise<number> {
-    if (!userIds.length) return 0;
+  async send(userIds: string[], note: Note): Promise<{ sent: number; failed: number }> {
+    if (!userIds.length) return { sent: 0, failed: 0 };
 
-    await pushKeys();
+    const keys = await pushKeys();
     const subs = await store.transaction((tx) => new PushRepository(tx).findAllFor(userIds));
-    if (!subs.length) return 0;
+    if (!subs.length) return { sent: 0, failed: 0 };
 
     const payload = JSON.stringify(note);
+    // Chi firma si dichiara a ogni invio e non una volta all'avvio: il nome
+    // del sito si impara dalla prima richiesta, che può arrivare dopo.
+    const vapidDetails = {
+      subject: subject(),
+      publicKey: keys.publicKey,
+      privateKey: keys.privateKey,
+    };
     let partite = 0;
+    let respinte = 0;
 
     await Promise.all(
       subs.map(async (sub) => {
@@ -68,17 +81,18 @@ export class PushManager {
           await webpush.sendNotification(
             { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
             payload,
-            { TTL: 600 },
+            { TTL: 600, vapidDetails },
           );
           partite += 1;
           await this.#alive(sub.endpoint);
         } catch (error) {
+          respinte += 1;
           await this.#maybeDead(sub, error);
         }
       }),
     );
 
-    return partite;
+    return { sent: partite, failed: respinte };
   }
 
   #alive(endpoint: string): Promise<void> {

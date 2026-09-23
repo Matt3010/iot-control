@@ -10,6 +10,12 @@ import { api } from './api';
  * l'interfaccia possa dire cosa manca invece di un «non funziona».
  */
 
+/** Quante ne sono partite e quante sono state respinte: due guasti diversi. */
+export interface Esito {
+  sent: number;
+  failed: number;
+}
+
 /** Come si passa dalla chiave pubblica, che è testo, a quello che vuole il browser. */
 function bytesOf(base64: string): Uint8Array {
   const dritto = (base64 + '='.repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
@@ -159,23 +165,25 @@ class Push {
    * pezzo che resta in ascolto. Allora si riconsegna l'indirizzo e si
    * riprova una volta, invece di lasciare un tasto che non fa niente.
    */
-  async tryIt(): Promise<number> {
-    if (this.busy) return 0;
+  async tryIt(): Promise<Esito> {
+    if (this.busy) return { sent: 0, failed: 0 };
     this.busy = true;
 
     try {
-      const { sent } = await api.post<{ sent: number }>('/push/test', {});
-      if (sent) return sent;
+      const primo = await api.post<Esito>('/push/test', {});
+      // respinte vuol dire che il server ci conosce: reiscriversi non
+      // servirebbe a niente e nasconderebbe il guasto vero
+      if (primo.sent || primo.failed) return primo;
 
       const reg = await navigator.serviceWorker.getRegistration();
       const sub = await reg?.pushManager.getSubscription();
       if (!sub) {
         this.on = false;
-        return 0;
+        return primo;
       }
 
       await this.#tell(sub);
-      return (await api.post<{ sent: number }>('/push/test', {})).sent;
+      return await api.post<Esito>('/push/test', {});
     } finally {
       this.busy = false;
     }

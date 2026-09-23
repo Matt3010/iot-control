@@ -53,10 +53,11 @@
    */
   async function prova(): Promise<void> {
     try {
-      const partite = await push.tryIt();
-      partita = partite > 0;
-      if (partite > 1) toast.show(`Avviso di prova mandato a ${partite} macchine`);
-      else if (partite === 1) toast.show('Avviso di prova mandato: arriva fra un istante');
+      const { sent, failed } = await push.tryIt();
+      partita = sent > 0;
+      if (sent > 1) toast.show(`Avviso di prova mandato a ${sent} macchine`);
+      else if (sent === 1) toast.show('Avviso di prova mandato: arriva fra un istante');
+      else if (failed) toast.show('La consegna è stata respinta: non dipende da questa macchina');
       else toast.show('Nessuna macchina iscritta: spegni e riaccendi la levetta');
     } catch (error) {
       toast.show(`Prova non riuscita: ${(error as Error).message}`);
@@ -86,31 +87,36 @@
     {#if partita}
       <p class="nota">
         <Icon name="alert" />
-        Se non ne vedi arrivare nessuna, è il sistema a trattenerla: su Mac in
+        <span>Se non ne vedi arrivare nessuna, è il sistema a trattenerla: su Mac in
         <b>Impostazioni di Sistema › Notifiche</b>, su Windows in <b>Sistema › Notifiche</b>, il
         browser dev'essere fra quelli che possono mostrarle — e una modalità «non disturbare»
-        accesa le mette da parte in silenzio.
+          accesa le mette da parte in silenzio.</span
+        >
       </p>
     {:else if push.why}
       <!-- cos'è andato storto, per esteso: la levetta da sola direbbe solo
            che è tornata indietro -->
       <p class="nota">
         <Icon name="alert" />
-        {push.why}
+        <span>{push.why}</span>
       </p>
     {:else if push.permission === 'denied'}
       <p class="nota">
         <Icon name="alert" />
-        Il browser li ha bloccati per questo sito. Si riaccendono dalle sue impostazioni, alla voce
-        delle notifiche — da qui non si può.
+        <span
+          >Il browser li ha bloccati per questo sito. Si riaccendono dalle sue impostazioni, alla
+          voce delle notifiche — da qui non si può.</span
+        >
       </p>
     {/if}
   {:else if push.needsInstall}
     <!-- Non è un difetto nostro e non si aggira: tanto vale dire come si fa. -->
     <p class="nota">
       <Icon name="alert" />
-      Su iPhone gli avvisi arrivano solo se aggiungi questa pagina alla schermata home: il tasto
-      <b>Condividi</b>, poi <b>Aggiungi alla schermata Home</b>. Da lì si accendono.
+      <span
+        >Su iPhone gli avvisi arrivano solo se aggiungi questa pagina alla schermata home: il tasto
+        <b>Condividi</b>, poi <b>Aggiungi alla schermata Home</b>. Da lì si accendono.</span
+      >
     </p>
   {:else}
     <p class="nota">Questo browser non sa ricevere avvisi.</p>
@@ -131,7 +137,11 @@
   }
 
   /* quello che manca, detto per esteso: una riga in più qui vale un supporto
-     tecnico in meno */
+     tecnico in meno.
+
+     Il testo sta tutto dentro un blocco suo: in fila con l'icona, i pezzi in
+     grassetto diventavano altrettante colonne e la frase si leggeva a
+     scalini. */
   .nota {
     display: flex;
     align-items: flex-start;
@@ -141,6 +151,8 @@
     line-height: 1.45;
     color: var(--ink-3);
   }
+
+  .nota span { min-width: 0; }
 
   .nota b { font-weight: 600; color: var(--ink-2); }
 

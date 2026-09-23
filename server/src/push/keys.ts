@@ -22,8 +22,40 @@ import { config } from '../config.js';
 export interface PushKeys {
   publicKey: string;
   privateKey: string;
-  /** A chi scrivere se un servizio di consegna ha qualcosa da ridire. */
-  subject: string;
+  /**
+   * Chi siamo, per il servizio di consegna. Sta nel file per le installazioni
+   * vecchie, ma non si usa più da lì: vedi `subject()`.
+   */
+  subject?: string;
+}
+
+/**
+ * L'indirizzo del sito, imparato dalla prima richiesta che arriva.
+ *
+ * Serve a firmare le notifiche, e non si può sapere da qui: questo
+ * programma gira dietro un tunnel, dentro un container, e il nome con cui lo
+ * si raggiunge lo conosce solo chi bussa. Chiederlo a chi installa sarebbe
+ * una domanda in più a cui si può rispondere da soli.
+ */
+let bussato = '';
+
+export function noteOrigin(host: string | undefined): void {
+  if (bussato || !host) return;
+  // da fuori si arriva sempre in https; in casa, sviluppando, no
+  const locale = /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(host);
+  bussato = `${locale ? 'http' : 'https'}://${host}`;
+}
+
+/**
+ * Con che nome ci si presenta al servizio di consegna.
+ *
+ * Deve essere un indirizzo vero — una pagina o una casella di posta — e
+ * Apple lo controlla davvero: con un dominio inventato risponde 403 e la
+ * notifica non parte, mentre Google la lascia passare lo stesso. Il primo
+ * iPhone iscritto qui non ha ricevuto niente proprio per questo.
+ */
+export function subject(): string {
+  return process.env.PUSH_SUBJECT || bussato || 'https://github.com/place-index';
 }
 
 const where = (): string => path.join(config.dataDir, 'push.json');
@@ -39,7 +71,7 @@ export async function pushKeys(): Promise<PushKeys> {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
 
     const made = webpush.generateVAPIDKeys();
-    held = { ...made, subject: 'mailto:avvisi@place-index.invalid' };
+    held = { ...made };
 
     await fs.mkdir(config.dataDir, { recursive: true });
     // Prima accanto e poi rinominato: un'interruzione a metà non deve
@@ -49,6 +81,5 @@ export async function pushKeys(): Promise<PushKeys> {
     await fs.rename(scratch, where());
   }
 
-  webpush.setVapidDetails(held.subject, held.publicKey, held.privateKey);
   return held;
 }

@@ -441,9 +441,12 @@
   #panel {
     left: 10px;
     right: 10px;
-    top: 10px;
+    /* Installata nella schermata home non c'è la barra del browser a fare da
+       cuscinetto: l'orologio e la batteria stanno sopra la pagina, e dieci
+       pixel dall'alto mandavano il nome della mappa a finirci sotto. */
+    top: calc(10px + env(safe-area-inset-top));
     width: auto;
-    max-height: calc(100dvh - 96px - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 
   /* Su uno schermo stretto in testa non ci stanno tutti: il conteggio se ne

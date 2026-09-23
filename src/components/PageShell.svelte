@@ -78,7 +78,10 @@
     inset: 0;
     z-index: var(--z-sheet);
     overflow: auto;
-    padding: 28px 20px 48px;
+    /* Gli angoli del telefono: installata nella schermata home la pagina
+       arriva fin sotto l'orologio, e in orizzontale fin dentro la tacca. */
+    padding: calc(28px + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+      calc(48px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
     background: rgb(var(--base));
   }
 
