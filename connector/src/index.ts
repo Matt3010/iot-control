@@ -10,6 +10,7 @@ import type {
 } from '../../shared/protocol.js';
 import { ConfigError, loadConfig } from './config.js';
 import { toServiceCall, translate } from './entities.js';
+import { forgetDoors, lastSeen, noticed, reachable, watchEyes } from './eyes.js';
 import { channelOf } from './go2rtc.js';
 import { HomeAssistant } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
@@ -104,6 +105,9 @@ async function main(): Promise<void> {
     }
 
     await distinte();
+    // l'indirizzo di una telecamera può essere cambiato mentre non guardavamo
+    forgetDoors();
+    await bussa();
 
     console.log(`${devices.size} dispositivi da home assistant`);
     announceAll();
@@ -138,6 +142,60 @@ async function main(): Promise<void> {
     );
   }
 
+  /** Le telecamere, che sono le uniche a cui si bussa. */
+  const occhi = (): string[] =>
+    [...devices.keys()].filter((externalId) => externalId.startsWith('camera.'));
+
+  /**
+   * Quello che dice il registratore, scritto sopra a quello che dice Home
+   * Assistant.
+   *
+   * Lui non va a bussare: una telecamera generica resta `idle` anche quando
+   * il registratore è staccato dalla rete, e da qui usciva verde. Il pallino
+   * di una telecamera deve dire una cosa sola — l'immagine arriva o no —
+   * perché è quella la domanda di chi lo guarda.
+   */
+  const vero = (externalId: string, online: boolean): boolean => {
+    if (!externalId.startsWith('camera.')) return online;
+    const visto = lastSeen(externalId);
+    // non sapere non è sapere di no: senza risposta si lascia dire a lui
+    return visto === undefined ? online : online && visto;
+  };
+
+  /**
+   * Quello che si è appena scoperto chiedendo un'immagine.
+   *
+   * È la prova più forte che ci sia e arriva gratis: se il fotogramma non
+   * viene, quella telecamera non c'è, e non c'è bisogno di aspettare il giro
+   * del minuto per dirlo a chi sta guardando lo schermo.
+   */
+  const visto = (externalId: string, ok: boolean): void => {
+    if (!noticed(externalId, ok)) return;
+    const device = devices.get(externalId);
+    if (!device) return;
+
+    const adesso = { ...device, online: vero(externalId, ok || device.online) };
+    devices.set(externalId, adesso);
+    link.send({
+      type: 'state',
+      externalId,
+      online: adesso.online,
+      state: adesso.state,
+      at: new Date().toISOString(),
+    });
+  };
+
+  /** Un giro di bussate su tutte, e l'inventario si allinea. */
+  const bussa = async (): Promise<void> => {
+    for (const externalId of occhi()) {
+      const device = devices.get(externalId);
+      if (!device) continue;
+      const risponde = await reachable(externalId);
+      if (risponde === undefined) continue;
+      devices.set(externalId, { ...device, online: device.online && risponde });
+    }
+  };
+
   const ha = new HomeAssistant(
     config,
     () => void refill().catch((error: unknown) => console.warn(`non riesco a leggere home assistant: ${(error as Error).message}`)),
@@ -149,7 +207,11 @@ async function main(): Promise<void> {
       const known = devices.get(fresh.externalId);
       // il nome accorciato non si perde a ogni cambio di stato: quello buono
       // lo ha deciso l'ultimo giro d'inventario, questo porta solo i valori
-      const device = { ...fresh, name: known?.name ?? fresh.name };
+      const device = {
+        ...fresh,
+        name: known?.name ?? fresh.name,
+        online: vero(fresh.externalId, fresh.online),
+      };
       devices.set(device.externalId, device);
 
       // Se cambia solo quanto è accesa una luce non serve rimandare l'inventario:
@@ -233,6 +295,7 @@ async function main(): Promise<void> {
 
     try {
       const jpeg = await ha.snapshot(ask.externalId);
+      visto(ask.externalId, true);
       link.send({
         type: 'ack',
         reqId: ask.reqId,
@@ -244,6 +307,7 @@ async function main(): Promise<void> {
       // guardare: una telecamera che non manda niente ha sempre un motivo, e
       // di la' arriva solo la frase corta.
       console.warn(`fotogramma da ${ask.externalId}: ${(error as Error).message}`);
+      visto(ask.externalId, false);
       fail((error as Error).message);
     }
   };
@@ -301,6 +365,30 @@ async function main(): Promise<void> {
     link.close();
     process.exit(0);
   };
+
+  /*
+   * E qualcuno bussa alle telecamere ogni minuto.
+   *
+   * Senza, il pallino direbbe la verità solo a chi sta guardando: un
+   * registratore staccato mentre nessuno guarda resterebbe verde fino alla
+   * prossima immagine chiesta — cioè, di notte, fino al mattino. E l'avviso
+   * «dimmi se smette di rispondere» aspetta proprio quel momento lì.
+   */
+  watchEyes(occhi, (externalId, up) => {
+    const device = devices.get(externalId);
+    if (!device) return;
+
+    const adesso = { ...device, online: up && device.online };
+    devices.set(externalId, adesso);
+    console.log(`${externalId}: ${up ? 'risponde di nuovo' : 'non risponde'}`);
+    link.send({
+      type: 'state',
+      externalId,
+      online: adesso.online,
+      state: adesso.state,
+      at: new Date().toISOString(),
+    });
+  });
 
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
