@@ -1,3 +1,8 @@
+<!-- Senza un blocco di codice, anche vuoto, chi legge i tipi non sa dire
+     cosa sia questo file e il controllo si ferma su un errore che non
+     riguarda nessuno. -->
+<script lang="ts"></script>
+
 <!-- Lo scheletro del pannello mentre il primo stato arriva dal server:
      meglio una forma vuota che un conteggio sbagliato. -->
 <div class="skeleton-block">

@@ -46,29 +46,44 @@
    * Si dice sulla riga, che è dove si guarda — e si dice come altrove, se no
    * la stessa cosa avrebbe due facce a seconda della pagina.
    */
+  /**
+   * A che punto è, se sta partendo adesso.
+   *
+   * Lo dice il server mentre la esegue, quindi si vede anche se l'ha premuta
+   * qualcun altro da un altro telefono — ed è l'unica cosa che distingue una
+   * scena lenta da una scena che non è partita.
+   */
+  const corre = $derived(devices.running[scene.id]);
+
   /** Le righe come le vuole la linea del tempo: chi, cosa, come sta, e l'attesa. */
   const rails = $derived(
     scene.steps
+      .map((step, at) => {
+        const says = devices.saysOf(step);
+        const sta =
+          step.notify !== undefined || step.scene
+            ? { state: 'live' as const, says: step.scene ? 'Fa partire un’altra scena' : 'Manda un avviso' }
+            : how(step.deviceId as string);
+        return {
+          key: `${step.deviceId ?? step.scene ?? 'avviso'}:${step.code ?? ''}:${at}`,
+          who: says.who,
+          what: says.what,
+          talk: step.notify !== undefined || !!step.scene,
+          call: !!step.scene,
+          wait: step.after,
+          state: sta.state,
+          says: sta.says,
+          // Il numero che dice il server conta le righe come stanno scritte,
+          // e qui sotto qualcuna non si disegna: senza il suo posto vero, il
+          // passo che batte sarebbe quello sbagliato.
+          now: corre?.at === at + 1,
+          done: !!corre && corre.at > at + 1,
+          vuota: step.notify === '',
+        };
+      })
       // una riga che deve ancora dire qualcosa non si mostra: quando parte
       // non avvisa nessuno, e qui sembrerebbe una riga vuota
-      .filter((step) => step.notify === undefined || step.notify !== '')
-      .map((step, at) => {
-      const says = devices.saysOf(step);
-      const sta =
-        step.notify !== undefined || step.scene
-          ? { state: 'live' as const, says: step.scene ? 'Fa partire un’altra scena' : 'Manda un avviso' }
-          : how(step.deviceId as string);
-      return {
-        key: `${step.deviceId ?? step.scene ?? 'avviso'}:${step.code ?? ''}:${at}`,
-        who: says.who,
-        what: says.what,
-        talk: step.notify !== undefined || !!step.scene,
-        call: !!step.scene,
-        wait: step.after,
-        state: sta.state,
-        says: sta.says,
-      };
-    }),
+      .filter((step) => !step.vuota),
   );
 
   function how(deviceId: string): { state: 'live' | 'lost' | 'unknown'; says: string } {
@@ -85,14 +100,6 @@
     };
   }
   const busy = $derived(devices.busy.includes(`scena:${scene.id}`));
-  /**
-   * A che punto è, se sta partendo adesso.
-   *
-   * Lo dice il server mentre la esegue, quindi si vede anche se l'ha premuta
-   * qualcun altro da un altro telefono — ed è l'unica cosa che distingue una
-   * scena lenta da una scena che non è partita.
-   */
-  const corre = $derived(devices.running[scene.id]);
 
   /**
    * Niente parte senza un sì, come per un dispositivo solo — e qui ancora di
@@ -130,14 +137,15 @@
     </Button>
   </div>
 
-  <!-- se parte da sola lo dice qui, senza doverla aprire: e' la differenza
-       fra una scena che aspetta te e una che va avanti per conto suo -->
-  {#if corre}
-    <p class="corre">
-      <span class="battito"></span>
-      {corre.of > 1 ? `sta partendo — passo ${corre.at} di ${corre.of}` : 'sta partendo'}
-    </p>
-  {:else if scene.when}
+  <!-- A che punto è non si scrive qui: lo dice la linea qui sotto, che si
+       colora fin dove è arrivata e batte sul passo di adesso. Contarli in
+       cima voleva dire leggere «passo 2 di 2» e poi cercare da soli quale
+       fosse la seconda riga.
+
+       Se invece parte da sola lo dice qui, senza doverla aprire: e' la
+       differenza fra una scena che aspetta te e una che va avanti per conto
+       suo. -->
+  {#if scene.when}
     <p class="auto" class:is-off={scene.when.off}>
       <Icon name="refresh" />
       <span class="detto">
@@ -219,33 +227,7 @@
 
   .away :global(.ico) { width: 12px; height: 12px; vertical-align: -2px; }
 
-
-
   .set-none { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
-
-  /* mentre parte: un punto che pulsa e a che passo è arrivata */
-  .corre {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: -2px 0 0;
-    font-size: 11.5px;
-    color: var(--accent);
-  }
-
-  .battito {
-    flex: none;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    animation: battito 1.1s ease-in-out infinite;
-  }
-
-  @keyframes battito {
-    0%, 100% { opacity: 0.35; transform: scale(0.85); }
-    50% { opacity: 1; transform: scale(1); }
-  }
 
   /* l'orario che ha, se parte da sola: piccolo, sotto il nome, e smorto
      quando è sospeso */

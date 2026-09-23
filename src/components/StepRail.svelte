@@ -1,4 +1,4 @@
-<script lang="ts" generics="T extends { key: string; wait?: number; state?: 'live' | 'lost' | 'unknown'; says?: string; talk?: boolean }">
+<script lang="ts" generics="T extends { key: string; wait?: number; state?: 'live' | 'lost' | 'unknown'; says?: string; talk?: boolean; now?: boolean; done?: boolean }">
   import type { Snippet } from 'svelte';
   import { saysWait } from '../lib/timing';
 
@@ -13,6 +13,11 @@
    *
    * Il pallino è lo stesso degli altri posti — verde risponde, rosso no,
    * grigio non si sa — perché un segno imparato una volta vale dappertutto.
+   *
+   * Mentre la sequenza gira, è la linea a dirlo: si colora fin dove è
+   * arrivata e il pallino di adesso batte. Una frase in cima che contava i
+   * passi diceva la stessa cosa in un punto che con quei passi non c'entra,
+   * e lasciava a chi guarda il compito di ritrovare la riga giusta.
    */
   let {
     steps,
@@ -27,7 +32,12 @@
 <ol class="rail">
   {#each steps as step, at (step.key)}
     {@const pausa = at > 0 ? step.wait : 0}
-    <li class:is-first={at === 0} class:is-last={at === steps.length - 1}>
+    <li
+      class:is-first={at === 0}
+      class:is-last={at === steps.length - 1}
+      class:is-now={step.now}
+      class:is-done={step.done}
+    >
       {#if pausa}
         <!-- il tempo che passa: la linea si allunga e si spezza, e in mezzo
              c'è scritto quanto -->
@@ -102,6 +112,33 @@
   .nodo.is-talk {
     background: rgb(var(--base));
     box-shadow: 0 0 0 3px rgb(var(--base)), inset 0 0 0 1.5px var(--accent);
+  }
+
+  /* Fin dove è arrivata: la linea si accende dietro i passi già fatti e si
+     ferma a quello di adesso. */
+  li.is-done::before, li.is-now::before { background: color-mix(in srgb, var(--accent) 85%, transparent); }
+
+  li.is-now.is-last::before, li.is-now::before { bottom: 50%; }
+
+  li.is-now.is-first::before { top: 50%; }
+
+  /* il passo di adesso: un alone che batte intorno al suo pallino */
+  li.is-now .nodo::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid var(--accent);
+    animation: batte 1.1s ease-in-out infinite;
+  }
+
+  @keyframes batte {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    li.is-now .nodo::after { animation: none; opacity: 0.9; }
   }
 
   .detto { min-width: 0; }

@@ -40,77 +40,6 @@
         : 'Non si sa, perché l’agente non è collegato',
   );
 
-  /* ---------------------------------------------------------- le regole */
-
-  /** Le regole scritte su questo dispositivo, e le cose che potrebbe fare. */
-  const rules = $derived(devices.rulesOf(device.id));
-
-  /**
-   * Gli avvisi di questa cosa, aperti o chiusi.
-   *
-   * Stanno dietro la campana e non sotto al nome: sono una cosa che si
-   * sistema una volta e poi non si guarda piu', e tenerli sempre aperti
-   * vorrebbe dire due righe in piu' per ognuno dei venti dispositivi di una
-   * casa. La campana intanto dice, da chiusa, se qualcuno sta guardando.
-   */
-  let avvisi = $state(false);
-  const guardato = $derived(!!device.watch || rules.some((rule) => !rule.off));
-
-  /**
-   * Come si legge una regola su questa cosa.
-   *
-   * Il nome del dispositivo non ci sta dentro: la frase si legge sotto al suo
-   * nome, e ripeterlo vuol dire «Tenda soggiorno» due volte in due righe
-   * alte trenta pixel. Le parole sono quelle che dice il dispositivo, e il
-   * valore sta fra virgolette perché «diventa apri» non è italiano e non lo
-   * diventa smontando la parola: quei valori li sceglie lui, e sono stati
-   * dove una porta dice aperta e comandi dove una tenda dice apri.
-   */
-  function frase(capability: Capability, value: string): string {
-    if (capability.kind === 'switch') return value === 'true' ? `${capability.label} si accende` : `${capability.label} si spegne`;
-    return `${capability.label} diventa «${value}»`;
-  }
-
-  /** La stessa frase partendo da una regola già scritta. */
-  function frasePer(code: string, becomes: string): string | undefined {
-    const capability = (device.capabilities as Capability[]).find((one) => one.code === code);
-    return capability ? frase(capability, becomes) : undefined;
-  }
-
-  /**
-   * I valori su cui si può scrivere una regola.
-   *
-   * Solo quelli che un dispositivo assume davvero: un interruttore ha acceso
-   * e spento, una tenda ha le sue tre posizioni. Su un numero — la
-   * luminosità, i gradi — non si offre niente per ora: «sopra» e «sotto»
-   * sono un'altra cosa da quella che c'è qui, e mezza cosa non si mette.
-   */
-  const watchable = $derived(
-    (device.capabilities as Capability[]).flatMap((capability) => {
-      if (capability.kind === 'switch')
-        return ['true', 'false'].map((value) => ({
-          id: `${capability.code}:${value}`,
-          label: frase(capability, value),
-        }));
-      if (capability.kind === 'enum')
-        return capability.values.map((value) => ({
-          id: `${capability.code}:${value}`,
-          label: frase(capability, String(value)),
-        }));
-      return [];
-    }),
-  );
-
-  /** Quelle che non sono già scritte: proporre due volte la stessa è rumore. */
-  const offrite = $derived(
-    watchable.filter((one) => !rules.some((rule) => `${rule.code}:${rule.becomes}` === one.id)),
-  );
-
-  function addRule(scelto: string): void {
-    const [code, becomes] = scelto.split(/:(.*)/s);
-    void devices.addRule(device.id, code as string, becomes as string);
-  }
-
   const numberOf = (value: DeviceValue | undefined): number => (typeof value === 'number' ? value : 0);
 
   /** Quello che si legge a destra dell'etichetta, mentre trascini. */
@@ -183,22 +112,6 @@
       <span class="dev-away" title={says}><Icon name="alert" /></span>
     {/if}
 
-    <!-- «Avvisami se questo smette di rispondere».
-         Sta qui e non in un elenco di regole altrove, perche' si decide
-         guardando la cosa di cui si parla. Spento di sua natura: una casa ha
-         venti cose attaccate e quasi tutte possono tacere un pomeriggio
-         senza che importi a nessuno. -->
-    <Button
-      look="icon"
-      size="sm"
-      extra="dev-watch"
-      title={guardato ? 'Gli avvisi di questa cosa sono accesi' : 'Avvisami quando…'}
-      aria-expanded={avvisi}
-      aria-pressed={guardato}
-      onclick={() => (avvisi = !avvisi)}
-    >
-      <Icon name={guardato ? 'bell' : 'alertOff'} />
-    </Button>
   </div>
 
   <div class="dev-body">
@@ -277,69 +190,6 @@
     {/each}
   </div>
 
-  {#if avvisi}
-    <!-- Gli avvisi di questa cosa, tutti nello stesso posto: se tace, e
-         quando diventa qualcosa. Si decide guardando la cosa di cui si
-         parla, non un elenco di regole dall'altra parte dell'app. -->
-    <div class="dev-alerts">
-      <!-- La riga sotto dice cosa cambia, come su ogni altra levetta
-           dell'app. Non dice dopo quanto: l'attesa prima di chiamarlo
-           silenzio la decide il server, e un numero scritto qui sarebbe vero
-           solo finché nessuno lo cambia di là. -->
-      <Switch
-        checked={!!device.watch}
-        label="Se smette di rispondere"
-        note={device.watch
-          ? 'Ricevi un avviso dopo un silenzio prolungato.'
-          : 'Non ricevi avvisi sul suo silenzio.'}
-        onchange={(wanted: boolean) => void devices.watch(device, wanted)}
-      />
-
-      {#if rules.length}
-        <ul class="regole">
-          {#each rules as rule (rule.id)}
-            <li class="regola" class:is-off={rule.off}>
-              <span class="dice">{frasePer(rule.code, rule.becomes) ?? rule.says}</span>
-              <Button
-                look="icon"
-                size="sm"
-                extra="regola-btn"
-                title={rule.off ? 'Riaccendi questa regola' : 'Sospendi questa regola'}
-                onclick={() => void devices.flipRule(rule, !rule.off)}
-              >
-                <Icon name={rule.off ? 'alertOff' : 'bell'} />
-              </Button>
-              <Button
-                look="icon"
-                size="sm"
-                tone="danger"
-                extra="regola-btn kill"
-                title="Togli questa regola"
-                onclick={() => void devices.removeRule(rule)}
-              >
-                <Icon name="trash" />
-              </Button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-
-      {#if offrite.length}
-        <!-- Le scelte scritte qui e non dentro a una domanda che si apre:
-             sono due o tre, stanno in una riga, e su un telefono un elenco
-             che compare da qualche altra parte dello schermo e' un salto in
-             piu' per aggiungere una riga sola. -->
-        <div class="aggiungi">
-          <span class="eyebrow">Avvisami quando…</span>
-          <div class="scelte">
-            {#each offrite as scelta (scelta.id)}
-              <Chip label={scelta.label} size="sm" onclick={() => addRule(scelta.id)} />
-            {/each}
-          </div>
-        </div>
-      {/if}
-    </div>
-  {/if}
 </div>
 
 <style>
@@ -405,61 +255,6 @@
     white-space: nowrap;
   }
 
-  /* l'interruttore dell'avviso: smorto finche' e' spento, acceso quando
-     qualcuno sta guardando per te */
-  .dev-head :global(.dev-watch) { margin-left: auto; opacity: 0.35; transition: opacity 0.16s; }
-
-  .dev-head:hover :global(.dev-watch), .dev-head :global(.dev-watch:hover) { opacity: 1; }
-
-  .dev-head :global(.dev-watch[aria-expanded='true']) { opacity: 1; }
-
-  .dev-head :global(.dev-watch[aria-pressed='true']) { opacity: 1; color: var(--accent); }
-
-  /* La sezione degli avvisi, che si apre dalla campana.
-     Sta sotto ai comandi e divisa da una riga: sopra c'e' quello che fai
-     alla cosa, sotto quello che la cosa dice a te. Non e' una scatola dentro
-     la scatola — resta nella stessa colonna del nome e dei comandi: un
-     riquadro qui dentro voleva il suo margine piu' il suo bordo, e il testo
-     finiva due rientri piu' in la' di tutto il resto della riga. */
-  .dev-alerts {
-    display: grid;
-    gap: 9px;
-    margin-top: 2px;
-    padding-top: 10px;
-    border-top: 1px solid var(--hairline);
-  }
-
-  .regole { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-
-  .aggiungi { display: grid; gap: 6px; }
-
-  .scelte { display: flex; flex-wrap: wrap; gap: 6px; }
-
-  .regola {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-  }
-
-  .regola.is-off .dice { opacity: 0.5; text-decoration: line-through; }
-
-  .dice {
-    flex: 1;
-    min-width: 0;
-    font-size: 11.5px;
-    /* una regola accesa e' una cosa che vale: si legge come la levetta
-       sopra, non come la nota di servizio sotto */
-    color: var(--ink-2);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .dev-alerts :global(.regola-btn) { width: 24px; height: 24px; opacity: 0.4; transition: opacity 0.16s; }
-
-  .regola:hover :global(.regola-btn), .dev-alerts :global(.regola-btn:hover) { opacity: 1; }
-
   .dev-away {
     margin-left: auto;
     display: grid;
@@ -492,7 +287,6 @@
   }
 
   .choices { display: flex; flex-wrap: wrap; gap: 5px; }
-
 
   /* un sensore si legge e basta: il numero è la cosa grossa, l'unità gli sta
      accanto piccola, come su un quadrante */
