@@ -20,3 +20,11 @@ export interface Column {
   /** I numeri e le date stanno a destra: si leggono in colonna. */
   align?: 'start' | 'end';
 }
+
+/** Una voce da scegliere: un identificativo, come si legge, e un'aggiunta. */
+export interface Choice {
+  id: string;
+  label: string;
+  /** Qualcosa da dire su quella voce: «ha già un agente». */
+  note?: string;
+}

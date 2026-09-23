@@ -6,6 +6,7 @@
   import Button from './Button.svelte';
   import Chip from './Chip.svelte';
   import Icon from './Icon.svelte';
+  import PickField from './PickField.svelte';
   import SceneControls from './SceneControls.svelte';
   import DateField from './DateField.svelte';
   import Switch from './Switch.svelte';
@@ -224,21 +225,14 @@
           <li class:is-talk={!!step.notify}>
             <!-- l'attesa prima di questa riga: la prima non ha un «prima» -->
             {#if at > 0}
-              <Button
-                look="link"
-                size="sm"
-                extra="pick-btn attesa"
-                title="Quando parte questa riga"
-                onclick={(event: MouseEvent) =>
-                  ui.askPick(event.currentTarget as HTMLElement, {
-                    title: 'Quando parte questa riga?',
-                    options: attese,
-                    current: String(step.after ?? 0),
-                    onPick: (scelto: string) => setWait(at, Number(scelto)),
-                  })}
-              >
-                {saysWait(step.after)}
-              </Button>
+              <PickField
+                look="pill"
+                value={String(step.after ?? 0)}
+                options={attese}
+                label="Quando parte questa riga"
+                title="Quando parte questa riga?"
+                onpick={(scelto: string) => setWait(at, Number(scelto))}
+              />
             {/if}
             {#if step.notify}
               <!-- le parole si scrivono qui: un avviso senza le sue parole
@@ -252,15 +246,17 @@
             {:else}
               <span class="line">{says.who} · <b>{says.what}</b></span>
             {/if}
-            <button
-              type="button"
-              class="drop"
+            <Button
+              look="icon"
+              size="sm"
+              tone="danger"
+              extra="drop"
               title="Togli questa riga"
               aria-label={`Togli ${says.who} ${says.what}`}
               onclick={() => drop(at)}
             >
               <Icon name="close" />
-            </button>
+            </Button>
           </li>
         {/each}
       </ul>
@@ -410,21 +406,6 @@
      accanto alla stessa altezza */
   .written li :global(.text-field) { flex: 1; min-width: 0; }
 
-  /* l'attesa sta davanti alla riga e non in una colonna sua: si legge come
-     una frase — «dopo 30s, Tenda 1 chiudi» */
-  .written :global(.attesa) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-    height: 26px;
-    min-width: 74px;
-    padding: 0 9px;
-    border-radius: 99px;
-    background: var(--sunken);
-    font-size: 10.5px;
-    font-variant-numeric: tabular-nums;
-  }
 
   .line {
     flex: 1;
@@ -438,29 +419,16 @@
 
   .line b { font-weight: 600; color: var(--ink-2); }
 
-  /* la ✕ sta sempre, smorta: un comando che si scopre solo passandoci sopra
-     non si scopre */
-  .drop {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: none;
-    color: var(--ink-3);
-    opacity: 0.5;
-    cursor: pointer;
-    transition: opacity 0.16s, background 0.16s, color 0.16s;
+  /* la crocetta sta sempre, smorta: un comando che si scopre solo passandoci
+     sopra non si scopre */
+  .written :global(.drop) {
+    width: 26px;
+    height: 26px;
+    opacity: 0.45;
+    transition: opacity 0.16s;
   }
 
-  .written li:hover .drop, .drop:hover, .drop:focus-visible { opacity: 1; }
-
-  .drop:hover { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
-
-  .drop :global(.ico) { width: 12px; height: 12px; }
+  .written li:hover :global(.drop), .written :global(.drop:hover) { opacity: 1; }
 
   /* Il pannello sono tre cose diverse una sotto l'altra: quello che la scena
      fa, quando parte da sola, e cosa aggiungerci. Senza una riga che le
