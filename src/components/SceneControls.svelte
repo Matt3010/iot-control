@@ -55,14 +55,14 @@
       .map((step, at) => {
       const says = devices.saysOf(step);
       const sta =
-        step.notify || step.scene
+        step.notify !== undefined || step.scene
           ? { state: 'live' as const, says: step.scene ? 'Fa partire un’altra scena' : 'Manda un avviso' }
           : how(step.deviceId as string);
       return {
         key: `${step.deviceId ?? step.scene ?? 'avviso'}:${step.code ?? ''}:${at}`,
         who: says.who,
         what: says.what,
-        talk: !!step.notify || !!step.scene,
+        talk: step.notify !== undefined || !!step.scene,
         call: !!step.scene,
         wait: step.after,
         state: sta.state,
@@ -159,7 +159,8 @@
           <span class="riga">«{step.what}»</span>
         {:else}
           <span class="riga">
-            {step.who} · <b>{step.what}</b>
+            <!-- il punto separa due cose: senza la seconda non separa niente -->
+            {step.who}{#if step.what} · <b>{step.what}</b>{/if}
             <!-- per il guasto vero anche l'icona, come nella scheda del
                  dispositivo: il colore del nodo da solo non basta a chi non
                  lo distingue -->

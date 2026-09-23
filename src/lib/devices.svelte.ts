@@ -254,8 +254,13 @@ class Devices {
    * comando — non `power=true`, che è come lo dice il protocollo.
    */
   saysOf(step: SceneStep): { who: string; what: string } {
-    // una riga che manda un avviso non ha un chi: ha delle parole
-    if (step.notify) return { who: 'Avviso', what: step.notify };
+    /*
+     * Una riga che manda un avviso non ha un chi, ha delle parole — e può
+     * non averle ancora: appena aggiunta è vuota, e resta una riga d'avviso
+     * lo stesso. Guardare se il testo c'è invece che se è pieno la faceva
+     * finire fra i dispositivi, dove diventava «Sparito».
+     */
+    if (step.notify !== undefined) return { who: 'Avviso', what: step.notify };
 
     // e una che ne chiama un'altra ha un nome, che e' quello dell'altra
     if (step.scene) {
@@ -265,9 +270,20 @@ class Devices {
 
     const device = this.list.find((one) => one.id === step.deviceId);
     const capability = device?.capabilities.find((entry) => entry.code === step.code);
-    const who = device?.name ?? 'Sparito';
 
-    if (!capability) return { who, what: String(step.value) };
+    /*
+     * Un dispositivo che non c'è più si dice a parole.
+     *
+     * Le righe dei dispositivi spariti il server le toglie da sé, ma fra il
+     * momento in cui sparisce e quello in cui l'elenco si rilegge la riga
+     * resta qui — e «Sparito · undefined» non è una frase, è il nome di una
+     * variabile finito sullo schermo.
+     */
+    if (!device) return { who: 'Un dispositivo che non c’è più', what: '' };
+
+    const who = device.name;
+
+    if (!capability) return { who, what: step.value === undefined ? '' : String(step.value) };
     if (capability.kind === 'switch') return { who, what: step.value ? 'Accendi' : 'Spegni' };
     if (capability.kind === 'enum') return { who, what: String(step.value) };
     if (capability.kind !== 'range') return { who, what: String(step.value) };

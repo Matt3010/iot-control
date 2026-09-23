@@ -272,7 +272,7 @@
                 onpick={(scelto: string) => setWait(at, Number(scelto))}
               />
             {/if}
-            {#if step.notify}
+            {#if step.notify !== undefined}
               <!-- le parole si scrivono qui: un avviso senza le sue parole
                    non si puo' nemmeno immaginare -->
               <TextField
@@ -283,7 +283,7 @@
                 onchange={(testo: string) => setNotify(at, testo)}
               />
             {:else}
-              <span class="line">{says.who} · <b>{says.what}</b></span>
+              <span class="line">{says.who}{#if says.what} · <b>{says.what}</b>{/if}</span>
             {/if}
             <!-- su e giù: l'ordine di una sequenza e' la sequenza, e senza
                  questi per spostare una riga bisognava rifare le altre -->
