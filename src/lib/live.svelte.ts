@@ -1,3 +1,4 @@
+import { alerts } from './alerts.svelte';
 import { auth } from './auth.svelte';
 import { devices, type Scene } from './devices.svelte';
 import { store } from './store.svelte';
@@ -25,6 +26,8 @@ export type LiveEvent =
   | { kind: 'category'; id: string; value: Category | null }
   | { kind: 'group'; id: string; value: Group | null }
   | { kind: 'scene'; id: string; value: Scene | null }
+  | { kind: 'running'; sceneId: string; at: number; of: number; done?: boolean }
+  | { kind: 'notice' }
   /** Il registro di un agente ha una riga in più: chi lo legge lo rilegga. */
   | { kind: 'log'; agentId: string };
 
@@ -102,9 +105,13 @@ class Live {
       event.kind === 'devices' ||
       event.kind === 'agents' ||
       event.kind === 'scene' ||
+      event.kind === 'running' ||
       event.kind === 'log'
     ) {
       devices.apply(event);
+    } else if (event.kind === 'notice') {
+      // se la pagina degli avvisi e' aperta si rilegge; se non lo e', niente
+      void alerts.seen();
     } else {
       store.apply(event);
       // una mappa che cambia può aver cambiato anche fin dove arrivo

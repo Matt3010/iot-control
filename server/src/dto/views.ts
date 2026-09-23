@@ -9,6 +9,7 @@ import type {
   PlaceMap,
   Scene,
   SceneStep,
+  Timing,
 } from '../types.js';
 import type { OwnerState } from '../managers/StateManager.js';
 
@@ -92,11 +93,12 @@ export interface DeviceView {
   lastSeenAt: string;
 }
 
-/** Una scena come esce di qui: il nome e le righe che parte insieme. */
+/** Una scena come esce di qui: il nome, le righe, e quando parte da sola. */
 export interface SceneView {
   id: string;
   name: string;
   steps: SceneStep[];
+  when?: Timing;
 }
 
 export interface StateView {
@@ -133,7 +135,14 @@ export const toPublicMapView = (map: PlaceMap): PublicMapView => {
 
 export const toGroupView = ({ id, name }: Group): GroupView => ({ id, name });
 
-export const toSceneView = ({ id, name, steps }: Scene): SceneView => ({ id, name, steps: steps ?? [] });
+export const toSceneView = ({ id, name, steps, when }: Scene): SceneView => ({
+  id,
+  name,
+  steps: steps ?? [],
+  // l'ultima partenza resta di qua: a chi guarda serve sapere quando parte,
+  // non quando e' partita l'ultima volta — quello e' nel registro
+  ...(when ? { when } : {}),
+});
 
 /** The defaults here also carry records written before groups existed. */
 export const toPlaceView = (place: Place): PlaceView => ({

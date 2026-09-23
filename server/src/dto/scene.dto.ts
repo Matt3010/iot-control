@@ -36,6 +36,13 @@ export class SceneStepDto {
 
   @IsDefined({ message: 'serve il valore' })
   value!: string | number | boolean;
+
+  /** Quanti secondi aspettare prima di questa riga. Zero vuol dire insieme alla precedente. */
+  @IsOptional()
+  @IsInt({ message: "l'attesa si conta in secondi interi" })
+  @Min(0)
+  @Max(21_600, { message: "un'attesa non può superare le sei ore" })
+  after?: number;
 }
 
 /**

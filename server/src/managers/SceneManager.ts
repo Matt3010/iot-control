@@ -113,34 +113,103 @@ export class SceneManager {
 
     if (!steps.length) throw badRequest(`«${scene.name}» è vuota e non c'è niente da fare`);
 
-    const results = await Promise.allSettled(
-      steps.map(({ step, device }) =>
-        hub.command(device.agentId, device.externalId, step.code, step.value),
-      ),
-    );
-
-    const mute = steps.filter((_pair, at) => results[at]?.status === 'rejected');
+    /*
+     * A momenti, non tutto in una volta.
+     *
+     * Le righe senza attesa partono insieme, come hanno sempre fatto: una
+     * scena che accende sei cose non deve aspettare che la prima risponda per
+     * mandare la seconda, se no un dispositivo muto terrebbe ferme tutte le
+     * altre per il tempo del suo silenzio. Dove c'è un'attesa invece si
+     * aspetta davvero, ed e' li' che la scena diventa una sequenza.
+     */
+    const momenti: { wait: number; quali: typeof steps }[] = [];
+    for (const pair of steps) {
+      const wait = pair.step.after ?? 0;
+      if (wait > 0 || !momenti.length) momenti.push({ wait, quali: [] });
+      momenti[momenti.length - 1]?.quali.push(pair);
+    }
 
     /*
-     * Una riga per agente, non una per passo: «Sera» è una cosa sola anche se
-     * ne muove sei, e sei righe uguali nel registro sono rumore. Ma se la
-     * scena tocca due case, ognuna deve poter leggere che è passata di lì.
+     * Chi ha premuto non aspetta la fine.
+     *
+     * Una scena con dentro «aspetta dieci minuti» dura dieci minuti, e tenere
+     * aperta una richiesta per tutto quel tempo vorrebbe dire un tasto che
+     * resta grigio mentre in casa non succede piu' niente. Si aspetta il
+     * primo momento — quello e' istantaneo, ed e' li' che si scopre se non
+     * risponde nessuno — e il resto va avanti per conto suo, lasciando nel
+     * registro com'e' finita.
      */
-    for (const agentId of new Set(steps.map(({ device }) => device.agentId))) {
-      const suoi = steps.filter(({ device }) => device.agentId === agentId);
-      const zitti = mute.filter(({ device }) => device.agentId === agentId).length;
-      logManager.note({
-        ownerId,
-        agentId,
-        kind: 'scene',
-        subject: scene.name,
-        detail: zitti
-          ? `${suoi.length - zitti} dispositivi su ${suoi.length}`
-          : `${suoi.length} ${suoi.length === 1 ? 'dispositivo' : 'dispositivi'}`,
-        ok: zitti === 0,
-        ...(who ? { who } : {}),
+    const mute: typeof steps = [];
+
+    const suona = async (momento: (typeof momenti)[number], at: number): Promise<void> => {
+      // Prima di aspettare si dice che si sta aspettando: una scena che dura
+      // dieci minuti, se non dice niente, sembra non essere partita.
+      hub.changed(ownerId, { kind: 'running', sceneId: scene.id, at, of: momenti.length });
+      if (momento.wait > 0) await new Promise((done) => setTimeout(done, momento.wait * 1000));
+
+      const esiti = await Promise.allSettled(
+        momento.quali.map(({ step, device }) =>
+          hub.command(device.agentId, device.externalId, step.code, step.value),
+        ),
+      );
+      momento.quali.forEach((pair, at) => {
+        if (esiti[at]?.status === 'rejected') mute.push(pair);
       });
+    };
+
+    const nota = (): void => {
+      /*
+       * Una riga per agente, non una per passo: «Sera» è una cosa sola anche
+       * se ne muove sei, e sei righe uguali nel registro sono rumore. Ma se la
+       * scena tocca due case, ognuna deve poter leggere che è passata di lì.
+       */
+      for (const agentId of new Set(steps.map(({ device }) => device.agentId))) {
+        const suoi = steps.filter(({ device }) => device.agentId === agentId);
+        const zitti = mute.filter(({ device }) => device.agentId === agentId).length;
+        logManager.note({
+          ownerId,
+          agentId,
+          kind: 'scene',
+          subject: scene.name,
+          detail: zitti
+            ? `${suoi.length - zitti} dispositivi su ${suoi.length}`
+            : `${suoi.length} ${suoi.length === 1 ? 'dispositivo' : 'dispositivi'}`,
+          ok: zitti === 0,
+          ...(who ? { who } : {}),
+        });
+      }
+    };
+
+    const finita = (): void => {
+      hub.changed(ownerId, {
+        kind: 'running',
+        sceneId: scene.id,
+        at: momenti.length,
+        of: momenti.length,
+        done: true,
+      });
+    };
+
+    const [primo, ...resto] = momenti;
+    if (primo) await suona(primo, 1);
+
+    if (resto.length) {
+      void (async () => {
+        for (const [at, momento] of resto.entries()) await suona(momento, at + 2);
+        nota();
+        finita();
+      })().catch((error: Error) => {
+        console.warn(`«${scene.name}» si è fermata: ${error.message}`);
+        finita();
+      });
+
+      // Quello che si sa adesso è solo del primo momento, e dirlo a metà
+      // sarebbe peggio che non dirlo: il resto finisce nel registro.
+      return;
     }
+
+    nota();
+    finita();
 
     if (!mute.length) return;
 
@@ -156,21 +225,23 @@ export class SceneManager {
    * Ogni riga dev'essere possibile: il dispositivo è suo, quella cosa la sa
    * fare, e il valore ha senso. Un dispositivo può comparire più volte — una
    * lampadina che si accende e si porta al 30% sono due righe, ed è giusto —
-   * ma non due volte per la stessa cosa: «apri» e «ferma» sulla stessa tenda
-   * sono una scena che non vuol dire niente, e partirebbero a mezzo secondo
-   * l'una dall'altra lasciando la tenda dove capita. Vale l'ultima scritta,
-   * che è quella che si stava scegliendo.
+   * e adesso può comparire anche due volte per la stessa cosa, purché in due
+   * momenti diversi: «apri, aspetta un minuto, richiudi» è una scena sensata,
+   * «apri e chiudi nello stesso istante» no.
    */
   #clean(tx: Transaction, ownerId: string, steps: SceneStepDto[]): SceneStep[] {
     const devices = new DeviceRepository(tx);
 
-    // l'ultima parola su una stessa cosa cancella le precedenti, e l'ordine
-    // resta quello in cui sono state scritte
-    const ultima = new Map<string, SceneStepDto>();
-    for (const step of steps) ultima.set(`${step.deviceId}:${step.code}`, step);
-    const sole = steps.filter((step) => ultima.get(`${step.deviceId}:${step.code}`) === step);
+    /*
+     * Un momento finisce dove comincia un'attesa. Dentro a un momento le righe
+     * partono insieme, quindi due volte la stessa cosa li' dentro vorrebbe
+     * dire dare due ordini contrari allo stesso dispositivo nello stesso
+     * istante: quello che succede dopo non lo decide piu' nessuno.
+     */
+    let momento = 0;
+    const gia = new Map<string, number>();
 
-    return sole.map((step) => {
+    return steps.map((step) => {
       const device = devices.findById(step.deviceId);
       if (!device || device.ownerId !== ownerId) throw badRequest('dispositivo inesistente');
 
@@ -181,7 +252,18 @@ export class SceneManager {
       if (kind !== 'string' && kind !== 'number' && kind !== 'boolean') throw badRequest('valore non valido');
       check(capability, step.value);
 
-      return { deviceId: step.deviceId, code: step.code, value: step.value };
+      const after = Math.max(0, Math.round(step.after ?? 0));
+      if (after > 0) momento += 1;
+
+      const chiave = `${step.deviceId}:${step.code}`;
+      if (gia.get(chiave) === momento) {
+        throw badRequest(
+          `«${device.name}» compare due volte nello stesso momento: mettici un'attesa in mezzo, o togline una`,
+        );
+      }
+      gia.set(chiave, momento);
+
+      return { deviceId: step.deviceId, code: step.code, value: step.value, ...(after ? { after } : {}) };
     });
   }
 }

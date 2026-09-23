@@ -1,6 +1,6 @@
 <script lang="ts">
   import { devices, type Device, type Scene, type SceneStep, type Timing } from '../lib/devices.svelte';
-  import { defaultWhen, GIORNI, today } from '../lib/timing';
+  import { ATTESE, defaultWhen, GIORNI, saysWait, today } from '../lib/timing';
   import type { Capability } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
@@ -73,13 +73,44 @@
    */
   function add(step: SceneStep): void {
     const stessa = (one: SceneStep) => one.deviceId === step.deviceId && one.code === step.code;
-    // al suo posto e non in fondo: cambiare idea su una riga non deve
-    // rimescolare l'ordine in cui si legge la scena
-    const steps = scene.steps.some(stessa)
-      ? scene.steps.map((one) => (stessa(one) ? step : one))
-      : [...scene.steps, step];
+
+    /*
+     * Le righe dell'ultimo momento sono quelle che partirebbero insieme a
+     * questa: dopo l'ultima attesa non c'è più niente che le separi.
+     */
+    const dopoAttesa = scene.steps.map((one) => one.after ?? 0).lastIndexOf(0) === 0
+      ? 0
+      : scene.steps.reduce((at, one, index) => ((one.after ?? 0) > 0 ? index : at), 0);
+    const insieme = scene.steps.slice(dopoAttesa);
+
+    // Cambiare idea su una riga che non è ancora partita la corregge al suo
+    // posto; rimetterla in un momento diverso invece è un'altra riga, e
+    // quella nasce con un'attesa, se no sarebbero due ordini contrari
+    // nello stesso istante.
+    if (insieme.some(stessa)) {
+      const steps = scene.steps.map((one) =>
+        one === insieme.find(stessa) ? { ...step, ...(one.after ? { after: one.after } : {}) } : one,
+      );
+      void devices.patchScene(scene, { steps });
+      return;
+    }
+
+    const ripete = scene.steps.some(stessa);
+    void devices.patchScene(scene, {
+      steps: [...scene.steps, { ...step, ...(ripete ? { after: 30 } : {}) }],
+    });
+  }
+
+  /** Quanto si aspetta prima di quella riga. Zero vuol dire insieme alla precedente. */
+  function setWait(at: number, seconds: number): void {
+    const steps = scene.steps.map((one, index) =>
+      index === at ? { ...one, ...(seconds ? { after: seconds } : { after: undefined }) } : one,
+    );
     void devices.patchScene(scene, { steps });
   }
+
+  /** L'elenco delle attese, per il foglietto che le fa scegliere. */
+  const attese = ATTESE.map((seconds) => ({ id: String(seconds), label: saysWait(seconds) }));
 
   /** Cosa fa già quel dispositivo in questa scena, capacità per capacità. */
   const already = (deviceId: string, code: string) =>
@@ -166,6 +197,24 @@
         {#each scene.steps as step, at (`${step.deviceId}:${step.code}:${at}`)}
           {@const says = devices.saysOf(step)}
           <li>
+            <!-- l'attesa prima di questa riga: la prima non ha un «prima» -->
+            {#if at > 0}
+              <Button
+                look="link"
+                size="sm"
+                extra="pick-btn attesa"
+                title="Quando parte questa riga"
+                onclick={(event: MouseEvent) =>
+                  ui.askPick(event.currentTarget as HTMLElement, {
+                    title: 'Quando parte questa riga?',
+                    options: attese,
+                    current: String(step.after ?? 0),
+                    onPick: (scelto: string) => setWait(at, Number(scelto)),
+                  })}
+              >
+                {saysWait(step.after)}
+              </Button>
+            {/if}
             <span class="line">{says.who} · <b>{says.what}</b></span>
             <button
               type="button"
@@ -309,6 +358,18 @@
   .written { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 
   .written li { display: flex; align-items: center; gap: 4px; min-width: 0; }
+
+  /* l'attesa sta davanti alla riga e non in una colonna sua: si legge come
+     una frase — «dopo 30s, Tenda 1 chiudi» */
+  .written :global(.attesa) {
+    flex: none;
+    min-width: 62px;
+    padding: 1px 5px;
+    border-radius: 99px;
+    background: var(--sunken);
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+  }
 
   .line {
     flex: 1;

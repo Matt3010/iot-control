@@ -2,7 +2,7 @@
   import type { Snippet } from 'svelte';
   import { devices, type Scene } from '../lib/devices.svelte';
   import { thingHealth } from '../lib/health';
-  import { saysWhen } from '../lib/timing';
+  import { saysWait, saysWhen } from '../lib/timing';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
@@ -59,6 +59,14 @@
     };
   }
   const busy = $derived(devices.busy.includes(`scena:${scene.id}`));
+  /**
+   * A che punto è, se sta partendo adesso.
+   *
+   * Lo dice il server mentre la esegue, quindi si vede anche se l'ha premuta
+   * qualcun altro da un altro telefono — ed è l'unica cosa che distingue una
+   * scena lenta da una scena che non è partita.
+   */
+  const corre = $derived(devices.running[scene.id]);
 
   /**
    * Niente parte senza un sì, come per un dispositivo solo — e qui ancora di
@@ -78,7 +86,7 @@
   }
 </script>
 
-<div class="set" class:is-off={!live} class:is-busy={busy}>
+<div class="set" class:is-off={!live} class:is-busy={busy || !!corre}>
   <div class="set-head">
     <span class="set-name">{scene.name}</span>
     {@render trail?.()}
@@ -98,7 +106,12 @@
 
   <!-- se parte da sola lo dice qui, senza doverla aprire: e' la differenza
        fra una scena che aspetta te e una che va avanti per conto suo -->
-  {#if scene.when}
+  {#if corre}
+    <p class="corre">
+      <span class="battito"></span>
+      {corre.of > 1 ? `sta partendo — passo ${corre.at} di ${corre.of}` : 'sta partendo'}
+    </p>
+  {:else if scene.when}
     <p class="auto" class:is-off={scene.when.off}>
       <Icon name="refresh" />
       {scene.when.off ? `sospesa — ${saysWhen(scene.when)}` : saysWhen(scene.when)}
@@ -113,6 +126,9 @@
              sembrava un tasto da premere, e invece si legge e basta -->
         {@const sta = how(step.deviceId)}
         <li>
+          <!-- l'attesa si legge come parte della frase: «dopo un minuto,
+               Tenda 1 chiudi» — e su una scena tutta insieme non si vede -->
+          {#if step.after}<span class="poi">{saysWait(step.after)},</span>{/if}
           <!-- lo stesso pallino della scheda del dispositivo: verde risponde,
                rosso non risponde, grigio non si sa -->
           <span class="dot is-{sta.state}" role="img" aria-label={sta.says} title={sta.says}></span>
@@ -161,6 +177,29 @@
      storto, ed e' l'unica cosa che questa scheda ha da dire sulla forma */
   .set :global(.go .ico) { margin-left: 1px; fill: currentColor; }
 
+  /* mentre parte: un punto che pulsa e a che passo e' arrivata */
+  .corre {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: -2px 0 0;
+    font-size: 11.5px;
+    color: var(--accent);
+  }
+
+  .battito {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: battito 1.1s ease-in-out infinite;
+  }
+
+  @keyframes battito {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+
   /* l'orario: piccolo, sotto il nome, e smorto quando e' sospeso */
   .auto {
     display: flex;
@@ -208,6 +247,8 @@
   .away :global(.ico) { width: 12px; height: 12px; }
 
   .steps b { font-weight: 560; color: var(--ink-2); }
+
+  .poi { color: var(--accent); font-variant-numeric: tabular-nums; }
 
 
   .set-none { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }

@@ -1,3 +1,4 @@
+import { hub } from '../iot/hub.js';
 import { store } from '../persistence/JsonStore.js';
 import { pageOf, type Ask, type Page } from '../persistence/page.js';
 import { NoticeRepository } from '../repositories/NoticeRepository.js';
@@ -45,6 +46,10 @@ export class NoticeManager {
 
     const { sent, failed } = await pushManager.send([ownerId], note);
     await store.transaction((tx) => new NoticeRepository(tx).settle(riga.id, sent, failed));
+
+    // Chi ha la pagina degli avvisi aperta la vede comparire: e' il posto
+    // dove un avviso esiste anche quando la notifica non e' arrivata.
+    hub.changed(ownerId, { kind: 'notice' });
     return { ...riga, sent, failed };
   }
 }

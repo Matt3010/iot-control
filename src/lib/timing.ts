@@ -79,3 +79,23 @@ export function nextDays(quanti = 30): string[] {
   }
   return out;
 }
+
+/** Le attese che si possono scegliere fra una riga e l'altra di una scena. */
+export const ATTESE = [0, 5, 10, 30, 60, 120, 300, 600, 1800] as const;
+
+/**
+ * Un'attesa detta a parole.
+ *
+ * Zero non è un'attesa ed è il caso normale: «insieme» dice quello che
+ * succede, mentre «0 secondi» fa contare a chi legge.
+ */
+export function saysWait(seconds: number | undefined): string {
+  if (!seconds) return 'insieme';
+  if (seconds < 60) return `dopo ${seconds}s`;
+  if (seconds % 60 === 0 && seconds < 3600) {
+    const minuti = seconds / 60;
+    return minuti === 1 ? 'dopo un minuto' : `dopo ${minuti} minuti`;
+  }
+  const ore = Math.round(seconds / 360) / 10;
+  return `dopo ${ore} ore`;
+}

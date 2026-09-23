@@ -152,6 +152,15 @@ export interface SceneStep {
   deviceId: string;
   code: string;
   value: DeviceValue;
+  /**
+   * Quanti secondi aspettare prima di questa riga.
+   *
+   * Zero, o niente, vuol dire «insieme a quella sopra»: una scena che accende
+   * sei cose le accende tutte insieme, come ha sempre fatto. Un numero
+   * qualsiasi apre un momento nuovo, e da li' in poi si aspetta davvero — e'
+   * quello che serve per dire «apri, aspetta un minuto, richiudi».
+   */
+  after?: number;
 }
 
 /**

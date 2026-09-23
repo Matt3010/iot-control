@@ -28,8 +28,24 @@ export type LiveEvent =
   | { kind: 'category'; id: string; value: CategoryView | null }
   | { kind: 'group'; id: string; value: GroupView | null }
   | { kind: 'scene'; id: string; value: SceneView | null }
+  /**
+   * Una scena sta partendo, e a che punto e'.
+   *
+   * Una scena con delle attese dura minuti: chi l'ha premuta deve poter
+   * vedere che sta andando avanti, se no la preme di nuovo. `of` e' quanti
+   * momenti sono in tutto, `done` che non ne restano.
+   */
+  | { kind: 'running'; sceneId: string; at: number; of: number; done?: boolean }
   /** Il registro di un agente ha una riga in più: chi lo sta leggendo lo rilegga. */
-  | { kind: 'log'; agentId: string };
+  | { kind: 'log'; agentId: string }
+  /**
+   * E' successo un avviso.
+   *
+   * Non si manda la riga ma il fatto che ce ne sia una: chi ha la pagina
+   * aperta la rilegge, e chi non ce l'ha non deve ricevere niente. L'avviso
+   * vero arriva sul telefono per un'altra strada.
+   */
+  | { kind: 'notice' };
 
 /** Quel poco che il hub sa dire al registro: chi, cosa, e di chi è. */
 export interface LiveNote {

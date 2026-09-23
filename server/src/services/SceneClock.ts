@@ -1,3 +1,5 @@
+import { toSceneView } from '../dto/views.js';
+import { hub } from '../iot/hub.js';
 import { sceneManager } from '../managers/SceneManager.js';
 import { store } from '../persistence/JsonStore.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
@@ -82,7 +84,7 @@ export async function tick(): Promise<void> {
     const { yes, minute, over } = due(scene);
 
     if (over) {
-      await store.transaction((tx) => new SceneRepository(tx).forgetWhen(scene.id));
+      await scorda(scene);
       continue;
     }
     if (!yes) continue;
@@ -97,7 +99,7 @@ export async function tick(): Promise<void> {
 
     // Una volta sola vuol dire una volta sola: l'orario se ne va appena
     // servito, anche se la scena e' partita a meta'.
-    if (scene.when?.on) await store.transaction((tx) => new SceneRepository(tx).forgetWhen(scene.id));
+    if (scene.when?.on) await scorda(scene);
 
     await sceneManager
       .run(scene.ownerId, scene.id)
@@ -106,6 +108,22 @@ export async function tick(): Promise<void> {
       // risposto, e qui si tira avanti con le altre.
       .catch((error: Error) => console.warn(`«${scene.name}» non è partita tutta: ${error.message}`));
   }
+}
+
+/**
+ * Toglie l'orario a una scena, e lo dice a chi sta guardando.
+ *
+ * Un appuntamento che si e' consumato deve sparire anche dallo schermo di chi
+ * ha la pagina aperta: se resta scritto «sabato alle 19» quando sabato e'
+ * passato, la prossima volta non ci si fida piu' di quello che c'e' scritto.
+ */
+async function scorda(scene: Scene): Promise<void> {
+  const dopo = await store.transaction((tx) => {
+    const scenes = new SceneRepository(tx);
+    scenes.forgetWhen(scene.id);
+    return scenes.findById(scene.id);
+  });
+  if (dopo) hub.changed(scene.ownerId, { kind: 'scene', id: dopo.id, value: toSceneView(dopo) });
 }
 
 export function watchClock(): void {

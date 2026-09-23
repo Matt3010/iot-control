@@ -41,6 +41,8 @@ export interface SceneStep {
   deviceId: string;
   code: string;
   value: DeviceValue;
+  /** Secondi da aspettare prima di questa riga. Zero: insieme alla precedente. */
+  after?: number;
 }
 
 /**
@@ -332,9 +334,30 @@ class Devices {
    * l'app, e sta in `live`. Qui si applica soltanto la parte che riguarda
    * quello che si accende.
    */
+  /** Le scene che stanno partendo adesso, e a che momento sono arrivate. */
+  running = $state<Record<string, { at: number; of: number }>>({});
+
   apply(
-    event: { kind: 'device' | 'agent' | 'devices' | 'agents' | 'scene' | 'log' } & Record<string, unknown>,
+    event: { kind: 'device' | 'agent' | 'devices' | 'agents' | 'scene' | 'running' | 'log' } & Record<
+      string,
+      unknown
+    >,
   ): void {
+    /*
+     * A che punto è una scena che sta partendo.
+     *
+     * Una con dentro delle attese dura minuti, e senza dirlo sembra non
+     * essere partita: chi l'ha premuta la preme di nuovo, e le tende fanno
+     * due giri. Il conto arriva dal server perché è lui che la sta
+     * eseguendo — e arriva anche a chi la guarda da un altro telefono.
+     */
+    if (event.kind === 'running') {
+      const sceneId = event.sceneId as string;
+      if (event.done) delete this.running[sceneId];
+      else this.running[sceneId] = { at: event.at as number, of: event.of as number };
+      return;
+    }
+
     // L'elenco è cambiato — uno nuovo, o uno sparito — e non vale la pena
     // raccontarlo pezzo per pezzo: si rilegge, che è corto e sempre vero.
     if (event.kind === 'devices' || event.kind === 'agents') {

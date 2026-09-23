@@ -50,6 +50,17 @@ class Alerts {
   loaded = $state(false);
   busy = $state(false);
 
+  /**
+   * E' successo qualcosa: se qualcuno sta guardando l'elenco, si rilegge.
+   *
+   * Chi non ha la pagina aperta non deve andare a chiedere niente: l'avviso
+   * gli arriva sul telefono, e l'elenco lo troverà quando lo aprirà.
+   */
+  async seen(): Promise<void> {
+    if (!this.loaded) return;
+    await this.load(0).catch(() => undefined);
+  }
+
   async load(offset = this.offset): Promise<void> {
     this.busy = true;
     try {
