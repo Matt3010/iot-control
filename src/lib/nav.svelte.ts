@@ -1,4 +1,4 @@
-import { readRoute, type Route } from './routing';
+import { canonical, readRoute, type Route } from './routing';
 
 /**
  * Dove siamo, e come ci si sposta senza ricaricare.
@@ -28,6 +28,14 @@ class Nav {
   route = $derived(readRoute(this.path));
 
   constructor() {
+    // un indirizzo vecchio si apre lo stesso, ma nella barra ci va quello
+    // buono: chi lo copia di lì copia quello che resta
+    const buono = canonical(this.path);
+    if (buono !== this.path) {
+      history.replaceState({}, '', buono + window.location.search + window.location.hash);
+      this.path = buono;
+    }
+
     // il tasto indietro del browser resta il tasto indietro del browser
     window.addEventListener('popstate', () => (this.path = window.location.pathname));
 
@@ -43,9 +51,10 @@ class Nav {
 
   /** Va a un indirizzo di casa senza ricaricare niente. */
   go(path: string): void {
-    if (path === this.path) return;
-    history.pushState({}, '', path);
-    this.path = path;
+    const dove = canonical(path);
+    if (dove === this.path) return;
+    history.pushState({}, '', dove);
+    this.path = dove;
     // una pagina nuova si legge dall'alto, non da dove stava l'altra
     window.scrollTo({ top: 0 });
   }

@@ -30,9 +30,11 @@ export function readRoute(path = window.location.pathname): Route {
 
   if (/^\/maps\/?$/i.test(path)) return { kind: 'maps' };
 
-  if (/^\/scene\/?$/i.test(path)) return { kind: 'scenes' };
+  // `/scene` e `/avvisi` sono i primi indirizzi che avevano, rimasti in giro
+  // per qualche ora: si riconoscono ancora e la pagina si mette quello giusto
+  if (/^\/(scenes|scene)\/?$/i.test(path)) return { kind: 'scenes' };
 
-  if (/^\/avvisi\/?$/i.test(path)) return { kind: 'alerts' };
+  if (/^\/(alerts|avvisi)\/?$/i.test(path)) return { kind: 'alerts' };
 
   return { kind: 'app' };
 }
@@ -41,9 +43,25 @@ export const AGENTS_PATH = '/agents';
 
 export const MAPS_PATH = '/maps';
 
-export const SCENES_PATH = '/scene';
+export const SCENES_PATH = '/scenes';
 
-export const ALERTS_PATH = '/avvisi';
+export const ALERTS_PATH = '/alerts';
+
+/**
+ * L'indirizzo buono di una pagina, dato uno qualsiasi che porti lì.
+ *
+ * Gli indirizzi sono in inglese come tutto il resto del codice; quelli
+ * vecchi continuano ad aprirsi, ma nella barra ci va questo — un link
+ * copiato da lì è quello che resta.
+ */
+export function canonical(path: string): string {
+  const route = readRoute(path);
+  if (route.kind === 'agents') return AGENTS_PATH;
+  if (route.kind === 'maps') return MAPS_PATH;
+  if (route.kind === 'scenes') return SCENES_PATH;
+  if (route.kind === 'alerts') return ALERTS_PATH;
+  return path;
+}
 
 export const mapPath = (handle: string, slug: string): string => `/u/${handle}/${slug}`;
 
