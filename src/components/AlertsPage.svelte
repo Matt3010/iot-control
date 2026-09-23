@@ -15,6 +15,7 @@
 
 <PageShell
   title="Avvisi"
+  layout="grid"
   lead="Le cose che vuoi sapere senza aprire l'app: un posto che smette di rispondere, una porta che resta aperta, una stanza che va sotto zero. Arrivano sul telefono, e li spegni da qui quando non li vuoi più."
 >
   <PageCard>

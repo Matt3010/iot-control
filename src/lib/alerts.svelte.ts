@@ -10,6 +10,7 @@ export interface Notice {
   /** Il posto e cosa gli è successo, già divisi: una riga di tabella. */
   who?: string;
   short?: string;
+  since?: string;
   at: string;
   /** Quante macchine l'hanno ricevuto e quante l'hanno respinto. */
   sent: number;

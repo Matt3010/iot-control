@@ -282,6 +282,14 @@ export interface Notice {
   who?: string;
   /** E cosa gli e' successo, in tre parole: «non risponde da 20 minuti». */
   short?: string;
+  /**
+   * Da quando taceva, sull'avviso che dice che tace.
+   *
+   * Serve a quello dopo: per dire quanto e' durato il silenzio bisogna
+   * saperne l'inizio, e quando il posto torna la sua ultima visita e' gia'
+   * quella di adesso.
+   */
+  since?: string;
   at: string;
   /** Quante macchine l'hanno ricevuta e quante l'hanno respinta. */
   sent: number;

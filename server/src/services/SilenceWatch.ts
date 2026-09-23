@@ -28,14 +28,16 @@ function quiet(agent: Agent): boolean {
   return Date.now() - new Date(agent.lastSeenAt).getTime() > QUIET_MS;
 }
 
-/** Da quanto tace, in parole: «da venti minuti», «da due ore». */
-function since(at: string): string {
-  const minuti = Math.round((Date.now() - new Date(at).getTime()) / 60_000);
-  if (minuti < 60) return `da ${minuti} minuti`;
+/** Quanto tempo e' passato, in parole: «venti minuti», «due ore». */
+function howLong(from: string): string {
+  const minuti = Math.round((Date.now() - new Date(from).getTime()) / 60_000);
+  if (minuti < 60) return minuti === 1 ? 'un minuto' : `${minuti} minuti`;
+
   const ore = Math.round(minuti / 60);
-  if (ore < 24) return ore === 1 ? "da un'ora" : `da ${ore} ore`;
+  if (ore < 24) return ore === 1 ? "un'ora" : `${ore} ore`;
+
   const giorni = Math.round(ore / 24);
-  return giorni === 1 ? 'da un giorno' : `da ${giorni} giorni`;
+  return giorni === 1 ? 'un giorno' : `${giorni} giorni`;
 }
 
 /** Un giro solo. Esportato perche' si possa provare senza aspettare un minuto. */
@@ -51,27 +53,35 @@ export async function sweep(): Promise<void> {
     if (tace === (detto?.kind === 'silent')) continue;
 
     if (tace) {
+      const muto = howLong(agent.lastSeenAt as string);
       await noticeManager.tell(agent.ownerId, {
         kind: 'silent',
         agentId: agent.id,
         who: agent.name,
-        short: `non risponde ${since(agent.lastSeenAt as string)}`,
+        since: agent.lastSeenAt as string,
+        short: `ha smesso di rispondere da ${muto}`,
         title: `${agent.name} non risponde`,
-        body: `Quel posto non si fa vivo ${since(agent.lastSeenAt as string)}. Se è saltata la corrente o la linea, di là non c'è più nessuno a dirlo.`,
+        body: `Quel posto non si fa vivo da ${muto}. Se è saltata la corrente o la linea, di là non c'è più nessuno a dirlo.`,
       });
       continue;
     }
 
-    // Non si dice «è tornato» a chi non ha mai saputo che era andato via.
+    // Non si dice che un posto risponde di nuovo a chi non ha mai saputo
+    // che aveva smesso.
     if (!detto) continue;
+
+    // Quanto e' durato il silenzio si conta da dove era cominciato, non da
+    // quando ce ne siamo accorti: in mezzo c'e' il quarto d'ora che si
+    // aspetta apposta, e dirlo in meno sarebbe dire una cosa falsa.
+    const muto = howLong(detto.since ?? detto.at);
 
     await noticeManager.tell(agent.ownerId, {
       kind: 'back',
       agentId: agent.id,
       who: agent.name,
-      short: 'è tornato',
-      title: `${agent.name} è tornato`,
-      body: 'Quel posto si è ricollegato: da qui si vede di nuovo quello che c\u2019è dentro.',
+      short: `ha ripreso a rispondere dopo ${muto}`,
+      title: `${agent.name} risponde di nuovo`,
+      body: `Ha ripreso a farsi vivo dopo ${muto} di silenzio: da qui si vede di nuovo quello che c’è dentro.`,
     });
   }
 }

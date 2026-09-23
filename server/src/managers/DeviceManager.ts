@@ -15,8 +15,8 @@ import type { Device } from '../types.js';
  * chi leggeva. Una riga di registro si legge di sfuggita, magari la mattina
  * dopo: deve dire per intero di cosa parla.
  */
-const conta = (quanti: number, come: string): string =>
-  `${quanti} ${quanti === 1 ? 'dispositivo' : 'dispositivi'} ${come}`;
+const conta = (quanti: number): string =>
+  `${quanti} ${quanti === 1 ? 'dispositivo' : 'dispositivi'}`;
 
 export class DeviceManager {
   list(ownerId: string): Promise<Device[]> {
@@ -69,12 +69,15 @@ export class DeviceManager {
         ownerId,
         agentId,
         kind: 'inventory',
+        // Una frase intera e non un conteggio: «2 dispositivi in meno» non
+        // dice se sono spariti dalla rete o se li hai tolti tu, e la riga si
+        // legge di sfuggita la mattina dopo.
         detail: [
-          devices.length > before ? conta(devices.length - before, 'in più') : '',
-          gone.length ? conta(gone.length, 'in meno') : '',
+          devices.length > before ? `ha trovato ${conta(devices.length - before)} in più` : '',
+          gone.length ? `non trova più ${conta(gone.length)}` : '',
         ]
           .filter(Boolean)
-          .join(', '),
+          .join(', e '),
       });
     }
 

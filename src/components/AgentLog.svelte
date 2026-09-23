@@ -35,6 +35,10 @@
    * La riga, in italiano. Il soggetto davanti quando c'è — «Tenda 1» — perché
    * un registro si scorre cercando un nome, non un tipo di evento.
    */
+  /** Le righe vecchie dicevano solo «collegato»: il verbo si mette qui. */
+  const legge = (detail: string | undefined): string =>
+    detail === 'collegato' || detail === 'scollegato' ? `è stato ${detail}` : (detail ?? '');
+
   function says(entry: LogEntry): { what: string; who: string } {
     const chi = entry.subject ?? '';
     switch (entry.kind) {
@@ -49,15 +53,33 @@
       case 'down':
         return { what: 'si è scollegato', who: agent.name };
       case 'inventory':
-        return { what: `ha ${entry.detail}`, who: agent.name };
+        return { what: entry.detail ?? '', who: agent.name };
       case 'device-up':
         return { what: 'ha ripreso a rispondere', who: chi };
       case 'device-down':
         return { what: 'ha smesso di rispondere', who: chi };
+      /*
+       * Il verbo lo mette la riga, non il server: le righe di ieri dicevano
+       * solo «collegato», e un registro non si riscrive per cambiare una
+       * parola — si legge come si legge oggi.
+       */
       case 'account':
-        return { what: `${entry.detail}`, who: chi || 'Un account' };
+        return { what: legge(entry.detail), who: chi || 'Un account' };
       case 'scene':
-        return { what: entry.ok ? `partita — ${entry.detail}` : `partita a metà — ${entry.detail}`, who: chi };
+        return {
+          what: entry.ok ? `è partita: ${entry.detail}` : `è partita a metà: ${entry.detail}`,
+          who: chi,
+        };
+      /*
+       * Il comando e non il risultato: qui ci finisce anche quello che non è
+       * riuscito, e scrivere «acceso» di una cosa che non si è accesa sarebbe
+       * il modo più veloce per rendere il registro inutile.
+       */
+      case 'command':
+        return {
+          what: entry.ok === false ? `non ha eseguito «${entry.detail}»` : `ha eseguito «${entry.detail}»`,
+          who: chi,
+        };
       default:
         return { what: entry.detail ?? '', who: chi };
     }

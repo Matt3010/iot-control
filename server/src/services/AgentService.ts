@@ -118,14 +118,14 @@ export class AgentService {
        * L'elenco no: guardare non è successo niente.
        */
       if (action === 'unlink') {
-        logManager.note({ ownerId, agentId: id, kind: 'account', detail: 'scollegato', who });
+        logManager.note({ ownerId, agentId: id, kind: 'account', detail: 'è stato scollegato', who });
       } else if (step && !Array.isArray(step) && step.kind === 'done') {
         logManager.note({
           ownerId,
           agentId: id,
           kind: 'account',
           subject: options.handler,
-          detail: 'collegato',
+          detail: 'è stato collegato',
           who,
         });
       }

@@ -45,5 +45,9 @@
     background: var(--glass-strong);
   }
 
-  .card.wide { column-span: all; }
+  /* attraverso tutte le colonne, in tutti e due i modi di disporle */
+  .card.wide {
+    column-span: all;
+    grid-column: 1 / -1;
+  }
 </style>

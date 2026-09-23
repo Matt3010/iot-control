@@ -23,6 +23,7 @@
     count,
     lead,
     siblings = true,
+    layout = 'columns',
     children,
   }: {
     title: string;
@@ -32,6 +33,19 @@
     lead?: string;
     /** Se questa pagina sta nella fila delle altre. Le mappe no. */
     siblings?: boolean;
+    /**
+     * Come si dispongono le schede.
+     *
+     * `columns` è il difetto: si accodano una sotto l'altra come in un
+     * giornale, e va bene dove sono alte in modo imprevedibile — un agente
+     * collegato è lungo una pagina, uno appena creato sono tre righe.
+     *
+     * `grid` le mette in riga vere: stessa altezza e stesso stacco fra tutte.
+     * Serve dove sotto c'è qualcosa di largo, perché a colonne il bordo di
+     * sotto resta frastagliato e il vuoto prima della tabella viene di due
+     * misure diverse a seconda di dove guardi.
+     */
+    layout?: 'columns' | 'grid';
     children: Snippet;
   } = $props();
 
@@ -67,7 +81,7 @@
   <!-- A colonne, non a griglia: una scheda collegata e' alta, una appena
        creata sono tre righe, e in una griglia la riga prende l'altezza della
        piu' alta lasciando accanto un buco grande come mezza pagina. -->
-  <div class="grid">
+  <div class="grid {layout}">
     {@render children()}
   </div>
 </div>
@@ -137,7 +151,20 @@
   .grid {
     max-width: 960px;
     margin: 0 auto;
+  }
+
+  .grid.columns {
     columns: 380px;
     column-gap: 14px;
+  }
+
+  /* lo stacco fra le righe lo tiene la scheda, come a colonne: qui il vuoto
+     è zero, se no le due misure si sommerebbero */
+  .grid.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    column-gap: 14px;
+    row-gap: 0;
+    align-items: stretch;
   }
 </style>

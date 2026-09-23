@@ -117,8 +117,8 @@ export class SceneManager {
         kind: 'scene',
         subject: scene.name,
         detail: zitti
-          ? `${suoi.length - zitti} di ${suoi.length}`
-          : `${suoi.length} ${suoi.length === 1 ? 'cosa' : 'cose'}`,
+          ? `${suoi.length - zitti} dispositivi su ${suoi.length}`
+          : `${suoi.length} ${suoi.length === 1 ? 'dispositivo' : 'dispositivi'}`,
         ok: zitti === 0,
         ...(who ? { who } : {}),
       });
@@ -129,8 +129,8 @@ export class SceneManager {
     const names = [...new Set(mute.map(({ device }) => `«${device.name}»`))].join(', ');
     throw badGateway(
       mute.length === steps.length
-        ? `Non ha risposto niente di «${scene.name}»`
-        : `${names}: nessuna risposta. Il resto è partito.`,
+        ? `Nessun dispositivo di «${scene.name}» ha risposto`
+        : `${names}: nessuna risposta. Il resto della scena è partito.`,
     );
   }
 
