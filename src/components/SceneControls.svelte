@@ -134,7 +134,9 @@
   {:else if scene.when}
     <p class="auto" class:is-off={scene.when.off}>
       <Icon name="refresh" />
-      {scene.when.off ? `sospesa — ${saysWhen(scene.when)}` : saysWhen(scene.when)}
+      <span class="detto">
+        {scene.when.off ? `sospesa — ${saysWhen(scene.when)}` : saysWhen(scene.when)}
+      </span>
     </p>
   {/if}
 
@@ -146,7 +148,13 @@
                vuoto sulla linea, e che siano parole lo dicono le virgolette -->
           <span class="riga">«{step.what}»</span>
         {:else}
-          <span class="riga">{step.who} · <b>{step.what}</b></span>
+          <span class="riga">
+            {step.who} · <b>{step.what}</b>
+            <!-- per il guasto vero anche l'icona, come nella scheda del
+                 dispositivo: il colore del nodo da solo non basta a chi non
+                 lo distingue -->
+            {#if step.state === 'lost'}<span class="away" title={step.says}><Icon name="alert" /></span>{/if}
+          </span>
         {/if}
       {/snippet}
     </StepRail>
@@ -196,7 +204,59 @@
 
   .riga b { font-weight: 560; color: var(--ink-2); }
 
+  .away { display: inline-grid; place-items: center; color: var(--danger); }
+
+  .away :global(.ico) { width: 12px; height: 12px; vertical-align: -2px; }
+
 
 
   .set-none { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
+
+  /* mentre parte: un punto che pulsa e a che passo è arrivata */
+  .corre {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: -2px 0 0;
+    font-size: 11.5px;
+    color: var(--accent);
+  }
+
+  .battito {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: battito 1.1s ease-in-out infinite;
+  }
+
+  @keyframes battito {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+
+  /* l'orario che ha, se parte da sola: piccolo, sotto il nome, e smorto
+     quando è sospeso */
+  .auto {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: -2px 0 0;
+    font-size: 11.5px;
+    line-height: 1.3;
+    color: var(--ink-3);
+  }
+
+  /* l'icona sta in mezzo alla riga e non sulla sua prima lettera */
+  .auto :global(.ico) {
+    flex: none;
+    width: 12px;
+    height: 12px;
+  }
+
+  .auto.is-off { opacity: 0.55; }
+
+  /* barrato solo il testo, non il segno davanti */
+  .auto.is-off .detto { text-decoration: line-through; }
 </style>

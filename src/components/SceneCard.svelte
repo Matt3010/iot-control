@@ -9,6 +9,7 @@
   import SceneControls from './SceneControls.svelte';
   import DateField from './DateField.svelte';
   import Switch from './Switch.svelte';
+  import TextField from './TextField.svelte';
   import TimeField from './TimeField.svelte';
 
   /**
@@ -242,13 +243,11 @@
             {#if step.notify}
               <!-- le parole si scrivono qui: un avviso senza le sue parole
                    non si puo' nemmeno immaginare -->
-              <input
-                class="parole"
-                type="text"
-                maxlength="140"
+              <TextField
                 value={step.notify}
-                aria-label="Cosa dice l'avviso"
-                onchange={(event) => setNotify(at, event.currentTarget.value)}
+                size="sm"
+                label="Cosa dice l'avviso"
+                onchange={(testo: string) => setNotify(at, testo)}
               />
             {:else}
               <span class="line">{says.who} · <b>{says.what}</b></span>
@@ -335,7 +334,9 @@
     {#if all.length}
       <!-- prima chi, poi cosa: due passi corti invece di un elenco lungo
            quanto tutti i dispositivi per tutte le loro azioni -->
-      <span class="eyebrow">Aggiungi una riga</span>
+      <div class="parte">
+        <span class="eyebrow">Aggiungi una riga</span>
+      </div>
       <div class="chips">
         <!-- l'unica azione che non riguarda una cosa in casa: sta con le
              altre perche' si aggiunge allo stesso modo -->
@@ -393,25 +394,24 @@
     border: 1px dashed var(--hairline);
   }
 
-  .rename { width: 100%; padding: 6px 8px; font-size: 13px; font-weight: 560; }
-
   .written { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 
   .written li { display: flex; align-items: center; gap: 4px; min-width: 0; }
 
-  .parole {
-    flex: 1;
-    min-width: 0;
-    padding: 3px 7px;
-    font-size: 11.5px;
-  }
+  /* il campo di un avviso prende la riga, e la pastiglia dell'attesa gli sta
+     accanto alla stessa altezza */
+  .written li :global(.text-field) { flex: 1; min-width: 0; }
 
   /* l'attesa sta davanti alla riga e non in una colonna sua: si legge come
      una frase — «dopo 30s, Tenda 1 chiudi» */
   .written :global(.attesa) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex: none;
-    min-width: 62px;
-    padding: 1px 5px;
+    height: 26px;
+    min-width: 74px;
+    padding: 0 9px;
     border-radius: 99px;
     background: var(--sunken);
     font-size: 10.5px;
@@ -454,11 +454,22 @@
 
   .drop :global(.ico) { width: 12px; height: 12px; }
 
+  /* Il pannello sono tre cose diverse una sotto l'altra: quello che la scena
+     fa, quando parte da sola, e cosa aggiungerci. Senza una riga che le
+     separi si leggono come un elenco solo, e il «parte da sola» sembra
+     l'ultima delle azioni. */
   .quando {
     display: grid;
     gap: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--hairline-soft);
+    margin-top: 2px;
+    padding-top: 11px;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .parte {
+    margin-top: 3px;
+    padding-top: 11px;
+    border-top: 1px solid var(--hairline);
   }
 
   .modo { display: flex; gap: 6px; }

@@ -176,6 +176,14 @@ export class SceneManager {
       });
     };
 
+    /** Com'è andata, in una frase che si regge da sola. */
+    const detto = (quanti: number, zitti: number): string => {
+      const quanti_ = (n: number) => `${n} ${n === 1 ? 'dispositivo' : 'dispositivi'}`;
+      if (!zitti) return `parte — ${quanti_(quanti)}`;
+      if (zitti === quanti) return 'non parte, non ha risposto nessuno';
+      return `parte a metà — ${quanti_(quanti - zitti)} su ${quanti}`;
+    };
+
     const nota = (): void => {
       /*
        * Una riga per agente, non una per passo: «Sera» è una cosa sola anche
@@ -191,12 +199,16 @@ export class SceneManager {
           agentId,
           kind: 'scene',
           subject: scene.name,
-          // il singolare vale anche dentro a «su»: «1 dispositivi su 2» e'
-          // il genere di dettaglio che fa sembrare tutto il resto scritto
-          // male
-          detail: zitti
-            ? `${suoi.length - zitti} ${suoi.length - zitti === 1 ? 'dispositivo' : 'dispositivi'} su ${suoi.length}`
-            : `${suoi.length} ${suoi.length === 1 ? 'dispositivo' : 'dispositivi'}`,
+          /*
+           * La frase intera, contata qui.
+           *
+           * Il singolare vale anche dentro a «su» — «1 dispositivi su 2» fa
+           * sembrare scritto male tutto il resto — e quando non risponde
+           * nessuno la scena non è partita a metà: non è partita, e dirlo
+           * con uno zero («0 dispositivi su 1») è un modo contorto di dire
+           * una cosa semplice.
+           */
+          detail: detto(suoi.length, zitti),
           ok: zitti === 0,
           ...(who ? { who } : {}),
         });

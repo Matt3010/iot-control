@@ -50,6 +50,13 @@
         ? 'si scollega'
         : (detail ?? '');
 
+  /** Le righe vecchie dicevano solo «6 dispositivi»: il verbo si mette qui. */
+  const conta = (detail: string | undefined, ok: boolean | undefined): string => {
+    const detto = detail ?? '';
+    if (detto.startsWith('parte') || detto.startsWith('non parte')) return detto;
+    return ok ? `parte — ${detto}` : `parte a metà — ${detto}`;
+  };
+
   function says(entry: LogEntry): { what: string; who: string } {
     const chi = entry.subject ?? '';
     switch (entry.kind) {
@@ -81,11 +88,13 @@
        */
       case 'account':
         return { what: legge(entry.detail), who: chi || 'Un account' };
+      /*
+       * La frase la scrive chi ha contato: quante righe sono partite, quante
+       * no, e se non è partito niente. Le righe di ieri portavano solo il
+       * conteggio, e per quelle il verbo si mette ancora qui.
+       */
       case 'scene':
-        return {
-          what: entry.ok ? `parte — ${entry.detail}` : `parte a metà — ${entry.detail}`,
-          who: chi,
-        };
+        return { what: conta(entry.detail, entry.ok), who: chi };
       /*
        * Il comando e non il risultato: qui ci finisce anche quello che non è
        * riuscito, e scrivere «acceso» di una cosa che non si è accesa sarebbe
