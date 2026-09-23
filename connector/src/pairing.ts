@@ -234,7 +234,33 @@ function fieldsOf(schema: unknown[] | undefined): PairingStep['fields'] {
     });
 }
 
-/** Il primo errore che HA segnala, detto in modo leggibile. */
+/**
+ * Le parole di un guasto, dette come si direbbero a voce.
+ *
+ * Di la' le chiamano per chiave — `invalid_auth`, `already_in_progress` — e
+ * accanto ci mettono il testo dell'eccezione che le ha causate. Quella roba
+ * non deve arrivare a chi guarda: non e' scritta per lui, non e' nella sua
+ * lingua, e la meta' delle volte non dice nemmeno cosa fare.
+ */
+const PAROLE: Record<string, string> = {
+  invalid_auth: 'Utente o password non vanno.',
+  invalid_credentials: 'Utente o password non vanno.',
+  cannot_connect: 'Non si riesce a raggiungere quel servizio da casa tua.',
+  timeout: 'Quel servizio non ha risposto in tempo.',
+  timeout_connect: 'Quel servizio non ha risposto in tempo.',
+  already_configured: 'Questo account risulta già collegato.',
+  already_in_progress: 'C’era un collegamento lasciato a metà. Riprova adesso.',
+  reauth_unsuccessful: 'Quel servizio ha chiesto di rifare l’accesso, e non è riuscito.',
+  no_devices_found: 'Non ha trovato niente da collegare.',
+  unknown: 'Quel servizio ha risposto in un modo che non ci aspettavamo.',
+  template: 'Quel servizio ha risposto in un modo che non ci aspettavamo.',
+};
+
+/** Se un dettaglio e' una frase o un pezzo di codice buttato li'. */
+const leggibile = (testo: string): boolean =>
+  !/[(){}[\]<>]|https?:\/\/|Error|Exception|Traceback|^[a-z_]+$/.test(testo.trim());
+
+/** Il primo errore che l'impianto segnala, detto in modo leggibile. */
 function errorOf(flow: HaFlow): string | undefined {
   // Il nome del campo conta: «obbligatorio» senza dire quale non aiuta
   // nessuno. «base» invece vuol dire «tutto il modulo», e non si nomina.
@@ -242,11 +268,14 @@ function errorOf(flow: HaFlow): string | undefined {
   if (!first) return undefined;
   const which = where && where !== 'base' ? `${where}: ` : '';
 
-  // HA dà una chiave ("login_error") e i dettagli a parte: si mettono insieme.
+  const detto = PAROLE[first] ?? first;
+
+  // I dettagli si tengono solo se sono una frase: il testo di un'eccezione e
+  // un indirizzo di un sito, in fondo a un messaggio, sono rumore che spaventa.
   const detail = Object.values(flow.description_placeholders ?? {})
-    .filter((value) => typeof value === 'string' && value)
+    .filter((value): value is string => typeof value === 'string' && !!value && leggibile(value))
     .join(' · ');
-  return detail ? `${which}${first} · ${detail}` : `${which}${first}`;
+  return detail ? `${which}${detto} ${detail}` : `${which}${detto}`;
 }
 
 function translate(flow: HaFlow, going?: { flowId: string; schema?: unknown[] }): PairingStep {
@@ -273,7 +302,13 @@ function translate(flow: HaFlow, going?: { flowId: string; schema?: unknown[] })
   }
   if (flow.type === 'abort') {
     if (flow.flow_id) SCHEMAS.delete(flow.flow_id);
-    return { flowId: flow.flow_id ?? '', kind: 'failed', fields: [], error: flow.reason ?? 'interrotto' };
+    const perche = flow.reason ?? '';
+    return {
+      flowId: flow.flow_id ?? '',
+      kind: 'failed',
+      fields: [],
+      error: PAROLE[perche] ?? (perche && leggibile(perche) ? perche : 'il collegamento si è interrotto'),
+    };
   }
 
   // Si tiene com'era: al passo dopo serve per rispondere anche di quello che
@@ -397,11 +432,39 @@ export async function startPairing(config: ConnectorConfig, handler: string): Pr
     };
   }
 
+  /*
+   * Una conversazione lasciata a meta' resta aperta di la' — una finestra
+   * chiusa, un telefono che si spegne — e alla prossima si sente rispondere
+   * che ce n'e' gia' una in corso. Chi guarda non puo' saperlo e non puo'
+   * farci niente: la si chiude e si ricomincia.
+   */
+  await forgetOpen(config, handler);
+
   const flow = await ask(config, FLOWS, {
     method: 'POST',
     body: JSON.stringify({ handler, show_advanced_options: false }),
   });
   return pictured(config, flow, translate(flow));
+}
+
+/** Chiude le conversazioni rimaste aperte per quel servizio. */
+async function forgetOpen(config: ConnectorConfig, handler: string): Promise<void> {
+  try {
+    const response = await fetch(`${config.haUrl}${FLOWS}`, {
+      headers: { authorization: `Bearer ${config.haToken}` },
+    });
+    if (!response.ok) return;
+
+    const open = (await response.json()) as { flow_id?: string; handler?: string }[];
+    await Promise.all(
+      open
+        .filter((one) => one.handler === handler && one.flow_id)
+        .map((one) => cancelPairing(config, one.flow_id as string)),
+    );
+  } catch {
+    // Se non si riesce a guardare non si insiste: al massimo si sente dire
+    // che ce n'e' una in corso, ed e' quello che succedeva prima.
+  }
 }
 
 export async function submitPairing(
