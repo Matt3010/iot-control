@@ -57,6 +57,23 @@ export class SceneManager {
 
       const patch: Partial<Scene> = { name: dto.name };
       if (dto.steps) patch.steps = this.#clean(tx, ownerId, dto.steps);
+
+      /*
+       * `null` vuol dire «non parte piu' da sola», che e' diverso da «non ne
+       * stiamo parlando»: il primo cancella l'orario, il secondo lo lascia
+       * dov'e'. Senza questa distinzione una scena non si potrebbe piu'
+       * spegnere senza rifarla.
+       */
+      if (dto.when !== undefined) {
+        patch.when = dto.when
+          ? {
+              at: dto.when.at,
+              days: dto.when.days ?? [],
+              tz: dto.when.tz || 'Europe/Rome',
+              ...(dto.when.off ? { off: true } : {}),
+            }
+          : undefined;
+      }
       return scenes.update(id, patch) as Scene;
     });
   }

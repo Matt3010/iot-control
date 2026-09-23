@@ -25,12 +25,30 @@ export class SceneRepository {
     return scene;
   }
 
-  update(id: string, patch: Partial<Pick<Scene, 'name' | 'steps'>>): Scene | undefined {
+  update(id: string, patch: Partial<Pick<Scene, 'name' | 'steps' | 'when'>>): Scene | undefined {
     const current = this.findById(id);
     if (!current) return undefined;
     Object.assign(current, patch);
     this.tx.markDirty();
     return current;
+  }
+
+  /**
+   * Si prende il turno di questo minuto, se nessuno l'ha gia' preso.
+   *
+   * L'orologio non esegue mai di sua iniziativa: prima scrive che quella
+   * scena e' partita in quel minuto, e solo se la scrittura ha vinto la fa
+   * partire davvero. Oggi vince sempre, perche' il processo e' uno; domani,
+   * con un archivio condiviso, la stessa riga diventa la gara fra due server
+   * senza che l'orologio debba saperne niente.
+   */
+  claim(id: string, minute: string): boolean {
+    const scene = this.findById(id);
+    if (!scene || scene.lastRunAt === minute) return false;
+
+    scene.lastRunAt = minute;
+    this.tx.markDirty();
+    return true;
   }
 
   delete(id: string): boolean {

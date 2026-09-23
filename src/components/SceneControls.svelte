@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { devices, type Scene } from '../lib/devices.svelte';
   import { thingHealth } from '../lib/health';
+  import { saysWhen } from '../lib/timing';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
@@ -95,6 +96,15 @@
     </Button>
   </div>
 
+  <!-- se parte da sola lo dice qui, senza doverla aprire: e' la differenza
+       fra una scena che aspetta te e una che va avanti per conto suo -->
+  {#if scene.when}
+    <p class="auto" class:is-off={scene.when.off}>
+      <Icon name="refresh" />
+      {scene.when.off ? `sospesa — ${saysWhen(scene.when)}` : saysWhen(scene.when)}
+    </p>
+  {/if}
+
   {#if scene.steps.length}
     <ul class="steps">
       {#each scene.steps as step, at (`${step.deviceId}:${step.code}:${at}`)}
@@ -150,6 +160,20 @@
   /* il triangolo dentro al cerchio tira a destra: al centro esatto sembra
      storto, ed e' l'unica cosa che questa scheda ha da dire sulla forma */
   .set :global(.go .ico) { margin-left: 1px; fill: currentColor; }
+
+  /* l'orario: piccolo, sotto il nome, e smorto quando e' sospeso */
+  .auto {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: -2px 0 0;
+    font-size: 11.5px;
+    color: var(--ink-3);
+  }
+
+  .auto :global(.ico) { width: 12px; height: 12px; }
+
+  .auto.is-off { opacity: 0.55; text-decoration: line-through; }
 
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 

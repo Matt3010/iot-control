@@ -50,10 +50,28 @@ export interface SceneStep {
  * cose diverse, premute una volta. Non ha uno stato suo — due tende possono
  * stare una aperta e una chiusa, e per quello non c'è una parola sola.
  */
+/**
+ * Quando una scena parte da sola.
+ *
+ * Un'ora come la si legge su un orologio e i giorni in cui vale, con il fuso
+ * in cui quell'ora è scritta: «le sette di sera» deve restare le sette anche
+ * dopo il cambio dell'ora, e chi la scrive da un'altra città non deve fare i
+ * conti a mente.
+ */
+export interface Timing {
+  at: string;
+  /** Da domenica (0) a sabato (6). Vuoto vuol dire tutti i giorni. */
+  days: number[];
+  tz: string;
+  /** Sospesa senza cancellarla, per l'estate o per una settimana fuori. */
+  off?: boolean;
+}
+
 export interface Scene {
   id: string;
   name: string;
   steps: SceneStep[];
+  when?: Timing;
 }
 
 /** Un agente appena creato: il token si vede una volta sola, e poi mai più. */
@@ -254,9 +272,17 @@ class Devices {
     return made;
   }
 
-  async patchScene(scene: Scene, patch: { name?: string; steps?: SceneStep[] }): Promise<void> {
+  /**
+   * Cambia una scena. `when: null` vuol dire «non parte più da sola», che è
+   * diverso da non nominarlo: il primo cancella l'orario, il secondo lo
+   * lascia dov'è.
+   */
+  async patchScene(
+    scene: Scene,
+    patch: { name?: string; steps?: SceneStep[]; when?: Timing | null },
+  ): Promise<void> {
     const before = { ...scene, steps: [...scene.steps] };
-    Object.assign(scene, patch);
+    Object.assign(scene, { ...patch, ...(patch.when === null ? { when: undefined } : {}) });
     try {
       Object.assign(scene, await api.put<Scene>(`/scenes/${scene.id}`, { name: scene.name, ...patch }));
     } catch (error) {

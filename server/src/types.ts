@@ -165,11 +165,40 @@ export interface SceneStep {
  * Non è nemmeno un dispositivo finto: non ha uno stato. Due tende possono
  * stare una aperta e una chiusa, e per quello non c'e' una parola sola.
  */
+/**
+ * Quando una scena parte da sola.
+ *
+ * Un orario a muro e i giorni in cui vale, con il fuso in cui quell'orario e'
+ * scritto: «le sette di sera» vuol dire sette di sera lì, non sette al
+ * meridiano di Greenwich, e a ottobre le lancette si spostano senza chiedere
+ * il permesso a nessuno.
+ */
+export interface Timing {
+  /** L'ora del giorno, come la si legge su un orologio: `07:30`. */
+  at: string;
+  /** I giorni in cui vale, da domenica (0) a sabato (6). Vuoto vuol dire tutti. */
+  days: number[];
+  /** Dove sono quelle lancette: `Europe/Rome`. */
+  tz: string;
+  /** Sospesa senza cancellarla, per l'estate o per una settimana fuori. */
+  off?: boolean;
+}
+
 export interface Scene {
   id: string;
   ownerId: string;
   name: string;
   steps: SceneStep[];
+  /** Se parte da sola, e quando. */
+  when?: Timing;
+  /**
+   * L'ultimo minuto in cui e' partita da sola.
+   *
+   * Serve a non farla partire due volte nello stesso minuto: il battito e'
+   * piu' fitto di un minuto apposta, per non perdere l'orario se la macchina
+   * era occupata.
+   */
+  lastRunAt?: string;
 }
 
 /**

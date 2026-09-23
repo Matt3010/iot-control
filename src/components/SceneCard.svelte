@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { devices, type Device, type Scene, type SceneStep } from '../lib/devices.svelte';
+  import { devices, type Device, type Scene, type SceneStep, type Timing } from '../lib/devices.svelte';
+  import { defaultWhen, GIORNI } from '../lib/timing';
   import type { Capability } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Chip from './Chip.svelte';
   import Icon from './Icon.svelte';
   import SceneControls from './SceneControls.svelte';
+  import Switch from './Switch.svelte';
 
   /**
    * Una scena, tutta in una scheda.
@@ -84,6 +86,34 @@
   /** Se è già in scena: la pastiglia lo dice invece di farlo scoprire premendo. */
   const inScene = (deviceId: string) => scene.steps.some((one) => one.deviceId === deviceId);
 
+  /* ------------------------------------------------------- parte da sola */
+
+  /** Cambia l'orario, o lo toglie del tutto. */
+  const setWhen = (when: Timing | null) => void devices.patchScene(scene, { when });
+
+  /**
+   * Un giorno si accende o si spegne.
+   *
+   * Dentro, «nessun giorno» vuol dire tutti — è come si scrive «ogni
+   * giorno» — ma sotto il dito non può funzionare così: chi vede sette
+   * pastiglie accese e ne preme una si aspetta che quella si spenga, non che
+   * resti accesa da sola. Quindi si parte dalla settimana intera. E un giorno
+   * ci vuole: un orario che non capita mai non è un orario.
+   */
+  function flipDay(day: number): void {
+    const when = scene.when;
+    if (!when) return;
+
+    const TUTTI = [0, 1, 2, 3, 4, 5, 6];
+    const adesso = when.days.length ? when.days : TUTTI;
+    const dopo = adesso.includes(day)
+      ? adesso.filter((one) => one !== day)
+      : [...adesso, day].sort((a, b) => a - b);
+
+    if (!dopo.length) return;
+    setWhen({ ...when, days: dopo.length === 7 ? [] : dopo });
+  }
+
   const drop = (at: number) =>
     void devices.patchScene(scene, { steps: scene.steps.filter((_step, index) => index !== at) });
 </script>
@@ -148,6 +178,45 @@
         {/each}
       </ul>
     {/if}
+
+    <!-- Quando parte da sola. Sta qui e non in una pagina degli orari:
+         «chiudi le tende alle 19» e' una cosa sola, e tenerla in due posti
+         vorrebbe dire aprirne due per cambiare un numero. -->
+    <div class="quando">
+      <Switch
+        checked={!!scene.when && !scene.when.off}
+        label="Parte da sola"
+        note={scene.when
+          ? 'Se l’ora è quella, parte anche se non sei in casa.'
+          : 'Adesso parte solo quando la premi.'}
+        onchange={(acceso: boolean) =>
+          setWhen(acceso ? (scene.when ? { ...scene.when, off: false } : defaultWhen()) : scene.when ? { ...scene.when, off: true } : null)}
+      />
+
+      {#if scene.when}
+        <div class="orario">
+          <input
+            class="ora"
+            type="time"
+            value={scene.when.at}
+            aria-label="A che ora parte"
+            onchange={(event) => setWhen({ ...scene.when!, at: event.currentTarget.value })}
+          />
+          <!-- nessun giorno acceso vuol dire tutti: un elenco vuoto si legge
+               male, e «ogni giorno» e' quello che si intende -->
+          <div class="giorni">
+            {#each GIORNI as label, day (day)}
+              <Chip
+                label={label}
+                size="sm"
+                look={!scene.when.days.length || scene.when.days.includes(day) ? 'on' : 'off'}
+                onclick={() => flipDay(day)}
+              />
+            {/each}
+          </div>
+        </div>
+      {/if}
+    </div>
 
     {#if all.length}
       <!-- prima chi, poi cosa: due passi corti invece di un elenco lungo
@@ -248,6 +317,24 @@
   .drop:hover { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
 
   .drop :global(.ico) { width: 12px; height: 12px; }
+
+  .quando {
+    display: grid;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--hairline-soft);
+  }
+
+  .orario { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+  .ora {
+    width: auto;
+    padding: 5px 8px;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .giorni { display: flex; flex-wrap: wrap; gap: 4px; }
 
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
