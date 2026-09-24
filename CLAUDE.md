@@ -113,10 +113,15 @@ si guarda l'altra.
 «Quando la porta si apre», «sopra 25 gradi» sono la stessa domanda per gli
 avvisi e per le scene, e hanno un motore solo. `server/src/rules/prove.ts`
 decide se vale e se è appena successo, `src/lib/prove.ts` dice come si legge
-e cosa si può scegliere. Scattano sul passaggio, non sullo stato. Una
-scena partita da sola non riparte per un minuto se il cambiamento l'ha
-provocato un nostro comando, perché è così che due scene si rincorrono. Se
-l'ha fatto una persona, dal muro o dall'app del provider, riparte subito.
+e cosa si può scegliere. Scattano sul passaggio, non sullo stato.
+
+Una scena non può far ripartire sé stessa, né da sola né passando per altre
+scene: il server rifiuta di salvarla così (`rules/giri.ts`) e dice il giro.
+Conta se un comando può davvero far scattare la partenza, e «quando si
+accende, spegni» non è un giro. Quello che dai dati non si vede lo ferma una
+pausa: una scena non riparte per un minuto se il cambiamento l'ha provocato
+un nostro comando. Se l'ha fatto una persona, dal muro o dall'app del
+provider, riparte subito.
 
 Due scene che possono partire nello stesso momento non danno ordini diversi
 alla stessa cosa: il server rifiuta di salvarle così (`rules/scontri.ts`) e

@@ -6,6 +6,7 @@ import { noticeManager } from './NoticeManager.js';
 import type { Transaction } from '../persistence/db.js';
 import { store } from '../persistence/db.js';
 import { check, provabile } from './check.js';
+import { giroNuovo } from '../rules/giri.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { logManager } from './LogManager.js';
@@ -79,6 +80,7 @@ export class SceneManager {
           : undefined;
       }
       await this.#scontri(tx, ownerId, id, patch);
+      await this.#giri(tx, ownerId, id, patch);
       return (await scenes.update(id, patch)) as Scene;
     });
   }
@@ -347,6 +349,33 @@ export class SceneManager {
    * in cui arrivano, cioè nessuno. Si dice con quale scena e su quale
    * dispositivo, così si sa cosa cambiare.
    */
+  /**
+   * Rifiuta una modifica che farebbe ripartire una scena da sola, e dice il
+   * giro con i nomi, perché «c'è un giro» non dice cosa togliere.
+   */
+  async #giri(tx: Transaction, ownerId: string, id: string, patch: Partial<Scene>): Promise<void> {
+    const prima = await new SceneRepository(tx).findAllOf(ownerId);
+    const dopo = prima.map((one) => (one.id === id ? { ...one, ...patch } : one));
+    const devices = await new DeviceRepository(tx).findAllOf(ownerId);
+
+    const giro = giroNuovo(prima, dopo, devices, id);
+    if (!giro) return;
+
+    const scena = (sceneId: string) => `«${dopo.find((one) => one.id === sceneId)?.name ?? 'una scena'}»`;
+    const dispositivo = (deviceId: string) => `il dispositivo «${devices.find((one) => one.id === deviceId)?.name ?? '?'}»`;
+
+    if (giro.length === 1) {
+      const [passo] = giro as [(typeof giro)[number]];
+      throw badRequest(
+        `La scena ${scena(passo.da)} ripartirebbe da sola, perché comanda ${dispositivo(passo.deviceId)}, che è quello che la fa partire.`,
+      );
+    }
+    const tappe = giro.map(
+      (passo) => `${scena(passo.da)} comanda ${dispositivo(passo.deviceId)}, che fa partire ${scena(passo.a)}`,
+    );
+    throw badRequest(`Queste scene si farebbero ripartire a vicenda. ${tappe.join(', e ')}.`);
+  }
+
   async #scontri(tx: Transaction, ownerId: string, id: string, patch: Partial<Scene>): Promise<void> {
     const scenes = new SceneRepository(tx);
     const prima = await scenes.findById(id);
