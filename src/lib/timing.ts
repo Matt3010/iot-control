@@ -128,6 +128,18 @@ export const ATTESE = [0, 5, 10, 30, 60, 120, 300, 600, 1800] as const;
  * Zero non è un'attesa ed è il caso normale: «insieme» dice quello che
  * succede, mentre «0 secondi» fa contare a chi legge.
  */
+/**
+ * Quanto manca, da leggere mentre passa: «42 s», «4:05», «1 h 20». Corto
+ * perché cambia ogni secondo, e una frase che si riscrive sotto gli occhi
+ * si legge male.
+ */
+export function saysLeft(seconds: number): string {
+  const s = Math.max(0, Math.ceil(seconds));
+  if (s < 60) return `${s} s`;
+  if (s < 3600) return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  return `${Math.floor(s / 3600)} h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`;
+}
+
 export function saysWait(seconds: number | undefined): string {
   if (!seconds) return 'insieme';
   if (seconds < 60) return `dopo ${seconds}s`;

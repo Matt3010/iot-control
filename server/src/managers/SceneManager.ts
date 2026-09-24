@@ -179,7 +179,13 @@ export class SceneManager {
     const suona = async (momento: (typeof momenti)[number], at: number): Promise<void> => {
       // Prima di aspettare si dice che si sta aspettando: una scena che dura
       // dieci minuti, se non dice niente, sembra non essere partita.
-      hub.changed(ownerId, { kind: 'running', sceneId: scene.id, at, of: momenti.length });
+      hub.changed(ownerId, {
+        kind: 'running',
+        sceneId: scene.id,
+        at,
+        of: momenti.length,
+        ...(momento.wait > 0 ? { resta: momento.wait * 1000 } : {}),
+      });
       if (momento.wait > 0) await new Promise((done) => setTimeout(done, momento.wait * 1000));
 
       const esiti = await Promise.allSettled(

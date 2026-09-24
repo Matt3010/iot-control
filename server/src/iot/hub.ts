@@ -35,7 +35,12 @@ export type LiveEvent =
    * vedere che sta andando avanti, se no la preme di nuovo. `of` e' quanti
    * momenti sono in tutto, `done` che non ne restano.
    */
-  | { kind: 'running'; sceneId: string; at: number; of: number; done?: boolean }
+  /**
+   * Una scena che sta andando: a che momento è, su quanti. `resta` sono i
+   * millisecondi dell'attesa che comincia adesso, e non un'ora, perché
+   * l'orologio del telefono non è quello del server.
+   */
+  | { kind: 'running'; sceneId: string; at: number; of: number; done?: boolean; resta?: number }
   /** Il registro di un agente ha una riga in più: chi lo sta leggendo lo rilegga. */
   | { kind: 'log'; agentId: string }
   /**

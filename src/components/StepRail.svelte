@@ -1,6 +1,6 @@
-<script lang="ts" generics="T extends { key: string; wait?: number; state?: 'live' | 'lost' | 'unknown'; says?: string; talk?: boolean; now?: boolean; done?: boolean }">
+<script lang="ts" generics="T extends { key: string; wait?: number; state?: 'live' | 'lost' | 'unknown'; says?: string; talk?: boolean; now?: boolean; done?: boolean; fino?: number }">
   import type { Snippet } from 'svelte';
-  import { saysWait } from '../lib/timing';
+  import { saysLeft, saysWait } from '../lib/timing';
 
   /**
    * Una sequenza letta dall'alto in basso.
@@ -27,6 +27,19 @@
     /** Cosa c'è scritto su quella riga: il nome, l'azione, e i suoi comandi. */
     row: Snippet<[T, number]>;
   } = $props();
+
+  /*
+   * L'orologio per il conto alla rovescia di un'attesa. Batte solo finché
+   * c'è un'attesa che sta passando: una pagina ferma non ha niente da contare.
+   */
+  let adesso = $state(Date.now());
+  const conta = $derived(steps.some((step) => step.fino));
+  $effect(() => {
+    if (!conta) return;
+    adesso = Date.now();
+    const batti = setInterval(() => (adesso = Date.now()), 1000);
+    return () => clearInterval(batti);
+  });
 </script>
 
 <ol class="rail">
@@ -43,7 +56,9 @@
              c'è scritto quanto. Anche sulla prima riga — lì non si disegnava,
              ma il server quell'attesa la rispetta lo stesso, e una scena che
              sta ferma mezzo minuto senza dirlo sembra non essere partita. -->
-        <span class="attesa">{saysWait(pausa)}</span>
+        <span class="attesa">
+          {saysWait(pausa)}{#if step.fino}<span class="resta">{' · ancora '}{saysLeft((step.fino - adesso) / 1000)}</span>{/if}
+        </span>
       {/if}
 
       <!-- una riga che parla ha il suo nodo vuoto: non racconta come sta un
@@ -154,4 +169,6 @@
     font-variant-numeric: tabular-nums;
     color: var(--accent);
   }
+
+  .resta { color: var(--ink-2); }
 </style>

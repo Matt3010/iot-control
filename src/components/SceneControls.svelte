@@ -58,9 +58,21 @@
   const corre = $derived(devices.running[scene.id]);
 
   /** Le righe come le vuole la linea del tempo: chi, cosa, come sta, e l'attesa. */
+  /*
+   * A quale momento appartiene ogni riga. Il server conta i momenti — le
+   * righe che partono insieme, fino alla prossima attesa — e non le righe:
+   * confrontarlo con la posizione della riga faceva battere la prima di un
+   * momento e mai le altre, e «Mansarda» restava spenta mentre partiva.
+   */
+  const momentoDi = $derived.by(() => {
+    let momento = 1;
+    return scene.steps.map((step, at) => (at > 0 && (step.after ?? 0) > 0 ? ++momento : momento));
+  });
+
   const rails = $derived(
     scene.steps
       .map((step, at) => {
+        const momento = momentoDi[at] ?? 1;
         const says = devices.saysOf(step);
         const sta =
           step.notify !== undefined || step.scene
@@ -75,11 +87,10 @@
           wait: step.after,
           state: sta.state,
           says: sta.says,
-          // Il numero che dice il server conta le righe come stanno scritte,
-          // e qui sotto qualcuna non si disegna: senza il suo posto vero, il
-          // passo che batte sarebbe quello sbagliato.
-          now: corre?.at === at + 1,
-          done: !!corre && corre.at > at + 1,
+          now: corre?.at === momento,
+          done: !!corre && corre.at > momento,
+          // l'attesa di questa riga, se è quella che sta passando adesso
+          fino: corre?.at === momento && (step.after ?? 0) > 0 ? corre.fino : undefined,
           vuota: step.notify === '',
         };
       })

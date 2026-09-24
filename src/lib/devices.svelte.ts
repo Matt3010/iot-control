@@ -491,7 +491,8 @@ class Devices {
    * quello che si accende.
    */
   /** Le scene che stanno partendo adesso, e a che momento sono arrivate. */
-  running = $state<Record<string, { at: number; of: number }>>({});
+  /** Le scene che stanno andando: a che momento, e quando finisce l'attesa di adesso. */
+  running = $state<Record<string, { at: number; of: number; fino?: number }>>({});
 
   apply(
     event: { kind: 'device' | 'agent' | 'devices' | 'agents' | 'scene' | 'running' | 'log' } & Record<
@@ -510,7 +511,14 @@ class Devices {
     if (event.kind === 'running') {
       const sceneId = event.sceneId as string;
       if (event.done) delete this.running[sceneId];
-      else this.running[sceneId] = { at: event.at as number, of: event.of as number };
+      else {
+        const resta = event.resta as number | undefined;
+        this.running[sceneId] = {
+          at: event.at as number,
+          of: event.of as number,
+          ...(resta ? { fino: Date.now() + resta } : {}),
+        };
+      }
       return;
     }
 
