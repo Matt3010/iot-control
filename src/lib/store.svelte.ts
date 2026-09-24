@@ -1,3 +1,4 @@
+import { rimpiazza } from './rimpiazza';
 import { api } from './api';
 import { DEFAULT_MARK, SUGGESTED } from './format';
 import { forgetJSON, readJSON, writeJSON } from './storage';
@@ -23,7 +24,7 @@ const withKey = (place: Place): LocalPlace => ({ ...place, key: crypto.randomUUI
 function absorb<T extends { id: string }>(list: T[], fresh: T): T {
   const at = list.findIndex((one) => one.id === fresh.id);
   if (at >= 0) {
-    Object.assign(list[at]!, fresh);
+    rimpiazza(list[at]!, fresh);
     return list[at]!;
   }
   list.push(fresh);
@@ -149,9 +150,9 @@ class Store {
     const before = { ...map };
     Object.assign(map, patch);
     try {
-      Object.assign(map, await api.put<PlaceMap>(`/maps/${map.id}`, { name: map.name, ...patch }));
+      rimpiazza(map, await api.put<PlaceMap>(`/maps/${map.id}`, { name: map.name, ...patch }));
     } catch (error) {
-      Object.assign(map, before);
+      rimpiazza(map, before);
       toast.show((error as Error).message);
     }
   }
@@ -250,7 +251,7 @@ class Store {
           return;
         }
         // il `key` non si tocca: è quello che tiene un marker attaccato al suo luogo
-        if (at >= 0) Object.assign(this.places[at]!, event.value);
+        if (at >= 0) rimpiazza(this.places[at]!, event.value, ['key']);
         else this.places.push(withKey(event.value));
         return;
       }
@@ -264,7 +265,7 @@ class Store {
           return;
         }
         const map = this.maps.find((candidate) => candidate.id === event.id);
-        if (map) Object.assign(map, event.value);
+        if (map) rimpiazza(map, event.value);
         else this.maps.push(event.value);
         return;
       }
@@ -276,7 +277,7 @@ class Store {
           return;
         }
         const category = this.categories.find((candidate) => candidate.id === event.id);
-        if (category) Object.assign(category, event.value);
+        if (category) rimpiazza(category, event.value);
         else this.categories.push(event.value);
         return;
       }
@@ -289,7 +290,7 @@ class Store {
           return;
         }
         const group = this.groups.find((candidate) => candidate.id === event.id);
-        if (group) Object.assign(group, event.value);
+        if (group) rimpiazza(group, event.value);
         else this.groups.push(event.value);
         return;
       }
@@ -407,9 +408,9 @@ class Store {
     const before = { ...category };
     Object.assign(category, patch);
     try {
-      Object.assign(category, await api.put<Category>(`/categories/${category.id}`, patch));
+      rimpiazza(category, await api.put<Category>(`/categories/${category.id}`, patch));
     } catch (error) {
-      Object.assign(category, before);
+      rimpiazza(category, before);
       toast.show((error as Error).message);
     }
   }
@@ -448,9 +449,9 @@ class Store {
     const before = { ...group };
     Object.assign(group, patch);
     try {
-      Object.assign(group, await api.put<Group>(`/groups/${group.id}`, patch));
+      rimpiazza(group, await api.put<Group>(`/groups/${group.id}`, patch));
     } catch (error) {
-      Object.assign(group, before);
+      rimpiazza(group, before);
       toast.show((error as Error).message);
     }
   }

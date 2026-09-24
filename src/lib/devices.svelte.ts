@@ -1,3 +1,4 @@
+import { rimpiazza } from './rimpiazza';
 import { healthOf } from './health';
 import { api } from './api';
 import { toast } from './toast.svelte';
@@ -404,7 +405,7 @@ class Devices {
     const made = await api.post<Scene>('/scenes', { name, steps });
     const at = this.scenes.findIndex((scene) => scene.id === made.id);
     if (at >= 0) {
-      Object.assign(this.scenes[at]!, made);
+      rimpiazza(this.scenes[at]!, made);
       return this.scenes[at]!;
     }
     this.scenes.push(made);
@@ -429,9 +430,9 @@ class Devices {
     const before = { ...scene, steps: [...scene.steps] };
     Object.assign(scene, { ...patch, ...(patch.when === null ? { when: undefined } : {}) });
     try {
-      Object.assign(scene, await api.put<Scene>(`/scenes/${scene.id}`, { name: scene.name, ...patch }));
+      rimpiazza(scene, await api.put<Scene>(`/scenes/${scene.id}`, { name: scene.name, ...patch }));
     } catch (error) {
-      Object.assign(scene, before);
+      rimpiazza(scene, before);
       toast.show((error as Error).message);
     }
   }
@@ -520,7 +521,7 @@ class Devices {
       if (!value) {
         if (at >= 0) this.scenes.splice(at, 1);
       } else if (at >= 0) {
-        Object.assign(this.scenes[at]!, value);
+        rimpiazza(this.scenes[at]!, value);
       } else {
         this.scenes.push(value);
       }
@@ -606,7 +607,7 @@ class Devices {
     const before = agent.name;
     agent.name = name;
     try {
-      Object.assign(agent, await api.put<Agent>(`/agents/${agent.id}`, { name }));
+      rimpiazza(agent, await api.put<Agent>(`/agents/${agent.id}`, { name }));
     } catch (error) {
       agent.name = before;
       toast.show((error as Error).message);
