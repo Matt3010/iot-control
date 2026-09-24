@@ -14,9 +14,19 @@ export type DeviceValue = string | number | boolean;
 /**
  * Cosa un dispositivo sa fare, detto in modo che l'interfaccia possa disegnarlo
  * senza sapere che cos'è: uno `switch` è un interruttore, un `range` è un
- * cursore, un `sensor` è un numero che si guarda e basta.
+ * cursore, un `enum` una scelta fra poche voci, un `sensor` è un numero che si
+ * guarda e basta.
+ *
+ * Sono gli stessi tre comandi generici che usa Alexa — sì o no, un valore in
+ * un intervallo, una voce da un elenco — e bastano per qualunque funzione di
+ * qualunque marca, anche una che non conosciamo: chi la descrive le dà un
+ * nome, e l'interfaccia la disegna.
+ *
+ * Il codice di una capacità che viene da un'altra entità dello stesso
+ * dispositivo è `<entità>#<codice>`: l'agente sa a chi mandare il comando,
+ * e per tutti gli altri è un nome come un altro.
  */
-export type Capability =
+export type Capability = (
   | {
       code: string;
       kind: 'switch';
@@ -37,8 +47,23 @@ export type Capability =
    */
   | { code: string; kind: 'image'; label: string }
   | { code: string; kind: 'range'; label: string; min: number; max: number; step: number; unit?: string }
-  | { code: string; kind: 'enum'; label: string; values: string[] }
-  | { code: string; kind: 'sensor'; label: string; unit?: string };
+  | {
+      code: string;
+      kind: 'enum';
+      label: string;
+      values: string[];
+      /** Come si leggono le voci, quando il valore è una parola da macchina: `off` → «Spento». */
+      labels?: Record<string, string>;
+    }
+  | { code: string; kind: 'sensor'; label: string; unit?: string }
+) & {
+  /**
+   * Un'impostazione e non un comando di tutti i giorni: la luce spia, lo
+   * stato dopo un blackout, la durata di un impulso. Si disegna a parte, e
+   * non conta per dire se una cosa è accesa.
+   */
+  setting?: boolean;
+};
 
 export interface DeviceSnapshot {
   /** L'id che gli dà la sua piattaforma: stabile, e la chiave con cui lo ritrovi. */
@@ -49,6 +74,13 @@ export interface DeviceSnapshot {
   online: boolean;
   capabilities: Capability[];
   state: Record<string, DeviceValue>;
+  /**
+   * Le entità che adesso stanno dentro a questo dispositivo e che prima
+   * potevano essere dispositivi a sé — il sensore dei consumi di una presa.
+   * Il backend ci sposta sopra le scene e gli avvisi scritti su di loro,
+   * invece di buttarli via con il dispositivo che sparisce.
+   */
+  absorbs?: string[];
 }
 
 /**
@@ -74,6 +106,12 @@ export interface PairingStep {
    */
   fields: {
     name: string;
+    /**
+     * Come si chiama il campo in italiano, quando la centrale lo sa. Per le
+     * marche del registro i nomi li scriviamo noi; per tutte le altre sono
+     * questi, e senza uno dei due resta il nome tecnico.
+     */
+    label?: string;
     required: boolean;
     secret?: boolean;
     options?: { value: string; label: string }[];
@@ -110,16 +148,25 @@ export interface PairingStep {
 export type Health = 'live' | 'degraded' | 'lost' | 'new';
 
 /**
- * I provider che si sanno collegare, con il nome che gli dà Home Assistant.
- * `sonoff` è eWeLink, `generic` una telecamera. Lo stesso nome lo usano
- * l'agente (connector/src/providers.ts) e il sito (src/lib/providers.ts),
- * e uno che l'altro non conosce non compila.
+ * I provider che hanno una voce nei due registri, con il nome che gli dà
+ * Home Assistant. `sonoff` è eWeLink, `generic` una telecamera. Lo stesso
+ * nome lo usano l'agente (connector/src/providers.ts) e il sito
+ * (src/lib/providers.ts), e uno che l'altro non conosce non compila.
+ *
+ * Collegare si può anche tutto il resto del catalogo, senza una voce: nei
+ * messaggi il nome è una stringa qualunque.
  */
 export type Handler = 'tuya' | 'sonoff' | 'generic';
 
+/** Una cosa del catalogo che si può collegare: il nome della centrale e quello da leggere. */
+export interface CatalogEntry {
+  handler: string;
+  name: string;
+}
+
 /** Un account già collegato a quell'agente, e come si fa a staccarlo. */
 export interface LinkedAccount {
-  handler: Handler;
+  handler: string;
   /** Come lo chiama lui: di solito l'utente con cui sei entrato. */
   title: string;
   /** Serve a scollegarlo. */
@@ -234,10 +281,10 @@ export interface ResyncMessage {
 export interface PairMessage {
   type: 'pair';
   reqId: string;
-  /** `list` chiede cosa è già collegato, `unlink` stacca. */
-  action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink';
+  /** `list` chiede cosa è già collegato, `unlink` stacca, `catalog` cosa si può collegare. */
+  action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink' | 'catalog';
   /** Quale account si sta collegando. */
-  handler?: Handler;
+  handler?: string;
   flowId?: string;
   input?: Record<string, string | boolean>;
   /** Quale collegamento staccare. */

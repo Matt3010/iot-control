@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import type { AgentView } from '../dto/views.js';
 import { toAgentView } from '../dto/views.js';
 import { badGateway, notFound } from '../errors/HttpError.js';
-import type { LinkedAccount, PairingStep, Handler } from '../../../shared/protocol.js';
+import type { CatalogEntry, LinkedAccount, PairMessage, PairingStep } from '../../../shared/protocol.js';
 import { hub } from '../iot/hub.js';
 import { toPlaceView } from '../dto/views.js';
 import { agentManager } from '../managers/AgentManager.js';
@@ -104,15 +104,15 @@ export class AgentService {
   async pair(
     ownerId: string,
     id: string,
-    action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink',
-    options: { handler?: Handler; flowId?: string; input?: Record<string, string | boolean>; entryId?: string },
+    action: PairMessage['action'],
+    options: { handler?: string; flowId?: string; input?: Record<string, string | boolean>; entryId?: string },
     who?: string,
-  ): Promise<PairingStep | LinkedAccount[] | null> {
+  ): Promise<PairingStep | LinkedAccount[] | CatalogEntry[] | null> {
     // che sia tuo lo si controlla prima di bussare a casa sua
     await agentManager.find(ownerId, id);
 
     try {
-      const step = (await hub.pair(id, action, options)) as PairingStep | LinkedAccount[] | undefined;
+      const step = (await hub.pair(id, action, options)) as PairingStep | LinkedAccount[] | CatalogEntry[] | undefined;
 
       /*
        * Un account collegato o staccato è una di quelle cose che succedono

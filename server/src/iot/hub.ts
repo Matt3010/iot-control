@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { BackendMessage, DeviceValue, Handler } from '../../../shared/protocol.js';
+import type { BackendMessage, DeviceValue, PairMessage } from '../../../shared/protocol.js';
 import type { CategoryView, GroupView, MapView, PlaceView, SceneView } from '../dto/views.js';
 import type { Device } from '../types.js';
 
@@ -332,8 +332,8 @@ export class Hub {
    */
   pair(
     agentId: string,
-    action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink',
-    options: { handler?: Handler; flowId?: string; input?: Record<string, string | boolean>; entryId?: string } = {},
+    action: PairMessage['action'],
+    options: { handler?: string; flowId?: string; input?: Record<string, string | boolean>; entryId?: string } = {},
   ): Promise<unknown> {
     return this.#ask(agentId, (reqId) => ({ type: 'pair', reqId, action, ...options }), PAIR_TIMEOUT_MS);
   }

@@ -27,6 +27,20 @@ interface RegistryDevice {
   name?: string | null;
 }
 
+/** Una riga dell'anagrafe come serve per raggruppare (connector/src/gruppi.ts). */
+export interface Voce {
+  entityId: string;
+  deviceId: string;
+  /** Come si chiama il dispositivo: quello che la persona ha scritto, se l'ha scritto. */
+  deviceName: string;
+  /** `config` per un'impostazione, niente per una cosa di tutti i giorni. */
+  category: string | null;
+  /** L'integrazione da cui viene: serve a trovare la sua traduzione. */
+  platform: string;
+  translationKey: string | null;
+  originalName: string | null;
+}
+
 /** Un'entità che è davvero un dispositivo, e di quale. */
 export interface RealEntity {
   deviceId: string;
@@ -42,6 +56,8 @@ interface Pending {
 const RETRY_MS = [1_000, 2_000, 5_000, 10_000, 30_000];
 /** HA si riavvia spesso mentre ci lavori: non è un guasto, è un riavvio. */
 const CALL_TIMEOUT_MS = 15_000;
+/** Ogni quanto si rilegge il catalogo di cosa si può collegare. */
+const CATALOGO_MS = 6 * 60 * 60_000;
 
 /**
  * E quanto si aspetta un fotogramma. Di più che per un comando: se la
@@ -236,6 +252,119 @@ export class HomeAssistant {
     // dice niente a chi la legge e non aiuta a fare niente.
     if (said) console.warn(`fotogramma da ${entityId}: risposta ${said}`);
     throw new Error(said ? 'la telecamera non ha risposto' : 'la telecamera non ha mandato niente');
+  }
+
+  /**
+   * L'anagrafe per raggruppare: ogni entità viva con il dispositivo a cui
+   * appartiene, la sua categoria e il nome con cui la chiama l'integrazione.
+   *
+   * Restano fuori quelle spente (di un'entità spenta Home Assistant non dà
+   * lo stato), quelle nascoste, le spie di diagnostica — il segnale, la
+   * connessione — e i dispositivi finti, come il sole e i backup. Le
+   * impostazioni (`config`) invece restano: sono le funzioni in più di un
+   * dispositivo, e da qui diventano capacità come le altre.
+   */
+  async anagrafe(): Promise<Voce[]> {
+    const [entities, devices] = (await Promise.all([
+      this.#call({ type: 'config/entity_registry/list' }),
+      this.#call({ type: 'config/device_registry/list' }),
+    ])) as [
+      (RegistryEntity & {
+        platform: string;
+        translation_key?: string | null;
+        original_name?: string | null;
+      })[],
+      RegistryDevice[],
+    ];
+
+    const finti = new Set(devices.filter((device) => device.entry_type === 'service').map((device) => device.id));
+    const nomi = new Map(devices.map((device) => [device.id, device.name_by_user || device.name || '']));
+
+    return entities
+      .filter(
+        (entity) =>
+          !!entity.device_id &&
+          !finti.has(entity.device_id) &&
+          !entity.disabled_by &&
+          !entity.hidden_by &&
+          entity.entity_category !== 'diagnostic',
+      )
+      .map((entity) => ({
+        entityId: entity.entity_id,
+        deviceId: entity.device_id as string,
+        deviceName: nomi.get(entity.device_id as string) ?? '',
+        category: entity.entity_category,
+        platform: entity.platform,
+        translationKey: entity.translation_key ?? null,
+        originalName: entity.original_name ?? null,
+      }));
+  }
+
+  /**
+   * Cosa si può collegare: ogni integrazione che ha una conversazione per
+   * farlo, con il suo nome. Solo quelle che portano dispositivi — un hub o
+   * un apparecchio — e non il meteo, la radio o la traduzione dei testi, che
+   * su una mappa di case non hanno niente da mostrare.
+   *
+   * Cambia solo quando la centrale si aggiorna, quindi si chiede una volta
+   * ogni tanto e non a ogni apertura della finestra.
+   */
+  async catalogo(): Promise<{ handler: string; name: string }[]> {
+    if (this.#catalogo && Date.now() - this.#catalogo.at < CATALOGO_MS) return this.#catalogo.voci;
+
+    const risposta = await fetch(`${this.config.haUrl}/api/config/config_entries/flow_handlers?type=integration`, {
+      headers: { authorization: `Bearer ${this.config.haToken}` },
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+    });
+    if (!risposta.ok) throw new Error(`catalogo ${risposta.status}`);
+    const domini = (await risposta.json()) as string[];
+
+    const manifesti = (await this.#call({ type: 'manifest/list', integrations: domini })) as {
+      domain: string;
+      name: string;
+      integration_type?: string;
+    }[];
+    const voci = manifesti
+      .filter((one) => one.integration_type === 'hub' || one.integration_type === 'device')
+      .map((one) => ({ handler: one.domain, name: one.name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'it'));
+
+    this.#catalogo = { at: Date.now(), voci };
+    return voci;
+  }
+
+  #catalogo: { at: number; voci: { handler: string; name: string }[] } | null = null;
+
+  /** I testi italiani della conversazione per collegare quella marca: i nomi dei campi, i passi. */
+  async traduzioniCollegamento(integrazione: string): Promise<Record<string, string>> {
+    const risposta = (await this.#call({
+      type: 'frontend/get_translations',
+      language: 'it',
+      category: 'config',
+      integration: [integrazione],
+    })) as { resources?: Record<string, string> };
+    return risposta.resources ?? {};
+  }
+
+  /**
+   * I nomi in italiano che le integrazioni danno alle loro entità, per chi
+   * li ha scritti. Una chiave come
+   * `component.tuya.entity.select.relay_status.name`, e il suo testo.
+   */
+  async traduzioni(integrazioni: string[]): Promise<Record<string, string>> {
+    if (!integrazioni.length) return {};
+    try {
+      const risposta = (await this.#call({
+        type: 'frontend/get_translations',
+        language: 'it',
+        category: 'entity',
+        integration: integrazioni,
+      })) as { resources?: Record<string, string> };
+      return risposta.resources ?? {};
+    } catch {
+      // senza traduzioni si usa il dizionario nostro e il nome originale
+      return {};
+    }
   }
 
   /**

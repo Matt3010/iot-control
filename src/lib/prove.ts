@@ -107,6 +107,8 @@ export const provabili = (device: Device, modo: Modo): Capability[] =>
   (device.capabilities as Capability[]).filter(
     (capability) =>
       capability.kind !== 'image' &&
+      // un'impostazione si cambia, ma non è una cosa che succede in casa
+      !capability.setting &&
       !SOLO_ORDINI.has(capability.code) &&
       !(modo === 'se' && capability.kind === 'switch' && capability.pulse),
   );

@@ -1,5 +1,4 @@
 import type { Handler } from '../../shared/protocol';
-
 /**
  * Le cose che si possono collegare a un agente, e come si spiegano.
  *
@@ -21,7 +20,8 @@ export interface Istruzione {
 }
 
 export interface Provider {
-  handler: Handler;
+  /** Il nome della centrale: uno del registro, o uno qualunque del catalogo. */
+  handler: string;
   label: string;
   /** Se se ne può avere più d'uno: una telecamera per canale, sì; un account, no. */
   many: boolean;
@@ -41,7 +41,8 @@ export interface Provider {
   qr?: string;
 }
 
-export const PROVIDERS: readonly Provider[] = [
+// le voci del registro usano solo i nomi del protocollo: uno sbagliato non compila
+export const PROVIDERS: readonly (Provider & { handler: Handler })[] = [
   {
     handler: 'tuya',
     label: 'Tuya',
@@ -94,3 +95,25 @@ export const PROVIDERS: readonly Provider[] = [
     ],
   },
 ];
+
+/**
+ * La voce di qualunque marca del catalogo.
+ *
+ * Quelle del registro hanno testi scritti da noi. Tutte le altre — quasi
+ * mille — si collegano lo stesso: il nome è quello che dà la centrale, e i
+ * campi da riempire li chiede lei, un passo per volta.
+ */
+export function providerDa(handler: string, nome?: string): Provider {
+  const nostro = PROVIDERS.find((one) => one.handler === handler);
+  if (nostro) return nostro;
+  return {
+    handler,
+    label: nome ?? handler,
+    many: false,
+    more: '',
+    warns: 'Ti chiederà quello che serve per collegarlo, un passo per volta.',
+  };
+}
+
+/** I nomi del registro, per non riproporli fra le altre marche. */
+export const nelRegistro = (handler: string): boolean => PROVIDERS.some((one) => one.handler === handler);

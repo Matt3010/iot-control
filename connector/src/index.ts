@@ -9,16 +9,17 @@ import type {
   WatchMessage,
 } from '../../shared/protocol.js';
 import { ConfigError, loadConfig } from './config.js';
-import { toServiceCall, translate } from './entities.js';
+import { targetOf, toServiceCall } from './entities.js';
+import { componi, raggruppa, type Gruppo } from './gruppi.js';
 import { forgetDoors, lastSeen, look as guardala, noticed, watchEyes } from './eyes.js';
 import { channelOf } from './go2rtc.js';
-import { HomeAssistant } from './homeassistant.js';
+import { HomeAssistant, type HaEntity, type Voce } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
 import { blind, look } from './live.js';
 import { leggiImpulsi } from './impulsi.js';
-import { lettoriImpulsi } from './providers.js';
+import { lettoriImpulsi, PROVIDERS } from './providers.js';
 import { ensureToken } from './onboarding.js';
-import { cancelPairing, listLinked, startPairing, submitPairing, titled, unlink } from './pairing.js';
+import { cancelPairing, conNomi, listLinked, startPairing, submitPairing, titled, unlink } from './pairing.js';
 
 /**
  * Chi e', per il server e per chi guarda i log.
@@ -47,7 +48,17 @@ async function main(): Promise<void> {
    * ogni volta che l'anagrafe di HA cambia — è così che i dispositivi Tuya
    * compaiono appena aggiungi l'integrazione, senza riavviare niente.
    */
-  let real = new Map<string, { deviceId: string; deviceName: string }>();
+  /**
+   * Come stanno insieme le entità (connector/src/gruppi.ts): il gruppo di
+   * ogni dispositivo, l'ultimo stato di ogni entità, e di quale dispositivo
+   * è ogni entità che sta dentro a un altro. Si rifà a ogni giro d'inventario;
+   * in mezzo cambiano solo gli stati.
+   */
+  let gruppi = new Map<string, Gruppo>();
+  let dentroA = new Map<string, string>();
+  let voci = new Map<string, Voce>();
+  let traduzioni: Record<string, string> = {};
+  const stati = new Map<string, HaEntity>();
   /** Gli interruttori a impulso, e per quanti millisecondi. Lo dice il provider. */
   let impulsi = new Map<string, number>();
 
@@ -72,7 +83,7 @@ async function main(): Promise<void> {
       ...(pulse
         ? {
             capabilities: device.capabilities.map((capability) =>
-              capability.kind === 'switch' ? { ...capability, pulse } : capability,
+              capability.kind === 'switch' && capability.code === 'power' ? { ...capability, pulse } : capability,
             ),
           }
         : {}),
@@ -107,34 +118,30 @@ async function main(): Promise<void> {
    * e ogni volta che l'anagrafe cambia, cioè quando aggiungi un'integrazione.
    */
   async function refill(): Promise<void> {
-    real = await ha.devices();
+    const anagrafe = await ha.anagrafe();
     impulsi = await leggiImpulsi(ha, lettoriImpulsi());
-    const entities = await ha.states();
+    stati.clear();
+    for (const entity of await ha.states()) stati.set(entity.entity_id, entity);
+    traduzioni = await ha.traduzioni([...new Set(anagrafe.map((voce) => voce.platform))]);
+
+    voci = new Map(anagrafe.map((voce) => [voce.entityId, voce]));
+    gruppi = new Map(raggruppa(anagrafe, stati).map((gruppo) => [gruppo.primaria, gruppo]));
+    dentroA = new Map([...gruppi.values()].flatMap((gruppo) => gruppo.accessori.map((id) => [id, gruppo.primaria] as const)));
 
     devices.clear();
-    /** Quante entità passa ogni dispositivo: serve a decidere come chiamarle. */
+    /** Quante schede fa ogni dispositivo vero: serve a decidere come chiamarle. */
     const quante = new Map<string, number>();
+    for (const gruppo of gruppi.values()) quante.set(gruppo.nome, (quante.get(gruppo.nome) ?? 0) + 1);
 
-    for (const entity of entities) {
-      const known = real.get(entity.entity_id);
-      if (!known) continue;
-      const device = translate(entity);
+    for (const gruppo of gruppi.values()) {
+      const device = componi(gruppo, stati, voci, traduzioni);
       if (!device) continue;
-
-      devices.set(device.externalId, device);
-      quante.set(known.deviceId, (quante.get(known.deviceId) ?? 0) + 1);
-    }
-
-    // Home Assistant chiama un'entità «<dispositivo> <cosa fa>»: "Persiane
-    // Curtain", "Luce salotto Switch". Quando di quel dispositivo passa una
-    // cosa sola, il nome giusto è quello del dispositivo — è come lo chiami
-    // tu. Con più entità i nomi lunghi servono a distinguerle, e restano.
-    for (const [id, device] of devices) {
-      const known = real.get(id);
-      if (!known?.deviceName || quante.get(known.deviceId) !== 1) continue;
-      if (device.name.startsWith(known.deviceName)) {
-        devices.set(id, { ...device, name: known.deviceName });
-      }
+      // Home Assistant chiama un'entità «<dispositivo> <cosa fa>»: "Persiane
+      // Curtain", "Luce salotto Switch". Quando il dispositivo fa una scheda
+      // sola, il nome giusto è il suo — è come lo chiami tu. Con più schede i
+      // nomi lunghi servono a distinguerle, e restano.
+      const nome = gruppo.nome && quante.get(gruppo.nome) === 1 && device.name.startsWith(gruppo.nome) ? gruppo.nome : device.name;
+      devices.set(device.externalId, { ...device, name: nome });
     }
 
     await distinte();
@@ -229,8 +236,12 @@ async function main(): Promise<void> {
     config,
     () => void refill().catch((error: unknown) => console.warn(`non riesco a leggere home assistant: ${(error as Error).message}`)),
     (entity) => {
-      if (!real.has(entity.entity_id)) return;
-      const fresh = translate(entity);
+      // una lettura o un'impostazione cambia il dispositivo che la tiene dentro
+      const primaria = dentroA.get(entity.entity_id) ?? entity.entity_id;
+      const gruppo = gruppi.get(primaria);
+      if (!gruppo) return;
+      stati.set(entity.entity_id, entity);
+      const fresh = componi(gruppo, stati, voci, traduzioni);
       if (!fresh) return;
 
       const known = devices.get(fresh.externalId);
@@ -264,6 +275,17 @@ async function main(): Promise<void> {
   );
 
   /**
+   * Cosa è collegato: tutto quello che viene dal catalogo, non solo le tre
+   * marche che hanno una voce nel registro. Se il catalogo non risponde,
+   * almeno quelle.
+   */
+  const collegati = async () => {
+    const catalogo = await ha.catalogo().catch(() => []);
+    const collegabili = new Set([...catalogo.map((voce) => voce.handler), ...Object.keys(PROVIDERS)]);
+    return titled(await listLinked(config, collegabili), await born());
+  };
+
+  /**
    * Collegare un account: una conversazione a più battute, e ogni battuta
    * torna indietro con la risposta attaccata all'`ack`. Gli errori non si
    * nascondono — chi sta guardando il QR deve sapere se è scaduto.
@@ -276,21 +298,28 @@ async function main(): Promise<void> {
         return;
       }
 
+      if (message.action === 'catalog') {
+        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await ha.catalogo() });
+        return;
+      }
+
       if (message.action === 'list') {
-        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await titled(await listLinked(config), await born()) });
+        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await collegati() });
         return;
       }
 
       if (message.action === 'unlink') {
         await unlink(config, message.entryId ?? '');
-        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await titled(await listLinked(config), await born()) });
+        link.send({ type: 'ack', reqId: message.reqId, ok: true, data: await collegati() });
         return;
       }
 
-      const step =
+      const grezzo =
         message.action === 'start'
           ? await startPairing(config, message.handler)
           : await submitPairing(config, message.flowId ?? '', message.input ?? {});
+      // i campi con il loro nome italiano, quando la centrale lo sa
+      const step = await conNomi(grezzo, (integrazione) => ha.traduzioniCollegamento(integrazione));
 
       link.send({ type: 'ack', reqId: message.reqId, ok: true, data: step });
     } catch (error) {
@@ -372,11 +401,16 @@ async function main(): Promise<void> {
     if (!devices.has(command.externalId)) return fail('dispositivo sconosciuto per questo agente');
     if (!ha.connected) return fail('il servizio in casa non è raggiungibile');
 
+    // un comando a una capacità che sta dentro va alla sua entità, e solo se è davvero di questo dispositivo
+    const bersaglio = targetOf(command.externalId, command.code);
+    if (bersaglio !== command.externalId && !gruppi.get(command.externalId)?.accessori.includes(bersaglio)) {
+      return fail(`"${command.code}" non è una cosa che questo dispositivo sa fare`);
+    }
     const call = toServiceCall(command.externalId, command.code, command.value);
     if (!call) return fail(`"${command.code}" non è una cosa che questo dispositivo sa fare`);
 
     try {
-      await ha.callService(call.domain, call.service, command.externalId, call.data);
+      await ha.callService(call.domain, call.service, bersaglio, call.data);
       link.send({ type: 'ack', reqId: command.reqId, ok: true });
     } catch (error) {
       fail((error as Error).message);

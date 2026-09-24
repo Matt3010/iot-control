@@ -33,6 +33,11 @@
    * guasto in casa quando il filo è caduto per strada.
    */
   const stato = $derived(devices.saluteDi(device));
+
+  /* le capacità di tutti i giorni, e a parte le impostazioni (protocol.d.ts, `setting`) */
+  const principali = $derived((device.capabilities as Capability[]).filter((one) => !one.setting));
+  const impostazioni = $derived((device.capabilities as Capability[]).filter((one) => one.setting));
+  let aperte = $state(false);
   const how = $derived(stato.state);
 
   const numberOf = (value: DeviceValue | undefined): number => (typeof value === 'number' ? value : 0);
@@ -87,7 +92,9 @@
 
     confirm(
       event.currentTarget as HTMLElement,
-      `${wanted ? 'Accendere' : 'Spegnere'} «${device.name}»?`,
+      capability.setting
+        ? `${wanted ? 'Accendere' : 'Spegnere'} «${capability.label}» di «${device.name}»?`
+        : `${wanted ? 'Accendere' : 'Spegnere'} «${device.name}»?`,
       wanted ? 'Accendi' : 'Spegni',
       () => void devices.command(device, capability.code, wanted),
     );
@@ -109,8 +116,9 @@
 
   </div>
 
-  <div class="dev-body">
-    {#each device.capabilities as capability (capability.code)}
+  <!-- Una riga per capacità, la stessa per quelle di tutti i giorni e per
+       le impostazioni: una levetta è una levetta, dovunque stia. -->
+  {#snippet controllo(capability: Capability)}
       {#if capability.kind === 'switch' && capability.pulse}
         <!-- A impulso non c'è un acceso da mostrare: torna spento da solo
              dopo mezzo secondo, e quello che comanda cambia a ogni impulso.
@@ -178,15 +186,17 @@
           <span class="choices">
             {#each capability.values as value (value)}
               <Chip
-                label={value}
+                label={capability.labels?.[value] ?? value}
                 look={device.state[capability.code] === value ? 'sel' : 'off'}
                 size="sm"
                 disabled={!device.online || devices.isBusy(device.id, capability.code)}
                 onclick={(event: MouseEvent) =>
                   confirm(
                     event.currentTarget as HTMLElement,
-                    `${value} «${device.name}»?`,
-                    value,
+                    capability.setting
+                      ? `Impostare «${capability.label}» a «${capability.labels?.[value] ?? value}»?`
+                      : `${value} «${device.name}»?`,
+                    capability.labels?.[value] ?? value,
                     () => void devices.command(device, capability.code, value),
                   )}
               />
@@ -204,8 +214,30 @@
           </span>
         </div>
       {/if}
+  {/snippet}
+
+  <div class="dev-body">
+    {#each principali as capability (capability.code)}
+      {@render controllo(capability)}
     {/each}
   </div>
+
+  <!-- Le impostazioni stanno chiuse: si toccano una volta, e aperte in mezzo
+       ai comandi di tutti i giorni si confondono con loro. -->
+  {#if impostazioni.length}
+    <button type="button" class="dev-more" aria-expanded={aperte} onclick={() => (aperte = !aperte)}>
+      <Icon name="expand" />
+      Impostazioni
+      <span class="dev-more-count">{impostazioni.length}</span>
+    </button>
+    {#if aperte}
+      <div class="dev-body is-settings">
+        {#each impostazioni as capability (capability.code)}
+          {@render controllo(capability)}
+        {/each}
+      </div>
+    {/if}
+  {/if}
 
 </div>
 
@@ -266,6 +298,32 @@
   /* i controlli ------------------------------------------------------------ */
 
   .dev-body { display: grid; gap: 9px; }
+
+  /* il tasto delle impostazioni: piccolo e in disparte, come una nota */
+  .dev-more {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    color: var(--ink-3);
+    font: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+  }
+
+  .dev-more:hover { color: var(--ink-2); }
+
+  .dev-more :global(.ico) { width: 12px; height: 12px; transition: transform 0.16s; }
+
+  .dev-more[aria-expanded='true'] :global(.ico) { transform: rotate(180deg); }
+
+  .dev-more-count { font-variant-numeric: tabular-nums; }
+
+  /* aperte, si distinguono da sopra con una riga, non con un riquadro */
+  .dev-body.is-settings { padding-top: 9px; border-top: 1px solid var(--hairline-soft); }
 
   .line { display: grid; gap: 6px; }
 

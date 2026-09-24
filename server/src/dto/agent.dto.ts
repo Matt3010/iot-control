@@ -1,4 +1,4 @@
-import type { Handler } from '../../../shared/protocol.js';
+import type { PairMessage } from '../../../shared/protocol.js';
 import { Transform } from 'class-transformer';
 import { Allow, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
@@ -6,8 +6,8 @@ const trim = () => Transform(({ value }: { value: unknown }) => (typeof value ==
 
 /** Una battuta della conversazione per collegare un account a un agente. */
 export class PairDto {
-  @IsIn(['start', 'submit', 'cancel', 'list', 'unlink'], { message: 'azione sconosciuta' })
-  action!: 'start' | 'submit' | 'cancel' | 'list' | 'unlink';
+  @IsIn(['start', 'submit', 'cancel', 'list', 'unlink', 'catalog'], { message: 'azione sconosciuta' })
+  action!: PairMessage['action'];
 
   /**
    * Quale account. Qui passa e basta: quali si sanno collegare lo sa
@@ -16,7 +16,7 @@ export class PairDto {
   @IsOptional()
   @IsString()
   @MaxLength(40)
-  handler?: Handler;
+  handler?: string;
 
   /** La conversazione in corso, dal passo prima. */
   @IsOptional()

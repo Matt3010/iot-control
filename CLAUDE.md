@@ -108,6 +108,27 @@ che arriva solo a chi l'ha fatta è una scheda che mente finché non la
 ricarichi. Prima di dire che una cosa nuova è fatta si apre in due schede e
 si guarda l'altra.
 
+## I dispositivi e le marche
+
+Un dispositivo è un dispositivo vero, non un'entità della centrale: l'agente
+mette insieme l'entità che si comanda con le letture e le impostazioni dello
+stesso dispositivo (`connector/src/gruppi.ts`). Una capacità che viene da
+un'altra entità ha il codice `<entità>#<codice>`, e l'agente sa a chi mandare
+il comando. Le funzioni in più di una marca arrivano da sole come levette,
+cursori ed elenchi (`setting` nel protocollo), come fa Alexa con i suoi
+comandi generici: prima di scrivere un ponte per una marca si guarda se la
+centrale la espone già così, o se si capisce dal comportamento.
+
+Si può collegare tutto il catalogo della centrale. I registri
+(`connector/src/providers.ts`, `src/lib/providers.ts`) servono solo a chi ha
+bisogno di qualcosa in più: un'integrazione da installare, istruzioni scritte
+da noi, un lettore di impulsi.
+
+La presentazione di un agente aggiunge e aggiorna dispositivi, mai li toglie:
+arriva prima che l'agente abbia letto la centrale. Toglie solo l'inventario
+completo, e un dispositivo che ne assorbe un altro si porta dietro le scene e
+gli avvisi scritti su di lui.
+
 ## Le prove sui dispositivi
 
 «Quando la porta si apre», «sopra 25 gradi» sono la stessa domanda per gli

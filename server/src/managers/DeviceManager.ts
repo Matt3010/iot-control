@@ -69,6 +69,24 @@ export class DeviceManager {
       }
 
       /*
+       * Un'entità che adesso sta dentro a un dispositivo — il sensore dei
+       * consumi dentro alla sua presa — era un dispositivo a sé. Prima di
+       * toglierlo, le scene e gli avvisi scritti su di lui passano al
+       * dispositivo che lo tiene dentro, con il codice che dice da dove
+       * viene. Tolto dopo, se li porterebbe via.
+       */
+      const perEsterno = new Map((await repository.findAllOfAgent(agentId)).map((one) => [one.externalId, one]));
+      for (const snapshot of snapshots) {
+        const casa = perEsterno.get(snapshot.externalId);
+        for (const assorbito of snapshot.absorbs ?? []) {
+          const vecchio = perEsterno.get(assorbito);
+          if (!casa || !vecchio || vecchio.id === casa.id) continue;
+          await new SceneRepository(tx).moveDevice(ownerId, vecchio.id, casa.id, assorbito);
+          await new AlertRepository(tx).moveDevice(vecchio.id, casa.id, assorbito);
+        }
+      }
+
+      /*
        * Prima si conta chi li nominava, e solo dopo si tolgono.
        *
        * Adesso un dispositivo che sparisce si porta via da sé le regole

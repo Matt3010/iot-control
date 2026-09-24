@@ -30,11 +30,17 @@
         // a impulso si preme e basta, e si spegne da solo
         out.push({ what: 'Premi', step: { deviceId: device.id, code: capability.code, value: true } });
       } else if (capability.kind === 'switch') {
-        out.push({ what: 'Accendi', step: { deviceId: device.id, code: capability.code, value: true } });
-        out.push({ what: 'Spegni', step: { deviceId: device.id, code: capability.code, value: false } });
+        // un'impostazione dice quale: «Accendi Luce spia», non un altro «Accendi»
+        const di = capability.setting ? ` ${capability.label}` : '';
+        out.push({ what: `Accendi${di}`, step: { deviceId: device.id, code: capability.code, value: true } });
+        out.push({ what: `Spegni${di}`, step: { deviceId: device.id, code: capability.code, value: false } });
       } else if (capability.kind === 'enum') {
         for (const value of capability.values) {
-          out.push({ what: value, step: { deviceId: device.id, code: capability.code, value } });
+          const detta = capability.labels?.[value] ?? value;
+          out.push({
+            what: capability.setting ? `${capability.label} ${detta}` : detta,
+            step: { deviceId: device.id, code: capability.code, value },
+          });
         }
       } else if (capability.kind === 'range') {
         // i valori tondi, perche' una scena non si scrive al pixel

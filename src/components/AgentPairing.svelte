@@ -1,7 +1,10 @@
 <script lang="ts">
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
-  import { PROVIDERS, type Provider } from '../lib/providers';
+  import type { CatalogEntry } from '../../shared/protocol';
+  import { nelRegistro, providerDa, PROVIDERS, type Provider } from '../lib/providers';
+  import { ui } from '../lib/ui.svelte';
+  import CatalogPicker from './CatalogPicker.svelte';
   import type { LinkedAccount } from '../lib/types';
   import AccountList from './AccountList.svelte';
   import PairingFlow from './PairingFlow.svelte';
@@ -28,13 +31,44 @@
   let open = $state<Provider | null>(null);
   let busy = $state(false);
 
+  /** Tutto quello che la centrale di quell'agente sa collegare. Si chiede una volta. */
+  let catalogo = $state<CatalogEntry[]>([]);
+
   $effect(() => {
     if (!agent.online) return;
     void devices
       .linked(agent)
       .then((list) => (linked = list))
       .catch(() => undefined);
+    void devices
+      .catalog(agent)
+      .then((list) => (catalogo = list))
+      .catch(() => undefined);
   });
+
+  /*
+   * Le righe: quelle del registro sempre, e in più ogni altra marca già
+   * collegata, con il nome che le dà il catalogo. Una marca collegata dal
+   * catalogo deve potersi vedere e staccare come le altre.
+   */
+  const accounts = $derived([
+    ...PROVIDERS,
+    ...[...new Set(linked.map((one) => one.handler))]
+      .filter((handler) => !nelRegistro(handler))
+      .map((handler) => providerDa(handler, catalogo.find((voce) => voce.handler === handler)?.name)),
+  ]);
+
+  /** Le altre marche, cercando nel catalogo. La conversazione è la stessa di quelle del registro. */
+  function altre(): void {
+    ui.openModal({
+      title: 'Collega un’altra marca',
+      view: CatalogPicker,
+      props: {
+        voci: catalogo.filter((voce) => !nelRegistro(voce.handler)),
+        onpick: (voce: CatalogEntry) => (open = providerDa(voce.handler, voce.name)),
+      },
+    });
+  }
 
   const reread = async (): Promise<void> => {
     linked = await devices.linked(agent).catch(() => linked);
@@ -66,7 +100,8 @@
 {:else}
   <AccountList
     {agent}
-    accounts={PROVIDERS}
+    {accounts}
+    altre={catalogo.length ? altre : undefined}
     {linked}
     {busy}
     onbegin={(account) => (open = account)}

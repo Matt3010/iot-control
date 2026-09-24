@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { and, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import { iso, type Transaction } from '../persistence/db.js';
 import { scenes } from '../persistence/schema.js';
-import { NESSUNA_CONDIZIONE, type Scene, type SceneStep } from '../types.js';
+import { NESSUNA_CONDIZIONE, type Scene, type SceneCondition, type SceneConditionGroup, type SceneStep } from '../types.js';
 
 type Row = typeof scenes.$inferSelect;
 
@@ -142,6 +142,33 @@ export class SceneRepository {
       const kept = row.steps.filter((step) => !step.deviceId || !gone.has(step.deviceId));
       if (kept.length === row.steps.length) continue;
       await this.tx.db.update(scenes).set({ steps: kept }).where(eq(scenes.id, row.id));
+      touched += 1;
+    }
+    return touched;
+  }
+
+  /**
+   * Un dispositivo che adesso sta dentro a un altro: le scene che lo
+   * nominavano — righe, partenze, condizioni — nominano l'altro, con il
+   * codice della capacità che dice da quale entità viene.
+   */
+  async moveDevice(ownerId: string, from: string, to: string, prefisso: string): Promise<number> {
+    const rows = await this.tx.db.select().from(scenes).where(eq(scenes.ownerId, ownerId));
+    const sposta = <T extends { deviceId?: string; code?: string }>(one: T): T =>
+      one.deviceId === from ? { ...one, deviceId: to, ...(one.code ? { code: `${prefisso}#${one.code}` } : {}) } : one;
+    const nelGruppo = (condizione: SceneCondition): SceneCondition => {
+      if (condizione.kind === 'group') return { ...condizione, items: condizione.items.map(nelGruppo) };
+      return condizione.kind === 'device' ? sposta(condizione) : condizione;
+    };
+
+    let touched = 0;
+    for (const row of rows) {
+      const steps = row.steps.map(sposta);
+      const triggers = (row.triggers ?? []).map(sposta);
+      const only = nelGruppo(row.only) as SceneConditionGroup;
+      const prima = JSON.stringify([row.steps, row.triggers, row.only]);
+      if (JSON.stringify([steps, triggers, only]) === prima) continue;
+      await this.tx.db.update(scenes).set({ steps, triggers, only }).where(eq(scenes.id, row.id));
       touched += 1;
     }
     return touched;

@@ -3,7 +3,7 @@ import { healthOf, salute, type Salute } from './health';
 import { api } from './api';
 import { toast } from './toast.svelte';
 import type { Capability, DeviceValue, Health, LinkedAccount, PairingStep } from './types';
-import type { Handler } from '../../shared/protocol';
+import type { CatalogEntry } from '../../shared/protocol';
 
 /** Un agente, per come lo vede il sito: il servizio installato in quel posto. */
 export interface Agent {
@@ -361,8 +361,14 @@ class Devices {
       // una riga scritta prima di sapere che è a impulso: spegnere non arriva a niente
       return { who, what: step.value ? 'Premi' : 'Spegni, che a impulso non fa niente' };
     }
-    if (capability.kind === 'switch') return { who, what: step.value ? 'Accendi' : 'Spegni' };
-    if (capability.kind === 'enum') return { who, what: String(step.value) };
+    if (capability.kind === 'switch') {
+      const di = capability.setting ? ` ${capability.label}` : '';
+      return { who, what: `${step.value ? 'Accendi' : 'Spegni'}${di}` };
+    }
+    if (capability.kind === 'enum') {
+      const detta = capability.labels?.[String(step.value)] ?? String(step.value);
+      return { who, what: capability.setting ? `${capability.label} ${detta}` : detta };
+    }
     if (capability.kind !== 'range') return { who, what: String(step.value) };
     return { who, what: `${capability.label} ${step.value}${capability.unit ?? ''}` };
   }
@@ -662,9 +668,16 @@ class Devices {
   pair(
     agent: Agent,
     action: 'start' | 'submit' | 'cancel',
-    options: { handler?: Handler; flowId?: string; input?: Record<string, string | boolean> } = {},
+    options: { handler?: string; flowId?: string; input?: Record<string, string | boolean> } = {},
   ): Promise<PairingStep | null> {
     return api.post<PairingStep | null>(`/agents/${agent.id}/pair`, { action, ...options });
+  }
+
+  /** Cosa si può collegare a quell'agente: tutto il catalogo della sua centrale. */
+  catalog(agent: Agent): Promise<CatalogEntry[]> {
+    return api
+      .post<CatalogEntry[] | null>(`/agents/${agent.id}/pair`, { action: 'catalog' })
+      .then((list) => list ?? []);
   }
 
   /** Cosa è già collegato a quell'agente: Tuya, eWeLink, quello che c'è. */

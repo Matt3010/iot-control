@@ -25,6 +25,7 @@
     busy,
     onbegin,
     onoff,
+    altre,
   }: {
     agent: Agent;
     accounts: readonly Provider[];
@@ -32,6 +33,8 @@
     busy: boolean;
     onbegin: (account: Provider) => void;
     onoff: (joint: LinkedAccount, label: string) => void;
+    /** Apre la ricerca fra tutte le altre marche, se l'agente ne ha un catalogo. */
+    altre?: () => void;
   } = $props();
 
   const joined = (handler: string) => linked.filter((one) => one.handler === handler);
@@ -123,6 +126,16 @@
       </div>
     {/if}
   {/each}
+
+  <!-- tutte le altre marche: quasi mille, e si cercano per nome -->
+  {#if altre}
+    <div class="account">
+      {@render segno('Altre marche', 'Shelly, Philips Hue, IKEA…', undefined)}
+      <Button look="link" disabled={!agent.online || busy} title="Cerca fra tutte le marche che si possono collegare" onclick={altre}>
+        Cerca
+      </Button>
+    </div>
+  {/if}
 </div>
 
 <style>

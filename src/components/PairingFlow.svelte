@@ -59,8 +59,13 @@
     host: 'Indirizzo',
   };
 
-  const named = (name: string) =>
-    provider.campi?.[name] ?? LABELS[name] ?? name.replace(/_/g, ' ');
+  /*
+   * Il nome di un campo: quello scritto da noi per questa marca, poi il
+   * nostro dizionario, poi la traduzione che manda la centrale, e per
+   * ultimo il nome tecnico, leggibile almeno senza trattini.
+   */
+  const named = (name: string, tradotto?: string) =>
+    provider.campi?.[name] ?? LABELS[name] ?? tradotto ?? name.replace(/_/g, ' ');
 
   let step = $state<PairingStep | null>(null);
   let busy = $state(false);
@@ -282,12 +287,12 @@
         <Switch
           checked={answers[field.name] === true}
           onchange={(value: boolean) => (answers = { ...answers, [field.name]: value })}
-          label={named(field.name)}
+          label={named(field.name, field.label)}
         />
       {:else}
         <label class="field">
           <span class="eyebrow">
-            {named(field.name)}{#if !field.required}<i class="may">opzionale</i>{/if}
+            {named(field.name, field.label)}{#if !field.required}<i class="may">opzionale</i>{/if}
           </span>
           {#if field.options}
             <select

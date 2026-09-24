@@ -97,6 +97,8 @@ function withDefaults(
 interface HaFlow {
   type: string;
   flow_id?: string;
+  /** Chi sta collegando: serve a trovare le traduzioni dei campi. */
+  handler?: string;
   step_id?: string;
   data_schema?: unknown[];
   errors?: Record<string, string>;
@@ -314,6 +316,30 @@ function errorOf(flow: HaFlow): string | undefined {
   return detail ? `${which}${detto} ${detail}` : `${which}${detto}`;
 }
 
+/** A che passo è ogni conversazione aperta, e di chi: le traduzioni dei campi stanno sotto questi due nomi. */
+const PASSI = new Map<string, { handler: string; stepId: string }>();
+
+/**
+ * I nomi italiani dei campi di un passo, dalle traduzioni della centrale.
+ * Chi le sa leggere passa la funzione che le chiede: qui si sa solo dove
+ * stanno — `component.<marca>.config.step.<passo>.data.<campo>`.
+ */
+export async function conNomi(
+  step: PairingStep,
+  traduzioni: (integrazione: string) => Promise<Record<string, string>>,
+): Promise<PairingStep> {
+  const dove = PASSI.get(step.flowId);
+  if (!dove || !step.fields.length) return step;
+  const testi = await traduzioni(dove.handler).catch(() => ({}) as Record<string, string>);
+  return {
+    ...step,
+    fields: step.fields.map((field) => {
+      const label = testi[`component.${dove.handler}.config.step.${dove.stepId}.data.${field.name}`];
+      return label ? { ...field, label } : field;
+    }),
+  };
+}
+
 function translate(flow: HaFlow, going?: { flowId: string; schema?: unknown[] }): PairingStep {
   if (!flow.type) {
     /*
@@ -356,6 +382,8 @@ function translate(flow: HaFlow, going?: { flowId: string; schema?: unknown[] })
     kind: 'form',
     fields: fieldsOf(flow.data_schema),
   };
+  // di chi è e a che passo è, per chi deve dare i nomi ai campi (index.ts)
+  if (flow.flow_id && flow.handler && flow.step_id) PASSI.set(flow.flow_id, { handler: flow.handler, stepId: flow.step_id });
 
   const qr = findQr(flow.data_schema) ?? findQr(flow.description_placeholders);
   if (qr) step.qr = qr;
@@ -464,15 +492,19 @@ async function handlers(config: ConnectorConfig): Promise<string[]> {
   return response.ok ? ((await response.json()) as string[]) : [];
 }
 
-export async function startPairing(config: ConnectorConfig, handler: Handler | undefined): Promise<PairingStep> {
+export async function startPairing(config: ConnectorConfig, handler: string | undefined): Promise<PairingStep> {
+  if (!handler) throw new Error('manca quale account collegare');
+  const chi = handler;
+  /*
+   * Una voce del registro c'è solo per chi ha bisogno di qualcosa in più,
+   * come un'integrazione da installare. Tutto il resto del catalogo si
+   * collega lo stesso, con la conversazione che propone la centrale.
+   */
   const provider = providerDi(handler);
-  if (!provider) throw new Error('questo agente non sa collegare quel tipo di account');
-  // da qui in avanti il nome è quello del registro, che di sicuro c'è
-  const chi = provider.handler;
 
   // Certe integrazioni HA non ce l'ha di serie: si installano al volo, la
   // prima volta che qualcuno le chiede, e non prima.
-  const extra = provider.extra;
+  const extra = provider?.extra;
   if (extra && !(await handlers(config)).includes(chi)) {
     if (!(await installed(config, extra))) await install(config, extra);
     return {
@@ -606,7 +638,7 @@ export async function submitPairing(
  * altre voci sono roba di Home Assistant — il sole, i backup, la radio — e
  * non sono account di nessuno.
  */
-export async function listLinked(config: ConnectorConfig): Promise<LinkedAccount[]> {
+export async function listLinked(config: ConnectorConfig, collegabili: Set<string>): Promise<LinkedAccount[]> {
   const response = await fetch(`${config.haUrl}/api/config/config_entries/entry`, {
     headers: { authorization: `Bearer ${config.haToken}` },
   });
@@ -618,12 +650,12 @@ export async function listLinked(config: ConnectorConfig): Promise<LinkedAccount
     title: string;
     state?: string;
   }[];
-  // Solo i provider che conosciamo. Le telecamere ci sono, una per canale:
-  // senza, una si poteva collegare e non scollegare più.
+  // Solo quello che porta dispositivi, non il sole e i backup. Le telecamere
+  // ci sono, una per canale: senza, una si poteva collegare e non scollegare più.
   return entries
-    .filter((entry) => entry.domain in PROVIDERS)
+    .filter((entry) => collegabili.has(entry.domain))
     .map((entry) => ({
-      handler: entry.domain as Handler,
+      handler: entry.domain,
       title: entry.title,
       entryId: entry.entry_id,
       health: howIs(entry.state),

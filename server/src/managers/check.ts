@@ -58,6 +58,11 @@ export function provabile(
   modo: 'quando' | 'se',
   value?: unknown,
 ): void {
+  // un'impostazione si cambia, ma non è una cosa che succede in casa
+  if (capability.setting) {
+    throw badRequest(`«${capability.label}» di «${deviceName}» è un’impostazione, quindi non si può chiedere in una condizione`);
+  }
+
   /*
    * A impulso torna spento dopo mezzo secondo, e com'è rimasto quello che
    * comanda non si sa: non si chiede in un «solo se». Che scatti invece si

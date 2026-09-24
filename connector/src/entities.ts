@@ -27,7 +27,7 @@ const COVER_STOP = 8;
 const FAN_SET_SPEED = 1;
 const CLIMATE_TARGET_TEMPERATURE = 1;
 
-const domainOf = (entityId: string): string => entityId.split('.')[0] ?? '';
+export const domainOf = (entityId: string): string => entityId.split('.')[0] ?? '';
 const features = (entity: HaEntity): number => Number(entity.attributes.supported_features ?? 0);
 const has = (entity: HaEntity, bit: number): boolean => (features(entity) & bit) === bit;
 
@@ -37,7 +37,7 @@ const percent = (label: string, code: string): Capability => ({ code, kind: 'ran
  * Cosa misura un sensore, detto in italiano. Home Assistant lo sa — lo chiama
  * `device_class` — e «Temperatura» dice molto più di «Valore».
  */
-const MEASURES: Record<string, string> = {
+export const MEASURES: Record<string, string> = {
   temperature: 'Temperatura',
   humidity: 'Umidità',
   power: 'Potenza',
@@ -64,7 +64,7 @@ function dimmable(entity: HaEntity): boolean {
   return modes.some((mode) => mode !== 'onoff' && mode !== 'unknown');
 }
 
-function capabilitiesOf(entity: HaEntity): Capability[] {
+export function capabilitiesOf(entity: HaEntity): Capability[] {
   const domain = domainOf(entity.entity_id);
   const acceso: Capability = { code: 'power', kind: 'switch', label: 'Acceso' };
 
@@ -155,13 +155,13 @@ const WORDS: Record<string, [string, string]> = {
 };
 
 /** Un numero resta un numero; quello che non lo è resta la sua parola. */
-const numeric = (value: unknown): DeviceValue | undefined => {
+export const numeric = (value: unknown): DeviceValue | undefined => {
   if (value === null || value === undefined) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-function stateOf(entity: HaEntity): Record<string, DeviceValue> {
+export function stateOf(entity: HaEntity): Record<string, DeviceValue> {
   const domain = domainOf(entity.entity_id);
   const state: Record<string, DeviceValue> = {};
 
@@ -248,6 +248,11 @@ export interface ServiceCall {
 export function toServiceCall(entityId: string, code: string, value: DeviceValue): ServiceCall | null {
   const domain = domainOf(entityId);
 
+  // una capacità di un'altra entità dello stesso dispositivo: il comando va a
+  // lei, e si traduce per quello che è lei (connector/src/gruppi.ts)
+  const [altra, interno] = code.split('#');
+  if (interno !== undefined && altra) return toAccessoryCall(altra, value);
+
   switch (code) {
     case 'power':
       return { domain: 'homeassistant', service: value ? 'turn_on' : 'turn_off', data: {} };
@@ -279,6 +284,27 @@ export function toServiceCall(entityId: string, code: string, value: DeviceValue
       return domain === 'cover' ? { domain: 'cover', service, data: {} } : null;
     }
 
+    default:
+      return null;
+  }
+}
+
+/** A quale entità va un comando con `#`: quella prima del cancelletto. */
+export const targetOf = (externalId: string, code: string): string => (code.includes('#') ? (code.split('#')[0] as string) : externalId);
+
+/**
+ * Un comando a un'impostazione, secondo cosa è: una levetta si accende, un
+ * numero si scrive, un elenco si sceglie. Un sensore non si comanda.
+ */
+function toAccessoryCall(entityId: string, value: DeviceValue): ServiceCall | null {
+  switch (domainOf(entityId)) {
+    case 'switch':
+    case 'input_boolean':
+      return { domain: 'homeassistant', service: value ? 'turn_on' : 'turn_off', data: {} };
+    case 'number':
+      return { domain: 'number', service: 'set_value', data: { value: Number(value) } };
+    case 'select':
+      return { domain: 'select', service: 'select_option', data: { option: String(value) } };
     default:
       return null;
   }

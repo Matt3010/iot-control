@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { iso, when, type Transaction } from '../persistence/db.js';
 import { alerts } from '../persistence/schema.js';
 import type { Alert } from '../types.js';
@@ -99,6 +99,16 @@ export class AlertRepository {
     const rows = await this.tx.db
       .delete(alerts)
       .where(inArray(alerts.deviceId, ids))
+      .returning({ id: alerts.id });
+    return rows.length;
+  }
+
+  /** Le regole di un dispositivo che adesso sta dentro a un altro passano all'altro. */
+  async moveDevice(from: string, to: string, prefisso: string): Promise<number> {
+    const rows = await this.tx.db
+      .update(alerts)
+      .set({ deviceId: to, code: sql`${prefisso} || '#' || ${alerts.code}` })
+      .where(eq(alerts.deviceId, from))
       .returning({ id: alerts.id });
     return rows.length;
   }
