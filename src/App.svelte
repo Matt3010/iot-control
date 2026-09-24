@@ -22,6 +22,17 @@
   import ScenesPage from './components/ScenesPage.svelte';
   import AlertsPage from './components/AlertsPage.svelte';
   import ManageSheet from './components/ManageSheet.svelte';
+  import Modal from './components/Modal.svelte';
+
+  /*
+   * Quale componente mostra la finestra di categorie e gruppi.
+   *
+   * Si dice qui e non dentro all'archivio dello stato: se quello importasse
+   * una schermata, i due si terrebbero per mano e nessuno dei due si
+   * potrebbe leggere da solo. Da qui in giu' nessuno sa cosa ci sia dentro
+   * a quella finestra.
+   */
+  ui.manageView = ManageSheet;
   import MapCanvas from './components/MapCanvas.svelte';
   import Palette from './components/Palette.svelte';
   import Panel from './components/Panel.svelte';
@@ -162,9 +173,11 @@
 
   {#if ui.sheet === 'place' && ui.draft}
     <PlaceSheet />
-  {:else if ui.sheet === 'manage'}
-    <ManageSheet />
   {/if}
+
+  <!-- La finestra: la apre chi ne ha bisogno passandole un componente, e da
+       qui in giù nessuno sa cosa ci sia dentro. -->
+  {#if ui.modal}<Modal />{/if}
 
   {#if ui.paletteOpen}<Palette />{/if}
   <!-- Il selettore dei segni si monta quando serve e sparisce quando no: è

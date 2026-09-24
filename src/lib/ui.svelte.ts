@@ -1,3 +1,4 @@
+import type { Component } from 'svelte';
 import { readJSON, writeJSON } from './storage';
 import type { Draft } from './types';
 
@@ -47,6 +48,43 @@ export interface SureRequest {
   tone?: 'danger' | 'plain';
 }
 
+/**
+ * Un tasto in fondo a una finestra.
+ *
+ * Sono i tasti dell'app: chi apre la finestra dice cosa scrivono e cosa
+ * fanno, e sceglie il vestito con le stesse parole che userebbe ovunque —
+ * quello importante, quello che porta via qualcosa, quello che annulla.
+ */
+export interface ModalAction {
+  label: string;
+  look?: 'primary' | 'ghost' | 'danger' | 'danger-solid' | 'link';
+  disabled?: boolean;
+  /**
+   * Cosa fa. Torna `false` per lasciarla aperta — serve quando quello che
+   * hai scritto non va bene e la finestra deve dirtelo restando dov'è.
+   */
+  onpick: () => boolean | void | Promise<boolean | void>;
+}
+
+/**
+ * Una finestra che si apre davanti a tutto.
+ *
+ * Dentro non ci va del testo: ci va **un componente**, lo stesso che
+ * potrebbe stare dentro a un pannello. È il motivo per cui esiste questa
+ * forma — il contenuto non sa dove sta, e spostarlo da una parte all'altra
+ * non lo tocca.
+ */
+export interface ModalRequest {
+  title: string;
+  /** Il componente da mostrare. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  view: Component<any>;
+  /** Quello che gli serve per disegnarsi. */
+  props?: Record<string, unknown>;
+  /** I tasti in fondo. Senza, in fondo non c'è niente. */
+  actions?: ModalAction[];
+}
+
 export interface ColorRequest {
   anchor: HTMLElement;
   current: string;
@@ -85,6 +123,7 @@ class Ui {
   color = $state<ColorRequest | null>(null);
   sure = $state<SureRequest | null>(null);
   pick = $state<PickRequest | null>(null);
+  modal = $state<ModalRequest | null>(null);
   /**
    * Su schermo stretto il pannello e una scheda non ci stanno insieme:
    * 'auto' lo fa ridurre quando serve, le altre due sono scelte tue.
@@ -113,6 +152,16 @@ class Ui {
    * One sheet at a time, but a draft in progress survives: you open this very
    * panel to create the category the place you are adding still needs.
    */
+  /**
+   * Cosa mostrare quando si aprono categorie e gruppi.
+   *
+   * Lo dice chi avvia l'applicazione, una volta: qui dentro non si importa
+   * nessun componente, se no l'archivio dello stato e le schermate si
+   * terrebbero per mano e nessuno dei due si potrebbe leggere da solo.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  manageView: Component<any> | null = null;
+
   openManage(tab: ManageTab = 'categories', intent: 'browse' | 'add' = 'browse'): void {
     this.panelWish = 'auto';
     this.#placePaused = this.sheet === 'place';
@@ -120,11 +169,14 @@ class Ui {
     this.manageIntent = intent;
     this.sheet = 'manage';
     this.#ricorda();
+    // e si vede dentro a una finestra, che di cosa ci sia dentro non sa niente
+    if (this.manageView) this.openModal({ title: 'Categorie e gruppi', view: this.manageView });
   }
 
   closeManage(): void {
     this.mark = null;
     this.color = null;
+    this.modal = null;
     this.sheet = this.#placePaused && this.draft ? 'place' : 'none';
     this.#placePaused = false;
     this.#ricorda();
@@ -166,6 +218,21 @@ class Ui {
     this.pick = { anchor, ...question };
   }
 
+  /**
+   * Apre una finestra su un componente.
+   *
+   * Si chiama da dove serve, senza che chi chiama debba tenersi uno stato
+   * suo e un `{#if}` da qualche parte: è lo stesso modo in cui si chiede una
+   * conferma o si fa scegliere una voce.
+   */
+  openModal(request: ModalRequest): void {
+    this.modal = request;
+  }
+
+  closeModal(): void {
+    this.modal = null;
+  }
+
   /** Questo browser e basta: quale scheda era aperta, e su quale linguetta. */
   #ricorda(): void {
     writeJSON(RICORDO, { aperta: this.sheet === 'manage', tab: this.#tab });
@@ -174,6 +241,7 @@ class Ui {
   /** Esc unwinds the overlay one layer at a time, topmost first. */
   escape(): boolean {
     if (this.sure) return (this.sure = null), true;
+    if (this.modal) return this.closeModal(), true;
     if (this.pick) return (this.pick = null), true;
     if (this.paletteOpen) return (this.paletteOpen = false), true;
     if (this.color) return (this.color = null), true;

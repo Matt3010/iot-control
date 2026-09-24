@@ -142,28 +142,28 @@ aside header {
    * `dvh` e non `vh`: su iPhone la barra dell'indirizzo si ritira mentre
    * scorri, e con `vh` la scheda cambiava altezza sotto il dito.
    */
+  /*
+   * Su un telefono una scheda non è un foglietto appoggiato in fondo: è la
+   * schermata.
+   *
+   * Appoggiata in fondo era alta quanto quello che aveva dentro, e sopra
+   * lasciava mezzo schermo di nero fra sé e il pannello ridotto — un vuoto
+   * che non mostrava niente e non si poteva toccare. E gli angoli tondi in
+   * basso disegnavano una cornice intorno a un bordo che non c'è: sotto
+   * finisce lo schermo, non la pagina.
+   */
   aside {
-    top: auto;
-    /*
-     * Ai bordi dello schermo, non dentro a una cornice.
-     *
-     * Dodici pixel per parte sono ventiquattro di larghezza regalati al
-     * nero, e su uno schermo da trecentonovanta sono il sette per cento
-     * della riga: un nome di categoria in meno per riga, una colonna in
-     * meno ovunque. La cornice ha senso dove sotto c'è una mappa da
-     * lasciar vedere; qui sotto non c'è niente.
-     */
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding-bottom: calc(var(--card-pad) + env(safe-area-inset-bottom));
-    /* si arrotonda solo dove si stacca da qualcosa: in alto */
-    border-radius: var(--r-lg) var(--r-lg) 0 0;
-    border-bottom: 0;
+    inset: 0;
     width: auto;
-    height: 74dvh;
-    /* ma mai fin sotto al pannello: quello resta la testa della pagina */
-    max-height: calc(100dvh - 138px - env(safe-area-inset-top));
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    padding-top: calc(22px + env(safe-area-inset-top));
+    padding-bottom: calc(var(--card-pad) + env(safe-area-inset-bottom));
     animation-name: sheet-in-mobile;
   }
+
+  /* la maniglia scende sotto l'orologio insieme al resto */
+  aside::before { top: calc(9px + env(safe-area-inset-top)); }
 }

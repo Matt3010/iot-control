@@ -6,8 +6,7 @@
   import { store } from '../lib/store.svelte';
   import type { PlaceMap } from '../lib/types';
   import { toast } from '../lib/toast.svelte';
-  import { swipeToClose } from '../lib/swipe';
-  import { ui } from '../lib/ui.svelte';
+    import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
   import AddRow from './AddRow.svelte';
   import Icon from './Icon.svelte';
@@ -160,196 +159,195 @@
   }
 </script>
 
-<aside id="manage-sheet" class="surface" use:swipeToClose={() => ui.closeManage()}>
-  <header>
-    <h2>{ui.manageTab === 'groups' ? 'Gruppi' : 'Categorie'}</h2>
-    <Button look="icon" title="Chiudi" onclick={() => ui.closeManage()}>
-      <Icon name="close" />
-    </Button>
-  </header>
+<!--
+  Questo non e' una finestra: e' quello che una finestra mostra.
 
-  <Tabs
-    value={ui.manageTab}
-    onpick={(id) => (ui.manageTab = id)}
-    options={[
-      { id: 'categories', label: 'Categorie' },
-      { id: 'groups', label: 'Gruppi' },
-    ]}
-    label="Cosa stai gestendo"
-  />
+  Del posto dove sta non sa niente — niente bordi, niente titolo, niente
+  tasto per chiudere: quelli li mette chi lo ospita. Cosi' la stessa cosa
+  puo' stare dentro a una finestra su un telefono e dentro a un pannello su
+  uno schermo grande, e a cambiare e' solo la cornice.
+-->
+<Tabs
+  value={ui.manageTab}
+  onpick={(id) => (ui.manageTab = id)}
+  options={[
+    { id: 'categories', label: 'Categorie' },
+    { id: 'groups', label: 'Gruppi' },
+  ]}
+  label="Cosa stai gestendo"
+/>
 
-  {#if ui.manageTab === 'categories'}
-    <div class="tab-panel">
-      {#if store.categories.length > MANY}
-        <TextField extra="list-filter" kind="search" placeholder="Cerca categoria" bind:value={categoryFilter} />
+{#if ui.manageTab === 'categories'}
+  <div class="tab-panel">
+    {#if store.categories.length > MANY}
+      <TextField extra="list-filter" kind="search" placeholder="Cerca categoria" bind:value={categoryFilter} />
+    {/if}
+    <ul id="category-list" data-fade="none" use:fadeEdges>
+      {#each visibleCategories as category (category.id)}
+        <li>
+          <Row>
+            {#snippet lead()}
+              <button
+                type="button"
+                class="mark-btn"
+                title="Cambia il segno"
+                onclick={(event) =>
+                  ui.askMark(event.currentTarget, category.emoji, (mark) =>
+                    store.patchCategory(category, { emoji: mark }),
+                  )}
+              >
+                <Mark value={category.emoji} size={17} />
+              </button>
+            {/snippet}
+
+            <TextField
+              maxlength={40}
+              value={category.name}
+              label="Nome della categoria"
+              onchange={(nome: string) => store.patchCategory(category, { name: nome })}
+            />
+
+            {#snippet trail()}
+              <button
+                type="button"
+                class="swatch"
+                title="Cambia colore"
+                style:--c={category.color}
+                aria-label="Colore"
+                onclick={(event) =>
+                  ui.askColor(event.currentTarget, category.color, (color) =>
+                    store.patchCategory(category, { color }),
+                  )}
+              ></button>
+              <span class="count">{store.countIn(category.id) || ''}</span>
+              <!-- Una categoria vale su tutte le mappe, anche quelle che a
+                   un ospite non sono state date: eliminarla è di chi
+                   l'indice ce l'ha, e il tasto sta con lui. -->
+              {#if atHome}
+              <Button
+                look="icon"
+                tone="danger"
+                extra="kill"
+                title="Elimina categoria"
+                onclick={(event: MouseEvent) =>
+                  ui.askSure(event.currentTarget as HTMLElement, {
+                    title: `Eliminare “${category.name}”?`,
+                    detail: store.countIn(category.id)
+                      ? `Se ne vanno con lei anche ${conta(store.countIn(category.id))}.`
+                      : undefined,
+                    verb: 'Elimina',
+                    onYes: () => store.deleteCategory(category),
+                  })}
+              >
+                <Icon name="trash" />
+              </Button>
+              {/if}
+            {/snippet}
+          </Row>
+        </li>
+      {/each}
+      {#if store.categories.length && !visibleCategories.length}
+        <li class="list-empty">Nessuna categoria con questo nome.</li>
       {/if}
-      <ul id="category-list" data-fade="none" use:fadeEdges>
-        {#each visibleCategories as category (category.id)}
-          <li>
-            <Row>
-              {#snippet lead()}
-                <button
-                  type="button"
-                  class="mark-btn"
-                  title="Cambia il segno"
-                  onclick={(event) =>
-                    ui.askMark(event.currentTarget, category.emoji, (mark) =>
-                      store.patchCategory(category, { emoji: mark }),
-                    )}
-                >
-                  <Mark value={category.emoji} size={17} />
-                </button>
-              {/snippet}
+    </ul>
 
-              <TextField
-                maxlength={40}
-                value={category.name}
-                label="Nome della categoria"
-                onchange={(nome: string) => store.patchCategory(category, { name: nome })}
-              />
+    <AddRow
+      id="category-form"
+      placeholder="Nome categoria"
+      title="Crea categoria"
+      bind:value={newCategoryName}
+      bind:field={categoryInput}
+      onadd={addCategory}
+    >
+      {#snippet before()}
+        <button
+          type="button"
+          class="mark-btn"
+          title="Scegli il segno"
+          onclick={(event) => ui.askMark(event.currentTarget, newEmoji, (mark) => (newEmoji = mark))}
+        >
+          <Mark value={newEmoji} size={17} />
+        </button>
+      {/snippet}
+      {#snippet after()}
+        <button
+          type="button"
+          class="swatch"
+          title="Scegli colore"
+          style:--c={newColor}
+          aria-label="Colore"
+          onclick={(event) => ui.askColor(event.currentTarget, newColor, (color) => (newColor = color))}
+        ></button>
+        <!-- il posto del conteggio resta vuoto, ma resta: così il colore e il
+             tasto cadono nella stessa colonna delle righe qui sopra -->
+        <span class="count" aria-hidden="true"></span>
+      {/snippet}
+    </AddRow>
+  </div>
+{:else}
+  <div class="tab-panel">
+    {#if mapGroups.length > MANY}
+      <TextField extra="list-filter" kind="search" placeholder="Cerca gruppo" bind:value={groupFilter} />
+    {/if}
+    <ul id="group-list" data-fade="none" use:fadeEdges>
+      {#each visibleGroups as group (group.id)}
+        <li>
+          <Row>
+            {#snippet lead()}
+              <span class="group-mark" aria-hidden="true"><Icon name="tag" /></span>
+            {/snippet}
 
-              {#snippet trail()}
-                <button
-                  type="button"
-                  class="swatch"
-                  title="Cambia colore"
-                  style:--c={category.color}
-                  aria-label="Colore"
-                  onclick={(event) =>
-                    ui.askColor(event.currentTarget, category.color, (color) =>
-                      store.patchCategory(category, { color }),
-                    )}
-                ></button>
-                <span class="count">{store.countIn(category.id) || ''}</span>
-                <!-- Una categoria vale su tutte le mappe, anche quelle che a
-                     un ospite non sono state date: eliminarla è di chi
-                     l'indice ce l'ha, e il tasto sta con lui. -->
-                {#if atHome}
-                <Button
-                  look="icon"
-                  tone="danger"
-                  extra="kill"
-                  title="Elimina categoria"
-                  onclick={(event: MouseEvent) =>
-                    ui.askSure(event.currentTarget as HTMLElement, {
-                      title: `Eliminare “${category.name}”?`,
-                      detail: store.countIn(category.id)
-                        ? `Se ne vanno con lei anche ${conta(store.countIn(category.id))}.`
-                        : undefined,
-                      verb: 'Elimina',
-                      onYes: () => store.deleteCategory(category),
-                    })}
-                >
-                  <Icon name="trash" />
-                </Button>
-                {/if}
-              {/snippet}
-            </Row>
-          </li>
-        {/each}
-        {#if store.categories.length && !visibleCategories.length}
-          <li class="list-empty">Nessuna categoria con questo nome.</li>
-        {/if}
-      </ul>
+            <TextField
+              maxlength={40}
+              value={group.name}
+              label="Nome del gruppo"
+              onchange={(nome: string) => store.patchGroup(group, { name: nome })}
+            />
 
-      <AddRow
-        id="category-form"
-        placeholder="Nome categoria"
-        title="Crea categoria"
-        bind:value={newCategoryName}
-        bind:field={categoryInput}
-        onadd={addCategory}
-      >
-        {#snippet before()}
-          <button
-            type="button"
-            class="mark-btn"
-            title="Scegli il segno"
-            onclick={(event) => ui.askMark(event.currentTarget, newEmoji, (mark) => (newEmoji = mark))}
-          >
-            <Mark value={newEmoji} size={17} />
-          </button>
-        {/snippet}
-        {#snippet after()}
-          <button
-            type="button"
-            class="swatch"
-            title="Scegli colore"
-            style:--c={newColor}
-            aria-label="Colore"
-            onclick={(event) => ui.askColor(event.currentTarget, newColor, (color) => (newColor = color))}
-          ></button>
-          <!-- il posto del conteggio resta vuoto, ma resta: così il colore e il
-               tasto cadono nella stessa colonna delle righe qui sopra -->
-          <span class="count" aria-hidden="true"></span>
-        {/snippet}
-      </AddRow>
-    </div>
-  {:else}
-    <div class="tab-panel">
-      {#if mapGroups.length > MANY}
-        <TextField extra="list-filter" kind="search" placeholder="Cerca gruppo" bind:value={groupFilter} />
+            {#snippet trail()}
+              <span class="count">{store.countGroup(group.id) || ''}</span>
+              <Button
+                look="icon"
+                tone="danger"
+                extra="kill"
+                title="Elimina gruppo"
+                onclick={(event: MouseEvent) =>
+                  ui.askSure(event.currentTarget as HTMLElement, {
+                    title: `Sciogliere “${group.name}”?`,
+                    detail: store.countGroup(group.id)
+                      ? `${conta(store.countGroup(group.id))} resta${store.countGroup(group.id) === 1 ? '' : 'no'} dov'è, senza questo gruppo.`
+                      : undefined,
+                    verb: 'Sciogli',
+                    onYes: () => store.deleteGroup(group),
+                  })}
+              >
+                <Icon name="trash" />
+              </Button>
+            {/snippet}
+          </Row>
+        </li>
+      {/each}
+      {#if mapGroups.length && !visibleGroups.length}
+        <li class="list-empty">Nessun gruppo con questo nome.</li>
       {/if}
-      <ul id="group-list" data-fade="none" use:fadeEdges>
-        {#each visibleGroups as group (group.id)}
-          <li>
-            <Row>
-              {#snippet lead()}
-                <span class="group-mark" aria-hidden="true"><Icon name="tag" /></span>
-              {/snippet}
+    </ul>
 
-              <TextField
-                maxlength={40}
-                value={group.name}
-                label="Nome del gruppo"
-                onchange={(nome: string) => store.patchGroup(group, { name: nome })}
-              />
+    <AddRow
+      id="group-form"
+      placeholder="Nome gruppo — es. Padova"
+      title="Crea gruppo"
+      bind:value={newGroupName}
+      bind:field={groupInput}
+      onadd={addGroup}
+    />
 
-              {#snippet trail()}
-                <span class="count">{store.countGroup(group.id) || ''}</span>
-                <Button
-                  look="icon"
-                  tone="danger"
-                  extra="kill"
-                  title="Elimina gruppo"
-                  onclick={(event: MouseEvent) =>
-                    ui.askSure(event.currentTarget as HTMLElement, {
-                      title: `Sciogliere “${group.name}”?`,
-                      detail: store.countGroup(group.id)
-                        ? `${conta(store.countGroup(group.id))} resta${store.countGroup(group.id) === 1 ? '' : 'no'} dov'è, senza questo gruppo.`
-                        : undefined,
-                      verb: 'Sciogli',
-                      onYes: () => store.deleteGroup(group),
-                    })}
-                >
-                  <Icon name="trash" />
-                </Button>
-              {/snippet}
-            </Row>
-          </li>
-        {/each}
-        {#if mapGroups.length && !visibleGroups.length}
-          <li class="list-empty">Nessun gruppo con questo nome.</li>
-        {/if}
-      </ul>
-
-      <AddRow
-        id="group-form"
-        placeholder="Nome gruppo — es. Padova"
-        title="Crea gruppo"
-        bind:value={newGroupName}
-        bind:field={groupInput}
-        onadd={addGroup}
-      />
-
-      <p class="sheet-note">
-        Un gruppo tiene insieme i luoghi di una città, di un viaggio, di una lista. Un luogo ne può
-        portare quanti ne vuoi, anche da mappe diverse, perché i gruppi sono tuoi come le
-        categorie.
-      </p>
-    </div>
-  {/if}
-</aside>
+    <p class="sheet-note">
+      Un gruppo tiene insieme i luoghi di una città, di un viaggio, di una lista. Un luogo ne può
+      portare quanti ne vuoi, anche da mappe diverse, perché i gruppi sono tuoi come le
+      categorie.
+    </p>
+  </div>
+{/if}
 
 <style>
 /* emoji button and colour swatch ------------------------------------------ */

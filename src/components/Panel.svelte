@@ -515,14 +515,15 @@
    * arriva fin sotto l'orologio invece di lasciargli una striscia nera.
    */
   #panel {
-    left: 0;
-    right: 0;
-    top: 0;
+    inset: 0;
     width: auto;
     padding-top: calc(var(--card-pad) + env(safe-area-inset-top));
-    border-radius: 0 0 var(--r-lg) var(--r-lg);
-    border-top: 0;
-    max-height: calc(100dvh - 86px - env(safe-area-inset-bottom));
+    /* sotto passa il tasto che aggiunge un luogo: l'ultima riga dell'elenco
+       non gli va a finire dietro */
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 0;
+    max-height: none;
   }
 
   /* Su uno schermo stretto in testa non ci stanno tutti: il conteggio se ne
