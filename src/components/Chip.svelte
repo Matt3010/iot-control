@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { Salute } from '../lib/health';
+  import HealthDot from './HealthDot.svelte';
   import Mark from './Mark.svelte';
   type Look = 'on' | 'off' | 'sel';
 
@@ -7,6 +9,7 @@
     emoji,
     label,
     count,
+    salute,
     look = 'on',
     size,
     disabled = false,
@@ -17,6 +20,8 @@
     emoji?: string;
     label: string;
     count?: number;
+    /** Per un dispositivo, se risponde: il pallino davanti al nome. */
+    salute?: Salute;
     look?: Look;
     /** Più piccola del normale: dentro a una card, in mezzo ad altri controlli. */
     size?: 'sm';
@@ -36,6 +41,7 @@
   {...rest}
 >
   {#if emoji}<span class="emo"><Mark value={emoji} size={14} /></span>{/if}
+  {#if salute}<HealthDot {salute} />{/if}
   <span class="name">{label}</span>
   {#if count !== undefined}<span class="count">{count}</span>{/if}
 </button>

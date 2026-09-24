@@ -1,3 +1,4 @@
+import type { Salute } from './health';
 /**
  * Le colonne di una tabella.
  *
@@ -35,4 +36,6 @@ export interface Choice {
   label: string;
   /** Qualcosa da dire su quella voce: «ha già un agente». */
   note?: string;
+  /** Per un dispositivo, se risponde: il pallino davanti al nome. */
+  salute?: Salute;
 }

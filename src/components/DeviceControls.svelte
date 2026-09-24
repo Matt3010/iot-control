@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { thingHealth } from '../lib/health';
+  import HealthDot from './HealthDot.svelte';
   import { devices, type Device } from '../lib/devices.svelte';
   import type { Capability, DeviceValue } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
@@ -31,14 +31,8 @@
    * di una tenda a trenta chilometri. Dipingerla di rosso manda a cercare un
    * guasto in casa quando il filo è caduto per strada.
    */
-  const how = $derived(thingHealth(devices.agentUp(device.agentId), device.online));
-  const says = $derived(
-    how === 'live'
-      ? 'Raggiungibile'
-      : how === 'lost'
-        ? 'Non risponde'
-        : 'Non si sa, perché l’agente non è collegato',
-  );
+  const stato = $derived(devices.saluteDi(device));
+  const how = $derived(stato.state);
 
   const numberOf = (value: DeviceValue | undefined): number => (typeof value === 'number' ? value : 0);
 
@@ -103,13 +97,13 @@
   <div class="dev-head">
     <!-- il pallino dice se la cosa risponde, non se è accesa: quello lo
          dicono la riga che si scalda e il suo interruttore -->
-    <span class="dev-dot is-{how}" role="img" aria-label={says} title={says}></span>
+    <HealthDot salute={stato} />
     <span class="dev-name">{device.name}</span>
     <!-- l'avviso solo per un guasto vero: se è l'agente a mancare, quello lo
          dice già il suo pallino qui sopra, e ripeterlo su ogni riga sarebbe
          una colonna di allarmi per una cosa sola -->
     {#if how === 'lost'}
-      <span class="dev-away" title={says}><Icon name="alert" /></span>
+      <span class="dev-away" title={stato.says}><Icon name="alert" /></span>
     {/if}
 
   </div>
@@ -224,25 +218,6 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
-  }
-
-  .dev-dot {
-    flex: none;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--ok);
-    transition: background 0.22s, box-shadow 0.22s;
-  }
-
-  /* non risponde: rosso, e accanto al nome ci finisce anche un'icona —
-     il colore da solo non basta a chi non lo distingue */
-  .dev-dot.is-lost { background: var(--danger); }
-
-  /* non si sa: l'agente non è collegato, e di qui non si vede niente */
-  .dev-dot.is-unknown {
-    background: var(--ink-3);
-    opacity: 0.55;
   }
 
   .dev-name {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { devices, type Scene } from '../lib/devices.svelte';
-  import { thingHealth } from '../lib/health';
+  import type { Salute } from '../lib/health';
   import { quante } from '../lib/condizioni';
   import { fraseCondizione, fraseDiProva } from '../lib/prove';
   import { saysWait, saysWhen } from '../lib/timing';
@@ -88,19 +88,8 @@
       .filter((step) => !step.vuota),
   );
 
-  function how(deviceId: string): { state: 'live' | 'lost' | 'unknown'; says: string } {
-    const device = devices.list.find((one) => one.id === deviceId);
-    const state = thingHealth(device ? devices.agentUp(device.agentId) : false, device?.online ?? false);
-    return {
-      state,
-      says:
-        state === 'live'
-          ? 'Raggiungibile'
-          : state === 'lost'
-            ? 'Non risponde'
-            : 'Non si sa, perché l’agente non è collegato',
-    };
-  }
+  const how = (deviceId: string): Salute => devices.saluteDi(devices.list.find((one) => one.id === deviceId));
+
   const busy = $derived(devices.busy.includes(`scena:${scene.id}`));
 
   /**

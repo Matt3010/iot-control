@@ -1,5 +1,5 @@
 import { rimpiazza } from './rimpiazza';
-import { healthOf } from './health';
+import { healthOf, salute, type Salute } from './health';
 import { api } from './api';
 import { toast } from './toast.svelte';
 import type { Capability, DeviceValue, Health, LinkedAccount, PairingStep } from './types';
@@ -237,6 +237,11 @@ class Devices {
   /** Se l'agente di un dispositivo è collegato adesso. */
   agentUp(agentId: string): boolean {
     return this.agents.find((agent) => agent.id === agentId)?.online ?? false;
+  }
+
+  /** Se risponde, con le parole per dirlo. Dipende anche dal suo agente. */
+  saluteDi(device: Device | undefined): Salute {
+    return salute(device ? this.agentUp(device.agentId) : false, device?.online ?? false);
   }
 
   /** Quanti ne sono accesi su quanti se ne possono accendere. */

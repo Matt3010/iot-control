@@ -67,3 +67,18 @@ export function thingHealth(agentUp: boolean, online: boolean): 'live' | 'lost' 
   if (!agentUp) return 'unknown';
   return online ? 'live' : 'lost';
 }
+
+/** Come sta, e come si dice a chi ci passa sopra. */
+export interface Salute {
+  state: 'live' | 'lost' | 'unknown';
+  says: string;
+}
+
+export function salute(agentUp: boolean, online: boolean): Salute {
+  const state = thingHealth(agentUp, online);
+  return {
+    state,
+    says:
+      state === 'live' ? 'Raggiungibile' : state === 'lost' ? 'Non risponde' : 'Non si sa, perché l’agente non è collegato',
+  };
+}

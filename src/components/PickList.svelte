@@ -1,6 +1,7 @@
 <script lang="ts">
   import { alCentro } from '../lib/centra';
   import type { Choice } from '../lib/table';
+  import HealthDot from './HealthDot.svelte';
 
   /**
    * Le voci di una scelta, dentro a un foglietto.
@@ -35,6 +36,7 @@
       class:is-on={option.id === current}
       onclick={() => onpick(option.id)}
     >
+      {#if option.salute}<HealthDot salute={option.salute} />{/if}
       <span class="name">{option.label}</span>
       {#if option.note}<span class="note">{option.note}</span>{/if}
     </button>
@@ -88,6 +90,12 @@
   .one.is-on { background: var(--sunken); color: var(--ink); font-weight: 560; }
 
   .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* col pallino davanti il nome prende lo spazio che avanza, e la nota
+     resta in fondo a destra come senza */
+  .one:has(:global(.dot)) .name { flex: 1; }
+
+  .one :global(.dot) { align-self: center; }
 
   .note { flex: none; font-size: 11px; color: var(--ink-3); }
 </style>

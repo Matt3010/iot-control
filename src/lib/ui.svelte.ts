@@ -1,3 +1,4 @@
+import type { Choice } from './table';
 import type { Component } from 'svelte';
 import { auth } from './auth.svelte';
 import type { IconName } from './icons';
@@ -25,8 +26,12 @@ export interface PickRequest {
   anchor: HTMLElement;
   /** Cosa si sta scegliendo: «Su quale luogo?» */
   title: string;
-  /** Le voci, già in ordine di come vanno lette. */
-  options: { id: string; label: string; note?: string }[];
+  /**
+   * Le voci, già in ordine di come vanno lette. Come funzione quando possono
+   * cambiare mentre l'elenco è aperto: un dispositivo che riprende a
+   * rispondere si deve vedere lì, non alla prossima apertura.
+   */
+  options: Choice[] | (() => Choice[]);
   /** Quella di adesso, che si segna e non si ripropone come novità. */
   current?: string;
   onPick: (id: string) => void;

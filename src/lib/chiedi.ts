@@ -19,13 +19,17 @@ export function chiediProva(
   /** Le scelte da non riproporre, per chi ne ha già scritte. */
   gia: (deviceId: string, scelta: string) => boolean = () => false,
 ): void {
-  const buoni = devices.list
-    .filter((device) => scelteDi(device, modo).some((one) => !gia(device.id, one.id)))
-    .sort((a, b) => a.name.localeCompare(b.name, 'it'));
+  // una funzione e non un elenco, così l'elenco aperto segue chi riprende
+  // a rispondere e chi smette
+  const buoni = () =>
+    devices.list
+      .filter((device) => scelteDi(device, modo).some((one) => !gia(device.id, one.id)))
+      .sort((a, b) => a.name.localeCompare(b.name, 'it'))
+      .map((device) => ({ id: device.id, label: device.name, salute: devices.saluteDi(device) }));
 
   ui.askPick(anchor, {
     title: 'Quale dispositivo?',
-    options: buoni.map((device) => ({ id: device.id, label: device.name })),
+    options: buoni,
     onPick: (deviceId: string) => {
       const device = devices.list.find((one) => one.id === deviceId);
       if (!device) return;

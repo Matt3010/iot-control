@@ -105,12 +105,13 @@
    */
   function aggiungi(event: MouseEvent): void {
     const tasto = event.currentTarget as HTMLElement;
-    const libere = devices.list.filter((device) => restaDa(device, rules).length);
     ui.askPick(tasto, {
       title: 'Di quale cosa?',
-      options: [...libere]
-        .sort((a, b) => a.name.localeCompare(b.name, 'it'))
-        .map((device) => ({ id: device.id, label: device.name, note: dove(device) })),
+      options: () =>
+        devices.list
+          .filter((device) => restaDa(device, rules).length)
+          .sort((a, b) => a.name.localeCompare(b.name, 'it'))
+          .map((device) => ({ id: device.id, label: device.name, note: dove(device), salute: devices.saluteDi(device) })),
       onPick: (id: string) => chiedi(tasto, id),
     });
   }

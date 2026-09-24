@@ -12,6 +12,7 @@
    * selettore a tendina sarebbe un pezzo di modulo in mezzo a una scheda.
    */
   const request = $derived(ui.pick!);
+  const options = $derived(typeof request.options === 'function' ? request.options() : request.options);
 
   function choose(id: string): void {
     const pick = request.onPick;
@@ -28,6 +29,6 @@
   id="pick-popover"
   onclose={() => (ui.pick = null)}
 >
-  <PickList options={request.options} current={request.current} title={request.title} onpick={choose} />
+  <PickList {options} current={request.current} title={request.title} onpick={choose} />
 </Popover>
 

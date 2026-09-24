@@ -284,7 +284,8 @@
           label={device.name}
           size="sm"
           look={picking === device.id ? 'sel' : inScene(device.id) ? 'on' : 'off'}
-          title={inScene(device.id) ? 'È già in questa scena' : device.online ? 'Risponde' : 'Adesso non risponde'}
+          salute={devices.saluteDi(device)}
+          title={inScene(device.id) ? 'È già in questa scena' : devices.saluteDi(device).says}
           onclick={() => (picking = picking === device.id ? null : device.id)}
         />
       {/each}
