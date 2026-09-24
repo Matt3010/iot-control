@@ -39,107 +39,99 @@
 </script>
 
 {#if tappe.length}
-  <section class="linea" aria-label="Le prossime partenze automatiche">
-    <span class="eyebrow">Prossime partenze</span>
+  <!-- una riga sola, in fondo alla pagina: si legge di passaggio, come la
+       barra di stato di un'app, e non ruba spazio alle schede -->
+  <section class="banner" aria-label="Le prossime partenze automatiche">
+    <!-- il fondo va da bordo a bordo, quello che dice sta in riga con le
+         schede: sul grande la pagina è una colonna in mezzo -->
+    <div class="dentro">
+    <span class="eyebrow">Prossime</span>
     <ol class="tappe" data-fade="none" use:fadeEdges>
       {#each tappe as tappa, at (tappa.scene.id)}
         <li class="tappa" class:is-prima={at === 0}>
           <span class="punto" aria-hidden="true"></span>
-          <span class="quando">
-            <b>{ora(tappa.at)}</b>
-            {saysShortDay(tappa.at, auth.tz)}
-          </span>
+          <b>{ora(tappa.at)}</b>
+          <span class="giorno">{saysShortDay(tappa.at, auth.tz)}</span>
           <span class="nome">{tappa.scene.name}</span>
         </li>
       {/each}
     </ol>
+    </div>
   </section>
 {/if}
 
 <style>
-  .linea {
-    display: grid;
-    gap: 10px;
-    min-width: 0;
-    /* sotto c'è già lo stacco della testata: uno in più farebbe un buco */
-    margin-top: 6px;
+  /*
+   * Un banner in fondo, fermo mentre le schede scorrono.
+   *
+   * Era una linea del tempo in cima, con i punti e il filo, alta quanto una
+   * scheda: per una cosa che si guarda di passaggio era troppa. Qui è una
+   * riga sola — l'ora, il giorno, il nome — e dice «cosa succede dopo» senza
+   * chiedere attenzione.
+   */
+  .banner {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    padding: 9px max(20px, env(safe-area-inset-right)) calc(9px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    border-top: 1px solid var(--hairline-soft);
   }
 
-  /*
-   * Una fila che scorre di lato, con il filo che passa sotto ai punti.
-   *
-   * Le tappe sono a distanza uguale e non in proporzione al tempo: la linea
-   * dice l'ordine, e un'ora vuota fra due partenze non ha bisogno di mezzo
-   * schermo per essere capita.
-   */
-  .tappe {
-    position: relative;
+  .dentro {
     display: flex;
-    gap: 28px;
-    margin: 0 -4px;
-    /* il bagliore del primo punto sporge di tre pixel: il riempimento gli fa
-       posto, e il margine qui sopra rimette la linea in riga col titolo */
-    padding: 4px 4px 2px;
+    align-items: center;
+    gap: 12px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  .banner .eyebrow { flex: none; }
+
+  .tappe {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
     list-style: none;
     overflow-x: auto;
     scrollbar-width: none;
-    /*
-     * Il filo corre per tutta la riga, non solo da un punto all'altro: una
-     * partenza sola restava un punto sospeso nel vuoto, e non si capiva che
-     * fosse una linea del tempo. `local` lo fa scorrere insieme alle tappe
-     * quando sono tante e la riga scorre di lato.
-     */
-    background: linear-gradient(var(--hairline), var(--hairline)) 0 8px / 100% 1px no-repeat local;
+    white-space: nowrap;
   }
 
   .tappe::-webkit-scrollbar { display: none; }
 
   .tappa {
-    position: relative;
-    flex: none;
-    display: grid;
-    gap: 3px;
-    min-width: 96px;
-    max-width: 180px;
-    padding-top: 16px;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--ink-3);
   }
 
   .punto {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 9px;
-    height: 9px;
+    align-self: center;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: var(--glass-strong);
-    box-shadow: inset 0 0 0 1.5px var(--ink-3);
+    background: var(--ink-3);
+    opacity: 0.6;
   }
 
   /* la prossima si accende: è quella che succede per prima */
-  .is-prima .punto {
-    background: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-  }
+  .is-prima .punto { background: var(--accent); opacity: 1; }
 
-  .quando {
-    font-size: 11px;
-    color: var(--ink-3);
-    white-space: nowrap;
-  }
-
-  .quando b {
-    margin-right: 4px;
-    font-size: 13px;
+  .tappa b {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: var(--ink);
   }
 
-  .nome {
-    font-size: 12.5px;
-    color: var(--ink-2);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  .nome { color: var(--ink-2); }
 </style>

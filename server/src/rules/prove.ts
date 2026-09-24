@@ -84,6 +84,13 @@ export function conditionsHold(
   /** Il fuso di chi ha la scena: le ore sono le sue, ovunque giri il server. */
   tz: string,
   at = new Date(),
+  /**
+   * Se a farla partire è l'orario. I giorni e le fasce orarie non lo
+   * riguardano: l'orario ha già i suoi giorni e il suo minuto, e una fascia
+   * che non lo contenesse non lo lascerebbe partire mai. Valgono per le
+   * partenze da un dispositivo, che non hanno un'ora loro.
+   */
+  perOrario = false,
 ): boolean {
   let adesso: ReturnType<typeof localNow> | undefined;
   try {
@@ -94,6 +101,7 @@ export function conditionsHold(
 
   return (only ?? []).every((condizione) => {
     if (condizione.kind === 'device') return holds(condizione, stateOf(condizione.deviceId)?.[condizione.code]);
+    if (perOrario && (condizione.kind === 'days' || condizione.kind === 'hours')) return true;
     if (!adesso) return false;
 
     if (condizione.kind === 'days') return !condizione.days.length || condizione.days.includes(adesso.day);

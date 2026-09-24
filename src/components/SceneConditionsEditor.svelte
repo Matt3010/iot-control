@@ -1,7 +1,7 @@
 <script lang="ts">
   import { chiediProva } from '../lib/chiedi';
-  import { devices, type Scene, type SceneCondition, type SceneTrigger } from '../lib/devices.svelte';
-  import { fraseCondizione, fraseDiProva } from '../lib/prove';
+  import { devices, type Scene, type SceneCondition } from '../lib/devices.svelte';
+  import { fraseCondizione } from '../lib/prove';
   import { dopoGiorni, oraIn } from '../lib/fuso';
   import { auth } from '../lib/auth.svelte';
   import { GIORNI } from '../lib/timing';
@@ -12,12 +12,10 @@
   import TimeField from './TimeField.svelte';
 
   /**
-   * Quando una scena parte da sola per una cosa di casa, e a quali condizioni.
+   * Il terzo passo di una scena: a quali condizioni parte da sola.
    *
-   * L'orario sta sopra, nella scheda, dove c'era. Qui ci sono le altre due
-   * metà: quello che la fa partire quando un dispositivo cambia — ne basta
-   * uno — e quello che deve essere vero perché parta — tutto. Le condizioni
-   * valgono solo per le partenze automatiche: premuta a mano, una scena
+   * Devono valere tutte, nel momento in cui qualcosa la farebbe partire.
+   * Valgono solo per le partenze automatiche: premuta a mano, una scena
    * parte sempre, perché chi la preme la vuole adesso.
    */
   let { scene }: { scene: Scene } = $props();
@@ -27,18 +25,7 @@
   /** Se parte da sola in qualche modo: senza, le condizioni non hanno a cosa servire. */
   const automatica = $derived(!!(scene.when && !scene.when.off) || triggers.length > 0);
 
-  const salvaTrigger = (lista: SceneTrigger[]) => void devices.patchScene(scene, { triggers: lista });
   const salvaCondizioni = (lista: SceneCondition[]) => void devices.patchScene(scene, { only: lista });
-
-  function aggiungiTrigger(event: MouseEvent): void {
-    chiediProva(
-      event.currentTarget as HTMLElement,
-      'quando',
-      (prova) => salvaTrigger([...triggers, prova]),
-      (deviceId, scelta) =>
-        triggers.some((t) => t.deviceId === deviceId && t.op === 'is' && `${t.code}:=${t.value}` === scelta),
-    );
-  }
 
   function aggiungiDispositivo(event: MouseEvent): void {
     chiediProva(event.currentTarget as HTMLElement, 'se', (prova) =>
@@ -61,32 +48,23 @@
     if (dopo.length) cambia(at, { kind: 'days', days: dopo });
   }
 
+  /*
+   * Giorni e ore valgono solo per le partenze da un dispositivo: l'orario ha
+   * già i suoi giorni e il suo minuto, e offrirli anche qui era chiedere due
+   * volte la stessa cosa, con il rischio di una fascia che non lo contiene.
+   */
+  const daDispositivo = $derived(triggers.length > 0);
   const haGiorni = $derived(only.some((one) => one.kind === 'days'));
   const haOre = $derived(only.some((one) => one.kind === 'hours'));
   const haDate = $derived(only.some((one) => one.kind === 'dates'));
 </script>
 
-<!-- le cose di casa che la fanno partire, sotto l'orario -->
-{#each triggers as trigger, at (trigger.id ?? at)}
-  <div class="riga">
-    <Icon name="bell" />
-    <span class="testo">{fraseDiProva(devices.list, trigger, 'quando')}</span>
-    <Button look="icon" size="sm" title="Togli" onclick={() => salvaTrigger(triggers.filter((_one, index) => index !== at))}>
-      <Icon name="close" />
-    </Button>
-  </div>
-{/each}
-
-{#if devices.list.length}
-  <div class="aggiungi">
-    <Chip label="Quando un dispositivo cambia" size="sm" look="off" extra="pick-btn" onclick={aggiungiTrigger} />
-  </div>
-{/if}
-
 {#if automatica}
   <div class="parte">
-    <span class="eyebrow">Solo se</span>
-    <span class="nota">Valgono quando parte da sola. Premuta a mano parte sempre.</span>
+    <span class="nota">
+      Valgono quando parte da sola. Premuta a mano parte sempre.{#if daDispositivo && scene.when && !scene.when.off}
+        Giorni e ore valgono per i dispositivi, perché l’orario ha già i suoi.{/if}
+    </span>
   </div>
 
   {#each only as condizione, at (condizione.id ?? at)}
@@ -126,10 +104,14 @@
     {#if devices.list.length}
       <Chip label="Un dispositivo" size="sm" look="off" extra="pick-btn" onclick={aggiungiDispositivo} />
     {/if}
-    {#if !haGiorni}<Chip label="Certi giorni" size="sm" look="off" onclick={aggiungiGiorni} />{/if}
-    {#if !haOre}<Chip label="Una fascia oraria" size="sm" look="off" onclick={aggiungiOre} />{/if}
+    {#if daDispositivo && !haGiorni}<Chip label="Certi giorni" size="sm" look="off" onclick={aggiungiGiorni} />{/if}
+    {#if daDispositivo && !haOre}<Chip label="Una fascia oraria" size="sm" look="off" onclick={aggiungiOre} />{/if}
     {#if !haDate}<Chip label="Un periodo" size="sm" look="off" onclick={aggiungiDate} />{/if}
   </div>
+{:else}
+  <p class="nota">
+    Non parte da sola, quindi non ci sono condizioni da mettere. Prima si sceglie quando parte, al passo prima.
+  </p>
 {/if}
 
 <style>
@@ -151,7 +133,7 @@
 
   .aggiungi { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px; }
 
-  .parte { display: grid; gap: 2px; padding-top: 10px; }
+  .parte { display: grid; gap: 2px; }
 
   .nota { font-size: 11px; color: var(--ink-3); }
 </style>

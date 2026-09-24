@@ -18,15 +18,15 @@ import type { Scene } from '../types.js';
 
 const TUTTI = [0, 1, 2, 3, 4, 5, 6];
 
-/** In quali giorni della settimana può partire a orario, contando le condizioni sui giorni. */
+/**
+ * In quali giorni della settimana può partire a orario. Le condizioni sui
+ * giorni non contano: valgono per le partenze da un dispositivo, non per
+ * l'orario, che ha già i suoi.
+ */
 function giorni(scene: Scene): number[] {
   const when = scene.when;
   if (!when || when.off) return [];
-  let quali = when.days.length ? when.days : TUTTI;
-  for (const condizione of scene.only ?? []) {
-    if (condizione.kind === 'days' && condizione.days.length) quali = quali.filter((day) => condizione.days.includes(day));
-  }
-  return quali;
+  return when.days.length ? when.days : TUTTI;
 }
 
 /** Il giorno della settimana di una data scritta come un calendario. */

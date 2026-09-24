@@ -35,7 +35,6 @@
   lead="Più cose che partono insieme, ognuna con la sua azione, così che «sera» chiuda le tende e accenda l'abat-jour. Una scena può toccare dispositivi di agenti diversi."
 >
   {#snippet tools()}<ViewControls vista={vistaScene} label="In che ordine le scene" />{/snippet}
-  {#snippet strip()}<SceneTimeline scenes={devices.scenes} />{/snippet}
 
   {#each vistaScene.applica(devices.scenes) as scene (scene.id)}
     <!-- il riquadro lo disegna gia' il comando della scena, come per gli
@@ -53,6 +52,8 @@
       di agenti diversi.
     </p>
   </PageCard>
+  <!-- le prossime partenze, in un banner fermo in fondo alla pagina -->
+  <SceneTimeline scenes={devices.scenes} />
 </PageShell>
 
 <style>

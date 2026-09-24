@@ -77,7 +77,7 @@ export async function tick(): Promise<void> {
     if (!yes) continue;
 
     // l'ora è quella, ma deve valere anche il resto di quello che hai scritto
-    if (!conditionsHold(scene.only, (id) => hub.stateOf(id), tz)) continue;
+    if (!conditionsHold(scene.only, (id) => hub.stateOf(id), tz, new Date(), true)) continue;
 
     /*
      * Prima il turno, poi il lavoro. Se la scrittura non vince vuol dire che

@@ -10,9 +10,10 @@ import type { Capability } from './types';
  * «quando la temperatura sale sopra 25» nella scheda di una scena e
  * nell'elenco degli avvisi: due copie divergerebbero alla prima correzione.
  *
- * Nessun participio che si accordi con un nome scelto da chi usa l'app: per
- * i valori di stato si scrive «su «acceso»», come su un selettore, invece di
- * «è accesa», che per metà dei nomi avrebbe il genere sbagliato.
+ * Nessun participio che si accordi con un nome scelto da chi usa l'app: lo
+ * stato di un interruttore è la parola da sola, «acceso», come la
+ * scritta su un selettore, e non «è accesa», che per metà dei nomi avrebbe
+ * il genere sbagliato.
  */
 
 /** Quando: una cosa che succede. Se: una cosa che è vera. */
@@ -35,19 +36,31 @@ export function numero(value: string | number, unit?: string): string {
 const valore = (capability: Capability, value: string | number): string =>
   capability.kind === 'switch' ? (String(value) === 'true' ? 'acceso' : 'spento') : String(value);
 
-/** La prova su quella capacità, senza il nome del dispositivo davanti. */
+/**
+ * La prova su quella capacità, senza il nome del dispositivo davanti.
+ *
+ * Un interruttore non porta la sua etichetta: la chiama il dispositivo, e
+ * spesso si chiama proprio «Acceso», che dava «Acceso su «acceso»». Per lui
+ * basta la parola, «si accende» o «acceso», col nome del dispositivo
+ * davanti quando serve.
+ */
 export function fraseProva(capability: Capability, op: Op, value: string | number, modo: Modo): string {
   if (op !== 'is') {
     const soglia = numero(value, unitaDi(capability));
     if (modo === 'quando') return `${capability.label} ${op === 'above' ? 'sale sopra' : 'scende sotto'} ${soglia}`;
     return `${capability.label} ${op === 'above' ? 'sopra' : 'sotto'} ${soglia}`;
   }
-  if (modo === 'quando') {
-    if (capability.kind === 'switch') return `${capability.label} ${String(value) === 'true' ? 'si accende' : 'si spegne'}`;
-    return `${capability.label} diventa «${value}»`;
+  if (capability.kind === 'switch') {
+    const acceso = String(value) === 'true';
+    if (modo === 'quando') return acceso ? 'si accende' : 'si spegne';
+    return valore(capability, value);
   }
-  return `${capability.label} su «${valore(capability, value)}»`;
+  if (modo === 'quando') return `${capability.label} diventa «${value}»`;
+  return `${capability.label} «${valore(capability, value)}»`;
 }
+
+/** La prima lettera grande, per le voci da scegliere: «Si accende». */
+const grande = (testo: string): string => testo.charAt(0).toLocaleUpperCase('it') + testo.slice(1);
 
 /** La stessa frase per una prova già scritta, col nome del dispositivo davanti. */
 export function fraseDiProva(devices: Device[], prova: DeviceTest, modo: Modo): string {
@@ -85,7 +98,7 @@ export function scelteDi(device: Device, modo: Modo): { id: string; label: strin
     const valori = capability.kind === 'switch' ? ['true', 'false'] : capability.kind === 'enum' ? capability.values : [];
     return valori.map((value) => ({
       id: `${capability.code}:=${value}`,
-      label: fraseProva(capability, 'is', value, modo),
+      label: grande(fraseProva(capability, 'is', value, modo)),
     }));
   });
 }
