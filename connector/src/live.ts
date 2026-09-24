@@ -26,6 +26,14 @@ import { flowing, forget, remember, sourceOf } from './go2rtc.js';
  */
 const TOO_MUCH = 1_000_000;
 
+/** Da dove si legge la diretta: il nostro flusso, o quello della centrale. */
+interface Sorgente {
+  url: string;
+  headers?: Record<string, string>;
+  /** Se l'abbiamo aperto noi, e quindi va chiuso quando si smette di guardare. */
+  nostra: boolean;
+}
+
 interface Looking {
   stop: () => void;
 }
@@ -94,13 +102,25 @@ export async function look(
 ): Promise<void> {
   if (eyes.has(session)) return;
 
+  /*
+   * Due strade. Con un indirizzo RTSP — le telecamere di rete di casa — si
+   * apre il flusso da noi, transcodificato: la telecamera parla una lingua
+   * che serve a registrare, e a noi ne serve una che un browser capisca
+   * senza attrezzi, ed è la strada più fluida. Senza — Ring, Nest, Blink e
+   * le altre che stanno solo nel cloud — il flusso lo dà la centrale, che
+   * ne sa fare uno per ogni telecamera di qualunque marca, anche solo
+   * mettendo in fila i fotogrammi. Così la diretta non dipende dalla marca.
+   */
   const raw = await sourceOf(entityId);
-  if (!raw) throw new Error('non si riesce a sapere l’indirizzo di questa telecamera');
-
-  // Transcodificato: la telecamera parla una lingua che serve a registrare, e
-  // a noi ne serve una che un browser capisca senza attrezzi.
   const name = `vivo-${entityId}`;
-  if (!(await remember(name, `ffmpeg:${raw}#video=mjpeg`))) {
+  const sorgente: Sorgente = raw
+    ? { url: flowing(name), nostra: true }
+    : {
+        url: `${config.haUrl}/api/camera_proxy_stream/${encodeURIComponent(entityId)}`,
+        headers: { authorization: `Bearer ${config.haToken}` },
+        nostra: false,
+      };
+  if (raw && !(await remember(name, `ffmpeg:${raw}#video=mjpeg`))) {
     throw new Error('non si riesce ad aprire il flusso della telecamera');
   }
 
@@ -117,7 +137,7 @@ export async function look(
     eyes.delete(session);
     halt.abort();
     if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) socket.close();
-    void forget(name);
+    if (sorgente.nostra) void forget(name);
   };
 
   eyes.set(session, { stop });
@@ -125,7 +145,7 @@ export async function look(
   socket.on('error', stop);
 
   socket.on('open', () => {
-    void pump(name, socket, fps, halt, stop);
+    void pump(name, sorgente, socket, fps, halt, stop);
   });
 }
 
@@ -137,6 +157,7 @@ export function blind(session: string): void {
 /** Il travaso vero: legge di qua, butta quello che è di troppo, manda di là. */
 async function pump(
   name: string,
+  sorgente: Sorgente,
   socket: WebSocket,
   fps: number,
   halt: AbortController,
@@ -146,7 +167,7 @@ async function pump(
   let last = 0;
 
   try {
-    const flow = await fetch(flowing(name), { signal: halt.signal });
+    const flow = await fetch(sorgente.url, { signal: halt.signal, headers: sorgente.headers ?? {} });
     if (!flow.ok || !flow.body) throw new Error(`il flusso dice ${flow.status}`);
 
     const said = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(flow.headers.get('content-type') ?? '');
