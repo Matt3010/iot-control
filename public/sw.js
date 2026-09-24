@@ -62,3 +62,71 @@ self.addEventListener('notificationclick', (event) => {
     }),
   );
 });
+
+/*
+ * Il browser ha rinnovato l'iscrizione, o l'ha lasciata scadere.
+ *
+ * Succede da sé, senza che nessuno apra l'app, e dopo gli avvisi vanno a un
+ * indirizzo che non c'è più. Senza dirlo al server la levetta restava
+ * accesa e non arrivava più niente. Qui si prende l'iscrizione nuova, o se
+ * ne chiede una con la stessa chiave, e si consegna al server togliendo
+ * quella vecchia.
+ */
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    (async () => {
+      const vecchia = event.oldSubscription;
+      let nuova = event.newSubscription;
+      // Senza la nuova la si chiede con la chiave di quella vecchia. Se non c'è
+      // nemmeno quella non si può fare niente da qui, e la levetta lo dirà
+      // spenta la prossima volta che si apre l'app.
+      if (!nuova) {
+        const chiave = vecchia && vecchia.options && vecchia.options.applicationServerKey;
+        if (!chiave) return;
+        nuova = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chiave });
+      }
+
+      const dati = nuova.toJSON();
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: dati.endpoint,
+          p256dh: dati.keys && dati.keys.p256dh,
+          auth: dati.keys && dati.keys.auth,
+          agent: macchina(),
+        }),
+      });
+      if (vecchia && vecchia.endpoint !== dati.endpoint) {
+        await fetch('/api/push/unsubscribe', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ endpoint: vecchia.endpoint }),
+        }).catch(() => undefined);
+      }
+    })(),
+  );
+});
+
+/**
+ * Che macchina è, in due parole, detto come lo dice l'app quando ci si
+ * iscrive da lì (`whichMachine` in `lib/push.svelte.ts`). È una copia
+ * perché qui dentro i moduli dell'app non arrivano, e senza il nome la
+ * macchina nell'elenco resterebbe senza.
+ */
+function macchina() {
+  const ua = self.navigator.userAgent;
+  const sistema = /iPhone|iPad/.test(ua)
+    ? 'iPhone'
+    : /Android/.test(ua)
+      ? 'Android'
+      : /Mac/.test(ua)
+        ? 'Mac'
+        : /Windows/.test(ua)
+          ? 'Windows'
+          : 'Computer';
+  const browser = /CriOS|Chrome/.test(ua) ? 'Chrome' : /Firefox/.test(ua) ? 'Firefox' : 'Safari';
+  return `${sistema} · ${browser}`;
+}

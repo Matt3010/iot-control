@@ -1,6 +1,7 @@
 import { auth } from './auth.svelte';
 import type { Timing } from './devices.svelte';
 import { dopoGiorni, istante, oraIn } from './fuso';
+import type { Choice } from './table';
 
 /**
  * Le parole di un orario che si ripete.
@@ -135,16 +136,43 @@ export function saysLeft(seconds: number): string {
 /**
  * Un'attesa detta a parole.
  *
- * Zero non è un'attesa ed è il caso normale: «insieme» dice quello che
+ * Zero non è un'attesa ed è il caso normale, e «insieme» dice quello che
  * succede, mentre «0 secondi» fa contare a chi legge.
  */
 export function saysWait(seconds: number | undefined): string {
-  if (!seconds) return 'insieme';
-  if (seconds < 60) return `dopo ${seconds}s`;
-  if (seconds % 60 === 0 && seconds < 3600) {
-    const minuti = seconds / 60;
-    return minuti === 1 ? 'dopo un minuto' : `dopo ${minuti} minuti`;
-  }
-  const ore = Math.round(seconds / 360) / 10;
-  return `dopo ${ore} ore`;
+  const s = Math.round(seconds ?? 0);
+  return s > 0 ? `dopo ${durata(s)}` : 'insieme';
+}
+
+/**
+ * Una durata a parole, per qualunque numero di secondi: «1 ora», «1 ora e
+ * 30 minuti», «1 minuto e 30 secondi».
+ *
+ * Il server può scriverne di attese che nell'elenco non ci sono, perché
+ * somma quelle di due righe quando una scena ne chiama un'altra. Arrotondare
+ * a ore diceva «dopo 0 ore» di un minuto e mezzo e «dopo 1 ore» di un'ora.
+ */
+export function durata(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const ore = Math.floor(s / 3600);
+  const minuti = Math.floor((s % 3600) / 60);
+  const secondi = s % 60;
+  const pezzi = [
+    ore ? `${ore} ${ore === 1 ? 'ora' : 'ore'}` : '',
+    minuti ? `${minuti} ${minuti === 1 ? 'minuto' : 'minuti'}` : '',
+    secondi ? `${secondi} ${secondi === 1 ? 'secondo' : 'secondi'}` : '',
+  ].filter(Boolean);
+  if (pezzi.length < 2) return pezzi[0] ?? '0 secondi';
+  return `${pezzi.slice(0, -1).join(', ')} e ${pezzi.at(-1)}`;
+}
+
+/**
+ * Le attese fra cui scegliere, con dentro anche quella di adesso quando non
+ * è una delle solite: la pastiglia la mostra con la sua frase, e nel
+ * foglietto è segnata come scelta invece di mancare.
+ */
+export function scelteAttesa(adesso = 0): Choice[] {
+  const tutte: number[] = [...ATTESE];
+  if (!tutte.includes(adesso)) tutte.push(adesso);
+  return tutte.sort((a, b) => a - b).map((seconds) => ({ id: String(seconds), label: saysWait(seconds) }));
 }

@@ -195,8 +195,39 @@ class Ui {
 
   /** Il guscio di ogni finestra, per sapere cosa ci sta dentro. */
   #gusci = new WeakMap<ModalRequest, HTMLElement>();
-  /** Da dove è stata aperta ogni finestra, per tornarci col fuoco quando si chiude. */
-  #origini = new WeakMap<ModalRequest, Element>();
+  /**
+   * Da dove è stata aperta ogni finestra, per tornarci col fuoco quando si
+   * chiude. Il tasto e tutto quello che gli sta intorno, fino in cima,
+   * presi quando si apre: se alla chiusura il tasto non c'è più — il fumetto
+   * di un segno sulla mappa si chiude mentre modifichi il luogo — si torna al
+   * più vicino fra quelli rimasti, invece di perdere il fuoco in fondo alla
+   * pagina.
+   */
+  #origini = new WeakMap<ModalRequest, Element[]>();
+
+  /**
+   * Quello che si è aperto sopra a tutto il resto e si chiude con Esc: un
+   * elenco da cui scegliere, un menu, un foglietto. L'ultimo della fila è
+   * quello davanti.
+   *
+   * Lo tiene chi lo apre, con uno stato suo, e qui si fa conoscere con
+   * `sopra()`. Senza, un Esc con l'elenco dell'attesa aperto passava
+   * dritto alla finestra sotto e chiudeva tutta la scena, perché qui non si
+   * sapeva che l'elenco c'era.
+   */
+  #sopra: (() => void)[] = [];
+
+  /**
+   * Si dice che qualcosa si è aperto sopra, con il modo di chiuderlo. Torna
+   * la funzione da chiamare quando si chiude per conto suo.
+   */
+  sopra(chiudi: () => void): () => void {
+    this.#sopra.push(chiudi);
+    return () => {
+      const at = this.#sopra.lastIndexOf(chiudi);
+      if (at >= 0) this.#sopra.splice(at, 1);
+    };
+  }
 
   /** Lo dice il guscio quando si disegna: `Modal.svelte`. */
   registra(request: ModalRequest, guscio: HTMLElement): void {
@@ -256,7 +287,9 @@ class Ui {
     const finestra = this.#place;
     this.#place = null;
     // solo lei: se sopra c'è categorie e gruppi, quella resta dov'è
-    if (finestra) this.modals = this.modals.filter((one) => one !== finestra);
+    if (!finestra) return;
+    this.modals = this.modals.filter((one) => one !== finestra);
+    this.#rendiIlFuoco(finestra);
   }
 
   /** Quale delle due finestre è davanti, per chi deve saperlo. */
@@ -372,7 +405,7 @@ class Ui {
      */
     const origine = daDove();
     const sopra = request.sopra ?? (!!origine && !!this.guscioDavanti?.contains(origine));
-    if (origine) this.#origini.set(request, origine);
+    if (origine) this.#origini.set(request, risalendo(origine));
 
     // un foglietto aperto resta attaccato a quello che adesso finisce coperto
     this.#chiudiFoglietti(() => true);
@@ -415,13 +448,16 @@ class Ui {
    * ricominciava da capo.
    */
   #rendiIlFuoco(chiusa: ModalRequest): void {
-    const origine = this.#origini.get(chiusa);
+    const strada = this.#origini.get(chiusa) ?? [];
     const davanti = this.modal;
     void tick().then(() => {
       // nel frattempo se n'è aperta un'altra: il fuoco è suo
       if (this.modal !== davanti) return;
       const guscio = davanti ? this.#gusci.get(davanti) : undefined;
-      const torna = origine?.isConnected && (!guscio || guscio.contains(origine)) ? origine : guscio;
+      const vicino = strada.find(
+        (one) => one.isConnected && focalizzabile(one) && (!guscio || guscio.contains(one)),
+      );
+      const torna = vicino ?? guscio;
       if (torna instanceof HTMLElement) torna.focus({ preventScroll: true });
     });
   }
@@ -434,9 +470,18 @@ class Ui {
     if (this.color && via(this.color.anchor)) this.color = null;
   }
 
-  /** Tutte, per chi cambia pagina: sopra a un'altra schermata non c'entrano più. */
+  /**
+   * Tutto, per chi cambia pagina: sopra a un'altra schermata non c'entra più
+   * niente. Anche i foglietti e gli elenchi, che non stanno dentro a nessuna
+   * finestra: una conferma rimasta aperta dopo il tasto indietro aveva
+   * ancora il suo «Elimina», e premuto eliminava una cosa della pagina di
+   * prima.
+   */
   closeAll(): void {
-    this.closeModal(this.modals[0]);
+    this.#chiudiFoglietti(() => true);
+    for (const chiudi of this.#sopra.splice(0).reverse()) chiudi();
+    this.paletteOpen = false;
+    if (this.modals.length) this.closeModal(this.modals[0]);
   }
 
   /** Questo browser e basta: su quale linguetta eri. */
@@ -456,6 +501,9 @@ class Ui {
      * di categorie e gruppi — quella sotto — e il selettore spariva insieme
      * a lei, lasciandoti due passi indietro rispetto a dove eri.
      */
+    // prima l'ultimo aperto sopra a tutto, chiunque sia stato ad aprirlo
+    const ultimo = this.#sopra.pop();
+    if (ultimo) return ultimo(), true;
     if (this.sure) return (this.sure = null), true;
     if (this.mark) return (this.mark = null), true;
     if (this.color) return (this.color = null), true;
@@ -508,6 +556,18 @@ function segna(event: Event): void {
 if (typeof window !== 'undefined') {
   window.addEventListener('pointerdown', segna, true);
   window.addEventListener('keydown', segna, true);
+}
+
+/** Un elemento e quelli che lo contengono, dal più vicino al più lontano. */
+function risalendo(from: Element): Element[] {
+  const strada: Element[] = [];
+  for (let one: Element | null = from; one; one = one.parentElement) strada.push(one);
+  return strada;
+}
+
+/** Se il fuoco ci può andare: un tasto, un campo, o chi lo chiede con `tabindex`. */
+function focalizzabile(one: Element): boolean {
+  return one instanceof HTMLElement && one.tabIndex >= 0 && !one.hasAttribute('disabled') && !one.closest('[hidden]');
 }
 
 /** L'ultimo tocco se c'è ancora, se no quello che ha il fuoco. */

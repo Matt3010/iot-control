@@ -136,6 +136,9 @@
 
 {#if auth.checking}
   <!-- un istante di niente: meglio del lampo della porta a chi è già dentro -->
+{:else if route.kind === 'invite'}
+  <!-- un link d'invito si apre da entrati e da non entrati: ci pensa la sua pagina -->
+  <Lazy load={() => import('./components/InvitePage.svelte')} props={{ code: route.code }} />
 {:else if !auth.account}
   <!-- le pagine di servizio, e la porta, si scaricano quando si aprono (Lazy) -->
   <Lazy load={() => import('./components/LoginScreen.svelte')} />

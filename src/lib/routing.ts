@@ -11,7 +11,9 @@ export type Route =
   /** E gli avvisi: cosa farsi dire, e su quali macchine. */
   | { kind: 'alerts' }
   /** Il proprio account: nome, fuso orario, password. */
-  | { kind: 'account' };
+  | { kind: 'account' }
+  /** Un link d'invito a una mappa d'altri: si entra, e poi ci si ritrova dentro. */
+  | { kind: 'invite'; code: string };
 
 /** Nessun router: un percorso, e la pagina che gli corrisponde. */
 export function readRoute(path = window.location.pathname): Route {
@@ -27,6 +29,10 @@ export function readRoute(path = window.location.pathname): Route {
   if (/^\/alerts\/?$/i.test(path)) return { kind: 'alerts' };
 
   if (/^\/account\/?$/i.test(path)) return { kind: 'account' };
+
+  // il codice è quello che è, maiuscole comprese: non si tocca
+  const invito = /^\/invito\/([A-Za-z0-9_-]+)\/?$/.exec(path);
+  if (invito) return { kind: 'invite', code: invito[1]! };
 
   return { kind: 'app' };
 }
@@ -56,6 +62,7 @@ export function canonical(path: string): string {
   if (route.kind === 'scenes') return SCENES_PATH;
   if (route.kind === 'alerts') return ALERTS_PATH;
   if (route.kind === 'account') return ACCOUNT_PATH;
+  if (route.kind === 'invite') return `/invito/${route.code}`;
   return path;
 }
 

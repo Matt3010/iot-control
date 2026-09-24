@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { auth } from '../lib/auth.svelte';
   import { devices, type Agent } from '../lib/devices.svelte';
   import { store } from '../lib/store.svelte';
   import { AGENTS_PATH } from '../lib/routing';
@@ -77,14 +78,17 @@
   smettere di funzionare qualcosa finché non rimedi.
 -->
 {#snippet controls(agent: Agent, attached: boolean)}
-  <Button
-    look="icon"
-    title="Rigenera il token"
-    onclick={(event: MouseEvent) =>
-      chiediRigenera(event.currentTarget as HTMLElement, () => void installa.rotate(agent))}
-  >
-    <Icon name="refresh" />
-  </Button>
+  <!-- il token e l'agente stesso sono di chi possiede l'indice: da ospite si stacca e basta -->
+  {#if auth.canAdmin}
+    <Button
+      look="icon"
+      title="Rigenera il token"
+      onclick={(event: MouseEvent) =>
+        chiediRigenera(event.currentTarget as HTMLElement, () => void installa.rotate(agent))}
+    >
+      <Icon name="refresh" />
+    </Button>
+  {/if}
 
   {#if attached}
     <Button
@@ -97,16 +101,18 @@
     </Button>
   {/if}
 
-  <Button
-    look="icon"
-    tone="danger"
-    extra="kill"
-    title="Elimina agente"
-    onclick={(event: MouseEvent) =>
-      chiediElimina(event.currentTarget as HTMLElement, agent, () => remove(agent))}
-  >
-    <Icon name="trash" />
-  </Button>
+  {#if auth.canAdmin}
+    <Button
+      look="icon"
+      tone="danger"
+      extra="kill"
+      title="Elimina agente"
+      onclick={(event: MouseEvent) =>
+        chiediElimina(event.currentTarget as HTMLElement, agent, () => remove(agent))}
+    >
+      <Icon name="trash" />
+    </Button>
+  {/if}
 {/snippet}
 
 
@@ -169,16 +175,18 @@
           >
             {agent.name}
           </button>
-          <button
-            type="button"
-            class="drop kill"
-            title="Elimina agente"
-            aria-label={`Elimina ${agent.name}`}
-            onclick={(event: MouseEvent) =>
-              chiediElimina(event.currentTarget as HTMLElement, agent, () => void devices.removeAgent(agent))}
-          >
-            <Icon name="close" />
-          </button>
+          {#if auth.canAdmin}
+            <button
+              type="button"
+              class="drop kill"
+              title="Elimina agente"
+              aria-label={`Elimina ${agent.name}`}
+              onclick={(event: MouseEvent) =>
+                chiediElimina(event.currentTarget as HTMLElement, agent, () => void devices.removeAgent(agent))}
+            >
+              <Icon name="close" />
+            </button>
+          {/if}
         </span>
       {/each}
     </div>
@@ -186,27 +194,30 @@
 
   <!-- crearne uno: è l'unica cosa in schermo quando non c'è niente, ed è un
        link quando c'è già qualcosa da guardare -->
-  {#if creating || (!mine.length && !free.length)}
-    <AddRow
-      placeholder="Nome agente — es. Padova"
-      title="Crea agente"
-      bind:value={newName}
-      onadd={create}
-    />
-  {:else}
-    <div class="acts">
-      <Button look="link" onclick={() => (creating = true)}>
-        {mine.length ? 'Aggiungi un altro agente' : 'Creane uno nuovo'}
-      </Button>
-    </div>
-  {/if}
+  <!-- crearne uno lo fa chi possiede l'indice: da ospite non c'è né il campo né il link -->
+  {#if auth.canAdmin}
+    {#if creating || (!mine.length && !free.length)}
+      <AddRow
+        placeholder="Nome agente — es. Padova"
+        title="Crea agente"
+        bind:value={newName}
+        onadd={create}
+      />
+    {:else}
+      <div class="acts">
+        <Button look="link" onclick={() => (creating = true)}>
+          {mine.length ? 'Aggiungi un altro agente' : 'Creane uno nuovo'}
+        </Button>
+      </div>
+    {/if}
 
-  {#if !mine.length}
-    <p class="hint">
-      Un agente è il servizio che installi su una macchina in quel luogo. Trova i dispositivi
-      sulla rete e si collega qui da solo. Appena creato si attacca a questo luogo, e ti diamo il
-      comando da lanciare là sopra. Ne servono due quando le reti sono separate.
-    </p>
+    {#if !mine.length}
+      <p class="hint">
+        Un agente è il servizio che installi su una macchina in quel luogo. Trova i dispositivi
+        sulla rete e si collega qui da solo. Appena creato si attacca a questo luogo, e ti diamo il
+        comando da lanciare là sopra. Ne servono due quando le reti sono separate.
+      </p>
+    {/if}
   {/if}
 </div>
 

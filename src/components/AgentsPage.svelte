@@ -1,5 +1,6 @@
 <script lang="ts">
   import StaleNote from './StaleNote.svelte';
+  import { auth } from '../lib/auth.svelte';
   import { devices, type Agent } from '../lib/devices.svelte';
   import { agentPath } from '../lib/routing';
   import { store } from '../lib/store.svelte';
@@ -90,7 +91,8 @@
               onclick={(event: MouseEvent) =>
                 ui.askPick(event.currentTarget as HTMLElement, {
                   title: 'Su quale luogo?',
-                  options: store.places.map((place) => ({
+                  // da ospite, solo i luoghi che puoi toccare: gli altri il server li rifiuta
+                  options: store.places.filter((place) => auth.canTouch(place.id)).map((place) => ({
                     id: place.id,
                     label: place.name,
                     note: (place.agentIds ?? []).length ? 'ha già un agente' : undefined,
@@ -101,24 +103,27 @@
               <Icon name="pin" />
             </Button>
           {/if}
-          <Button
-            look="icon"
-            title="Rigenera il token"
-            onclick={(event: MouseEvent) =>
-              chiediRigenera(event.currentTarget as HTMLElement, () => void installa.rotate(agent))}
-          >
-            <Icon name="refresh" />
-          </Button>
-          <Button
-            look="icon"
-            tone="danger"
-            extra="kill"
-            title="Elimina agente"
-            onclick={(event: MouseEvent) =>
-              chiediElimina(event.currentTarget as HTMLElement, agent, () => void devices.removeAgent(agent))}
-          >
-            <Icon name="trash" />
-          </Button>
+          <!-- il token e l'agente stesso sono di chi possiede l'indice -->
+          {#if auth.canAdmin}
+            <Button
+              look="icon"
+              title="Rigenera il token"
+              onclick={(event: MouseEvent) =>
+                chiediRigenera(event.currentTarget as HTMLElement, () => void installa.rotate(agent))}
+            >
+              <Icon name="refresh" />
+            </Button>
+            <Button
+              look="icon"
+              tone="danger"
+              extra="kill"
+              title="Elimina agente"
+              onclick={(event: MouseEvent) =>
+                chiediElimina(event.currentTarget as HTMLElement, agent, () => void devices.removeAgent(agent))}
+            >
+              <Icon name="trash" />
+            </Button>
+          {/if}
         {/snippet}
 
         {#snippet foot()}
@@ -142,6 +147,8 @@
     </PageCard>
   {/each}
 
+  <!-- un agente nuovo lo installa chi possiede l'indice: da ospite il riquadro non c'è -->
+  {#if auth.canAdmin}
   <PageCard dashed>
     <span class="eyebrow">Un altro agente</span>
     <AddRow
@@ -155,6 +162,7 @@
       dalla sua scheda.
     </p>
   </PageCard>
+  {/if}
 </PageShell>
 
 <style>

@@ -1,7 +1,9 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { alerts, type Notice } from '../lib/alerts.svelte';
+  import { auth } from '../lib/auth.svelte';
   import { devices } from '../lib/devices.svelte';
+  import { quandoEra } from '../lib/fuso';
   import Pager from './Pager.svelte';
   import type { Column } from '../lib/table';
   import Table from './Table.svelte';
@@ -58,6 +60,7 @@
   function chi(row: Notice): { tipo: string; nome: string }[] {
     const nome = row.who ?? '—';
     if (row.kind === 'scene') return [{ tipo: 'Scena', nome }];
+    if (row.kind === 'map') return [{ tipo: 'Mappa', nome }];
     const agente = devices.agents.find((agent) => agent.id === row.agentId)?.name;
     // un account è di un agente, e senza l'agente non si sa quale casa ha perso l'accesso
     if (row.kind === 'account') return [...(agente ? [{ tipo: 'Agente', nome: agente }] : []), { tipo: 'Account', nome }];
@@ -67,20 +70,6 @@
       ...(agente ? [{ tipo: 'Agente', nome: agente }] : []),
       { tipo: 'Dispositivo', nome },
     ];
-  }
-
-  /** Che ora era. Oggi basta l'ora; prima serve dire anche il giorno. */
-  function when(at: string): string {
-    const then = new Date(at);
-    const ore = then.toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit' });
-    const oggi = new Date().toDateString() === then.toDateString();
-    if (oggi) return ore;
-
-    const ieri = new Date();
-    ieri.setDate(ieri.getDate() - 1);
-    if (ieri.toDateString() === then.toDateString()) return `ieri ${ore}`;
-
-    return `${then.toLocaleDateString('it', { day: 'numeric', month: 'short' })}, ${ore}`;
   }
 
   /**
@@ -113,7 +102,7 @@
     <Table columns={COLONNE} rows={alerts.rows} vista={alerts.vista} label="Gli avvisi avvenuti">
       {#snippet row(one: Notice)}
         {@const esito = delivery(one)}
-        <td class="quando fit">{when(one.at)}</td>
+        <td class="quando fit">{quandoEra(one.at, auth.tz)}</td>
         <td class="chi fit">
           <!-- il pallino, come sui luoghi e sugli agenti: giallo quando c'e'
                qualcosa che non va, verde quando e' rientrato -->

@@ -233,8 +233,13 @@
       }
       // Il popup si lega una volta sola: il contenuto lo fa la funzione, ogni
       // volta che si apre. Rilegarlo a ogni giro butterebbe via quello aperto.
+      // Il luogo lo cerca per chiave quando si apre, e non tiene quello di
+      // adesso: una rilettura mette nell'elenco oggetti nuovi, e il fumetto
+      // mostrava il nome di prima, e «Modifica» e «Salva» lo riscrivevano.
       if (!marker.getPopup()) {
-        marker.bindPopup(() => popupFor(place), {
+        const key = place.key;
+        const primo = place;
+        marker.bindPopup(() => popupFor(store.places.find((one) => one.key === key) ?? primo), {
           closeButton: false,
           offset: [0, 2],
           key: place.key,

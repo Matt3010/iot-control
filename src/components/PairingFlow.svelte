@@ -173,6 +173,9 @@
   });
 
   async function go(action: 'start' | 'submit', input: Record<string, string | boolean> = {}) {
+    // una battuta alla volta: due Invio di fila mandavano due risposte sulla
+    // stessa conversazione, e la seconda arrivava a un passo che non c'era più
+    if (busy) return;
     busy = true;
     // Prima di partire si mette da parte quello che c'è scritto adesso: se si
     // torna a chiedere le stesse cose — un errore, una conversazione scaduta,
@@ -257,7 +260,11 @@
     return out;
   }
 
-  const submit = () => go('submit', cleaned());
+  /** Si manda solo un modulo pronto, da qualunque parte arrivi, perché Invio deve valere quanto il tasto, che fino ad allora è spento. */
+  const submit = () => {
+    if (busy || !ready) return;
+    void go('submit', cleaned());
+  };
 
   /**
    * Se c'è abbastanza per mandare qualcosa.

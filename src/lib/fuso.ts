@@ -67,3 +67,32 @@ export function dopoGiorni(date: string, quanti: number): string {
   const d = new Date(Date.UTC(anno, mese - 1, giorno + quanti));
   return d.toISOString().slice(0, 10);
 }
+
+/** L'ora di un istante in quel fuso, «18:05» o, con i secondi, «18:05:12». */
+export function oreIn(tz: string, at: Date, secondi = false): string {
+  return at.toLocaleTimeString('it', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(secondi ? { second: '2-digit' as const } : {}),
+  });
+}
+
+/**
+ * Che ora era, letta in un elenco di cose successe: oggi basta l'ora, ieri
+ * si dice «ieri», prima serve anche il giorno.
+ *
+ * Nel fuso dell'account e non in quello del browser: «si ferma alle 23:05»
+ * deve voler dire le 23:05 di casa anche per chi lo legge in viaggio,
+ * perché è l'ora a cui partono le scene. Erano due copie nei due elenchi
+ * che la mostrano, ognuna con il fuso del browser.
+ */
+export function quandoEra(iso: string, tz: string, now = new Date()): string {
+  const then = new Date(iso);
+  const ore = oreIn(tz, then);
+  const giorno = oraIn(tz, then).date;
+  const oggi = oraIn(tz, now).date;
+  if (giorno === oggi) return ore;
+  if (giorno === dopoGiorni(oggi, -1)) return `ieri ${ore}`;
+  return `${then.toLocaleDateString('it', { day: 'numeric', month: 'short', timeZone: tz })}, ${ore}`;
+}

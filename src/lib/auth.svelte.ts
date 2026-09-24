@@ -66,6 +66,19 @@ class Auth {
   }
 
   /**
+   * E gli agenti, posso amministrarli?
+   *
+   * Solo a casa mia: crearli, rinominarli, eliminarli, rigenerarne il token,
+   * collegarci un account, togliere un dispositivo sparito. Da ospite si
+   * accendono le luci degli agenti dei luoghi aperti a me, e ci si scrivono
+   * scene e avvisi, ma la casa resta di chi la possiede: il server lo
+   * rifiuta, e un tasto che porta a un no non si mostra.
+   */
+  get canAdmin(): boolean {
+    return !this.account?.actingAs;
+  }
+
+  /**
    * E un luogo nuovo?
    *
    * A casa mia sì, e da ospite solo se mi hanno aperto la mappa intera: chi
@@ -164,6 +177,16 @@ class Auth {
    */
   async goInto(handle: string): Promise<void> {
     await api.post('/auth/act', { handle });
+    window.location.assign('/');
+  }
+
+  /**
+   * Accettare un link d'invito: si diventa editor di quella mappa e ci si
+   * entra. Come per `goInto`, dopo si ricarica da capo, dentro all'indice
+   * di chi ha mandato il link.
+   */
+  async acceptInvite(code: string): Promise<void> {
+    await api.post(`/invites/${code}`, {});
     window.location.assign('/');
   }
 

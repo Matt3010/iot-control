@@ -51,6 +51,12 @@
     if (creating) field?.focus();
   });
 
+  // aperto, si chiude con Esc come ogni cosa che sta sopra (`ui.sopra`)
+  $effect(() => {
+    if (!open) return;
+    return ui.sopra(() => (open = false));
+  });
+
   async function create(name: string) {
     try {
       const created = await store.createMap(name);

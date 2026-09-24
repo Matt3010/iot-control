@@ -20,16 +20,39 @@ import type { Category, Group, Place, PlaceMap } from './types';
  */
 export type LiveEvent = Evento<{ place: Place; map: PlaceMap; category: Category; group: Group; scene: Scene }>;
 
+/**
+ * Quanto si aspetta prima di riaprire il filo che il browser ha lasciato
+ * cadere: due secondi, poi il doppio a ogni tentativo andato a vuoto, fino
+ * a mezzo minuto.
+ */
+const RIAPRI_MS = 2000;
+const RIAPRI_MAX_MS = 30_000;
+
 class Live {
   #stream: EventSource | null = null;
+  /** Se qualcuno ha chiesto il filo e non l'ha ancora lasciato. */
+  #voluto = false;
+  /** Se il filo si è già aperto almeno una volta da quando è stato chiesto. */
+  #aperto = false;
+  #attesa = 0;
+  #riapri: ReturnType<typeof setTimeout> | null = null;
 
   /**
-   * `EventSource` si riconnette da sé quando la rete torna. Quello che si è
-   * perso nel frattempo non si recupera messaggio per messaggio: si rilegge
-   * tutto, che è più corto e più vero.
+   * `EventSource` si riconnette da sé quando la rete cade, ma non quando
+   * dall'altra parte risponde qualcuno che non è il server: dietro a un
+   * proxy, con il server che riparte, arriva un 502, e lì il browser chiude
+   * il filo per sempre senza dirlo a nessuno. La scheda restava ferma a
+   * quel momento finché non la ricaricavi. Allora lo si riapre da qui.
    */
   start(): void {
-    if (this.#stream) return;
+    if (this.#voluto) return;
+    this.#voluto = true;
+    this.#aperto = false;
+    this.#attesa = 0;
+    this.#apri();
+  }
+
+  #apri(): void {
     const stream = new EventSource('/api/state/stream');
     this.#stream = stream;
 
@@ -41,21 +64,52 @@ class Live {
       }
     };
 
-    // Alla prima apertura non si rilegge niente: chi si collega ha appena
-    // caricato. Da lì in poi ogni ritorno è un buco da colmare.
-    let first = true;
+    // Alla prima apertura non si rilegge niente, perché chi si collega ha
+    // appena caricato. Da lì in poi ogni ritorno è un buco da colmare.
     stream.onopen = () => {
-      if (!first) {
-        void store.load();
-        void devices.load();
-      }
-      first = false;
+      this.#attesa = 0;
+      if (this.#aperto) this.#rileggi();
+      this.#aperto = true;
+    };
+
+    // mentre si riconnette da sé lo si lascia fare, e si interviene solo
+    // quando ha smesso di provarci
+    stream.onerror = () => {
+      if (this.#stream !== stream || stream.readyState !== EventSource.CLOSED) return;
+      stream.close();
+      this.#stream = null;
+      this.#attesa = Math.min(this.#attesa ? this.#attesa * 2 : RIAPRI_MS, RIAPRI_MAX_MS);
+      this.#riapri = setTimeout(() => {
+        this.#riapri = null;
+        if (this.#voluto) this.#apri();
+      }, this.#attesa);
     };
   }
 
   stop(): void {
+    this.#voluto = false;
+    if (this.#riapri) clearTimeout(this.#riapri);
+    this.#riapri = null;
     this.#stream?.close();
     this.#stream = null;
+  }
+
+  /**
+   * Quello che può essere cambiato mentre il filo era giù, riletto intero:
+   * i luoghi e le mappe, i dispositivi e le scene, le regole degli avvisi,
+   * l'account, gli account collegati agli agenti, gli avvisi e i registri
+   * aperti. Messaggio per messaggio non si recupera niente, e rileggere è
+   * più corto e più vero.
+   */
+  #rileggi(): void {
+    void store.load().catch(() => undefined);
+    void devices.load().then(() => {
+      for (const agent of devices.agents) devices.accountsCambiati(agent.id);
+      devices.rileggiRegistri();
+    });
+    void devices.loadRules().catch(() => undefined);
+    void auth.refresh();
+    void alerts.seen();
   }
 
   /**

@@ -1,11 +1,19 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { auth } from '../lib/auth.svelte';
   import Alert from './Alert.svelte';
   import Icon from './Icon.svelte';
-  import MapBackdrop from './MapBackdrop.svelte';
+  import Gate from './Gate.svelte';
   import Stop from './Stop.svelte';
   import TextField from './TextField.svelte';
   import Button from './Button.svelte';
+
+  /**
+   * Chi arriva da un link d'invito: la porta è la stessa, ma prima di
+   * chiedere chi sei dice perché sei qui. Di solito non ha ancora un
+   * accesso, e allora si parte dal crearlo.
+   */
+  let { invito }: { invito?: { mapName: string; ownerHandle: string } } = $props();
 
   let email = $state('');
   let password = $state('');
@@ -17,7 +25,8 @@
   let error = $state('');
   let working = $state(false);
   /** Chi arriva per primo crea; gli altri entrano, o creano se è permesso. */
-  let wantsAccount = $state(false);
+  // chi arriva da un invito di solito un accesso non ce l'ha ancora
+  let wantsAccount = $state(untrack(() => !!invito) && auth.signupOpen);
   /** Finché non lo tocchi, il nome utente lo proponiamo noi dall'email. */
   let chosen = $state(false);
 
@@ -61,40 +70,67 @@
   }
 </script>
 
-<div class="gate">
-  <MapBackdrop />
+{#snippet lead()}
+  {#if invito}
+    <b>@{invito.ownerHandle}</b> ti apre la mappa «{invito.mapName}».
+    {creating ? 'Crea il tuo accesso, e ci sei dentro.' : 'Entra con il tuo accesso, e ci sei dentro.'}
+  {:else if creating}
+    Un nome, un'email e una password di almeno otto caratteri.
+  {/if}
+{/snippet}
 
-  <form class="route surface" onsubmit={submit}>
-    <header class="route-head">
-      <span class="wordmark"><Icon name="pin" /> Place Index</span>
-      <h1>{creating ? 'Crea il tuo accesso' : 'Bentornato'}</h1>
-      {#if creating}
-        <p>Un nome, un'email e una password di almeno otto caratteri.</p>
-      {/if}
-    </header>
+<Gate
+  title={invito ? 'Ti hanno invitato su una mappa' : creating ? 'Crea il tuo accesso' : 'Bentornato'}
+  lead={invito || creating ? lead : undefined}
+  onsubmit={submit}
+>
+  <div class="stops">
+    <Stop icon="mail" color="#2f6fed" label="Email">
+      <TextField
+        kind="email"
+        name="email"
+        autocomplete="username"
+        placeholder="tu@esempio.it"
+        required
+        bind:value={email}
+      />
+    </Stop>
 
-    <div class="stops">
-      <Stop icon="mail" color="#2f6fed" label="Email">
+    <Stop icon="lock" color="#6a4c93" label="Password">
+      <span class="peek">
         <TextField
-          kind="email"
-          name="email"
-          autocomplete="username"
-          placeholder="tu@esempio.it"
+          kind={mostra ? 'text' : 'password'}
+          name="password"
+          autocomplete={creating ? 'new-password' : 'current-password'}
+          placeholder={creating ? 'Almeno 8 caratteri' : '••••••••'}
           required
-          bind:value={email}
+          minlength={creating ? 8 : undefined}
+          bind:value={password}
         />
-      </Stop>
+        <button
+          type="button"
+          class="peek-btn"
+          title={mostra ? 'Nascondi' : 'Mostra'}
+          aria-label={mostra ? 'Nascondi la password' : 'Mostra la password'}
+          aria-pressed={mostra}
+          onclick={() => (mostra = !mostra)}
+        >
+          <Icon name={mostra ? 'eyeOff' : 'eye'} />
+        </button>
+      </span>
+    </Stop>
 
-      <Stop icon="lock" color="#6a4c93" label="Password">
+    {#if creating}
+      <Stop icon="check" color="#6a4c93" label="Conferma password">
         <span class="peek">
           <TextField
             kind={mostra ? 'text' : 'password'}
-            name="password"
-            autocomplete={creating ? 'new-password' : 'current-password'}
-            placeholder={creating ? 'Almeno 8 caratteri' : '••••••••'}
+            name="conferma"
+            autocomplete="new-password"
+            placeholder="La stessa di sopra"
             required
-            minlength={creating ? 8 : undefined}
-            bind:value={password}
+            minlength={8}
+            bind:value={conferma}
           />
           <button
             type="button"
@@ -107,161 +143,79 @@
             <Icon name={mostra ? 'eyeOff' : 'eye'} />
           </button>
         </span>
+        {#if conferma && password !== conferma}
+          <span class="stop-hint stop-no">Non coincide con quella sopra.</span>
+        {/if}
       </Stop>
-
-      {#if creating}
-        <Stop icon="check" color="#6a4c93" label="Conferma password">
-          <span class="peek">
-            <TextField
-              kind={mostra ? 'text' : 'password'}
-              name="conferma"
-              autocomplete="new-password"
-              placeholder="La stessa di sopra"
-              required
-              minlength={8}
-              bind:value={conferma}
-            />
-            <button
-              type="button"
-              class="peek-btn"
-              title={mostra ? 'Nascondi' : 'Mostra'}
-              aria-label={mostra ? 'Nascondi la password' : 'Mostra la password'}
-              aria-pressed={mostra}
-              onclick={() => (mostra = !mostra)}
-            >
-              <Icon name={mostra ? 'eyeOff' : 'eye'} />
-            </button>
-          </span>
-          {#if conferma && password !== conferma}
-            <span class="stop-hint stop-no">Non coincide con quella sopra.</span>
-          {/if}
-        </Stop>
-      {/if}
-
-      {#if creating}
-        <Stop icon="handle" color="#1f7a5c" label="Nome utente">
-          <!-- quello che si scrive diventa subito un nome utente valido: le
-               maiuscole e gli spazi si tolgono mentre si batte, invece di
-               farlo scoprire dopo con un rifiuto -->
-          <TextField
-            name="handle"
-            autocomplete="username"
-            placeholder="nome-utente"
-            required
-            minlength={3}
-            maxlength={20}
-            value={chosenHandle}
-            oninput={(scritto: string) => {
-              chosen = true;
-              handle = toHandle(scritto);
-            }}
-          />
-          <span class="stop-hint">
-            Nell'app ti vedrai scritto così: <b>@{chosenHandle || 'nome-utente'}</b>
-          </span>
-        </Stop>
-      {/if}
-    </div>
-
-    {#if error}
-      <Alert
-        message={error}
-        action={errorLeadsBack
-          ? {
-              label: 'Entra',
-              run: () => {
-                wantsAccount = false;
-                error = '';
-              },
-            }
-          : undefined}
-      />
     {/if}
 
-    <Button look="primary" type="submit" extra="go" disabled={working}>
-      {working ? 'Un attimo…' : creating ? "Crea l'accesso" : 'Entra'}
-      <Icon name="submit" />
-    </Button>
+    {#if creating}
+      <Stop icon="handle" color="#1f7a5c" label="Nome utente">
+        <!-- quello che si scrive diventa subito un nome utente valido: le
+             maiuscole e gli spazi si tolgono mentre si batte, invece di
+             farlo scoprire dopo con un rifiuto -->
+        <TextField
+          name="handle"
+          autocomplete="username"
+          placeholder="nome-utente"
+          required
+          minlength={3}
+          maxlength={20}
+          value={chosenHandle}
+          oninput={(scritto: string) => {
+            chosen = true;
+            handle = toHandle(scritto);
+          }}
+        />
+        <span class="stop-hint">
+          Nell'app ti vedrai scritto così: <b>@{chosenHandle || 'nome-utente'}</b>
+        </span>
+      </Stop>
+    {/if}
+  </div>
 
-    {#if !firstRun && !errorLeadsBack}
-      {#if auth.signupOpen}
-        <p class="route-foot">
-          {creating ? 'Hai già un accesso?' : "Non ce l'hai ancora?"}
-          <button
-            type="button"
-            class="route-switch"
-            onclick={() => {
-              wantsAccount = !wantsAccount;
+  {#if error}
+    <Alert
+      message={error}
+      action={errorLeadsBack
+        ? {
+            label: 'Entra',
+            run: () => {
+              wantsAccount = false;
               error = '';
-            }}
-          >
-            {creating ? 'Entra' : 'Creane uno'}
-          </button>
-        </p>
-      {:else}
-        <p class="route-foot">Le iscrizioni sono chiuse, questo indice ha già i suoi.</p>
-      {/if}
+            },
+          }
+        : undefined}
+    />
+  {/if}
+
+  <Button look="primary" type="submit" extra="go" disabled={working}>
+    {working ? 'Un attimo…' : creating ? "Crea l'accesso" : 'Entra'}
+    <Icon name="submit" />
+  </Button>
+
+  {#if !firstRun && !errorLeadsBack}
+    {#if auth.signupOpen}
+      <p class="route-foot">
+        {creating ? 'Hai già un accesso?' : "Non ce l'hai ancora?"}
+        <button
+          type="button"
+          class="route-switch"
+          onclick={() => {
+            wantsAccount = !wantsAccount;
+            error = '';
+          }}
+        >
+          {creating ? 'Entra' : 'Creane uno'}
+        </button>
+      </p>
+    {:else}
+      <p class="route-foot">Le iscrizioni sono chiuse, questo indice ha già i suoi.</p>
     {/if}
-  </form>
-</div>
+  {/if}
+</Gate>
 
 <style>
-  .gate {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 24px 16px;
-    overflow: hidden;
-  }
-
-  /* la mappa dietro resta un paesaggio: si guarda, non si tocca */
-  .gate::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(120% 90% at 50% 40%, rgb(var(--base) / 0.1), rgb(var(--base) / 0.72));
-    pointer-events: none;
-  }
-
-  .route {
-    position: relative;
-    z-index: 1;
-    width: min(420px, 100%);
-    padding: 22px 22px 20px;
-    display: grid;
-    gap: 18px;
-    animation: rise 0.45s var(--ease);
-  }
-
-  .route-head { display: grid; gap: 6px; }
-
-  .wordmark {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 12.5px;
-    font-weight: 620;
-    letter-spacing: -0.01em;
-    color: var(--ink-3);
-  }
-
-  .wordmark :global(.ico) { width: 15px; height: 15px; }
-
-  h1 {
-    margin: 2px 0 0;
-    font-size: 22px;
-    font-weight: 640;
-    letter-spacing: -0.028em;
-  }
-
-  .route-head p {
-    margin: 0;
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--ink-3);
-  }
-
   /* due tappe di un percorso: il tratteggio le tiene insieme */
   .stops {
     position: relative;
@@ -321,18 +275,6 @@
     border-left: 2px dashed color-mix(in srgb, var(--ink-3) 45%, transparent);
   }
 
-  .route :global(.go) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 12px 18px;
-    font-size: 14.5px;
-  }
-
-  .route :global(.go .ico) { width: 17px; height: 17px; }
-  .route :global(.go:disabled) { opacity: 0.6; }
-
   .route-foot {
     margin: -8px 0 0;
     font-size: 12px;
@@ -351,8 +293,4 @@
     text-underline-offset: 2px;
   }
 
-  @media (max-width: 600px) {
-    .route { padding: 18px; }
-    h1 { font-size: 20px; }
-  }
 </style>

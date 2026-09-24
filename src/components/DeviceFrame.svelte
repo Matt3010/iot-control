@@ -3,6 +3,9 @@
   import Button from './Button.svelte';
   import CameraSheet from './CameraSheet.svelte';
   import Icon from './Icon.svelte';
+  import { untrack } from 'svelte';
+  import { auth } from '../lib/auth.svelte';
+  import { oreIn } from '../lib/fuso';
   import { ui } from '../lib/ui.svelte';
 
   /**
@@ -33,6 +36,17 @@
    */
   const ASPETTA_MS = 12_000;
 
+  /**
+   * Quanto si aspetta prima di richiedere una fotografia che non è arrivata:
+   * si parte da due secondi e si raddoppia fino a mezzo minuto.
+   *
+   * Senza, una telecamera spenta veniva richiesta appena arrivava il
+   * rifiuto, cioè centinaia di volte al secondo per tutto il tempo in cui la
+   * carta restava sullo schermo, e ogni richiesta arrivava fino a casa.
+   */
+  const RIPROVA_MS = 2000;
+  const RIPROVA_MAX_MS = 30_000;
+
   let box = $state<HTMLDivElement | undefined>();
   let shown = $state<HTMLImageElement | undefined>();
   let src = $state('');
@@ -45,6 +59,12 @@
   let lastMs = 0;
   let failing = $state('');
   let loading = $state(false);
+  /** Prima di quando non si richiede, dopo un rifiuto. Zero se l'ultima è arrivata. */
+  let nonPrima = 0;
+  /** L'attesa dopo l'ultimo rifiuto, che raddoppia a ogni rifiuto di fila. */
+  let pausa = 0;
+  /** Cresce quando l'attesa è finita, per far riguardare l'effetto qui sotto. */
+  let sveglia = $state(0);
   /**
    * Due cose diverse, tenute separate apposta: essere sullo schermo e avere
    * la scheda in primo piano. Mescolarle in un flag solo vuol dire che,
@@ -161,6 +181,7 @@
   async function refresh(): Promise<void> {
     if (loading) return;
     loading = true;
+    let arrivata = false;
 
     try {
       const response = await fetch(`/api/devices/${device.id}/frame`, { cache: 'no-store' });
@@ -177,10 +198,14 @@
       failing = '';
       at = new Date();
       lastMs = Date.now();
+      arrivata = true;
     } catch {
       failing = 'L’immagine non è arrivata';
     } finally {
+      pausa = arrivata ? 0 : Math.min(pausa ? pausa * 2 : RIPROVA_MS, RIPROVA_MAX_MS);
+      nonPrima = arrivata ? 0 : Date.now() + pausa;
       loading = false;
+      if (!arrivata) sveglia += 1;
     }
   }
 
@@ -249,12 +274,24 @@
    */
   $effect(() => {
     if (!seen || live) return;
-    if (Date.now() - lastMs >= OGNI_MS) void refresh();
+    void sveglia;
+    /*
+     * Fuori dalla reattività quello che succede dentro: `refresh` legge
+     * `loading` prima della sua prima attesa, e l'effetto che lo leggeva
+     * ripartiva a ogni risposta, anche a quelle andate male.
+     */
+    return untrack(() => {
+      const manca = nonPrima - Date.now();
+      if (manca > 0) {
+        const aspetta = setTimeout(() => (sveglia += 1), manca);
+        return () => clearTimeout(aspetta);
+      }
+      if (Date.now() - lastMs >= OGNI_MS) void refresh();
+    });
   });
 
-  const quando = $derived(
-    at ? at.toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '',
-  );
+  /* l'ora di casa, anche per chi guarda da un altro fuso */
+  const quando = $derived(at ? oreIn(auth.tz, at, true) : '');
 </script>
 
 <div class="cam" bind:this={box} class:is-waiting={loading && !at}>

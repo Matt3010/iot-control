@@ -2,7 +2,7 @@
   import { COLORI } from '../lib/colori';
   import { devices, type Device, type Scene, type SceneStep } from '../lib/devices.svelte';
   import { nomeAzione } from '../lib/azioni';
-  import { ATTESE, saysWait } from '../lib/timing';
+  import { scelteAttesa } from '../lib/timing';
   import type { Capability } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
@@ -178,9 +178,6 @@
     void devices.patchScene(scene, { steps });
   }
 
-  /** L'elenco delle attese, per il foglietto che le fa scegliere. */
-  const attese = ATTESE.map((seconds) => ({ id: String(seconds), label: saysWait(seconds) }));
-
   /** Cosa fa già quel dispositivo in questa scena, capacità per capacità. */
   const already = (deviceId: string | undefined, code: string | undefined) =>
     scene.steps.find((one) => one.deviceId === deviceId && one.code === code)?.value;
@@ -209,7 +206,7 @@
             <PickField
               look="pill"
               value={String(step.after ?? 0)}
-              options={attese}
+              options={scelteAttesa(step.after ?? 0)}
               label="Quando parte questa riga"
               title="Quando parte questa riga?"
               onpick={(scelto: string) => setWait(at, Number(scelto))}

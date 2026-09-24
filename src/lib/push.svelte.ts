@@ -94,7 +94,18 @@ class Push {
 
     this.permission = Notification.permission;
     const reg = await navigator.serviceWorker.getRegistration();
-    this.on = !!(await reg?.pushManager.getSubscription());
+    const sub = await reg?.pushManager.getSubscription();
+    this.on = !!sub;
+
+    /*
+     * Iscritti qui vuol dire poco, se il server non lo sa. Il browser a volte
+     * rinnova l'iscrizione da sé, con un indirizzo nuovo, e il server
+     * continuava a mandare a quello vecchio finché il servizio di consegna non
+     * lo dichiarava morto. La levetta restava accesa e gli avvisi smettevano
+     * di arrivare. Si riconsegna l'indirizzo ogni volta che si guarda, e al
+     * server uno che conosce già non cambia niente.
+     */
+    if (sub && this.permission === 'granted') await this.#tell(sub).catch(() => undefined);
   }
 
   /** Accendere: il permesso, l'iscrizione, e dirlo al server. */

@@ -3,22 +3,37 @@ export type { CatalogEntry, Capability, DeviceValue, Health, LinkedAccount, Pair
 /**
  * Uno che può modificare una mappa, e fin dove.
  *
- * `only` assente vuol dire tutta la mappa — il caso normale. Con un elenco
- * dentro, solo quei luoghi: gli altri li vede e non li tocca.
+ * È un account, entrato aprendo un link d'invito: il nome e l'email sono i
+ * suoi, così chi ha mandato il link sa chi l'ha aperto davvero. `only`
+ * assente vuol dire tutta la mappa, il caso normale. Con un elenco dentro,
+ * solo quei luoghi: gli altri li vede e non li tocca.
  */
 export interface MapEditor {
+  userId: string;
+  handle: string;
   email: string;
   only?: string[];
+  createdAt: string;
+}
+
+/** Un link d'invito ancora da aprire. Il link stesso non c'è: si vede una volta sola, appena creato. */
+export interface MapInvite {
+  id: string;
+  /** A chi è stato mandato, per ricordarselo. Può essere vuoto. */
+  label: string;
+  createdAt: string;
+  expiresAt: string;
 }
 
 export interface PlaceMap {
   id: string;
   name: string;
   /**
-   * Chi può modificarla oltre a te, e con quali regole. Le regole stanno sulla
-   * persona, non su ogni pin: «questi tre a lui, tutti a lei».
+   * Chi può modificarla oltre a te, e i link ancora da aprire. Arrivano solo
+   * a casa tua: da ospite chi altri ci lavora non si vede.
    */
-  editors: MapEditor[];
+  editors?: MapEditor[];
+  invites?: MapInvite[];
   createdAt: string;
 }
 

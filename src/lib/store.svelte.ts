@@ -1,9 +1,9 @@
-import { rimpiazza } from './rimpiazza';
+import { rimpiazza, ritira } from './rimpiazza';
 import { api } from './api';
 import { DEFAULT_MARK, SUGGESTED } from './format';
 import { forgetJSON, readJSON, writeJSON } from './storage';
 import { toast, UNDO_MS } from './toast.svelte';
-import type { Category, Draft, Group, LocalPlace, MapEditor, Place, PlaceMap, Snapshot } from './types';
+import type { Category, Draft, Group, LocalPlace, Place, PlaceMap, Snapshot } from './types';
 
 /** Quello che il filo aperto racconta di cambiato. `null` vuol dire sparito. */
 type LiveChange =
@@ -158,16 +158,38 @@ class Store {
     return created;
   }
 
-  async patchMap(
-    map: PlaceMap,
-    patch: { name?: string; editors?: MapEditor[] },
-  ): Promise<void> {
+  async patchMap(map: PlaceMap, patch: { name?: string }): Promise<void> {
     const before = { ...map };
     Object.assign(map, patch);
     try {
       rimpiazza(map, await api.put<PlaceMap>(`/maps/${map.id}`, { name: map.name, ...patch }));
     } catch (error) {
-      rimpiazza(map, before);
+      ritira(map, patch, before);
+      toast.show((error as Error).message);
+    }
+  }
+
+  /**
+   * Un link d'invito nuovo. Torna il link completo, che il server fa vedere
+   * una volta sola: chi lo perde ne crea un altro.
+   */
+  async invite(map: PlaceMap, label: string): Promise<string> {
+    const { map: dopo, link } = await api.post<{ map: PlaceMap; link: string }>(`/maps/${map.id}/invites`, { label });
+    rimpiazza(map, dopo);
+    return link;
+  }
+
+  /** Chi può modificare una mappa: un invito revocato, un editor ristretto o tolto. Torna la mappa com'è dopo. */
+  async share(map: PlaceMap, cosa: { revoke: string } | { restrict: string; only: string[] | null } | { drop: string }): Promise<void> {
+    try {
+      const dopo =
+        'revoke' in cosa
+          ? await api.delete<PlaceMap>(`/maps/${map.id}/invites/${cosa.revoke}`)
+          : 'restrict' in cosa
+            ? await api.put<PlaceMap>(`/maps/${map.id}/editors/${cosa.restrict}`, { only: cosa.only })
+            : await api.delete<PlaceMap>(`/maps/${map.id}/editors/${cosa.drop}`);
+      rimpiazza(map, dopo);
+    } catch (error) {
       toast.show((error as Error).message);
     }
   }
@@ -450,7 +472,7 @@ class Store {
     try {
       rimpiazza(category, await api.put<Category>(`/categories/${category.id}`, patch));
     } catch (error) {
-      rimpiazza(category, before);
+      ritira(category, patch, before);
       toast.show((error as Error).message);
     }
   }
@@ -496,7 +518,7 @@ class Store {
     try {
       rimpiazza(group, await api.put<Group>(`/groups/${group.id}`, patch));
     } catch (error) {
-      rimpiazza(group, before);
+      ritira(group, patch, before);
       toast.show((error as Error).message);
     }
   }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { auth } from '../lib/auth.svelte';
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
   import type { CatalogEntry } from '../../shared/protocol';
@@ -20,6 +21,9 @@
    * in un posto e collega le cose. Anche gli errori che salgono da laggiù
    * parlano così; il nome vero resta nel registro della macchina, che è dove
    * serve.
+   *
+   * Gli account collegati sono di chi possiede l'indice, con i loro nomi e
+   * le loro email: da ospite qui non si chiede niente e non si mostra niente.
    */
   let { agent }: { agent: Agent } = $props();
 
@@ -81,7 +85,7 @@
   let giro = 0;
 
   $effect(() => {
-    if (!online) return;
+    if (!online || !auth.canAdmin) return;
     void devices.versioniAccount[agentId];
     const mio = ++giro;
     const questo = untrack(() => agent);
@@ -164,5 +168,7 @@
 </script>
 
 <!-- nella scheda una riga sola: cosa è collegato e cosa si può collegare stanno nella finestra -->
-<AccountList {agent} accounts={loro} linked={guasti} busy={stato.busy} altre={cerca} onricollega={ricollega} {riassunto} />
+{#if auth.canAdmin}
+  <AccountList {agent} accounts={loro} linked={guasti} busy={stato.busy} altre={cerca} onricollega={ricollega} {riassunto} />
+{/if}
 

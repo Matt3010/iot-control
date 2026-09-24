@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { auth } from '../lib/auth.svelte';
   import { devices, type Agent, type LogEntry } from '../lib/devices.svelte';
+  import { quandoEra } from '../lib/fuso';
   import Icon from './Icon.svelte';
 
   /**
@@ -15,14 +17,6 @@
 
   const rows = $derived(devices.logs[agent.id] ?? []);
   const chiesto = $derived(agent.id in devices.logs);
-
-  /** Che ora era. Oggi basta l'ora; ieri serve dire che era ieri. */
-  function when(at: string): string {
-    const then = new Date(at);
-    const ore = then.toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit' });
-    const oggi = new Date().toDateString() === then.toDateString();
-    return oggi ? ore : `ieri ${ore}`;
-  }
 
   /**
    * La riga, in italiano. Il soggetto davanti quando c'è — «Tenda 1» — perché
@@ -43,11 +37,22 @@
         ? 'si scollega'
         : (detail ?? '');
 
-  /** Le righe vecchie dicevano solo «6 dispositivi»: il verbo si mette qui. */
-  const conta = (detail: string | undefined, ok: boolean | undefined): string => {
+  /**
+   * La riga di una scena si legge com'è, perché la frase la scrive chi ha contato,
+   * e dice già se è partita, a metà o per niente, oppure perché si è
+   * fermata. «Parte a metà» davanti a tutte quelle andate male diceva il
+   * falso di una scena che si era fermata per un'altra ragione.
+   *
+   * Solo le righe di ieri portavano il conteggio e basta — «6 dispositivi»,
+   * «2 dispositivi su 3» — e a quelle il verbo si mette qui, contando.
+   */
+  const conta = (detail: string | undefined): string => {
     const detto = detail ?? '';
-    if (detto.startsWith('parte') || detto.startsWith('non parte')) return detto;
-    return ok ? `parte — ${detto}` : `parte a metà — ${detto}`;
+    const vecchia = /^(\d+) dispositiv[oi](?: su (\d+))?$/.exec(detto);
+    if (!vecchia) return detto;
+    const [, risposti, su] = vecchia;
+    if (Number(risposti) === 0) return su === undefined ? 'non parte' : 'non parte, non ha risposto nessuno';
+    return su === undefined ? `parte — ${detto}` : `parte a metà — ${detto}`;
   };
 
   function says(entry: LogEntry): { what: string; who: string } {
@@ -87,7 +92,7 @@
        * conteggio, e per quelle il verbo si mette ancora qui.
        */
       case 'scene':
-        return { what: conta(entry.detail, entry.ok), who: chi };
+        return { what: conta(entry.detail), who: chi };
       /*
        * Il comando e non il risultato: qui ci finisce anche quello che non è
        * riuscito, e scrivere «acceso» di una cosa che non si è accesa sarebbe
@@ -111,7 +116,7 @@
     {#each rows as entry (entry.id)}
       {@const line = says(entry)}
       <li class:is-bad={entry.ok === false}>
-        <span class="at">{when(entry.at)}</span>
+        <span class="at">{quandoEra(entry.at, auth.tz)}</span>
         <span class="what">
           {#if line.who}<b>{line.who}</b>{/if}
           {line.what}

@@ -4,7 +4,7 @@ import { Vista } from './vista.svelte';
 /** Un avviso avvenuto, come arriva dal server. */
 export interface Notice {
   id: string;
-  kind: 'silent' | 'back' | 'scene' | 'account';
+  kind: 'silent' | 'back' | 'scene' | 'account' | 'map';
   agentId?: string;
   /** Quando l'avviso riguarda una cosa sola in casa: quale. */
   deviceId?: string;
@@ -101,22 +101,34 @@ class Alerts {
     await this.load();
   }
 
-  /** Non solleva mai: se non arriva, lo dice `errore` a chi guarda. */
+  /**
+   * L'ultima lettura chiesta. Vince lei e non l'ultima risposta arrivata:
+   * cambiando ordine due volte di fila, la prima risposta poteva arrivare
+   * dopo la seconda e rimettere a schermo l'ordine di prima.
+   */
+  #giro = 0;
+
+  /** Non solleva mai. Se non arriva, lo dice `errore` a chi guarda. */
   async load(offset = this.offset): Promise<void> {
+    const mio = ++this.#giro;
     this.busy = true;
     try {
       const page = await api.get<Page<Notice>>(
         `/alerts?offset=${offset}&limit=${this.limit}&${this.vista.richiesta}`,
       );
+      if (mio !== this.#giro) return;
       this.rows = page.rows;
       this.total = page.total;
       this.offset = page.offset;
       this.errore = null;
     } catch (error) {
+      if (mio !== this.#giro) return;
       this.errore = (error as Error).message;
     } finally {
-      this.busy = false;
-      this.loaded = true;
+      if (mio === this.#giro) {
+        this.busy = false;
+        this.loaded = true;
+      }
     }
   }
 }

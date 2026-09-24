@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { offriIlFondo } from '../lib/fondo.svelte';
   import { ui, type ModalAction, type ModalRequest } from '../lib/ui.svelte';
   import { swipeToClose } from '../lib/swipe';
@@ -55,6 +56,55 @@
 
   const azioni = $derived(dettati ? dettati() : (request.actions ?? []));
 
+  /*
+   * Il fuoco entra quando si apre.
+   *
+   * Aperta con Invio, il fuoco restava sul tasto della pagina dietro, e il
+   * primo Tab girava fra le cose che la finestra copre. Se chi ci sta
+   * dentro l'ha già messo su un suo campo lo si lascia lì, se no va sulla
+   * finestra stessa, e da lì Tab comincia dal primo tasto.
+   */
+  let entrata = false;
+  $effect(() => {
+    if (!davanti || !guscio || entrata) return;
+    entrata = true;
+    const qui = guscio;
+    void tick().then(() => {
+      if (!qui.contains(document.activeElement)) qui.focus({ preventScroll: true });
+    });
+  });
+
+  /** Quello su cui Tab si ferma, dentro alla finestra e visibile. */
+  const TAPPE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  /*
+   * E resta dentro finché la finestra è davanti: dall'ultimo tasto Tab torna
+   * al primo, e al contrario. Dietro c'è una pagina che la finestra dichiara
+   * coperta (`aria-modal`), e il fuoco che ci finisce dentro è un fuoco che
+   * non si vede. Un foglietto aperto da qui sta fuori dalla finestra ed è
+   * suo, e lì Tab fa il suo giro.
+   */
+  function trattieni(event: KeyboardEvent): void {
+    if (event.key !== 'Tab' || !davanti || !guscio) return;
+    const attivo = document.activeElement;
+    if (attivo instanceof Element && attivo.closest('[data-pop]')) return;
+
+    const tappe = [...guscio.querySelectorAll<HTMLElement>(TAPPE)].filter((one) => one.getClientRects().length > 0);
+    const primo = tappe[0];
+    const ultimo = tappe.at(-1);
+    const fuori = !(attivo instanceof Node) || !guscio.contains(attivo);
+    if (!primo || !ultimo) {
+      event.preventDefault();
+      guscio.focus();
+    } else if (event.shiftKey && (fuori || attivo === primo || attivo === guscio)) {
+      event.preventDefault();
+      ultimo.focus();
+    } else if (!event.shiftKey && (fuori || attivo === ultimo)) {
+      event.preventDefault();
+      primo.focus();
+    }
+  }
+
   /** Un tasto che risponde «no» chiude e basta; gli altri lo dicono loro. */
   async function press(at: number, anchor: HTMLElement): Promise<void> {
     const azione = azioni[at];
@@ -65,6 +115,8 @@
     if (resta !== false) ui.closeModal(request);
   }
 </script>
+
+<svelte:window onkeydown={trattieni} />
 
 <!-- `div` e non `aside`: una finestra che copre tutto non è «contenuto a
      lato», e chi legge lo schermo ad alta voce deve sentirsi dire che è

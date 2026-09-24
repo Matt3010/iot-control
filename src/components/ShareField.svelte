@@ -1,69 +1,56 @@
 <script lang="ts">
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
-  import type { MapEditor } from '../lib/types';
+  import type { MapEditor, PlaceMap } from '../lib/types';
   import Button from './Button.svelte';
-  import TextField from './TextField.svelte';
   import Chip from './Chip.svelte';
+  import CopyLine from './CopyLine.svelte';
   import Icon from './Icon.svelte';
+  import TextField from './TextField.svelte';
 
   /**
-   * Chi può modificare una mappa, e fin dove.
+   * Chi può modificare una mappa, fin dove, e i link che fanno entrare.
    *
-   * Le regole stanno qui, sulla persona, e non su ogni singolo pin: «questi
-   * tre a lui, tutti a lei» si decide in un posto solo invece che entrando in
-   * venti schede — e soprattutto si può dire diverso a persone diverse, che
-   * da dentro un pin non si poteva proprio.
+   * Si entra con un link d'invito e non scrivendo un'email: un'email scritta
+   * qui la poteva usare chiunque si iscrivesse con quell'indirizzo, un link
+   * lo apre chi l'ha ricevuto, una volta. Le regole stanno sulla persona e
+   * non su ogni singolo pin: «questi tre a lui, tutti a lei» si decide in un
+   * posto solo invece che entrando in venti schede.
    */
-  let {
-    mapId,
-    editors = [],
-    onchange,
-  }: {
-    mapId: string;
-    editors?: MapEditor[];
-    onchange: (editors: MapEditor[]) => void;
-  } = $props();
+  let { map }: { map: PlaceMap } = $props();
 
-  let fresh = $state('');
-  /** Di chi si stanno guardando le regole: una per volta. */
+  const editors = $derived(map.editors ?? []);
+  const invites = $derived(map.invites ?? []);
+
+  /** Il promemoria del prossimo invito: a chi lo si manda. */
+  let label = $state('');
+  /** L'ultimo link creato: si vede adesso e poi mai più. */
+  let link = $state<string | null>(null);
+  let busy = $state(false);
+  /** Di chi si stanno guardando le regole: uno per volta. */
   let open = $state<string | null>(null);
 
   /** I luoghi di questa mappa: sono quelli che si possono spuntare. */
-  const places = $derived(store.places.filter((place) => place.mapId === mapId));
+  const places = $derived(store.places.filter((place) => place.mapId === map.id));
 
-  function add() {
-    const email = fresh.trim().toLowerCase();
-    if (!email) return;
-    if (editors.some((editor) => editor.email === email)) {
-      toast.show('Quell’indirizzo c’è già');
-      fresh = '';
-      return;
+  async function create() {
+    busy = true;
+    try {
+      link = await store.invite(map, label.trim());
+      label = '';
+    } catch (error) {
+      toast.show((error as Error).message);
+    } finally {
+      busy = false;
     }
-    // si entra con tutta la mappa: è il caso normale, e le eccezioni si
-    // scrivono dopo, guardando l'elenco
-    onchange([...editors, { email }]);
-    fresh = '';
-    open = email;
   }
 
-  const drop = (email: string) => onchange(editors.filter((editor) => editor.email !== email));
-
-  /** Cambiare le regole di uno, lasciando gli altri dov'erano. */
-  function rule(email: string, only: string[] | undefined) {
-    onchange(
-      editors.map((editor) =>
-        editor.email === email ? (only ? { email, only } : { email }) : editor,
-      ),
-    );
-  }
+  const rule = (editor: MapEditor, only: string[] | null) =>
+    void store.share(map, { restrict: editor.userId, only });
 
   function toggle(editor: MapEditor, placeId: string) {
     const held = editor.only ?? [];
-    rule(
-      editor.email,
-      held.includes(placeId) ? held.filter((id) => id !== placeId) : [...held, placeId],
-    );
+    rule(editor, held.includes(placeId) ? held.filter((id) => id !== placeId) : [...held, placeId]);
   }
 
   /** Cosa può toccare, in una riga: è quello che si legge di sfuggita. */
@@ -72,52 +59,60 @@
     if (!editor.only.length) return 'nessun luogo';
     return editor.only.length === 1 ? 'un luogo' : `${editor.only.length} luoghi`;
   }
+
+  /** Quanto vale ancora un invito, in giorni: la data precisa qui non serve. */
+  function scade(expiresAt: string): string {
+    const giorni = Math.ceil((Date.parse(expiresAt) - Date.now()) / 86_400_000);
+    if (giorni <= 1) return 'scade entro domani';
+    return `scade fra ${giorni} giorni`;
+  }
 </script>
 
 <div class="field">
   <span class="eyebrow">Chi può modificare questa mappa</span>
   <p class="sub">
-    Ci entrano e ci lavorano come te: luoghi, categorie, gruppi, agenti. Le tue altre mappe non le
-    vedono. Devono entrare con quell’indirizzo — un link non dice chi sei, un accesso sì.
+    Ci lavorano come te su luoghi, categorie e gruppi, e comandano gli agenti dei luoghi che gli
+    apri. Le tue altre mappe non le vedono. Si entra con un link d’invito, che vale per una persona
+    sola e per sette giorni.
   </p>
 
-  {#each editors as editor (editor.email)}
-    <div class="one" class:is-open={open === editor.email}>
+  {#each editors as editor (editor.userId)}
+    <div class="one" class:is-open={open === editor.userId}>
       <div class="who">
         <button
           type="button"
           class="pick"
           title="Cosa può modificare"
-          onclick={() => (open = open === editor.email ? null : editor.email)}
+          onclick={() => (open = open === editor.userId ? null : editor.userId)}
         >
-          <span class="mail">{editor.email}</span>
-          <span class="reach">{reach(editor)}</span>
+          <span class="mail">@{editor.handle}</span>
+          <span class="reach">{editor.email} · {reach(editor)}</span>
         </button>
         <button
           type="button"
           class="drop"
-          title="Togli la chiave"
-          aria-label={`Togli la chiave a ${editor.email}`}
-          onclick={() => drop(editor.email)}
+          title="Togli l’accesso"
+          aria-label={`Togli l’accesso a @${editor.handle}`}
+          onclick={() => void store.share(map, { drop: editor.userId })}
         >
           <Icon name="close" />
         </button>
       </div>
 
-      {#if open === editor.email}
+      {#if open === editor.userId}
         <div class="rules">
           <div class="chips">
             <Chip
               label="Tutta la mappa"
               size="sm"
               look={editor.only ? 'off' : 'sel'}
-              onclick={() => rule(editor.email, undefined)}
+              onclick={() => rule(editor, null)}
             />
             <Chip
               label="Solo alcuni luoghi"
               size="sm"
               look={editor.only ? 'sel' : 'off'}
-              onclick={() => rule(editor.email, editor.only ?? [])}
+              onclick={() => rule(editor, editor.only ?? [])}
             />
           </div>
 
@@ -138,7 +133,10 @@
                   Con l’elenco vuoto non tocca niente, entra e guarda senza cambiare una riga.
                 </p>
               {:else}
-                <p class="sub">Gli altri luoghi li vede, ma non li tocca. E non ne aggiunge di nuovi.</p>
+                <p class="sub">
+                  Gli altri luoghi li vede, ma non li tocca, e non ne aggiunge di nuovi. Degli
+                  agenti vede solo quelli dei luoghi spuntati.
+                </p>
               {/if}
             {:else}
               <p class="sub">Questa mappa non ha ancora nessun luogo da spuntare.</p>
@@ -149,22 +147,51 @@
     </div>
   {/each}
 
+  {#each invites as invite (invite.id)}
+    <div class="one">
+      <div class="who is-waiting">
+        <span class="pick">
+          <span class="mail">{invite.label || 'Invito senza promemoria'}</span>
+          <span class="reach">da aprire, {scade(invite.expiresAt)}</span>
+        </span>
+        <button
+          type="button"
+          class="drop"
+          title="Revoca l’invito"
+          aria-label={invite.label ? `Revoca l’invito per ${invite.label}` : 'Revoca l’invito senza promemoria'}
+          onclick={() => void store.share(map, { revoke: invite.id })}
+        >
+          <Icon name="close" />
+        </button>
+      </div>
+    </div>
+  {/each}
+
+  {#if link}
+    <div class="fresh">
+      <CopyLine text={link} title="Copia il link" fallita="Copia non riuscita, il link è quello che vedi" />
+      <p class="sub">
+        Si vede solo adesso, perché qui ne resta un’impronta e non il link. Mandalo a chi deve
+        entrare, che lo apre, entra o si iscrive, e si ritrova sulla mappa.
+      </p>
+    </div>
+  {/if}
+
   <div class="add">
     <TextField
-      kind="email"
-      maxlength={120}
-      placeholder="nome@esempio.it"
+      maxlength={60}
+      placeholder="A chi lo mandi (facoltativo)"
       autocomplete="off"
-      bind:value={fresh}
+      bind:value={label}
       onkeydown={(event: KeyboardEvent) => {
         if (event.key !== 'Enter') return;
-        // dentro una scheda il tasto invio salverebbe altro: qui aggiunge
+        // dentro una scheda il tasto invio salverebbe altro: qui crea il link
         event.preventDefault();
-        add();
+        void create();
       }}
     />
-    <Button look="icon" extra="add-go" title="Dai la chiave" disabled={!fresh.trim()} onclick={add}>
-      <Icon name="plus" />
+    <Button size="sm" extra="add-go" disabled={busy} onclick={() => void create()}>
+      <Icon name="link" />Crea un link d’invito
     </Button>
   </div>
 </div>
@@ -193,6 +220,14 @@
 
   .who:hover, .who:focus-within { opacity: 1; }
 
+  /* un invito da aprire non si preme: non c'è niente da regolare finché
+     nessuno è entrato */
+  .who.is-waiting { border-style: dashed; }
+
+  .who.is-waiting .pick { cursor: default; }
+
+  .fresh { display: grid; gap: 6px; min-width: 0; }
+
   .one.is-open .who {
     opacity: 1;
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);
@@ -212,6 +247,8 @@
   }
 
   .mail {
+    flex: 0 0 auto;
+    max-width: 60%;
     min-width: 0;
     color: var(--ink-2);
     font-size: 12.5px;
@@ -221,8 +258,17 @@
     white-space: nowrap;
   }
 
-  /* fin dove arriva, detto di sfuggita: è quello che si cerca scorrendo */
-  .reach { flex: none; font-size: 11px; color: var(--ink-3); }
+  /* fin dove arriva, detto di sfuggita: è quello che si cerca scorrendo.
+     Quando la riga è stretta cede lui, e il nome resta intero */
+  .reach {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: 11px;
+    color: var(--ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .one.is-open .pick .mail { color: var(--ink); }
 
@@ -288,10 +334,5 @@
 
   .add :global(.text-field):hover, .add :global(.text-field):focus { background: none; box-shadow: none; }
 
-  .add :global(.add-go) { color: var(--ink-3); }
-
-  .add:focus-within :global(.add-go:not(:disabled)) {
-    background: var(--accent);
-    color: var(--on-accent);
-  }
+  .add :global(.add-go) { flex: none; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 </style>

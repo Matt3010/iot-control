@@ -137,11 +137,7 @@
                passa avanti, quindi da ospite il riquadro non c'è. -->
           {#if atHome}
             <div class="map-keys">
-              <ShareField
-                mapId={map.id}
-                editors={map.editors ?? []}
-                onchange={(editors) => store.patchMap(map, { editors })}
-              />
+              <ShareField {map} />
             </div>
           {/if}
         {/snippet}
@@ -168,7 +164,7 @@
     <PageCard dashed>
       <span class="eyebrow">Non sei a casa tua</span>
       <p class="note">
-        Stai lavorando nelle mappe di <b>{auth.account.actingAs.handle}</b>: quello che cambi qui
+        Stai lavorando nelle mappe di <b>{auth.account.actingAs.handle}</b>, e quello che cambi qui
         è suo. Le chiavi delle <i>tue</i> mappe le dai dal tuo.
       </p>
     </PageCard>

@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { placeAnchored, placeBeside } from '../lib/popover';
   import { portal } from '../lib/portal';
+  import { ui } from '../lib/ui.svelte';
 
   /**
    * Il foglietto che si apre accanto a qualcosa.
@@ -76,6 +77,13 @@
       window.removeEventListener('resize', guarda);
     };
   });
+
+  /*
+   * Si fa conoscere, così Esc chiude lui e non la finestra da cui è nato.
+   * Chi lo apre ha uno stato suo — l'elenco dell'attesa, un orario — e
+   * all'applicazione, che è quella che sente Esc, non lo diceva nessuno.
+   */
+  $effect(() => ui.sopra(() => onclose()));
 
   /**
    * Un clic fuori chiude, ma non quello sul tasto che l'ha aperto: quello sta

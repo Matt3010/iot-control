@@ -1,7 +1,7 @@
 {
   "name": "Place Index",
   "short_name": "Luoghi",
-  "description": "I tuoi posti su una mappa, e quello che c'è dentro.",
+  "description": "I tuoi luoghi su una mappa, e quello che c'è dentro.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

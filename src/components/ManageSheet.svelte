@@ -247,7 +247,7 @@
                   ui.askSure(event.currentTarget as HTMLElement, {
                     title: `Sciogliere “${group.name}”?`,
                     detail: store.countGroup(group.id)
-                      ? `${conta(store.countGroup(group.id))} resta${store.countGroup(group.id) === 1 ? '' : 'no'} dov'è, senza questo gruppo.`
+                      ? `${conta(store.countGroup(group.id))} ${store.countGroup(group.id) === 1 ? 'resta dov’è' : 'restano dove sono'}, senza questo gruppo.`
                       : undefined,
                     verb: 'Sciogli',
                     onYes: () => store.deleteGroup(group),

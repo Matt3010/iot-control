@@ -4,6 +4,7 @@
   import { leggiValore } from '../lib/valori';
   import { numero } from '../lib/prove';
   import HealthDot from './HealthDot.svelte';
+  import { auth } from '../lib/auth.svelte';
   import { devices, type Device } from '../lib/devices.svelte';
   import type { Capability, DeviceValue } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
@@ -62,13 +63,24 @@
       device.state[code],
     );
 
+  /** Dov'era ogni cursore prima di cominciare a trascinarlo, perché è lì che torna se il comando non passa. */
+  const partenza: Record<string, { value: DeviceValue | undefined }> = {};
+
   /**
    * Mentre trascini il cursore il numero deve seguire il dito, ma il comando
    * parte una volta sola, quando lasci: una luce non va comandata sessanta
    * volte al secondo.
    */
   function preview(code: string, value: number): void {
+    if (!(code in partenza)) partenza[code] = { value: device.state[code] };
     device.state = { ...device.state, [code]: value };
+  }
+
+  /** Lasciato il cursore parte il comando, e il trascinamento è finito. */
+  function lascia(code: string, value: number): void {
+    const prima = partenza[code];
+    delete partenza[code];
+    void devices.command(device, code, value, prima);
   }
 
   /**
@@ -183,7 +195,7 @@
               Math.max(capability.max - capability.min, 1)) *
               100}%"
             oninput={(event) => preview(capability.code, Number(event.currentTarget.value))}
-            onchange={(event) => devices.command(device, capability.code, Number(event.currentTarget.value))}
+            onchange={(event) => lascia(capability.code, Number(event.currentTarget.value))}
           />
         </div>
       {:else if capability.kind === 'color'}
@@ -205,7 +217,7 @@
             disabled={!device.online}
             value={tinta}
             oninput={(event) => preview(capability.code, Number(event.currentTarget.value))}
-            onchange={(event) => devices.command(device, capability.code, Number(event.currentTarget.value))}
+            onchange={(event) => lascia(capability.code, Number(event.currentTarget.value))}
           />
         </div>
       {:else if capability.kind === 'enum'}
@@ -248,6 +260,8 @@
          lo toglie davvero, e con lui quello che lo nominava. -->
     <div class="dev-gone">
       <span class="dev-gone-say">{stato.says}. Torna com’era se ricolleghi il servizio da cui veniva.</span>
+      <!-- toglierlo davvero lo fa chi possiede l'indice -->
+      {#if auth.canAdmin}
       <Button
         look="link"
         tone="danger"
@@ -263,6 +277,7 @@
       >
         Rimuovi
       </Button>
+      {/if}
     </div>
   {:else}
   <div class="dev-body">

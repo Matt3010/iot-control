@@ -1,4 +1,4 @@
-import { rimpiazza } from './rimpiazza';
+import { rimpiazza, ritira } from './rimpiazza';
 import { nomeAzione } from './azioni';
 import { daQuando, healthOf, salute, type Salute } from './health';
 import { api } from './api';
@@ -413,6 +413,11 @@ class Devices {
     }
   }
 
+  /** I registri aperti, riletti: il filo è stato giù e le righe nuove non sono arrivate. */
+  rileggiRegistri(): void {
+    for (const agentId of this.#guardati) void this.#leggiLog(agentId);
+  }
+
   closeLog(agentId: string): void {
     this.#guardati.delete(agentId);
     const { [agentId]: _via, ...rest } = this.logs;
@@ -576,11 +581,12 @@ class Devices {
     },
   ): Promise<void> {
     const before = { ...scene, steps: [...scene.steps] };
-    Object.assign(scene, { ...patch, ...(patch.when === null ? { when: undefined } : {}) });
+    const scritto = { ...patch, ...(patch.when === null ? { when: undefined } : {}) };
+    Object.assign(scene, scritto);
     try {
       rimpiazza(scene, await api.put<Scene>(`/scenes/${scene.id}`, { name: scene.name, ...patch }));
     } catch (error) {
-      rimpiazza(scene, before);
+      ritira(scene, scritto as Partial<Scene>, before);
       toast.show((error as Error).message);
     }
   }
@@ -723,11 +729,19 @@ class Devices {
    * il motivo arriva intero: "non risponde" è un'informazione, una luce che
    * finge di essersi accesa non lo è.
    */
-  async command(device: Device, code: string, value: DeviceValue): Promise<void> {
+  async command(device: Device, code: string, value: DeviceValue, prima?: { value: DeviceValue | undefined }): Promise<void> {
     const key = `${device.id}:${code}`;
     if (this.busy.includes(key)) return;
 
-    const before = { ...device.state };
+    /*
+     * Com'era prima, per tornarci se va male. Un cursore lo dice da sé
+     * (`prima`), perché mentre lo trascini l'anteprima ha già scritto il
+     * valore nuovo, e tornare «a com'era» voleva dire restare dove l'avevi
+     * lasciato, come se il comando fosse passato.
+     */
+    const before: Record<string, DeviceValue> = { ...device.state };
+    if (prima && prima.value !== undefined) before[code] = prima.value;
+    else if (prima) delete before[code];
     device.state = { ...device.state, [code]: value };
     this.busy = [...this.busy, key];
 
