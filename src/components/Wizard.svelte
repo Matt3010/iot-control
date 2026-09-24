@@ -37,6 +37,12 @@
 
   const ultimo = $derived(passo >= passi.length - 1);
 
+  // i passi possono diminuire mentre si scrive, e chi stava sull'ultimo che
+  // se n'è andato resta su quello che adesso è l'ultimo
+  $effect(() => {
+    if (passo > passi.length - 1) passo = Math.max(0, passi.length - 1);
+  });
+
   function azioni(): ModalAction[] {
     return [
       ...(passo > 0 ? [{ label: 'Indietro', look: 'ghost' as const, onpick: () => ((passo -= 1), false) }] : []),

@@ -29,15 +29,24 @@
     if (!scene) ui.closeModal();
   });
 
-  const PASSI = [
+  type Passo = { id: 'cosa' | 'quando' | 'se'; titolo: string };
+
+  /*
+   * «Solo se» c'è solo quando la scena parte da sola. Premuta a mano parte
+   * sempre, e un passo che dice soltanto che non c'è niente da fare è un
+   * clic in più per arrivare a «Fatto».
+   */
+  const passi = $derived<Passo[]>([
     { id: 'cosa', titolo: 'Cosa fa' },
     { id: 'quando', titolo: 'Quando' },
-    { id: 'se', titolo: 'Solo se' },
-  ] as const;
+    ...(scene && ((scene.when && !scene.when.off) || (scene.triggers ?? []).length)
+      ? [{ id: 'se' as const, titolo: 'Solo se' }]
+      : []),
+  ]);
 </script>
 
 {#if scene}
-  <Wizard passi={[...PASSI]} bind:passo onfine={() => undefined}>
+  <Wizard {passi} bind:passo onfine={() => undefined}>
     {#snippet contenuto(id)}
       {#if id === 'cosa'}
         <SceneStepsEditor {scene} />

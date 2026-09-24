@@ -112,10 +112,6 @@
     {#if daDispositivo && !haOre}<Chip label="Una fascia oraria" size="sm" look="off" onclick={aggiungiOre} />{/if}
     {#if !haDate}<Chip label="Un periodo" size="sm" look="off" onclick={aggiungiDate} />{/if}
   </div>
-{:else}
-  <p class="nota">
-    Non parte da sola, quindi non ci sono condizioni da mettere. Prima si sceglie quando parte, al passo prima.
-  </p>
 {/if}
 
 <style>
