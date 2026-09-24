@@ -31,7 +31,9 @@
     onricollega: (joint: LinkedAccount, account: Provider) => void;
   } = $props();
 
-  const nome = (handler: string) => stato.catalogo.find((voce) => voce.handler === handler)?.name;
+  // il nome del catalogo, o quello che l'agente manda con l'account per quelli che nel catalogo non ci sono
+  const nome = (handler: string) =>
+    stato.catalogo.find((voce) => voce.handler === handler)?.name ?? stato.linked.find((one) => one.handler === handler)?.name;
 
   const collegati = $derived(
     [...new Set(stato.linked.map((one) => one.handler))].map((handler) => providerDa(handler, nome(handler))),

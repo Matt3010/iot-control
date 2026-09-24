@@ -638,7 +638,12 @@ export async function submitPairing(
  * altre voci sono roba di Home Assistant — il sole, i backup, la radio — e
  * non sono account di nessuno.
  */
-export async function listLinked(config: ConnectorConfig, collegabili: Set<string>): Promise<LinkedAccount[]> {
+export async function listLinked(
+  config: ConnectorConfig,
+  collegabili: Set<string>,
+  /** I collegamenti da cui vengono dispositivi dell'app: ci sono sempre, anche fuori dal catalogo. */
+  conDispositivi: Set<string> = new Set(),
+): Promise<LinkedAccount[]> {
   const response = await fetch(`${config.haUrl}/api/config/config_entries/entry`, {
     headers: { authorization: `Bearer ${config.haToken}` },
   });
@@ -655,7 +660,7 @@ export async function listLinked(config: ConnectorConfig, collegabili: Set<strin
   // Solo quello che porta dispositivi, non il sole e i backup. Le telecamere
   // ci sono, una per canale: senza, una si poteva collegare e non scollegare più.
   return entries
-    .filter((entry) => collegabili.has(entry.domain))
+    .filter((entry) => collegabili.has(entry.domain) || conDispositivi.has(entry.entry_id))
     .map((entry) => {
       const ricollega = rientri.get(entry.entry_id);
       return {

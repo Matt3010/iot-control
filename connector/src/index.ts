@@ -304,7 +304,16 @@ async function main(): Promise<void> {
     const collegabili = new Set([...catalogo.map((voce) => voce.handler), ...Object.keys(PROVIDERS)]);
     const nomeDi = (handler: string): string | undefined =>
       PROVIDERS[handler as keyof typeof PROVIDERS]?.label ?? catalogo.find((voce) => voce.handler === handler)?.name;
-    const elenco = await titled(await listLinked(config, collegabili), await born());
+    /*
+     * E ogni collegamento da cui viene almeno un dispositivo dell'app, anche
+     * se non è nel catalogo. La centrale ne aggiunge qualcuno da sola — Google
+     * Cast, quando trova un apparecchio Google in rete — e un dispositivo che
+     * si vede deve far vedere anche da dove viene, e come si stacca.
+     */
+    const nati = await born();
+    const nostri = new Set([...devices.keys(), ...dentroA.keys()]);
+    const conDispositivi = new Set([...nati].filter(([entita]) => nostri.has(entita)).map(([, collegamento]) => collegamento));
+    const elenco = await titled(await listLinked(config, collegabili, conDispositivi), nati);
     return elenco.map((one) => {
       const name = nomeDi(one.handler);
       return name ? { ...one, name } : one;

@@ -324,8 +324,10 @@ export class HomeAssistant {
       name: string;
       integration_type?: string;
     }[];
+    // senza un tipo dichiarato un'integrazione è un hub: è la regola della
+    // centrale stessa, e Google Cast, che non lo dichiara, restava fuori
     const voci = manifesti
-      .filter((one) => one.integration_type === 'hub' || one.integration_type === 'device')
+      .filter((one) => (one.integration_type ?? 'hub') === 'hub' || one.integration_type === 'device')
       .map((one) => ({ handler: one.domain, name: one.name }))
       .sort((a, b) => a.name.localeCompare(b.name, 'it'));
 
