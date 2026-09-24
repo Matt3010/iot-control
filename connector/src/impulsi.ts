@@ -73,6 +73,9 @@ const EWELINK: LettoreImpulsi = {
   },
 };
 
+/** I domini delle entità che hanno un interruttore, l'unica cosa che può essere a impulso. */
+const ACCENDIBILI = new Set(['switch', 'light', 'fan', 'input_boolean']);
+
 /** I provider che sappiamo leggere. Tuya avrà il suo, quando ci sarà un relè vero da provare. */
 export const LETTORI: LettoreImpulsi[] = [EWELINK];
 
@@ -87,7 +90,15 @@ export async function leggiImpulsi(ha: HomeAssistant): Promise<Map<string, numbe
   const tutti = new Map<string, number>();
   for (const lettore of LETTORI) {
     try {
-      const entita = await ha.entitiesOf(lettore.piattaforma);
+      /*
+       * Solo quelle che si accendono e si spengono. Un'integrazione dà lo
+       * stesso nome interno a più entità dello stesso canale — Mansarda ha
+       * `10025415b6_1` sia sull'interruttore sia sul selettore dello stato
+       * all'accensione — e l'impulso finiva sul selettore, dove non si vede.
+       */
+      const entita = (await ha.entitiesOf(lettore.piattaforma)).filter((one) =>
+        ACCENDIBILI.has(one.entityId.split('.')[0] ?? ''),
+      );
       const collegamenti = [...new Set(entita.map((one) => one.entryId).filter((id): id is string => !!id))];
       for (const entryId of collegamenti) {
         const suoi = entita.filter((one) => one.entryId === entryId);
