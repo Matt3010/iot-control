@@ -97,7 +97,7 @@
         </span>
         <Button look="ghost" size="sm" onclick={scegliFuso}>Cambia</Button>
       </div>
-      <span class="nota">Le scene partono all'ora di questo fuso, anche quando le guardi da un posto dove è un'altra ora.</span>
+      <span class="nota">Le scene partono all'ora di questo fuso, anche quando le guardi da dove è un'altra ora.</span>
       {#if qui !== auth.tz}
         <!-- il browser è altrove: può essere un viaggio, o un fuso scelto
              male. Lo si dice, e decide chi guarda -->

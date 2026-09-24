@@ -210,7 +210,9 @@
      è zero, se no le due misure si sommerebbero */
   .cards.rows {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    /* su un telefono stretto una colonna è meno di 320px, e il minimo fisso la
+       faceva uscire di lato */
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
     column-gap: 14px;
     row-gap: 0;
     align-items: stretch;
