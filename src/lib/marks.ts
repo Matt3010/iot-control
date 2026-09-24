@@ -171,17 +171,44 @@ export function marksLike(query: string): readonly Mark[] {
 export const DEFAULT_MARK = 'pin';
 
 /**
+ * Quando quello che c'è scritto non è una chiave, esce così com'è — ed esce
+ * dentro a del markup. Un'emoji è innocua, ma il campo lo scrive una persona
+ * e una parentesi angolata lì dentro diventerebbe un pezzo di pagina.
+ */
+const plain = (text: string): string =>
+  text.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/**
+ * Il disegno da mettere, qualunque cosa ci sia scritta nel campo.
+ *
+ * I casi sono tre. La chiave di un segno — «restaurant» — è quello normale.
+ * Un'emoji è una categoria di prima, e si lascia la sua: chi non l'ha mai
+ * toccata non deve vedersela cambiare sotto gli occhi.
+ *
+ * Il terzo è una parola che non è né l'una né l'altra — «tag», «star» —,
+ * la chiave di un catalogo di ieri rimasta nei dati da quando i segni si
+ * chiamavano in un altro modo. Nessuno la sa più disegnare, e finiva scritta
+ * accanto al nome: si leggeva «tag Lavoro», e chi guardava cercava fra le
+ * sue categorie una che si chiamasse così. Di quelle si disegna il
+ * segnaposto, che è quello che si mette quando non si sa.
+ *
+ * Riconoscerle è semplice, perché un'emoji sta fuori dall'alfabeto latino e
+ * una parola scritta da noi ci sta dentro.
+ */
+export function drawFor(value: string | undefined): Mark | undefined {
+  const mark = markOf(value);
+  if (mark) return mark;
+  if (value && /[^\u0000-\u007f]/.test(value)) return undefined;
+  return markOf(DEFAULT_MARK);
+}
+
+/**
  * Il segno come pezzo di markup, per dove non c'è Svelte a disegnarlo — il
  * pin sulla mappa, che Leaflet costruisce da sé.
- *
- * Prima la chiave di un disegno. Poi, se c'è scritto qualcos'altro, è
- * un'emoji di quelle di prima e si lascia com'è: una categoria che non hai
- * mai toccato non deve cambiarti faccia sulla mappa. Solo se non c'è niente
- * si mette il segnaposto.
  */
 export function signOf(value: string | undefined): string {
-  const mark = markOf(value) ?? (value ? undefined : markOf(DEFAULT_MARK));
-  if (!mark) return value ?? '';
+  const mark = drawFor(value);
+  if (!mark) return plain(value ?? '');
 
   const svg = createElement(mark.icon);
   svg.setAttribute('class', 'ico');

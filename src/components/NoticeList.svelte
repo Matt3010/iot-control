@@ -1,5 +1,6 @@
 <script lang="ts">
   import { alerts, type Notice } from '../lib/alerts.svelte';
+  import { devices } from '../lib/devices.svelte';
   import Pager from './Pager.svelte';
   import type { Column } from '../lib/table';
   import Table from './Table.svelte';
@@ -34,6 +35,30 @@
     { label: 'Cosa' },
     { label: 'Consegna', width: 'fit', align: 'end' },
   ];
+
+  /**
+   * Chi, con davanti che cosa è.
+   *
+   * Un nome da solo non basta. «Casa» può essere un agente o una scena, e
+   * «Test» pure, e chi legge doveva ricordarsi come aveva chiamato cosa. Per
+   * un dispositivo si scrive anche l'agente che l'ha trovato, perché
+   * «192.168.1.44/video1» da solo non dice in quale casa stia.
+   *
+   * L'agente di un dispositivo si cerca fra quelli che ci sono adesso: se nel
+   * frattempo è stato eliminato resta il dispositivo da solo, che è meglio di
+   * un nome inventato.
+   */
+  function chi(row: Notice): { tipo: string; nome: string }[] {
+    const nome = row.who ?? '—';
+    if (row.kind === 'scene') return [{ tipo: 'Scena', nome }];
+    if (!row.deviceId) return [{ tipo: 'Agente', nome }];
+
+    const agente = devices.agents.find((agent) => agent.id === row.agentId)?.name;
+    return [
+      ...(agente ? [{ tipo: 'Agente', nome: agente }] : []),
+      { tipo: 'Dispositivo', nome },
+    ];
+  }
 
   /** Che ora era. Oggi basta l'ora; prima serve dire anche il giorno. */
   function when(at: string): string {
@@ -81,7 +106,10 @@
           <!-- il pallino, come sui luoghi e sugli agenti: giallo quando c'e'
                qualcosa che non va, verde quando e' rientrato -->
           <span class="segno" class:is-back={one.kind === 'back'}></span>
-          {one.who ?? '—'}
+          {#each chi(one) as pezzo, at (at)}
+            {#if at}<span class="sep">/</span>{/if}
+            <span class="tipo">{pezzo.tipo}</span><span class="sep">/</span>{pezzo.nome}
+          {/each}
         </td>
         <td class="dove fit">{one.where ?? 'nessun luogo'}</td>
         <td>{one.short ?? one.title}</td>
@@ -119,6 +147,11 @@
   .quando { color: var(--ink-3); }
 
   .chi { font-weight: 560; color: var(--ink); }
+
+  /* il tipo e le barre si leggono di passaggio, il nome è quello che si cerca */
+  .tipo { font-weight: 450; color: var(--ink-3); }
+
+  .sep { margin: 0 5px; font-weight: 400; color: var(--ink-3); opacity: 0.6; }
 
   /* il luogo è un'informazione di contorno: si legge, non si urla */
   .dove { color: var(--ink-3); }

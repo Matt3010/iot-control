@@ -114,6 +114,17 @@ function serve(socket: WebSocket, agent: Agent): void {
   socket.on('close', () => {
     clearInterval(beat);
     hub.detach(agent.id, connection);
+    /*
+     * Anche andandosene l'agente si è fatto sentire, e il silenzio comincia
+     * adesso, non da quando si era collegato.
+     *
+     * «Visto l'ultima volta» si scriveva solo all'arrivo. Un agente rimasto
+     * collegato due ore e caduto per un secondo risultava muto da due ore:
+     * se il giro del minuto capitava proprio in quel secondo partivano due
+     * avvisi, «ha smesso di rispondere da 2 ore» e subito dopo «ha ripreso
+     * dopo 2 ore», tutti e due falsi.
+     */
+    void agentManager.touch(agent.id);
     logManager.note({ ownerId: agent.ownerId, agentId: agent.id, kind: 'down' });
     console.log(`agente scollegato: ${agent.name}`);
   });

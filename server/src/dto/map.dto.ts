@@ -2,14 +2,11 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
-  IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
-  Matches,
   MaxLength,
-  MinLength,
   ValidateNested,
 } from 'class-validator';
 
@@ -40,19 +37,6 @@ export class MapDto {
   @IsNotEmpty({ message: 'il nome è obbligatorio' })
   @MaxLength(40)
   name!: string;
-
-  /** L'indirizzo pubblico, se vuoi sceglierlo tu. */
-  @IsOptional()
-  @trim()
-  @IsString()
-  @MinLength(2)
-  @MaxLength(40)
-  @Matches(/^[a-z0-9-]+$/, { message: "l'indirizzo può avere lettere minuscole, numeri e trattini" })
-  slug?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  published?: boolean;
 
   /**
    * Chi può modificarla oltre a chi ce l'ha, e con quali regole. Sono email

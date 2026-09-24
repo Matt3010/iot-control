@@ -32,9 +32,8 @@ export const SUGGESTED = COLORS.slice(20, 30);
 /**
  * Il segno di una categoria appena nata.
  *
- * È la chiave di un disegno, non più un'emoji: «pin» sta per il segnaposto,
- * che è il modo più onesto di dire «un luogo» finché non scegli tu. Le
- * categorie di prima hanno ancora la loro emoji nel campo, e restano come
- * sono: il campo è lo stesso, e chi lo legge sa riconoscere le due cose.
+ * Sta nel catalogo dei segni insieme a tutti gli altri, e da qui si ripassa
+ * soltanto, perché era scritto anche lì e due volte lo stesso valore vuol
+ * dire che un giorno uno dei due cambia da solo.
  */
-export const DEFAULT_MARK = 'pin';
+export { DEFAULT_MARK } from './marks';

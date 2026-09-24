@@ -139,6 +139,13 @@
 
   .back:hover { color: var(--ink); }
 
+  /* Dove si tocca, il ritorno è alto quanto un dito: era diciotto pixel, e
+     sbagliarlo vuol dire restare dove non volevi. Lo spazio si aggiunge
+     dentro e si toglie fuori, così il titolo qui sotto non si muove. */
+  @media (hover: none) {
+    .back { padding: 10px 2px; margin: -10px -2px -4px; }
+  }
+
   /* la freccia guarda a sinistra: è un ritorno, non un pannello che si chiude */
   .back :global(.ico) { width: 14px; height: 14px; transform: rotate(-90deg); }
 

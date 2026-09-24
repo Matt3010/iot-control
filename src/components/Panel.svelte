@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { fadeEdges } from '../lib/overflow';
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { auth } from '../lib/auth.svelte';
-  import { here } from '../lib/here.svelte';
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
@@ -11,73 +11,49 @@
   import MapSwitcher from './MapSwitcher.svelte';
   import PanelSkeleton from './PanelSkeleton.svelte';
   import PlaceList from './PlaceList.svelte';
-  import Tabs from './Tabs.svelte';
   import SearchTrigger from './SearchTrigger.svelte';
   import Button from './Button.svelte';
 
-  /**
-   * Su uno schermo stretto il pannello e una sheet non ci stanno insieme:
-   * aprendo una sheet il pannello si fa piccolo da solo, e resta come lo
-   * lasci se lo apri o lo chiudi a mano.
+  /*
+   * Gruppi e categorie si vedono tutti, tutti e due, dappertutto.
+   *
+   * C'era una soglia — sei gruppi, otto categorie — e oltre quella il resto
+   * finiva dietro a un «Altre 3» da aprire, con due variabili che si
+   * ricordavano se l'avessi aperto. Serviva a non farne un muro quando
+   * andavano a capo. Adesso stanno in fila su una riga sola e si scorrono,
+   * come sul telefono: non c'è nessun muro da evitare, e niente che si
+   * nasconda da solo alla nona categoria.
    */
-  /**
-   * Oltre una certa soglia i chip diventano un muro: si mostrano i primi e
-   * il resto sta dietro a un "+N", che resta aperto se lo apri.
-   */
-  const CAP = { groups: 6, categories: 8 };
-  let allGroups = $state(false);
-  let allCategories = $state(false);
-
-  const shownGroups = $derived(allGroups ? store.currentGroups : store.currentGroups.slice(0, CAP.groups));
-  const shownCategories = $derived(
-    allCategories ? store.categories : store.categories.slice(0, CAP.categories),
-  );
-  const hiddenGroups = $derived(store.currentGroups.length - shownGroups.length);
-  const hiddenCategories = $derived(store.categories.length - shownCategories.length);
   const everythingVisible = $derived(store.hiddenCategories.length === 0);
 
-  const collapsed = $derived(
-    viewport.narrow && (ui.panelWish === 'closed' || (ui.panelWish === 'auto' && ui.sheet !== 'none')),
-  );
-
-  /** Il modo "vicino a me" vale solo se sappiamo dove sei. */
-  const near = $derived(store.listMode === 'near' && !!here.spot);
-
   /**
-   * L'indice: quello che è inquadrato adesso, dal più vicino. Oppure, in
-   * strada, i più vicini a te ovunque siano: lì il riquadro non conta.
+   * L'indice, e ci sono tutti.
+   *
+   * Prima si poteva scegliere fra due modi di leggerlo — quello che sta nel
+   * riquadro, o i più vicini a te — e nessuno dei due mostrava l'elenco per
+   * intero. Un luogo che c'era spariva dalla lista perché la mappa si era
+   * spostata di un centimetro, e per ritrovarlo bisognava capire quale dei
+   * due modi fosse acceso. L'elenco adesso è l'elenco. Restano fuori solo i
+   * luoghi che i filtri qui sopra escludono, che è una scelta di chi guarda.
+   *
+   * L'ordine sì, quello dipende da cosa c'è sotto. Con la mappa i luoghi si
+   * leggono dal più vicino al centro di quello che stai guardando; sul
+   * telefono, dove mappa non ce n'è, in ordine alfabetico.
    */
   const rows = $derived.by(() => {
     mapBridge.view.moves; // re-read whenever the map settles somewhere new
 
-    /*
-     * Senza mappa non c'è nessun riquadro da cui scegliere, e nemmeno un
-     * centro da cui misurare: sul telefono ci sono tutti, in ordine
-     * alfabetico. Diventano «i più vicini» solo quando sai dove sei, che è
-     * l'unica origine che resta quando la mappa non c'è.
-     */
-    const all = store.currentPlaces.filter(
-      (place) => store.visible(place) && (near || viewport.narrow || mapBridge.contains(place.lat, place.lng)),
-    );
+    const misurati = store.currentPlaces
+      .filter((place) => store.visible(place))
+      .map((place) => ({
+        place,
+        distance: mapBridge.distanceFrom(place.lat, place.lng, null),
+      }));
 
-    const misurati = all.map((place) => ({
-      place,
-      distance: mapBridge.distanceFrom(place.lat, place.lng, near ? here.spot : null),
-    }));
-
-    return viewport.narrow && !near
-      ? misurati.sort((a, b) => a.place.name.localeCompare(b.place.name, 'it'))
-      : misurati.sort((a, b) => a.distance - b.distance);
+    return viewport.hasMap
+      ? misurati.sort((a, b) => a.distance - b.distance)
+      : misurati.sort((a, b) => a.place.name.localeCompare(b.place.name, 'it'));
   });
-
-  /** Chiedere "vicino a me" senza aver mai detto dove sei attiva la domanda. */
-  async function goNear() {
-    store.setListMode('near');
-    if (here.spot) return;
-    // se il permesso non arriva, il modo non può restare acceso a vuoto:
-    // sarebbe una preferenza che scatta da sola al prossimo "dove sono"
-    if (!(await here.locate())) store.setListMode('view');
-  }
 
   function pickGroup(id: string | null) {
     store.setGroup(id === store.activeGroup ? null : id);
@@ -92,31 +68,32 @@
   }
 </script>
 
-<div id="panel" class="surface" class:is-collapsed={collapsed}>
+<div id="panel" class="surface">
   <div class="panel-head">
     <MapSwitcher />
     <span class="panel-head-end">
-      {#if !store.loading}
-        <span
-          id="place-count"
-          class="tally"
-          title={store.shownMaps.length > 1
-            ? 'Di ' + store.shownMaps.map((map) => map.name).join(' e ')
-            : undefined}
-        >
-          {store.currentPlaces.length}
-          {store.currentPlaces.length === 1 ? 'luogo' : 'luoghi'}
-        </span>
-      {/if}
-      {#if viewport.narrow}
+      {#if auth.account}
+        <!-- Chi sei e la porta, in testa.
+             In fondo a un telefono quel posto è del pollice e serve a quello
+             che si fa tutti i giorni, quindi il piede se n'era già andato di
+             lì. Sul grande stava ancora sotto, e con lui il nome scritto per
+             intero, cioè due modi di uscire dalla stessa app, e uno dei due da
+             tenere in piedi per niente. Il nome si legge dove serve davvero,
+             cioè nella domanda che chiede se uscire. -->
         <Button
           look="icon"
-          extra="panel-toggle"
-          aria-expanded={!collapsed}
-          title={collapsed ? 'Mostra filtri ed elenco' : 'Riduci il pannello'}
-          onclick={() => (ui.panelWish = collapsed ? 'open' : 'closed')}
+          extra="whoami-btn"
+          title={'@' + auth.account.handle + ' — esci'}
+          onclick={(event: MouseEvent) =>
+            ui.askSure(event.currentTarget as HTMLElement, {
+              title: `Uscire da @${auth.account?.handle ?? ''}?`,
+              detail: 'Le tue mappe restano dove sono. Si rientra quando vuoi.',
+              verb: 'Esci',
+              no: 'Resto',
+              onYes: () => auth.leave(),
+            })}
         >
-          <Icon name={collapsed ? 'expand' : 'collapse'} />
+          <Icon name="handle" />
         </Button>
       {/if}
     </span>
@@ -124,193 +101,118 @@
 
   <SearchTrigger />
 
-  {#if !collapsed}
-    {#if store.categories.length && !store.loading}
-      <!-- Etichetta, pastiglie e matita stanno insieme: su un telefono
-           diventano una riga sola, e le due righe risparmiate vanno
-           all'elenco, che e' quello per cui la pagina si apre. -->
-      <div class="filtro">
-      <div class="panel-row" id="group-head">
-        <span class="eyebrow">Gruppi</span>
-        <!-- apre la scheda dei gruppi: lì dentro se ne creano, si rinominano
-             e si sciolgono. Un "+" prometteva una cosa sola delle tre. -->
-        <Button
-          look="icon"
-          id="add-group"
-          title="Gestisci i gruppi"
-          onclick={() => ui.toggleManage('groups', 'add')}
-        >
-          <Icon name="edit" />
-        </Button>
-      </div>
-      <div id="group-filters" class="strisce">
-        {#if store.currentGroups.length}
-          <Chip
-            label="Tutti i luoghi"
-            count={store.currentPlaces.length}
-            look={store.activeGroup === null ? 'sel' : 'off'}
-            onclick={() => pickGroup(null)}
-          />
-        {:else}
-          <p class="section-hint">I gruppi tengono insieme i luoghi di una città, di un viaggio, di una lista.</p>
-        {/if}
-        {#each shownGroups as group (group.id)}
-          <Chip
-            label={group.name}
-            count={store.countGroup(group.id)}
-            look={store.activeGroup === group.id ? 'sel' : 'off'}
-            onclick={() => pickGroup(group.id)}
-          />
-        {/each}
-        {#if hiddenGroups > 0}
-          <Chip
-            label={'Altri ' + hiddenGroups}
-            look="off"
-            title="Mostra tutti"
-            onclick={() => (allGroups = true)}
-          />
-        {:else if allGroups && store.currentGroups.length > CAP.groups}
-          <Chip label="Mostra meno" look="off" onclick={() => (allGroups = false)} />
-        {/if}
-      </div>
-      </div>
-    {/if}
-
-    {#if store.loading}
-      <PanelSkeleton />
-    {:else}
-      {#if store.categories.length}
-        <div class="filtro is-cut">
-        <div class="panel-row">
-          <span class="eyebrow">Categorie</span>
-          <span class="row-actions">
-            {#if store.categories.length > 1}
-              <!-- l'occhio dice come stanno adesso le categorie, come nella scheda
-                   delle mappe: aperto se sono sulla mappa, chiuso se le hai tolte -->
-              <Button
-                look="icon"
-                extra={'see-all' + (everythingVisible ? '' : ' is-off')}
-                title={everythingVisible ? 'Nascondi tutte' : 'Mostra tutte'}
-                onclick={() =>
-                  everythingVisible ? store.hideAllCategories() : store.showAllCategories()}
-              >
-                <Icon name={everythingVisible ? 'eye' : 'eyeOff'} />
-              </Button>
-            {/if}
-            <Button
-              look="icon"
-              id="add-category"
-              title="Gestisci le categorie"
-              onclick={() => ui.toggleManage('categories', 'add')}
-            >
-              <Icon name="edit" />
-            </Button>
-          </span>
-        </div>
-
-        <div id="filters" class="strisce">
-          {#each shownCategories as category (category.id)}
-            <Chip
-              color={category.color}
-              emoji={category.emoji}
-              label={category.name}
-              count={store.countIn(category.id)}
-              look={store.hiddenCategories.includes(category.id) ? 'off' : 'on'}
-              onclick={() => store.toggleCategory(category.id)}
-            />
-          {/each}
-          {#if hiddenCategories > 0}
-            <Chip
-              label={'Altre ' + hiddenCategories}
-              look="off"
-              title="Mostra tutte"
-              onclick={() => (allCategories = true)}
-            />
-          {:else if allCategories && store.categories.length > CAP.categories}
-            <Chip label="Mostra meno" look="off" onclick={() => (allCategories = false)} />
-          {/if}
-        </div>
-        </div>
-      {/if}
-
-      {#if store.currentPlaces.length}
-        <div class="panel-row is-cut" id="list-head">
-          <!-- due modi di leggere lo stesso indice: il riquadro, o le gambe.
-               "Vicino a me" non è un interruttore: la prima volta chiede dove
-               sei, quindi passa da goNear e non dal solo cambio di modo -->
-          <Tabs
-            look="text"
-            value={near ? 'near' : 'view'}
-            onpick={(id) => (id === 'near' ? goNear() : store.setListMode('view'))}
-            label="Quali luoghi elencare"
-            options={[
-              viewport.narrow
-                ? { id: 'view', label: 'Tutti', title: 'Tutti i luoghi di questa mappa' }
-                : { id: 'view', label: 'In vista', title: 'I luoghi inquadrati adesso' },
-              {
-                id: 'near',
-                label: here.asking ? 'Rilevo la posizione…' : 'Vicino a me',
-                title: here.spot ? 'I luoghi più vicini a te' : 'Usa la tua posizione',
-              },
-            ]}
-          />
-          <span class="list-end">
-            <!-- i chilometri partono da qualcosa: qui si dice da cosa, e
-                 passandoci sopra quel qualcosa si illumina sulla mappa -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <!-- «dal centro» è il centro della mappa: dove la mappa non c'è
-                 non vuol dire niente, e non si scrive -->
-            <span
-              class="list-hint"
-              hidden={near || viewport.narrow}
-              title="Misurate dal centro della mappa"
-              onpointerenter={() => document.body.classList.add('centre-hint')}
-              onpointerleave={() => document.body.classList.remove('centre-hint')}
-            >
-              dal centro
-            </span>
-            <span id="list-count" class="tally">{rows.length}</span>
-          </span>
-        </div>
-        <PlaceList {rows} {near} />
-      {:else}
-        <EmptyState />
-      {/if}
-    {/if}
-  {/if}
-
-  <!--
-    In fondo, chi sei e la porta.
-    Stavano tutte e due nel tasto rosso in testa: il nome solo nel suo titolo,
-    cioè da nessuna parte su un telefono. Ma «esci» senza sapere da cosa è una
-    domanda senza risposta — soprattutto in un'app dove si può stare dentro i
-    dati di qualcun altro — e le due cose vanno lette insieme. Qui hanno una
-    riga loro, allineata ai bordi del pannello come tutto il resto.
-  -->
-  {#if auth.account && !collapsed}
-    <div class="panel-foot">
-      <span class="whoami" title={auth.account.email}>@{auth.account.handle}</span>
-      <!-- Uscire è un clic solo e si rientra scrivendo la password: chiedere
-           prima costa mezzo secondo, e un tasto rosso accanto a un elenco che
-           si scorre col dito si preme per sbaglio. -->
+  {#if store.categories.length && !store.loading}
+    <div class="filtro">
+    <div class="panel-row" id="group-head">
+      <span class="eyebrow">Gruppi</span>
+      <!-- apre la scheda dei gruppi: lì dentro se ne creano, si rinominano
+           e si sciolgono. Un "+" prometteva una cosa sola delle tre. -->
       <Button
-        look="link"
-        tone="danger"
-        extra="leave-btn"
-        title={'Esci da ' + auth.account.email}
-        onclick={(event: MouseEvent) =>
-          ui.askSure(event.currentTarget as HTMLElement, {
-            title: `Uscire da @${auth.account?.handle ?? ''}?`,
-            detail: 'Le tue mappe restano dove sono. Si rientra quando vuoi.',
-            verb: 'Esci',
-            no: 'Resto',
-            onYes: () => auth.leave(),
-          })}
+        look="icon"
+        id="add-group"
+        title="Gestisci i gruppi"
+        onclick={() => ui.toggleManage('groups', 'add')}
       >
-        Esci
+        <Icon name="edit" />
       </Button>
     </div>
+    <div id="group-filters" class="strisce" data-fade="none" use:fadeEdges>
+      {#if store.groups.length}
+        <Chip
+          label="Tutti i luoghi"
+          count={store.currentPlaces.length}
+          look={store.activeGroup === null ? 'sel' : 'off'}
+          onclick={() => pickGroup(null)}
+        />
+      {/if}
+      {#each store.groups as group (group.id)}
+        <Chip
+          label={group.name}
+          count={store.countGroup(group.id)}
+          look={store.activeGroup === group.id ? 'sel' : 'off'}
+          onclick={() => pickGroup(group.id)}
+        />
+      {/each}
+    </div>
+    </div>
   {/if}
+
+  {#if store.loading}
+    <PanelSkeleton />
+  {:else}
+    {#if store.categories.length}
+      <div class="filtro is-cut">
+      <div class="panel-row">
+        <span class="eyebrow">Categorie</span>
+        <span class="row-actions">
+          {#if store.categories.length > 1}
+            <!-- l'occhio dice come stanno adesso le categorie, come nella scheda
+                 delle mappe: aperto se sono sulla mappa, chiuso se le hai tolte -->
+            <Button
+              look="icon"
+              extra={'see-all' + (everythingVisible ? '' : ' is-off')}
+              title={everythingVisible ? 'Nascondi tutte' : 'Mostra tutte'}
+              onclick={() =>
+                everythingVisible ? store.hideAllCategories() : store.showAllCategories()}
+            >
+              <Icon name={everythingVisible ? 'eye' : 'eyeOff'} />
+            </Button>
+          {/if}
+          <Button
+            look="icon"
+            id="add-category"
+            title="Gestisci le categorie"
+            onclick={() => ui.toggleManage('categories', 'add')}
+          >
+            <Icon name="edit" />
+          </Button>
+        </span>
+      </div>
+
+      <div id="filters" class="strisce" data-fade="none" use:fadeEdges>
+        {#each store.categories as category (category.id)}
+          <Chip
+            color={category.color}
+            emoji={category.emoji}
+            label={category.name}
+            count={store.countIn(category.id)}
+            look={store.hiddenCategories.includes(category.id) ? 'off' : 'on'}
+            onclick={() => store.toggleCategory(category.id)}
+          />
+        {/each}
+      </div>
+      </div>
+    {/if}
+
+    {#if store.currentPlaces.length}
+      <div class="panel-row is-cut" id="list-head">
+        <!-- una testa come quella delle categorie e dei gruppi qui sopra:
+             dice cosa si sta leggendo, e quanti ne restano dopo i filtri -->
+        <span class="eyebrow">Luoghi</span>
+        <span class="list-end">
+          <!-- i chilometri partono da qualcosa: qui si dice da cosa, e
+               passandoci sopra quel qualcosa si illumina sulla mappa -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <!-- «dal centro» è il centro della mappa: dove la mappa non c'è
+               non vuol dire niente, e non si scrive -->
+          <span
+            class="list-hint"
+            hidden={!viewport.hasMap}
+            title="Misurate dal centro della mappa"
+            onpointerenter={() => document.body.classList.add('centre-hint')}
+            onpointerleave={() => document.body.classList.remove('centre-hint')}
+          >
+            dal centro
+          </span>
+          <span id="list-count" class="tally">{rows.length}</span>
+        </span>
+      </div>
+      <PlaceList {rows} />
+    {:else}
+      <EmptyState />
+    {/if}
+  {/if}
+
 </div>
 
 <style>
@@ -325,12 +227,20 @@
   top: 14px;
   left: 14px;
   z-index: var(--z-panel);
-  width: min(326px, calc(100vw - 28px));
+  /* Il pannello era piu' stretto di un telefono, e adesso che i filtri
+     stanno su una riga sola quella larghezza si legge: l'etichetta con le
+     sue due icone prende meta' riga, e delle quattro categorie se ne
+     vedevano due. Trentaquattro pixel bastano a farne stare un'altra, e
+     sono anche quattro parole in piu' per il nome di un luogo. */
+  width: min(360px, calc(100vw - 28px));
   max-height: calc(100vh - 116px);
   padding: var(--card-pad);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  /* gli stacchi sono quelli del telefono, dove ogni pixel tolto e' una riga
+     in piu' di luoghi. Sul grande quei tre pixel non li rimpiangeva nessuno,
+     e due misure per la stessa cosa vogliono dire ricordarsene due. */
+  gap: 9px;
   overflow: hidden;
   animation: rise 0.5s var(--ease);
 }
@@ -351,11 +261,6 @@
   flex: none;
 }
 
-/* i bottoni sono di <Button>: le decorazioni li raggiungono con :global */
-.panel-head :global(.panel-toggle) { margin-right: -4px; }
-
-/* quando la mappa è pubblica il link si accende: lo stato si vede da lì */
-
 .tally {
   font-size: 11.5px;
   font-weight: 560;
@@ -369,7 +274,7 @@
 .list-end { display: flex; align-items: center; gap: 8px; }
 
 /* la testata appartiene alla lista che sta sotto, non allo spazio sopra */
-#list-head { margin-top: 10px; }
+#list-head { margin-top: 4px; }
 
 .list-hint {
   font-size: 10.5px;
@@ -391,7 +296,7 @@
 /* gruppi, categorie ed elenco sono tre cose diverse: un filo lo dice senza
    parlare. Il primo non ce l'ha: sopra di lui c'è già il bordo della ricerca. */
 .panel-row.is-cut {
-  padding-top: 12px;
+  padding-top: 9px;
   border-top: 1px solid var(--hairline-soft);
 }
 
@@ -405,130 +310,88 @@
   gap: 4px;
 }
 
-.section-hint {
-  margin: 0;
-  padding: 0 6px 2px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--ink-3);
-}
-
 /* filters ----------------------------------------------------------------- */
 
-#filters, #group-filters { display: flex; flex-wrap: wrap; gap: 6px; }
-
-/* Chi sei: piccolo e smorto, ma scritto per intero. Un nome utente arriva a
-   venti caratteri, e «@sca…» non dice con che utente sei entrato.
-   Non si chiama «me»: quel nome è già del puntino blu di dove sei, sulla
-   mappa, e due cose con lo stesso nome si vestono a vicenda. */
-/* la riga in fondo: chi sei a sinistra, la porta a destra, e il filo sopra
-   che la stacca dall'elenco come le altre sezioni */
-.panel-foot {
-  display: flex;
+/*
+ * Etichetta, matita e pastiglie su una riga sola, e le pastiglie scorrono.
+ *
+ * Nato sul telefono, dove le righe si contano: erano due per sezione,
+ * quattro in tutto, e le pagava l'elenco, che è quello per cui la pagina si
+ * apre. Ma il pannello è largo trecentoventisei pixel anche sul grande —
+ * quattro categorie andavano a capo lo stesso, e dalla nona in poi
+ * sparivano dietro a un «Altre 3» da aprire. Una striscia sola non manda
+ * niente a capo e non nasconde niente, e il conto di quelle nascoste non
+ * serve più a nessuno dei due.
+ */
+.filtro {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  column-gap: 8px;
+}
+
+.filtro .panel-row { padding-left: 6px; padding-right: 0; gap: 6px; }
+
+.filtro.is-cut {
   padding-top: 9px;
   border-top: 1px solid var(--hairline-soft);
 }
 
-.whoami {
-  min-width: 0;
-  font-size: 11.5px;
-  color: var(--ink-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.filtro.is-cut .panel-row { padding-top: 0; border-top: 0; }
+
+.strisce {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* la striscia che scorre arriva fino al bordo del pannello, se no sembra
+     che finisca lì */
+  margin-right: calc(-1 * var(--card-pad));
+  padding: 2px var(--card-pad) 2px 0;
+  scroll-padding: 0 var(--card-pad);
+}
+
+.strisce::-webkit-scrollbar { display: none; }
+
+.strisce :global(.chip) { flex: none; }
+
+/* Una pastiglia tagliata di netto sul bordo sembra un disegno sbagliato
+   invece che una fila che continua, e il bordo sfumato è lo stesso segno che
+   usano gli elenchi qui sotto, che di quel mestiere vivono da sempre.
+
+   A destra sfuma più a lungo perché lì dentro ci sono anche i quattordici
+   pixel di riempimento che tengono la striscia staccata dal bordo: contati
+   quelli, sulla pastiglia ne restavano otto, e otto non si vedono. */
+.strisce:global([data-fade='right']) {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+}
+
+.strisce:global([data-fade='left']) {
+  -webkit-mask-image: linear-gradient(270deg, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(270deg, #000 calc(100% - 22px), transparent);
+}
+
+.strisce:global([data-fade='both']) {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 36px), transparent);
 }
 
 @media (max-width: 600px) {
-  /*
-   * Su un telefono la mappa non c'è, quindi il pannello è l'applicazione e
-   * l'elenco è quello per cui si apre. Prima del primo luogo c'erano
-   * trecentottantasei pixel di filtri — metà schermo — e i luoghi visibili
-   * erano sei su dodici.
-   *
-   * Le pastiglie non vanno più a capo: stanno in fila e si scorrono col
-   * dito, come le linguette di qualunque altra app. Quattro categorie
-   * occupavano due righe, e le righe le paga l'elenco.
-   */
-  /*
-   * Etichetta, pastiglie e matita su una riga sola.
-   *
-   * Erano due righe per sezione, quattro in tutto, e le pagava l'elenco: il
-   * primo luogo cominciava a metà schermo. La striscia delle pastiglie
-   * prende quello che avanza e scorre col dito.
-   */
-  .filtro {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    column-gap: 8px;
-  }
-
-  .filtro .panel-row { padding-left: 6px; padding-right: 0; gap: 6px; }
-
-  .filtro.is-cut {
-    padding-top: 9px;
-    border-top: 1px solid var(--hairline-soft);
-  }
-
-  .filtro.is-cut .panel-row { padding-top: 0; border-top: 0; }
-
-  #filters,
-  #group-filters {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    /* il filo che scorre arriva fino al bordo del pannello, se no sembra
-       che finisca lì */
-    margin: 0 -14px 0 0;
-    padding: 2px 14px 2px 0;
-    scroll-padding: 0 14px;
-  }
-
-  #filters::-webkit-scrollbar,
-  #group-filters::-webkit-scrollbar { display: none; }
-
-  :global(#filters .chip),
-  :global(#group-filters .chip) { flex: none; }
-
-  /* gli stacchi fra una cosa e l'altra: quello che avanza va all'elenco */
-  #panel { gap: 9px; }
-
-  .panel-row.is-cut { padding-top: 9px; }
-
-  #list-head { margin-top: 4px; }
-
-  /* Senza la mappa dietro non c'è niente da lasciar vedere: l'elenco prende
-     tutto lo schermo, meno il posto del tasto in fondo. Un pannello alto
-     mezzo schermo davanti a uno sfondo vuoto era metà spazio buttato. */
-  /*
-   * Il pannello arriva ai bordi, perché qui il pannello è la pagina.
-   *
-   * Sul grande galleggia sopra la mappa, e la cornice serve a far vedere
-   * cosa c'è sotto. Su un telefono sotto non c'è niente: dieci pixel per
-   * parte erano venti di larghezza dati al nero, e sopra la cornice faceva
-   * sembrare la pagina una finestra aperta su una stanza vuota.
-   *
-   * L'incavo in alto lo tiene il riempimento, non il margine: così lo sfondo
-   * arriva fin sotto l'orologio invece di lasciargli una striscia nera.
-   */
+  /* Su un telefono il pannello e' l'applicazione, non una card appoggiata
+     sulla mappa: arriva ai bordi, perche' dietro non c'e' niente da lasciar
+     vedere. E' l'unica cosa che qui sotto e' diversa. */
   #panel {
     inset: 0;
     width: auto;
     padding-top: calc(var(--card-pad) + env(safe-area-inset-top));
-    /* sotto passa il tasto che aggiunge un luogo: l'ultima riga dell'elenco
-       non gli va a finire dietro */
-    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    /* sotto passa il tasto che aggiunge un luogo, e l'ultima riga
+       dell'elenco non gli va a finire dietro */
+    padding-bottom: var(--sopra-al-tasto);
     border: 0;
     border-radius: 0;
     max-height: none;
   }
-
-  /* Su uno schermo stretto in testa non ci stanno tutti: il conteggio se ne
-     va, perché lo stesso numero è scritto due righe più sotto, accanto a
-     «Tutti». Chi sei invece non è scritto da nessun'altra parte. */
-  :global(#place-count) { display: none; }
 }
 </style>

@@ -3,7 +3,6 @@
   import { devices } from './lib/devices.svelte';
   import { live } from './lib/live.svelte';
   import { nav } from './lib/nav.svelte';
-  import { readRoute } from './lib/routing';
   import { store } from './lib/store.svelte';
   import { toast } from './lib/toast.svelte';
   import { ui } from './lib/ui.svelte';
@@ -14,8 +13,6 @@
   import PickPopover from './components/PickPopover.svelte';
   import Hint from './components/Hint.svelte';
   import LoginScreen from './components/LoginScreen.svelte';
-  import PublicMap from './components/PublicMap.svelte';
-  import PublicProfile from './components/PublicProfile.svelte';
   import AgentPage from './components/AgentPage.svelte';
   import AgentsPage from './components/AgentsPage.svelte';
   import MapsPage from './components/MapsPage.svelte';
@@ -33,6 +30,7 @@
    * a quella finestra.
    */
   ui.manageView = ManageSheet;
+  ui.placeView = PlaceSheet;
   import MapCanvas from './components/MapCanvas.svelte';
   import Palette from './components/Palette.svelte';
   import Panel from './components/Panel.svelte';
@@ -48,23 +46,10 @@
    */
   const route = $derived(nav.route);
 
-  /** /m/<slug> e /u/<handle> sono pubblici: non chiedono nulla a nessuno. */
-  const first = readRoute();
-
-  /**
-   * Le pagine che sono l'app: vogliono sapere chi sei prima di disegnare.
-   *
-   * Per esclusione, non per elenco: di pubblico c'è la mappa di qualcuno e il
-   * suo profilo, tutto il resto è casa tua. Con l'elenco, ogni pagina nuova
-   * che ci si dimenticava di aggiungere si apriva sulla schermata d'ingresso
-   * a chi era già entrato.
-   */
-  const mine = first.kind !== 'map' && first.kind !== 'profile';
-
   // Prima si vede chi c'è: l'indice si carica solo per chi è entrato, e si
   // ricarica se rientra con un altro account. Senza questo la pagina degli
-  // agenti restava bianca: nessuno aveva chiesto chi fosse.
-  if (mine) auth.load();
+  // agenti restava bianca, perché nessuno aveva chiesto chi fosse.
+  auth.load();
 
   $effect(() => {
     if (!auth.account) return;
@@ -83,31 +68,28 @@
     return () => live.stop();
   });
 
-  // The map cursor and the bottom-of-screen rules read these off the body.
+  /*
+   * Cambiare pagina chiude quello che sta davanti.
+   *
+   * La finestra galleggia sopra a tutta l'applicazione, non sopra una
+   * schermata: da «Gestisci tutti gli agenti» si finiva nella pagina degli
+   * agenti con la scheda del luogo ancora appesa in un angolo, con dentro
+   * un «Salva» che parlava di una schermata che non era piu' li'.
+   */
+  let eravamo = nav.path;
   $effect(() => {
-    document.body.classList.toggle('picking', ui.picking);
-    document.body.classList.toggle('sheet-open', ui.sheet !== 'none');
+    const siamo = nav.path;
+    if (siamo === eravamo) return;
+    eravamo = siamo;
+    ui.closeModal();
   });
 
-  /**
-   * On a narrow screen an open sheet covers the bottom, where the map chrome
-   * lives. The zoom hides; the attribution is not optional, so it is pushed up
-   * by exactly the height of the sheet — which changes as the sheet grows.
-   */
+  // Il cursore della mappa e le regole del fondo schermo si leggono da qui.
   $effect(() => {
-    // effects run after the DOM settles, so the open sheet is already there
-    const which = ui.sheet;
-    const node = which === 'none' ? null : document.querySelector<HTMLElement>(`#${which}-sheet`);
-    if (!node) {
-      document.body.style.removeProperty('--sheet-h');
-      return;
-    }
-    const measure = () =>
-      document.body.style.setProperty('--sheet-h', `${Math.round(node.getBoundingClientRect().height)}px`);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
+    document.body.classList.toggle('picking', ui.picking);
+    // «c'è una finestra davanti», che è quello che serve sapere in fondo a
+    // un telefono, dove il tasto che aggiunge un luogo le finirebbe sotto
+    document.body.classList.toggle('sheet-open', ui.modal !== null);
   });
 
   function onKeydown(event: KeyboardEvent) {
@@ -116,7 +98,7 @@
       ui.paletteOpen = !ui.paletteOpen;
       return;
     }
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && ui.sheet === 'place') {
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && ui.draft) {
       event.preventDefault();
       document.querySelector<HTMLFormElement>('#place-form')?.requestSubmit();
       return;
@@ -129,11 +111,7 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-{#if route.kind === 'map'}
-  <PublicMap handle={route.handle} slug={route.slug} />
-{:else if route.kind === 'profile'}
-  <PublicProfile handle={route.handle} />
-{:else if auth.checking}
+{#if auth.checking}
   <!-- un istante di niente: meglio del lampo della porta a chi è già dentro -->
 {:else if !auth.account}
   <LoginScreen />
@@ -162,22 +140,16 @@
     elenco — questo posto, quanto dista, aprilo — e l'elenco c'era già: qui
     smette di essere l'inquilino di mezzo pannello e prende tutto lo schermo.
   -->
-  {#if !viewport.narrow}
+  {#if viewport.hasMap}
     <MapCanvas />
   {/if}
   <Panel />
   <AddButton />
-  {#if !viewport.narrow}
+  <!-- il suggerimento spiega come si tocca la mappa, quindi vive dove la
+       mappa c'è -->
+  {#if viewport.hasMap}
     <Hint />
   {/if}
-
-  {#if ui.sheet === 'place' && ui.draft}
-    <PlaceSheet />
-  {/if}
-
-  <!-- La finestra: la apre chi ne ha bisogno passandole un componente, e da
-       qui in giù nessuno sa cosa ci sia dentro. -->
-  {#if ui.modal}<Modal />{/if}
 
   {#if ui.paletteOpen}<Palette />{/if}
   <!-- Il selettore dei segni si monta quando serve e sparisce quando no: è
@@ -189,6 +161,18 @@
 <!-- La domanda prima di una cosa: è di tutta l'app, non della sola mappa.
      Stava dentro al ramo della mappa, e nella pagina degli agenti i tasti
      avrebbero chiesto conferma a nessuno. -->
+<!-- La finestra: la apre chi ne ha bisogno passandole un componente, e da qui
+     in giù nessuno sa cosa ci sia dentro. Come la domanda qui sotto, è di
+     tutta l'app: stava dentro al ramo della mappa, e nelle pagine degli
+     agenti, delle mappe, delle scene e degli avvisi chi la apriva non vedeva
+     comparire niente. -->
+<!-- `key` e non solo `if`: una finestra nuova è un guscio nuovo. Tenendo lo
+     stesso, i tasti in fondo restavano quelli dettati da chi c'era prima, e
+     categorie e gruppi si ritrovava in fondo «Elimina luogo». -->
+{#key ui.modal}
+  {#if ui.modal}<Modal />{/if}
+{/key}
+
 {#if ui.sure}<SurePopover />{/if}
 <!-- E la scelta fra cose che hai creato tu, che e' la stessa domanda con dei
      nomi al posto del si' e del no. -->

@@ -1,28 +1,23 @@
 <script lang="ts">
   import { auth } from '../lib/auth.svelte';
-  import { mapUrl, profileUrl } from '../lib/routing';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
-  import type { PlaceMap } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import AddRow from './AddRow.svelte';
   import Button from './Button.svelte';
   import TextField from './TextField.svelte';
   import Icon from './Icon.svelte';
-  import LinkRow from './LinkRow.svelte';
   import PageCard from './PageCard.svelte';
   import PageShell from './PageShell.svelte';
   import Row from './Row.svelte';
   import ShareField from './ShareField.svelte';
-  import Switch from './Switch.svelte';
 
   /**
    * La pagina delle mappe.
    *
    * Stava in una linguetta della scheda laterale, insieme a categorie e
-   * gruppi. Ma una mappa non è una voce d'elenco come una categoria: ha un
-   * indirizzo pubblico, dei conteggi, e sotto ognuna l'elenco di chi la può
-   * modificare con le sue regole. In trecento pixel diventava una colonna che
+   * gruppi. Ma una mappa non è una voce d'elenco come una categoria: sotto
+   * ognuna c'è l'elenco di chi la può modificare, con le sue regole. In trecento pixel diventava una colonna che
    * scorreva e non si capiva più dove si era.
    */
   let newName = $state('');
@@ -36,53 +31,8 @@
     return `Se ne ${quanti === 1 ? 'va' : 'vanno'} con lei ${conta(quanti)}. Categorie e gruppi restano.`;
   }
 
-  const many = (count: number, one: string, more: string) => `${count} ${count === 1 ? one : more}`;
-
-  const visitsOfMap = (map: PlaceMap) => {
-    if (!map.views && !map.viewers) return 'Ancora nessuna visita.';
-    const parts = [many(map.views, 'apertura', 'aperture'), many(map.viewers, 'persona', 'persone')];
-    if (map.viewsFromProfile) parts.push(`${map.viewsFromProfile} dal profilo`);
-    return parts.join(' · ');
-  };
-
-  const visitsOfProfile = () => {
-    const me = auth.account;
-    if (!me || (!me.profileViews && !me.profileViewers)) return 'Ancora nessuna visita.';
-    const parts = [
-      many(me.profileViews, 'apertura', 'aperture'),
-      many(me.profileViewers, 'persona', 'persone'),
-    ];
-    if (me.profileFollowed) {
-      parts.push(
-        me.profileFollowed === 1
-          ? '1 ha aperto una mappa'
-          : `${me.profileFollowed} hanno aperto una mappa`,
-      );
-    }
-    return parts.join(' · ');
-  };
-
-  const COUNT_NOTE =
-    'Le aperture sono quante volte il link è stato usato, senza contare le ricariche ' +
-    'dei primi minuti. Le persone sono le impronte diverse in una giornata, e chi ' +
-    'torna domani conta di nuovo. Chi sei lo indoviniamo da indirizzo e browser ' +
-    'mescolati a un numero che cambia ogni giorno, non lo conserviamo, e dalla ' +
-    'stessa rete con lo stesso browser sei sempre la stessa persona, anche in ' +
-    'incognito. Le visite fatte mentre sei entrato nel tuo account non contano.';
-
-  /**
-   * Di chi è l'indirizzo pubblico di quello che si sta guardando. Dentro le
-   * mappe di un altro i link sono suoi: mettere il proprio handle davanti
-   * darebbe indirizzi che non esistono.
-   */
-  const handle = $derived(auth.account?.actingAs?.handle ?? auth.account?.handle ?? '');
-  /** I conti delle visite sono di chi possiede: in casa d'altri non li abbiamo. */
+  /** Le chiavi le dà chi la mappa ce l'ha: in casa d'altri non si passano avanti. */
   const atHome = $derived(!auth.account?.actingAs);
-
-  /** Le visite arrivano mentre guardi altro: aprendo la pagina si rileggono. */
-  $effect(() => {
-    void auth.refresh();
-  });
 
   async function create(name: string) {
     try {
@@ -106,15 +56,14 @@
 <PageShell
   title="Mappe"
   siblings={false}
-  lead="Ogni mappa tiene i suoi luoghi. Categorie e gruppi invece sono tuoi e valgono su tutte, quindi eliminarne una porta via soltanto i luoghi che ci stavano dentro. Quella che pubblichi la vede chi ha il link, tranne i luoghi segnati come privati."
+  lead="Ogni mappa tiene i suoi luoghi. Categorie e gruppi invece sono tuoi e valgono su tutte, quindi eliminarne una porta via soltanto i luoghi che ci stavano dentro."
 >
 
   {#each store.maps as map (map.id)}
     {@const open = map.id === store.activeMap?.id}
     {@const places = store.places.filter((place) => place.mapId === map.id).length}
-    {@const url = mapUrl(handle, map.slug)}
     <section class="card">
-      <Row active={open} class={map.published ? 'is-public' : ''}>
+      <Row active={open}>
         {#snippet lead()}
           <button
             type="button"
@@ -178,24 +127,7 @@
                   ? ' · in vista'
                   : ''}
             </span>
-            <Switch
-              checked={map.published}
-              onchange={(published) => store.patchMap(map, { published })}
-              label={map.published ? 'Mappa pubblica' : 'Mappa privata'}
-              title={map.published ? 'Smetti di pubblicarla' : 'Pubblicala'}
-              side="end"
-            />
           </div>
-
-          {#if map.published}
-            <LinkRow
-              prefix={'/u/' + handle + '/'}
-              value={map.slug}
-              {url}
-              onchange={(slug) => store.patchMap(map, { slug })}
-            />
-            <p class="visits" title={COUNT_NOTE}>{visitsOfMap(map)}</p>
-          {/if}
 
           <!-- Le chiavi stanno sotto la mappa che aprono. Un ospite non le
                passa avanti, quindi da ospite il riquadro non c'è. -->
@@ -225,17 +157,6 @@
         bind:value={newName}
         onadd={create}
       />
-    </PageCard>
-  {/if}
-
-  {#if store.maps.some((map) => map.published)}
-    <PageCard dashed>
-      <span class="eyebrow">Link del profilo</span>
-      <p class="note">Raccoglie tutte le mappe che hai pubblicato. È l'indirizzo da mettere in bio.</p>
-      <LinkRow prefix="/u/" value={handle} url={profileUrl(handle)} title="Copia link" />
-      {#if atHome}
-        <p class="visits" title={COUNT_NOTE}>{visitsOfProfile()}</p>
-      {/if}
     </PageCard>
   {/if}
 
@@ -317,15 +238,6 @@
   .map-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
   .map-meta { font-size: 11.5px; color: var(--ink-3); }
-
-  /* il conto sta sotto al link, smorzato: è una nota, non un titolo */
-  .visits {
-    margin: 0;
-    padding: 0;
-    font-size: 11.5px;
-    color: var(--ink-3);
-    font-variant-numeric: tabular-nums;
-  }
 
   /* le chiavi di una mappa stanno dentro la sua card, staccate da una riga */
   .map-keys {

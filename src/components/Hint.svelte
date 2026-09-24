@@ -41,8 +41,4 @@
   background: rgb(255 255 255 / 0.14);
   color: rgb(255 255 255 / 0.75);
 }
-
-@media (max-width: 600px) {
-  #hint { top: auto; bottom: calc(76px + env(safe-area-inset-bottom)); }
-}
 </style>

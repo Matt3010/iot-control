@@ -6,6 +6,7 @@
   import { clearOf } from '../lib/clearance';
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { clusterGroup, createMap, DEFAULT_COLOR, glyph, meIcon, pinIcon } from '../lib/mapkit';
+  import { signOf } from '../lib/marks';
   import { AGENTS_PATH } from '../lib/routing';
   import { readJSON, writeJSON } from '../lib/storage';
   import { store } from '../lib/store.svelte';
@@ -22,14 +23,12 @@
   const lookOf = (
     category: Category | undefined,
     extra = '',
-    locked = false,
     count = 0,
     health: string | null = null,
   ) => ({
     color: category?.color,
     emoji: category?.emoji,
     extra,
-    locked,
     count,
     ...(health ? { health } : {}),
   });
@@ -42,20 +41,23 @@
     const badge = document.createElement('span');
     badge.className = 'pop-cat';
     badge.style.setProperty('--c', category?.color ?? DEFAULT_COLOR);
-    const emoji = document.createElement('span');
-    emoji.className = 'emo';
-    emoji.textContent = category?.emoji ?? '📍';
+    /*
+     * Il segno della categoria, non la parola che lo nomina.
+     *
+     * Qui ci finiva il valore così com'è scritto nei dati, come testo. Finché
+     * dentro c'era un'emoji funzionava; da quando un segno è un disegno con
+     * una chiave — «pin», «restaurant» — nel fumetto si leggeva la chiave,
+     * e chi guardava cercava fra le sue categorie una che si chiamasse così.
+     * Il pin sulla mappa, la pastiglia e l'elenco il disegno lo sapevano già
+     * fare; questo era l'unico posto rimasto indietro.
+     */
+    const sign = document.createElement('span');
+    sign.className = 'emo';
+    sign.innerHTML = signOf(category?.emoji);
     const label = document.createElement('span');
     label.textContent = category?.name ?? 'Senza categoria';
-    badge.append(emoji, label);
+    badge.append(sign, label);
 
-    if (place.private) {
-      const closed = document.createElement('span');
-      closed.className = 'pop-lock';
-      closed.title = 'Resta fuori dalla mappa pubblica';
-      closed.append(glyph('lock'), document.createTextNode('Privato'));
-      badge.after(closed);
-    }
 
     const name = document.createElement('h3');
     name.className = 'pop-name';
@@ -187,14 +189,14 @@
 
       if (!marker) {
         marker = L.marker([place.lat, place.lng], {
-          icon: pinIcon(lookOf(category, lit, place.private, count, health)),
+          icon: pinIcon(lookOf(category, lit, count, health)),
           riseOnHover: true,
           colour,
         } as L.MarkerOptions);
         markers.set(place.key, marker);
       } else {
         marker.setLatLng([place.lat, place.lng]);
-        marker.setIcon(pinIcon(lookOf(category, lit, place.private, count, health)));
+        marker.setIcon(pinIcon(lookOf(category, lit, count, health)));
         // il grappolo legge il colore da qui: se cambia categoria deve saperlo
         (marker.options as { colour?: string }).colour = colour;
       }
@@ -269,7 +271,6 @@
     const look = lookOf(
       category,
       [draft.id ? '' : 'draft', devices.anyOn(draft.agentIds) ? 'lit' : ''].filter(Boolean).join(' '),
-      draft.private ?? false,
       draft.agentIds?.length ?? 0,
       devices.health(draft.agentIds),
     );
@@ -289,10 +290,9 @@
 <div id="map" bind:this={container}></div>
 
 <!--
-  In "in vista" le distanze partono dal centro del riquadro: tanto vale che
-  quel centro si veda. In "vicino a me" l'origine e' il puntino blu, e qui non
-  serve piu' niente.
+  Le distanze dell'elenco partono dal centro del riquadro, e tanto vale che
+  quel centro si veda.
 -->
-{#if (store.listMode !== 'near' || !here.spot) && store.currentPlaces.length}
+{#if store.currentPlaces.length}
   <span id="centre-mark" aria-hidden="true"></span>
 {/if}

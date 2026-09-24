@@ -1,21 +1,16 @@
 <script lang="ts">
   import { auth } from '../lib/auth.svelte';
   import { DEFAULT_MARK, normalise, SUGGESTED } from '../lib/format';
-  import { mapUrl, profileUrl } from '../lib/routing';
   import { fadeEdges } from '../lib/overflow';
   import { store } from '../lib/store.svelte';
-  import type { PlaceMap } from '../lib/types';
   import { toast } from '../lib/toast.svelte';
-    import { ui } from '../lib/ui.svelte';
+  import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
   import AddRow from './AddRow.svelte';
   import Icon from './Icon.svelte';
-  import LinkRow from './LinkRow.svelte';
   import Mark from './Mark.svelte';
   import Row from './Row.svelte';
-  import Switch from './Switch.svelte';
   import Tabs from './Tabs.svelte';
-  import ShareField from './ShareField.svelte';
   import Button from './Button.svelte';
   import TextField from './TextField.svelte';
 
@@ -37,58 +32,9 @@
   let newColor = $state<string>(SUGGESTED[0]!);
   let newCategoryName = $state('');
   let newGroupName = $state('');
-  let newMapName = $state('');
 
-  /**
-   * Due numeri, due domande: quante volte il link è stato usato, e quanta
-   * gente diversa l'ha usato. La frase si costruisce qui perché è la stessa
-   * per le mappe e per il profilo, a parte l'ultimo pezzo.
-   */
-  const many = (count: number, one: string, more: string) =>
-    `${count} ${count === 1 ? one : more}`;
-
-  const visitsOfMap = (map: PlaceMap) => {
-    if (!map.views && !map.viewers) return 'Ancora nessuna visita.';
-    const parts = [many(map.views, 'apertura', 'aperture'), many(map.viewers, 'persona', 'persone')];
-    if (map.viewsFromProfile) parts.push(`${map.viewsFromProfile} dal profilo`);
-    return parts.join(' · ');
-  };
-
-  /**
-   * Di chi è l'indirizzo pubblico di quello che si sta guardando. Dentro
-   * l'indice di un altro le mappe sono sue, quindi i link sono suoi: mettere
-   * il proprio handle davanti alle mappe di qualcun altro darebbe indirizzi
-   * che non esistono.
-   */
-  const handle = $derived(auth.account?.actingAs?.handle ?? auth.account?.handle ?? '');
-  /** I conti delle visite sono di chi possiede: in casa d'altri non li abbiamo. */
+  /** Categorie ed eliminazioni sono di chi l'indice ce l'ha, non di un ospite. */
   const atHome = $derived(!auth.account?.actingAs);
-
-  const visitsOfProfile = () => {
-    const me = auth.account;
-    if (!me || (!me.profileViews && !me.profileViewers)) return 'Ancora nessuna visita.';
-    const parts = [
-      many(me.profileViews, 'apertura', 'aperture'),
-      many(me.profileViewers, 'persona', 'persone'),
-    ];
-    if (me.profileFollowed) {
-      parts.push(
-        me.profileFollowed === 1
-          ? '1 ha aperto una mappa'
-          : `${me.profileFollowed} hanno aperto una mappa`,
-      );
-    }
-    return parts.join(' · ');
-  };
-
-  /** Come si conta, detto una volta sola e appeso a ogni numero. */
-  const COUNT_NOTE =
-    'Le aperture sono quante volte il link è stato usato, senza contare le ricariche ' +
-    'dei primi minuti. Le persone sono le impronte diverse in una giornata, e chi ' +
-    'torna domani conta di nuovo. Chi sei lo indoviniamo da indirizzo e browser ' +
-    'mescolati a un numero che cambia ogni giorno, non lo conserviamo, e dalla ' +
-    'stessa rete con lo stesso browser sei sempre la stessa persona, anche in ' +
-    'incognito. Le visite fatte mentre sei entrato nel tuo account non contano.';
 
   /** Oltre una decina di voci scorrerle non basta più: serve poterle cercare. */
   const MANY = 8;
@@ -124,24 +70,6 @@
       newColor = SUGGESTED[(SUGGESTED.indexOf(newColor as never) + 1) % SUGGESTED.length]!;
       if (ui.draft) ui.draft.categoryId = created.id;
       toast.show(`Categoria "${created.name}" creata`);
-    } catch (error) {
-      toast.show((error as Error).message);
-    }
-  }
-
-  async function addMap(name: string) {
-    try {
-      const created = await store.createMap(name);
-      newMapName = '';
-      toast.show(`"${created.name}" è la mappa selezionata`);
-    } catch (error) {
-      toast.show((error as Error).message);
-    }
-  }
-
-  async function goInto(handle: string) {
-    try {
-      await auth.goInto(handle);
     } catch (error) {
       toast.show((error as Error).message);
     }
@@ -395,6 +323,17 @@
 :global(.row.is-dashed) .mark-btn { width: 28px; height: 28px; font-size: 16px; }
 
 :global(.row.is-dashed) .swatch { width: 22px; height: 22px; margin: 0 3px; }
+
+/* Dove si tocca, il segno e il colore di una categoria tornano prendibili.
+   Ventotto e ventidue pixel si vedono bene e si mancano col dito, e sono i
+   due tasti che in questa scheda si premono di più. */
+@media (hover: none) {
+  :global(#category-list) .mark-btn,
+  :global(.row.is-dashed) .mark-btn { width: 40px; height: 40px; font-size: 18px; }
+
+  :global(#category-list) .swatch,
+  :global(.row.is-dashed) .swatch { width: 34px; height: 34px; margin: 0; }
+}
 
 .sheet-note {
   margin: 12px 2px 0;

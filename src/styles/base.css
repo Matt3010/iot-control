@@ -94,7 +94,17 @@ h2 {
 
 /* ------------------------------------------------------------------ sheets */
 
-aside {
+/*
+ * La scatola di tutto quello che si apre davanti.
+ *
+ * La scheda di un luogo, categorie e gruppi, il registro di un agente: stesso
+ * posto, stessa larghezza, stesso riempimento, e su un telefono prendono lo
+ * schermo allo stesso modo, maniglia compresa. Erano due descrizioni identiche
+ * in due file diversi, e quando una cambiava l'altra restava indietro finché
+ * qualcuno non se ne accorgeva guardando lo schermo. Qui la scatola è una;
+ * dentro, ognuna si arreda come vuole.
+ */
+.modal {
   position: absolute;
   top: 14px;
   right: 14px;
@@ -106,19 +116,12 @@ aside {
   animation: sheet-in 0.32s var(--ease);
 }
 
-aside header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
 @media (max-width: 600px) {
-  /* su un telefono la sheet è una cosa che si spinge via: la maniglia lo dice,
+  /* su un telefono la sheet è una cosa che si spinge via, la maniglia lo dice
      e swipeToClose la fa seguire il dito */
-  aside { padding-top: 22px; }
+  .modal { padding-top: 22px; }
 
-  aside::before {
+  .modal::before {
     content: "";
     position: absolute;
     top: 9px;
@@ -152,7 +155,11 @@ aside header {
    * basso disegnavano una cornice intorno a un bordo che non c'è: sotto
    * finisce lo schermo, non la pagina.
    */
-  aside {
+  /* `.surface.modal` e non `.modal`: il vestito — bordo, angoli, ombra — lo
+     mette `.surface`, e per vincere su di lei ci vogliono due classi. Con una
+     sola gli angoli restavano tondi in basso, a disegnare una cornice intorno
+     a un bordo che non c'è. */
+  .surface.modal {
     inset: 0;
     width: auto;
     height: 100dvh;
@@ -165,5 +172,5 @@ aside header {
   }
 
   /* la maniglia scende sotto l'orologio insieme al resto */
-  aside::before { top: calc(9px + env(safe-area-inset-top)); }
+  .modal::before { top: calc(9px + env(safe-area-inset-top)); }
 }

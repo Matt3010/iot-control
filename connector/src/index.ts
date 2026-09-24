@@ -51,12 +51,12 @@ async function main(): Promise<void> {
    * Un dispositivo come esce di qui.
    *
    * Nella mappa `devices` resta quello che dice Home Assistant, sempre e
-   * solo quello. Il sapere in più sulle telecamere si applica qui, in
+   * solo quello. Il sapere in più sulle telecamere si applica qui, in
    * uscita, e non si scrive mai dentro: scrivercelo voleva dire perdere la
-   * verità di HA, e da lì in poi ogni conto successivo si moltiplicava per
+   * verità di HA, e da lì in poi ogni conto successivo si moltiplicava per
    * un falso rimasto appiccicato. Una telecamera tornata a funzionare
-   * restava rossa finché HA non si ricordava di mandare un aggiornamento
-   * suo, che può voler dire fra un minuto o domani.
+   * restava rossa finché HA non si ricordava di mandare un aggiornamento
+   * suo, che può voler dire fra un minuto o domani.
    */
   const fuori = (device: DeviceSnapshot): DeviceSnapshot => ({
     ...device,

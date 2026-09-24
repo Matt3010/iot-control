@@ -14,13 +14,6 @@ export interface MapEditor {
 export interface PlaceMap {
   id: string;
   name: string;
-  /** Aperture del link, persone diverse, e quante di quelle aperture dal profilo. */
-  views: number;
-  viewers: number;
-  viewsFromProfile: number;
-  /** L'indirizzo pubblico: /m/<slug>. */
-  slug: string;
-  published: boolean;
   /**
    * Chi può modificarla oltre a te, e con quali regole. Le regole stanno sulla
    * persona, non su ogni pin: «questi tre a lui, tutti a lei».
@@ -52,8 +45,6 @@ export interface Place {
   lat: number;
   lng: number;
   note: string;
-  /** Un posto privato resta fuori da quello che si pubblica. */
-  private: boolean;
   /** Gli agenti appesi a questo luogo: più d'uno quando le reti sono separate. */
   agentIds: string[];
   createdAt: string;
@@ -81,7 +72,6 @@ export interface Draft {
   id?: string;
   /** Di quale mappa è: un posto che modifichi non cambia casa. */
   mapId?: string;
-  private?: boolean;
   /** Un elenco vuoto li stacca tutti: il luogo resta, i fili si tagliano. */
   agentIds?: string[];
   name?: string;

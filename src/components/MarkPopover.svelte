@@ -107,6 +107,14 @@
     overscroll-behavior: contain;
   }
 
+  /* In fondo a un telefono il foglietto ha l'altezza dello schermo da
+     spartirsi, non i duecentotrenta pixel che gli lasciava un tasto a metà
+     pagina: i cinquantacinque disegni si sfogliano invece di passare da una
+     finestrella di tre righe. */
+  @media (max-width: 600px) {
+    .marks { max-height: 48dvh; }
+  }
+
   .mark-pick {
     display: grid;
     place-items: center;

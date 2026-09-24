@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
-import { uniqueSlug } from '../auth/slug.js';
 import { iso, type Transaction } from '../persistence/db.js';
 import { maps } from '../persistence/schema.js';
 import type { MapEditor, PlaceMap, Scope } from '../types.js';
@@ -11,11 +10,6 @@ const toMap = (row: Row): PlaceMap => ({
   id: row.id,
   ownerId: row.ownerId,
   name: row.name,
-  slug: row.slug,
-  published: row.published,
-  views: row.views,
-  viewers: row.viewers,
-  viewsFromProfile: row.viewsFromProfile,
   editors: row.editors ?? [],
   createdAt: iso(row.createdAt) as string,
 });
@@ -82,46 +76,6 @@ export class MapRepository {
     return rows.map(toMap);
   }
 
-  async findBySlug(ownerId: string, slug: string): Promise<PlaceMap | undefined> {
-    const [row] = await this.tx.db
-      .select()
-      .from(maps)
-      .where(and(eq(maps.ownerId, ownerId), eq(maps.slug, slug)))
-      .limit(1);
-    return row ? toMap(row) : undefined;
-  }
-
-  /** Per i link vecchi, quando l'indirizzo non diceva ancora di chi era. */
-  async findPublishedBySlug(slug: string): Promise<PlaceMap | undefined> {
-    const [row] = await this.tx.db
-      .select()
-      .from(maps)
-      .where(and(eq(maps.slug, slug), eq(maps.published, true)))
-      .limit(1);
-    return row ? toMap(row) : undefined;
-  }
-
-  async findPublishedOf(ownerId: string): Promise<PlaceMap[]> {
-    const rows = await this.tx.db
-      .select()
-      .from(maps)
-      .where(and(eq(maps.ownerId, ownerId), eq(maps.published, true)));
-    return rows.map(toMap);
-  }
-
-  /**
-   * L'indirizzo pubblico vive sotto il tuo handle: /u/tu/<slug>. Perciò basta
-   * che sia unico fra le tue mappe — la stessa "pizzerie" può averla chiunque.
-   */
-  async freeSlug(ownerId: string, wanted: string, except?: string): Promise<string> {
-    const presi = new Set(
-      (await this.tx.db.select({ slug: maps.slug, id: maps.id }).from(maps).where(eq(maps.ownerId, ownerId)))
-        .filter((row) => row.id !== except)
-        .map((row) => row.slug),
-    );
-    return uniqueSlug(wanted, (candidate) => presi.has(candidate));
-  }
-
   async insert(ownerId: string, name: string): Promise<PlaceMap> {
     const [row] = await this.tx.db
       .insert(maps)
@@ -129,7 +83,6 @@ export class MapRepository {
         id: `map-${randomUUID()}`,
         ownerId,
         name,
-        slug: await this.freeSlug(ownerId, name),
         editors: [],
       })
       .returning();
@@ -138,30 +91,11 @@ export class MapRepository {
 
   async update(
     id: string,
-    patch: Partial<Pick<PlaceMap, 'name' | 'slug' | 'published' | 'editors'>>,
+    patch: Partial<Pick<PlaceMap, 'name' | 'editors'>>,
   ): Promise<PlaceMap | undefined> {
     if (!Object.keys(patch).length) return this.findById(id);
     const [row] = await this.tx.db.update(maps).set(patch).where(eq(maps.id, id)).returning();
     return row ? toMap(row) : undefined;
-  }
-
-  /**
-   * Un'apertura, una persona nuova di giornata, o tutte e due.
-   *
-   * Si somma dentro al database: leggere il numero, aggiungere uno e
-   * riscriverlo vuol dire che due visite nello stesso istante ne contano una.
-   */
-  async countVisit(
-    id: string,
-    what: { opened: boolean; newToday: boolean; fromProfile?: boolean },
-  ): Promise<void> {
-    const set = {
-      ...(what.opened ? { views: sql`${maps.views} + 1` } : {}),
-      ...(what.newToday ? { viewers: sql`${maps.viewers} + 1` } : {}),
-      ...(what.opened && what.fromProfile ? { viewsFromProfile: sql`${maps.viewsFromProfile} + 1` } : {}),
-    };
-    if (!Object.keys(set).length) return;
-    await this.tx.db.update(maps).set(set).where(eq(maps.id, id));
   }
 
   /** Una mappa eliminata si porta via i suoi luoghi: lo dice lo schema. */

@@ -251,8 +251,8 @@ const PAROLE: Record<string, string> = {
   timeout: 'Quel servizio non ha risposto in tempo.',
   timeout_connect: 'Quel servizio non ha risposto in tempo.',
   already_configured: 'Questo account risulta già collegato.',
-  already_in_progress: 'C’era un collegamento lasciato a metà. Riprova adesso.',
-  reauth_unsuccessful: 'Quel servizio ha chiesto di rifare l’accesso, e non è riuscito.',
+  already_in_progress: 'C’era un collegamento lasciato a metà. Riprova adesso.',
+  reauth_unsuccessful: 'Quel servizio ha chiesto di rifare l’accesso, e non è riuscito.',
   no_devices_found: 'Non ha trovato niente da collegare.',
   unknown: 'Quel servizio ha risposto in un modo che non ci aspettavamo.',
   template: 'Quel servizio ha risposto in un modo che non ci aspettavamo.',
@@ -342,7 +342,7 @@ function translate(flow: HaFlow, going?: { flowId: string; schema?: unknown[] })
       flowId: flow.flow_id ?? '',
       kind: 'failed',
       fields: [],
-      error: PAROLE[perche] ?? (perche && leggibile(perche) ? perche : 'il collegamento si è interrotto'),
+      error: PAROLE[perche] ?? (perche && leggibile(perche) ? perche : 'il collegamento si è interrotto'),
     };
   }
 
@@ -447,7 +447,7 @@ function listed(schema: unknown[] | undefined): string {
        */
       const value = proposed(entry);
       if (value !== undefined) {
-        bits.push(isSecret(entry) ? 'già compilato' : `propone ${JSON.stringify(value)}`);
+        bits.push(isSecret(entry) ? 'già compilato' : `propone ${JSON.stringify(value)}`);
       }
       if (entry.type !== undefined) bits.push(`tipo ${String(entry.type)}`);
       return bits.join(' ');

@@ -58,6 +58,13 @@
   --z-toast: 1500;
 
   /* geometry */
+  /* Dove comincia lo spazio del tasto che aggiunge un luogo.
+     Su un telefono quel tasto sta in fondo e largo quanto lo schermo, e
+     tutto quello che gli galleggia sopra — il messaggio con l'annulla, la
+     fascia di chi è ospite, l'ultima riga dell'elenco — deve stare sopra
+     questa riga. Era la sua altezza sommata a mano in quattro file, e chi
+     avesse cambiato il tasto avrebbe dovuto sapere quali. */
+  --sopra-al-tasto: calc(76px + env(safe-area-inset-bottom));
   --card-pad: 14px;
   --r-lg: 20px;
   --r-md: 13px;

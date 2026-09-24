@@ -157,7 +157,7 @@
             }}
           />
           <span class="stop-hint">
-            Le tue mappe pubbliche staranno qui: <b>/u/{chosenHandle || 'nome-utente'}</b>
+            Nell'app ti vedrai scritto così: <b>@{chosenHandle || 'nome-utente'}</b>
           </span>
         </Stop>
       {/if}

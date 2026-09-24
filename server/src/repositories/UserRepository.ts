@@ -13,9 +13,6 @@ const toUser = (row: Row): User => ({
   handle: row.handle,
   salt: row.salt,
   hash: row.hash,
-  profileViews: row.profileViews,
-  profileViewers: row.profileViewers,
-  profileFollowed: row.profileFollowed,
   createdAt: iso(row.createdAt) as string,
 });
 
@@ -55,7 +52,7 @@ export class UserRepository {
   }
 
   /**
-   * Un nome libero per il link pubblico.
+   * Un nome utente libero.
    *
    * Si chiede al database se quello è già di qualcuno invece di scorrere
    * tutti: con mille iscritti la differenza è fra una domanda e mille righe
@@ -70,34 +67,8 @@ export class UserRepository {
     return uniqueSlug(wanted, (candidate) => presi.has(candidate));
   }
 
-  /**
-   * Un'apertura del profilo, una persona nuova di giornata, o tutte e due.
-   *
-   * Si somma dentro al database e non qui: leggere il numero, aggiungere uno
-   * e riscriverlo vuol dire che due visite nello stesso istante ne contano
-   * una. Con un file solo non capitava mai, con due server capita.
-   */
-  async countVisit(id: string, what: { opened: boolean; newToday: boolean }): Promise<void> {
-    if (!what.opened && !what.newToday) return;
-    await this.tx.db
-      .update(users)
-      .set({
-        ...(what.opened ? { profileViews: sql`${users.profileViews} + 1` } : {}),
-        ...(what.newToday ? { profileViewers: sql`${users.profileViewers} + 1` } : {}),
-      })
-      .where(eq(users.id, id));
-  }
-
-  /** Una di quelle visite ha poi aperto una mappa. */
-  async countFollowed(id: string): Promise<void> {
-    await this.tx.db
-      .update(users)
-      .set({ profileFollowed: sql`${users.profileFollowed} + 1` })
-      .where(eq(users.id, id));
-  }
-
   async insert(
-    data: Omit<User, 'id' | 'createdAt' | 'profileViews' | 'profileViewers' | 'profileFollowed'>,
+    data: Omit<User, 'id' | 'createdAt'>,
   ): Promise<User> {
     const [row] = await this.tx.db
       .insert(users)

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { formatDistance, normalise } from '../lib/format';
-  import { here } from '../lib/here.svelte';
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { store } from '../lib/store.svelte';
   import type { LocalPlace } from '../lib/types';
@@ -49,12 +48,13 @@
       else if (place.groupIds.some((id) => normalise(store.groupOf(id)?.name ?? '').includes(needle))) rank = 3;
       else if (normalise(place.note ?? '').includes(needle)) rank = 4;
       if (rank === Number.POSITIVE_INFINITY) continue;
-      // stessa origine dell'indice: altrimenti due distanze diverse per lo
-      // stesso posto, sulla stessa schermata
+      // `null` vuol dire dal centro del riquadro, che e' l'origine dell'elenco
+      // qui sotto. Misurate da due punti diversi, le due distanze dello stesso
+      // luogo si contraddicono sulla stessa schermata
       scored.push({
         place,
         rank,
-        distance: mapBridge.distanceFrom(place.lat, place.lng, origin()),
+        distance: mapBridge.distanceFrom(place.lat, place.lng, null),
       });
     }
 
@@ -72,13 +72,12 @@
         note: [groups.join(', '), place.note || category?.name].filter(Boolean).join(' · '),
         // Una distanza si scrive solo se si sa da dove: senza mappa e senza
         // posizione, «0 m» sarebbe una bugia precisa.
-        meta: origin() || !viewport.narrow ? formatDistance(distance) : '',
+        meta: viewport.hasMap ? formatDistance(distance) : '',
         pick: () => {
           ui.paletteOpen = false;
-          if (viewport.narrow) ui.panelWish = 'closed';
           store.reveal(place);
           // sul telefono non c'è nessuna mappa a cui volare: si apre la scheda
-          if (viewport.narrow) return ui.openPlace(place);
+          if (!viewport.hasMap) return ui.openPlace(place);
           mapBridge.focus(place);
         },
       };
@@ -179,9 +178,6 @@
       rows[selected]?.pick();
     }
   }
-
-  /** In "vicino a me" si misura da te; altrimenti dal centro del riquadro. */
-  const origin = () => (store.listMode === 'near' ? here.spot : null);
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -211,7 +207,7 @@
       {#if placeRows.length}
         <div class="palette-section">
           <span class="eyebrow">I tuoi luoghi</span>
-          {#if !query.trim() && (origin() || !viewport.narrow)}
+          {#if !query.trim() && viewport.hasMap}
             <span class="palette-meta">i più vicini</span>
           {/if}
         </div>

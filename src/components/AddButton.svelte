@@ -11,8 +11,8 @@
    * il nome della via ce l'hai in testa.
    */
   const add = (): void => {
-    if (viewport.narrow) ui.paletteOpen = true;
-    else ui.setPicking(!ui.picking);
+    if (viewport.hasMap) ui.setPicking(!ui.picking);
+    else ui.paletteOpen = true;
   };
 </script>
 
@@ -69,13 +69,18 @@
 
 @media (max-width: 600px) {
   #add-btn {
-      left: 12px;
-      right: 12px;
-      bottom: calc(12px + env(safe-area-inset-bottom));
-      justify-content: center;
-    }
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    justify-content: center;
+    /* Sopra al pannello, non dietro. Finche' il pannello era una card che
+       galleggiava sulla mappa l'ordine non contava; adesso e' la pagina e
+       prende tutto lo schermo, e il tasto ci finiva sotto: visibile a meta'
+       e impossibile da premere. */
+    z-index: var(--z-hint);
+  }
 
   /* an open sheet fills the bottom: the add button would sit under it */
-    :global(.sheet-open) #add-btn { display: none; }
+  :global(.sheet-open) #add-btn { display: none; }
 }
 </style>

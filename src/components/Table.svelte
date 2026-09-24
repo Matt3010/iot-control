@@ -155,11 +155,10 @@
 
   tbody tr :global(td) { transition: background 0.14s; }
 
+  /* Una fascia dritta, senza angoli tondi. La linea che separa le righe sta
+     sulle stesse celle, e con gli angoli tondi si piegava anche lei ai due
+     capi, come un nastro invece che un filo. */
   tbody tr:hover :global(td) { background: var(--sunken); }
-
-  tbody tr :global(td:first-child) { border-radius: var(--r-sm) 0 0 var(--r-sm); }
-
-  tbody tr :global(td:last-child) { border-radius: 0 var(--r-sm) var(--r-sm) 0; }
 
   th.end,
   tbody :global(td.end) { text-align: right; }

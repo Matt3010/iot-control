@@ -80,7 +80,7 @@
 }
 
 @media (max-width: 600px) {
-  #toast { bottom: calc(76px + env(safe-area-inset-bottom)); }
+  #toast { bottom: var(--sopra-al-tasto); }
 
   :global(.sheet-open) #toast { bottom: calc(12px + env(safe-area-inset-bottom)); }
 }

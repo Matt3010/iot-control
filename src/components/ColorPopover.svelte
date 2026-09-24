@@ -28,16 +28,27 @@
 
 <style>
 /* the palette that opens from it */
+/* Dieci per riga sul grande, dove si punta con un mouse. Otto sul telefono,
+   perché la riga è larga quanto lo schermo e i pallini crescono fino a
+   diventare prendibili: erano ventiquattro pixel, sotto la misura di un
+   dito, e ce n'erano quaranta attaccati. */
 .swatches {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(10, 24px);
   gap: 5px;
-  padding: 12px;
+  justify-content: center;
+}
+
+@media (max-width: 600px) {
+  .swatches {
+    grid-template-columns: repeat(8, 1fr);
+    gap: 8px;
+  }
 }
 
 .swatch-dot {
-  width: 24px;
-  height: 24px;
+  width: 100%;
+  aspect-ratio: 1;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -56,7 +67,5 @@
     0 0 0 3.5px var(--c);
 }
 
-/* il vetro e la posizione li mette il foglietto: qui resta la sola cosa che
-   riguarda i colori, cioe' che stanno attaccati al bordo */
-:global(#color-popover) { padding: 0; }
+/* il vetro, la posizione e lo spazio intorno li mette il foglietto */
 </style>

@@ -3,8 +3,10 @@ import { api } from './api';
 /** Un avviso avvenuto, come arriva dal server. */
 export interface Notice {
   id: string;
-  kind: 'silent' | 'back';
+  kind: 'silent' | 'back' | 'scene';
   agentId?: string;
+  /** Quando l'avviso riguarda una cosa sola in casa: quale. */
+  deviceId?: string;
   title: string;
   body: string;
   /** Il posto e cosa gli è successo, già divisi: una riga di tabella. */

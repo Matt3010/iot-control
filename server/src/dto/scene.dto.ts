@@ -60,7 +60,7 @@ export class SceneStepDto {
   @IsOptional()
   @IsInt({ message: "l'attesa si conta in secondi interi" })
   @Min(0)
-  @Max(21_600, { message: "un'attesa non può superare le sei ore" })
+  @Max(21_600, { message: "un'attesa non può superare le sei ore" })
   after?: number;
 }
 

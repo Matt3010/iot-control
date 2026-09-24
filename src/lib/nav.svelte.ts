@@ -1,4 +1,4 @@
-import { canonical, readRoute, type Route } from './routing';
+import { canonical, readRoute } from './routing';
 
 /**
  * Dove siamo, e come ci si sposta senza ricaricare.
@@ -12,16 +12,6 @@ import { canonical, readRoute, type Route } from './routing';
  *
  * Nessun router: un oggetto che sa il percorso, e un ascolto solo sui clic.
  */
-
-/** Gli indirizzi che sa aprire da sé. Le mappe pubbliche no: sono di fuori. */
-const NOSTRI: ReadonlySet<Route['kind']> = new Set<Route['kind']>([
-  'app',
-  'agents',
-  'agent',
-  'maps',
-  'scenes',
-  'alerts',
-]);
 
 class Nav {
   path = $state(window.location.pathname);
@@ -72,9 +62,6 @@ class Nav {
     if (url.origin !== window.location.origin) return;
     // un'ancora dentro la stessa pagina non è un viaggio
     if (url.pathname === this.path) return;
-    // da fuori — la mappa di qualcuno, il suo profilo — si entra ricaricando:
-    // quelle pagine non hanno chiesto chi sei, e la nostra sì
-    if (!NOSTRI.has(this.route.kind) || !NOSTRI.has(readRoute(url.pathname).kind)) return;
 
     event.preventDefault();
     this.go(url.pathname);

@@ -39,7 +39,6 @@ const placePayload = (mapId: string, draft: Required<Pick<Draft, 'lat' | 'lng'>>
   groupIds: draft.groupIds ?? [],
   lat: draft.lat,
   lng: draft.lng,
-  private: draft.private ?? false,
   agentIds: draft.agentIds ?? [],
 });
 
@@ -63,11 +62,6 @@ class Store {
   /** Per-browser view preferences, not server state. */
   hiddenCategories = $state<string[]>(readJSON('pi.hidden', []));
   activeGroup = $state<string | null>(readJSON('pi.group', null));
-  /**
-   * Cosa elenca il pannello: quello che sta nel riquadro ('view'), oppure i
-   * posti più vicini a te ovunque siano ('near'). In strada serve il secondo.
-   */
-  listMode = $state<'view' | 'near'>(readJSON('pi.list', 'view'));
 
   /** Deletes shown as done but not yet sent, so "Annulla" costs nothing. */
   #pending = new Set<PendingDelete>();
@@ -129,7 +123,9 @@ class Store {
     writeJSON('pi.maps', this.extraMapIds);
     // un gruppo si vede se qualcosa ci sta dentro: cambiando cosa guardi può
     // restare senza posti, e allora smette di essere un filtro
-    if (this.activeGroup && !this.currentGroups.some((group) => group.id === this.activeGroup)) {
+    // un gruppo scelto resta scelto anche se è vuoto: sparisce solo quando
+    // sparisce lui, non quando non ha ancora niente dentro
+    if (this.activeGroup && !this.groups.some((group) => group.id === this.activeGroup)) {
       this.setGroup(null);
     }
   }
@@ -148,7 +144,7 @@ class Store {
 
   async patchMap(
     map: PlaceMap,
-    patch: { name?: string; slug?: string; published?: boolean; editors?: MapEditor[] },
+    patch: { name?: string; editors?: MapEditor[] },
   ): Promise<void> {
     const before = { ...map };
     Object.assign(map, patch);
@@ -202,11 +198,6 @@ class Store {
     if (!this.extraMapIds.includes(id)) return;
     this.extraMapIds = this.extraMapIds.filter((other) => other !== id);
     writeJSON('pi.maps', this.extraMapIds);
-  }
-
-  setListMode(mode: 'view' | 'near'): void {
-    this.listMode = mode;
-    writeJSON('pi.list', mode);
   }
 
   /* ----------------------------------------------------------------- reads */

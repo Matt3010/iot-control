@@ -1,22 +1,23 @@
 <script lang="ts">
   import { createElement } from 'lucide';
-  import { markOf } from '../lib/marks';
+  import { drawFor } from '../lib/marks';
 
   /**
    * Il segno di una categoria.
    *
    * Nel campo ci può stare la chiave di un disegno — «restaurant» — o
-   * un'emoji, che è quello che ci finiva prima. Qui si guarda cosa c'è e si
-   * disegna di conseguenza: le categorie di ieri restano come sono finché
-   * qualcuno non le cambia, e nessuno si ritrova i dati riscritti sotto i
-   * piedi per una decisione di stile.
+   * un'emoji, che è quello che ci finiva prima. Cosa farne per ognuno dei
+   * casi lo decide `drawFor`, una volta per tutti quelli che disegnano un
+   * segno: qui, sul pin della mappa e dentro al fumetto. Le categorie di
+   * ieri restano come sono finché qualcuno non le cambia, e nessuno si
+   * ritrova i dati riscritti sotto i piedi per una decisione di stile.
    *
    * Il disegno prende il colore di chi lo contiene, che è il punto: un'emoji
    * ha colori suoi e litiga con quello della categoria.
    */
   let { value, size = 16 }: { value: string | undefined; size?: number } = $props();
 
-  const mark = $derived(markOf(value));
+  const mark = $derived(drawFor(value));
 
   const drawn = $derived.by(() => {
     if (!mark) return '';

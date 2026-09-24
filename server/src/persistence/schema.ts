@@ -33,13 +33,10 @@ export const users = pgTable('users', {
   id: text('id').primaryKey(),
   /** Minuscola e ripulita: è la chiave con cui si entra. */
   email: text('email').notNull().unique(),
-  /** Il nome nel link pubblico del profilo. */
+  /** Il nome con cui ti vedi scritto nell'app: @tu. */
   handle: text('handle').notNull().unique(),
   salt: text('salt').notNull(),
   hash: text('hash').notNull(),
-  profileViews: integer('profile_views').notNull().default(0),
-  profileViewers: integer('profile_viewers').notNull().default(0),
-  profileFollowed: integer('profile_followed').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -51,20 +48,11 @@ export const maps = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    slug: text('slug').notNull(),
-    published: boolean('published').notNull().default(false),
-    views: integer('views').notNull().default(0),
-    viewers: integer('viewers').notNull().default(0),
-    viewsFromProfile: integer('views_from_profile').notNull().default(0),
     /** Chi può modificarla oltre a chi ce l'ha, e fin dove. */
     editors: jsonb('editors').$type<MapEditor[]>().notNull().default([]),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [
-    // due mappe della stessa persona non possono avere lo stesso indirizzo
-    // pubblico, e adesso è il database a dirlo invece di chi scrive il codice
-    uniqueIndex('maps_owner_slug').on(table.ownerId, table.slug),
-  ],
+  (table) => [index('maps_owner').on(table.ownerId)],
 );
 
 export const categories = pgTable(
@@ -122,8 +110,6 @@ export const places = pgTable(
     lat: doublePrecision('lat').notNull(),
     lng: doublePrecision('lng').notNull(),
     note: text('note').notNull().default(''),
-    /** Un luogo privato resta fuori da quello che si pubblica. */
-    private: boolean('private').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('places_map').on(table.mapId)],

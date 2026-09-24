@@ -19,8 +19,8 @@ export class CredentialsDto {
 }
 
 /**
- * Chi si registra sceglie anche come si chiama: è il suo indirizzo pubblico,
- * /u/<handle>, e non glielo può dare l'email.
+ * Chi si registra sceglie anche come si chiama: è il nome con cui lo vedono
+ * gli altri, e non glielo può dare l'email.
  */
 export class RegisterDto extends CredentialsDto {
   @clean()

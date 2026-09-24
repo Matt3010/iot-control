@@ -6,8 +6,8 @@ import { signOf } from './marks';
 
 /**
  * Quello che serve per avere *questa* mappa e non una qualsiasi: gli stessi
- * tasselli, gli stessi controlli, gli stessi pin. Lo usano la mappa dell'app,
- * quella pubblica e lo sfondo della porta. Il vestito sta in styles/map.css.
+ * tasselli, gli stessi controlli, gli stessi pin. Lo usano la mappa dell'app
+ * e lo sfondo della porta. Il vestito sta in styles/map.css.
  */
 
 /** Tasselli OpenStreetMap: niente chiavi, niente terzi. Il colore è un filtro CSS. */
@@ -128,8 +128,6 @@ export interface PinLook {
   emoji?: string;
   /** Classi in più sul pin: 'draft' mentre lo stai posando. */
   extra?: string;
-  /** Un posto privato lo si riconosce dalla mappa, senza aprirlo. */
-  locked?: boolean;
   /** Quante cose si accendono qui. Zero non si scrive. */
   count?: number;
   /** Come stanno gli agenti: 'live', 'degraded', 'lost', 'new'. */
@@ -138,7 +136,7 @@ export interface PinLook {
 
 /**
  * Il pin, e sopra un'etichetta sola con quello che c'è da sapere: come sta,
- * quanti agenti tiene, e se è privato.
+ * e quanti agenti tiene.
  *
  * L'etichetta sta **fuori** dal pin e non dentro: il pin è ruotato di 45
  * gradi, e tutto quello che ci metti dentro va controruotato uno per uno.
@@ -149,14 +147,12 @@ export function pinIcon({
   color,
   emoji,
   extra = '',
-  locked = false,
   count = 0,
   health,
 }: PinLook): L.DivIcon {
   const parts = [
     health ? `<b class="pin-health is-${health}"></b>` : '',
     count > 0 ? `<em>${count}</em>` : '',
-    locked ? glyph('lock').outerHTML : '',
   ].join('');
 
   const tag = parts ? `<i class="pin-tag">${parts}</i>` : '';

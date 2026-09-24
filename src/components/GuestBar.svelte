@@ -94,6 +94,6 @@
 
   /* al telefono la fascia scende sotto il pannello, se no lo copre */
   @media (max-width: 600px) {
-    .bar { top: auto; bottom: calc(76px + env(safe-area-inset-bottom)); }
+    .bar { top: auto; bottom: var(--sopra-al-tasto); }
   }
 </style>

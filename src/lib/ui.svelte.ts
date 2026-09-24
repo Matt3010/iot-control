@@ -1,8 +1,9 @@
 import type { Component } from 'svelte';
+import { auth } from './auth.svelte';
+import type { IconName } from './icons';
 import { readJSON, writeJSON } from './storage';
 import type { Draft } from './types';
 
-export type Sheet = 'none' | 'place' | 'manage';
 export type ManageTab = 'categories' | 'groups';
 
 /** Si chiede quale segno dare a una categoria: un disegno, o quello che c'era. */
@@ -58,12 +59,21 @@ export interface SureRequest {
 export interface ModalAction {
   label: string;
   look?: 'primary' | 'ghost' | 'danger' | 'danger-solid' | 'link';
+  tone?: 'danger';
+  /** Un disegno prima della scritta, per i tasti che si riconoscono da quello. */
+  icon?: IconName;
   disabled?: boolean;
   /**
-   * Cosa fa. Torna `false` per lasciarla aperta — serve quando quello che
-   * hai scritto non va bene e la finestra deve dirtelo restando dov'è.
+   * Cosa fa, e da quale tasto è partita.
+   *
+   * L'elemento serve a chi deve chiedere conferma: la domanda si apre
+   * accanto al tasto che l'ha fatta nascere, e il tasto qui lo disegna la
+   * finestra, non chi ha scritto l'azione.
+   *
+   * Torna `false` per lasciarla aperta — serve quando quello che hai scritto
+   * non va bene e la finestra deve dirtelo restando dov'è.
    */
-  onpick: () => boolean | void | Promise<boolean | void>;
+  onpick: (anchor: HTMLElement) => boolean | void | Promise<boolean | void>;
 }
 
 /**
@@ -83,6 +93,16 @@ export interface ModalRequest {
   props?: Record<string, unknown>;
   /** I tasti in fondo. Senza, in fondo non c'è niente. */
   actions?: ModalAction[];
+  /**
+   * Cosa fare quando si chiude, comunque la si chiuda.
+   *
+   * Una finestra si chiude dalla crocetta, con Esc, spingendola via col dito
+   * o premendo un tasto in fondo. Chi l'ha aperta ha quasi sempre qualcosa da
+   * rimettere a posto — delle righe da lasciar andare, uno stato da azzerare
+   * — e scriverlo su ognuna di quelle quattro strade vuol dire dimenticarsene
+   * su una.
+   */
+  onclose?: () => void;
 }
 
 export interface ColorRequest {
@@ -97,14 +117,23 @@ export interface ColorRequest {
  */
 const RICORDO = 'pi.scheda';
 interface Ricordo {
-  aperta: boolean;
   tab: ManageTab;
 }
-const ricordo = readJSON<Ricordo>(RICORDO, { aperta: false, tab: 'categories' });
 
-/** Which panels are open, and what the place sheet is editing. */
+/**
+ * Di quella finestra si ricorda su quale linguetta eri, non che era aperta.
+ *
+ * Riaprirla da sola voleva dire trovarsi davanti categorie e gruppi appena
+ * accesa l'app, senza averlo chiesto — su un telefono a schermo intero, per
+ * giunta. E dopo che la finestra è diventata un componente suo, quel ricordo
+ * riapriva soltanto lo stato: nessuna finestra sullo schermo, ma l'app che si
+ * credeva con una scheda aperta, e il tasto per aggiungere un luogo nascosto
+ * dietro a niente.
+ */
+const ricordo = readJSON<Ricordo>(RICORDO, { tab: 'categories' });
+
+/** Cosa c'è aperto davanti, e cosa sta modificando la scheda di un luogo. */
 class Ui {
-  sheet = $state<Sheet>(ricordo.aperta ? 'manage' : 'none');
   #tab = $state<ManageTab>(ricordo.tab);
   draft = $state<Draft | null>(null);
 
@@ -124,28 +153,48 @@ class Ui {
   sure = $state<SureRequest | null>(null);
   pick = $state<PickRequest | null>(null);
   modal = $state<ModalRequest | null>(null);
-  /**
-   * Su schermo stretto il pannello e una scheda non ci stanno insieme:
-   * 'auto' lo fa ridurre quando serve, le altre due sono scelte tue.
-   */
-  panelWish = $state<'auto' | 'open' | 'closed'>('auto');
   /** 'add' significa: ho premuto + , mettimi il cursore nel campo giusto. */
   manageIntent = $state<'browse' | 'add'>('browse');
-  /** True while the place sheet is only stepping aside for the manage sheet. */
+  /** Vero finché la scheda di un luogo si è solo fatta da parte. */
   #placePaused = false;
 
+  /**
+   * La scheda di un luogo è una finestra, come categorie e gruppi.
+   *
+   * Erano due gusci che facevano lo stesso lavoro — la stessa posizione, la
+   * stessa larghezza, gli stessi angoli, lo stesso prendersi lo schermo su un
+   * telefono — scritti in due posti. Adesso il guscio è uno, e la scheda è
+   * quello che ci sta dentro. Il titolo lo decide chi apre, perché dipende da
+   * cosa stai aprendo, mentre i tasti in fondo li detta la scheda stessa,
+   * perché dipendono da com'è messa lei.
+   */
   openPlace(draft: Draft): void {
-    this.panelWish = 'auto';
     this.draft = draft;
     this.#placePaused = false;
     this.picking = false;
-    this.sheet = 'place';
+    if (!this.placeView) return;
+
+    const suo = !draft.id || auth.canTouch(draft.id);
+    this.openModal({
+      title: !suo ? 'Luogo' : draft.id ? 'Modifica luogo' : 'Nuovo luogo',
+      view: this.placeView,
+      // farsi da parte per categorie e gruppi non è chiudere: la bozza resta
+      // dov'è, e torna davanti quando quella finestra si chiude
+      onclose: () => !this.#placePaused && this.closePlace(),
+    });
   }
 
   closePlace(): void {
     this.draft = null;
     this.#placePaused = false;
-    if (this.sheet === 'place') this.sheet = 'none';
+    // solo se davanti c'è lei: chiudere un luogo mentre guardi categorie e
+    // gruppi portava via quella finestra insieme al resto
+    if (this.placeOpen) this.modal = null;
+  }
+
+  /** Quale delle due finestre è davanti, per chi deve saperlo. */
+  get placeOpen(): boolean {
+    return this.placeView !== null && this.modal?.view === this.placeView;
   }
 
   /**
@@ -162,29 +211,53 @@ class Ui {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   manageView: Component<any> | null = null;
 
+  /** E quello della scheda di un luogo, che è una finestra come l'altra. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  placeView: Component<any> | null = null;
+
   openManage(tab: ManageTab = 'categories', intent: 'browse' | 'add' = 'browse'): void {
-    this.panelWish = 'auto';
-    this.#placePaused = this.sheet === 'place';
+    // una sola finestra alla volta: la scheda di un luogo aperta si fa da
+    // parte, e la sua bozza resta dov'è per essere ripresa dopo
+    this.#placePaused = this.draft !== null;
     this.#tab = tab;
     this.manageIntent = intent;
-    this.sheet = 'manage';
     this.#ricorda();
     // e si vede dentro a una finestra, che di cosa ci sia dentro non sa niente
-    if (this.manageView) this.openModal({ title: 'Categorie e gruppi', view: this.manageView });
+    if (this.manageView) {
+      this.openModal({
+        title: 'Categorie e gruppi',
+        view: this.manageView,
+        /* Chiusa la finestra, anche la scheda dietro deve risultare chiusa.
+           Con Esc si chiudeva solo la finestra e lo stato restava su
+           'manage': niente in mezzo allo schermo, ma l'applicazione si
+           credeva con una scheda aperta, e il tasto che aggiunge un luogo
+           spariva dietro a niente. */
+        onclose: () => this.closeManage(),
+      });
+    }
   }
 
   closeManage(): void {
     this.mark = null;
     this.color = null;
     this.modal = null;
-    this.sheet = this.#placePaused && this.draft ? 'place' : 'none';
+
+    const riprendi = this.#placePaused ? this.draft : null;
     this.#placePaused = false;
     this.#ricorda();
+    // la scheda che si era fatta da parte torna davanti, con dentro la
+    // categoria appena creata
+    if (riprendi) this.openPlace(riprendi);
   }
 
   toggleManage(tab: ManageTab = 'categories', intent: 'browse' | 'add' = 'browse'): void {
-    if (this.sheet === 'manage' && this.manageTab === tab) this.closeManage();
+    if (this.manageOpen && this.manageTab === tab) this.closeManage();
     else this.openManage(tab, intent);
+  }
+
+  /** Quale delle due finestre è davanti, per chi deve saperlo. */
+  get manageOpen(): boolean {
+    return this.modal?.view === this.manageView;
   }
 
   setPicking(on: boolean): void {
@@ -226,29 +299,43 @@ class Ui {
    * conferma o si fa scegliere una voce.
    */
   openModal(request: ModalRequest): void {
+    const prima = this.modal;
     this.modal = request;
+    // una finestra che ne rimpiazza un'altra: quella che se ne va ha le sue
+    // cose da rimettere a posto come se l'avessi chiusa tu
+    if (prima && prima !== request) prima.onclose?.();
   }
 
   closeModal(): void {
+    const chiusa = this.modal;
     this.modal = null;
+    chiusa?.onclose?.();
   }
 
-  /** Questo browser e basta: quale scheda era aperta, e su quale linguetta. */
+  /** Questo browser e basta: su quale linguetta eri. */
   #ricorda(): void {
-    writeJSON(RICORDO, { aperta: this.sheet === 'manage', tab: this.#tab });
+    writeJSON(RICORDO, { tab: this.#tab });
   }
 
   /** Esc unwinds the overlay one layer at a time, topmost first. */
   escape(): boolean {
+    /*
+     * Si toglie quello che sta davvero davanti, e l'ordine è quello in cui le
+     * cose si sovrappongono sullo schermo.
+     *
+     * Le quattro domande a foglietto stanno sopra a tutto perché nascono da
+     * un tasto che è dentro a qualcos'altro. Erano scritte sotto le
+     * finestre: col selettore dei segni aperto, un Esc chiudeva la finestra
+     * di categorie e gruppi — quella sotto — e il selettore spariva insieme
+     * a lei, lasciandoti due passi indietro rispetto a dove eri.
+     */
     if (this.sure) return (this.sure = null), true;
-    if (this.modal) return this.closeModal(), true;
+    if (this.mark) return (this.mark = null), true;
+    if (this.color) return (this.color = null), true;
     if (this.pick) return (this.pick = null), true;
     if (this.paletteOpen) return (this.paletteOpen = false), true;
-    if (this.color) return (this.color = null), true;
-    if (this.mark) return (this.mark = null), true;
+    if (this.modal) return this.closeModal(), true;
     if (this.picking) return (this.picking = false), true;
-    if (this.sheet === 'place') return this.closePlace(), true;
-    if (this.sheet === 'manage') return this.closeManage(), true;
     return false;
   }
 }

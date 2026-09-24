@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { ui } from '../lib/ui.svelte';
+  import { offriIlFondo } from '../lib/fondo.svelte';
+  import { ui, type ModalAction } from '../lib/ui.svelte';
   import { swipeToClose } from '../lib/swipe';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
@@ -27,17 +28,33 @@
    */
   const request = $derived(ui.modal!);
 
+  /*
+   * I tasti in fondo, che può dettare anche chi sta dentro.
+   *
+   * Chi apre la finestra ne passa una lista se li conosce già. Ma i tasti di
+   * una scheda cambiano con lei — «Elimina» compare solo su un luogo che
+   * esiste — e quelli li detta il componente, con un modo di ricavarli che
+   * qui si richiama ogni volta che qualcosa dentro si muove.
+   */
+  let dettati = $state<(() => ModalAction[]) | null>(null);
+  offriIlFondo({ detta: (azioni) => (dettati = azioni) });
+
+  const azioni = $derived(dettati ? dettati() : (request.actions ?? []));
+
   /** Un tasto che risponde «no» chiude e basta; gli altri lo dicono loro. */
-  async function press(at: number): Promise<void> {
-    const azione = request.actions?.[at];
+  async function press(at: number, anchor: HTMLElement): Promise<void> {
+    const azione = azioni[at];
     if (!azione) return;
 
-    const resta = await azione.onpick();
+    const resta = await azione.onpick(anchor);
     if (resta !== false) ui.closeModal();
   }
 </script>
 
-<aside
+<!-- `div` e non `aside`: una finestra che copre tutto non è «contenuto a
+     lato», e chi legge lo schermo ad alta voce deve sentirsi dire che è
+     una finestra, non un margine della pagina -->
+<div
   class="surface modal"
   role="dialog"
   aria-modal="true"
@@ -59,32 +76,35 @@
     {/if}
   </div>
 
-  {#if request.actions?.length}
+  {#if azioni.length}
     <div class="modal-foot">
-      {#each request.actions as azione, at (azione.label)}
-        <Button look={azione.look ?? 'ghost'} disabled={azione.disabled} onclick={() => void press(at)}>
+      {#each azioni as azione, at (azione.label)}
+        <Button
+          look={azione.look ?? 'ghost'}
+          tone={azione.tone}
+          disabled={azione.disabled}
+          onclick={(event: MouseEvent) => void press(at, event.currentTarget as HTMLElement)}
+        >
+          {#if azione.icon}<Icon name={azione.icon} />{/if}
           {azione.label}
         </Button>
       {/each}
     </div>
   {/if}
-</aside>
+</div>
 
 <style>
-  /* Di lato, dove dietro c'è una mappa che vale la pena lasciar vedere. */
+  /* Dove sta, quanto è larga e cosa le succede su un telefono lo dice la
+     scatola in base.css, che è la stessa della scheda di un luogo. Qui c'è
+     solo come è fatta dentro: tre fasce, e quella di mezzo è l'unica che
+     scorre. */
   .modal {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    z-index: var(--z-sheet);
-    width: min(356px, calc(100vw - 28px));
-    max-height: calc(100vh - 28px);
-    padding: var(--card-pad);
     display: flex;
     flex-direction: column;
     gap: 12px;
+    /* la scatola la lascia scorrere tutta; qui scorre solo il corpo, se no
+       il tasto che conferma se ne va mentre scrivi */
     overflow: hidden;
-    animation: sheet-in 0.32s var(--ease);
   }
 
   header {
@@ -103,8 +123,6 @@
     color: var(--ink);
   }
 
-  /* il corpo è l'unica parte che scorre: la testa e i tasti restano fermi,
-     se no il tasto che conferma se ne va mentre scrivi */
   .modal-body {
     flex: 1;
     min-height: 0;
@@ -112,6 +130,17 @@
     display: grid;
     align-content: start;
     gap: 10px;
+    /*
+     * Un po' di aria intorno, e ripresa fuori.
+     *
+     * Quello che scorre taglia quello che sporge, e a sporgere sono le
+     * ombre: la riga di una categoria ha la sua, e contro il bordo del
+     * corpo si vedeva mozzata di netto su tutti e quattro i lati. Il
+     * riempimento le lascia il posto, il margine negativo rimette il
+     * contenuto in riga con il titolo qui sopra.
+     */
+    margin: -6px;
+    padding: 6px;
   }
 
   /* i tasti in fondo, a destra come ovunque nell'app */
@@ -125,41 +154,12 @@
   }
 
   @media (max-width: 600px) {
-    /*
-     * Su un telefono prende lo schermo.
-     *
-     * Dietro non c'è nessuna mappa da lasciar vedere, quindi non c'è niente
-     * da cui staccarsi: gli angoli tondi disegnavano una cornice intorno a
-     * un bordo che non esiste, e i margini regalavano al nero ventiquattro
-     * pixel di larghezza su trecentonovanta.
-     */
-    .modal {
-      inset: 0;
-      width: auto;
-      max-height: none;
-      border: 0;
-      border-radius: 0;
-      padding-top: calc(22px + env(safe-area-inset-top));
-      padding-bottom: calc(var(--card-pad) + env(safe-area-inset-bottom));
-      animation-name: sheet-in-mobile;
-    }
-
-    /* la maniglia: dice che si può spingere via col dito, e swipeToClose
-       la fa seguire */
-    .modal::before {
-      content: '';
-      position: absolute;
-      top: calc(9px + env(safe-area-inset-top));
-      left: 50%;
-      transform: translateX(-50%);
-      width: 38px;
-      height: 4px;
-      border-radius: 99px;
-      background: var(--hairline);
-    }
-
-    /* in fondo i tasti si allargano: un dito non mira, e qui sotto non c'è
-       nient'altro da premere per sbaglio */
+    /* in fondo i tasti si allargano, perché un dito non mira e qui sotto non
+       c'è nient'altro da premere per sbaglio */
     .modal-foot :global(.btn) { flex: 1; justify-content: center; }
+
+    /* Quello che porta via qualcosa no. Allargato sembrava uno dei due
+       grandi, e la sua scritta — «Elimina luogo» — andava a capo. */
+    .modal-foot :global(.btn.danger) { flex: none; white-space: nowrap; }
   }
 </style>

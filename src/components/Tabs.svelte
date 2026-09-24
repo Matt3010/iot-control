@@ -150,6 +150,11 @@
   @media (hover: none) {
     .tabs.text { gap: 4px; margin: -11px 0; }
     .tabs.text .tab { padding: 11px 5px; }
+
+    /* Anche quelle a pastiglia: erano alte trentadue pixel, e un polpastrello
+       ne copre quaranta. Qui lo spazio si aggiunge e basta, perché la barra è
+       già un blocco suo e crescere di otto pixel non sposta niente. */
+    .tabs.pill .tab { padding: 11px 14px; font-size: 13px; }
   }
 
   .tabs.text .tab.is-on { color: var(--ink); opacity: 1; }

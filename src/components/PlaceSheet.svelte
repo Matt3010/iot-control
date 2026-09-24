@@ -1,19 +1,26 @@
 <script lang="ts">
   import { auth } from '../lib/auth.svelte';
+  import { tasti } from '../lib/fondo.svelte';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
-  import { swipeToClose } from '../lib/swipe';
-  import { ui } from '../lib/ui.svelte';
+  import { ui, type ModalAction } from '../lib/ui.svelte';
   import Chip from './Chip.svelte';
   import AgentField from './AgentField.svelte';
-  import Icon from './Icon.svelte';
-  import Switch from './Switch.svelte';
   import Tabs from './Tabs.svelte';
   import Button from './Button.svelte';
   import TextField from './TextField.svelte';
 
-  // Closing the sheet clears the draft a beat before this component goes away,
-  // so every read of it has to survive the gap.
+  /**
+   * Quello che di un luogo si legge e si cambia.
+   *
+   * Non è una finestra: è quello che una finestra ha dentro. Del guscio —
+   * dove sta, quanto è largo, la crocetta, lo spingerla via col dito — non
+   * sa niente, e per questo lo stesso pezzo starebbe altrettanto bene dentro
+   * a un pannello.
+   */
+
+  // Chiudendo la scheda la bozza sparisce un attimo prima di questo
+  // componente, quindi ogni lettura deve sopravvivere a quell'attimo.
   const draft = $derived(ui.draft);
   const editing = $derived(Boolean(draft?.id));
 
@@ -60,8 +67,7 @@
     if (alive.length !== held.length) draft.groupIds = alive;
   });
 
-  function save(event: SubmitEvent) {
-    event.preventDefault();
+  function save() {
     if (!draft || !mine) return;
     if (!draft.categoryId) {
       toast.show('Scegli una categoria prima di salvare');
@@ -76,15 +82,6 @@
       toast.show('Dai un nome al luogo prima di salvare');
       return;
     }
-    /*
-     * Qui c'era una domanda: «questo luogo ha un agente, lo rendo privato?».
-     * Aveva senso quando gli agenti sembravano una cosa che poteva uscire dal
-     * link pubblico. Non lo sono mai stati — dalla mappa pubblica un agente
-     * non esce, e adesso nemmeno i suoi interruttori stanno più su un pin —
-     * quindi la domanda avvisava di un pericolo che non c'è, a ogni
-     * salvataggio. Una domanda che si impara a chiudere senza leggerla fa
-     * male anche alle altre.
-     */
     store.savePlace({ ...draft, name });
     // Saving something the filters would hide makes it vanish; show it instead.
     if (store.hiddenCategories.includes(draft.categoryId)) store.toggleCategory(draft.categoryId);
@@ -107,6 +104,45 @@
     if (place) store.deletePlace(place);
   }
 
+  /*
+   * I tasti in fondo, che cambiano insieme alla scheda.
+   *
+   * Non li può sapere chi apre la finestra: «Elimina luogo» esiste solo su
+   * un luogo che esiste già, e chi sta guardando la mappa di qualcun altro
+   * non ha niente da salvare né da annullare, ha solo da chiudere. Qui si
+   * consegna il modo di ricavarli, e il guscio lo richiama ogni volta che
+   * qualcosa qui dentro si muove.
+   */
+  tasti(() => {
+    if (!mine) return [{ label: 'Chiudi', look: 'primary', onpick: () => ui.closePlace() }];
+
+    const fondo: ModalAction[] = [];
+
+    if (editing) {
+      fondo.push({
+        label: 'Elimina luogo',
+        look: 'danger',
+        icon: 'trash',
+        onpick: (anchor) => {
+          ui.askSure(anchor, {
+            title: `Eliminare “${draft?.name || 'questo luogo'}”?`,
+            verb: 'Elimina',
+            onYes: remove,
+          });
+          // la finestra resta dov'è finché non hai risposto
+          return false;
+        },
+      });
+    }
+
+    fondo.push({ label: 'Annulla', look: 'ghost', onpick: () => ui.closePlace() });
+    // chiudere è mestiere di `save`, che lo fa solo se quello che hai scritto
+    // sta in piedi
+    fondo.push({ label: 'Salva', look: 'primary', onpick: () => (save(), false) });
+
+    return fondo;
+  });
+
   /** I gruppi sono tuoi e valgono su tutte le mappe: ci sono tutti. */
   const groupsHere = $derived(store.groups);
 
@@ -120,22 +156,17 @@
 </script>
 
 {#if draft}
-  <aside id="place-sheet" class="surface" use:swipeToClose={() => ui.closePlace()}>
-    <header>
-      <span class="head-text">
-        <h2 id="place-title">{!mine ? 'Luogo' : editing ? 'Modifica luogo' : 'Nuovo luogo'}</h2>
-        {#if store.shownMaps.length > 1}
-          <span class="head-where">in {store.maps.find((m) => m.id === (draft.mapId ?? store.activeMap?.id))?.name}</span>
-        {/if}
-      </span>
-      <Button look="icon" title="Chiudi" onclick={() => ui.closePlace()}>
-        <Icon name="close" />
-      </Button>
-    </header>
+  <!-- Su quale mappa si sta scrivendo, quando ce n'è più d'una accesa. Il
+       titolo della finestra dice cosa stai facendo, non dove. -->
+  {#if store.shownMaps.length > 1}
+    <p class="head-where">
+      in {store.maps.find((m) => m.id === (draft.mapId ?? store.activeMap?.id))?.name}
+    </p>
+  {/if}
 
-    <!-- Le due linguette dicono «cosa stai modificando», e chi non modifica
-         niente non ha niente da scegliere: appendere un agente a un luogo è
-         un modo di cambiarlo come un altro. -->
+  <!-- Le due linguette dicono «cosa stai modificando», e chi non modifica
+       niente non ha niente da scegliere: appendere un agente a un luogo è
+       un modo di cambiarlo come un altro. -->
     {#if mine}
       <Tabs
         value={tab}
@@ -148,7 +179,7 @@
       />
     {/if}
 
-    <form id="place-form" onsubmit={save}>
+  <form id="place-form" onsubmit={(event) => (event.preventDefault(), save())}>
       {#if tab === 'edit' || !mine}
       <label class="field">
         <span class="eyebrow">Nome del luogo</span>
@@ -210,14 +241,6 @@
       </div>
     {/if}
 
-    <Switch
-      checked={draft.private ?? false}
-      disabled={!mine}
-      onchange={(value) => draft && (draft.private = value)}
-      label="Luogo privato"
-      note="Non compare nella mappa pubblica."
-    />
-
     <label class="field">
       <span class="eyebrow">Note</span>
       <textarea
@@ -239,38 +262,11 @@
         />
       {/if}
 
-    <!-- i tasti restano sotto tutt'e due: una casa scelta e non salvata
-         sarebbe una casa persa -->
-    <div class="actions">
-      {#if editing && mine}
-        <Button
-          look="danger"
-          extra="kill"
-          onclick={(event: MouseEvent) =>
-            ui.askSure(event.currentTarget as HTMLElement, {
-              title: `Eliminare “${draft.name || 'questo luogo'}”?`,
-              verb: 'Elimina',
-              onYes: remove,
-            })}
-        >
-          <Icon name="trash" /> Elimina luogo
-        </Button>
-      {/if}
-      {#if mine}
-        <Button look="ghost" onclick={() => ui.closePlace()}>Annulla</Button>
-        <Button look="primary" type="submit" extra="save-go">Salva</Button>
-      {:else}
-        <Button look="primary" extra="save-go" onclick={() => ui.closePlace()}>Chiudi</Button>
-      {/if}
-    </div>
   </form>
-  </aside>
 {/if}
 
 <style>
-/* il titolo si porta dietro in quale mappa stai scrivendo, quando non è ovvio */
-.head-text { display: grid; gap: 1px; min-width: 0; }
-
+/* in quale mappa stai scrivendo, quando non è ovvio */
 .head-where {
   font-size: 11.5px;
   color: var(--ink-3);
@@ -281,29 +277,4 @@
 
 #place-form { display: grid; gap: 14px; }
 
-
-/* un interruttore, non una casella: la differenza si vede da lontano */
-/* the container is drawn here; the chips inside it come from <Chip> */
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-
-.chips :global(.chip) { cursor: pointer; }
-
-
-.coords {
-  margin: -4px 0 0;
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-  color: var(--ink-3);
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
-  padding-top: 4px;
-  border-top: 1px solid var(--hairline-soft);
-  margin-top: 2px;
-}
 </style>

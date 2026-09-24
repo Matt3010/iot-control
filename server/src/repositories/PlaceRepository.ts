@@ -39,7 +39,6 @@ async function attach(db: Db, rows: Row[]): Promise<Place[]> {
     lat: row.lat,
     lng: row.lng,
     note: row.note,
-    private: row.private,
     agentIds: suoiAgenti.get(row.id) ?? [],
     createdAt: iso(row.createdAt) as string,
   }));
@@ -70,7 +69,6 @@ export class PlaceRepository {
       lat: data.lat,
       lng: data.lng,
       note: data.note,
-      private: data.private,
     });
     await this.#relink(id, data.groupIds, data.agentIds);
     return (await this.findById(id)) as Place;
@@ -84,7 +82,6 @@ export class PlaceRepository {
       ...(patch.lat === undefined ? {} : { lat: patch.lat }),
       ...(patch.lng === undefined ? {} : { lng: patch.lng }),
       ...(patch.note === undefined ? {} : { note: patch.note }),
-      ...(patch.private === undefined ? {} : { private: patch.private }),
     };
 
     if (Object.keys(set).length) {

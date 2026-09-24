@@ -6,18 +6,13 @@ export interface KeyRef {
   handle: string;
   mapId: string;
   mapName: string;
-  slug: string;
 }
 
 export interface Account {
   id: string;
   email: string;
-  /** Il nome nel link del profilo: /u/<handle>. */
+  /** Il nome con cui ti vedi scritto nell'app: @tu. */
   handle: string;
-  /** Aperture, persone diverse, e quante hanno poi aperto una mappa. */
-  profileViews: number;
-  profileViewers: number;
-  profileFollowed: number;
   createdAt: string;
   /** Le mappe di altri che posso modificare: chi mi ha dato la chiave. */
   keys: KeyRef[];

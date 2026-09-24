@@ -6,13 +6,9 @@
   import { viewport } from '../lib/viewport.svelte';
   import { store } from '../lib/store.svelte';
   import type { LocalPlace } from '../lib/types';
-  import Icon from './Icon.svelte';
   import Mark from './Mark.svelte';
 
-  let {
-    rows,
-    near = false,
-  }: { rows: { place: LocalPlace; distance: number }[]; near?: boolean } = $props();
+  let { rows }: { rows: { place: LocalPlace; distance: number }[] } = $props();
 
   /** Keep the row of the open popup in sight without stealing the scroll. */
   function followActive(node: HTMLLIElement) {
@@ -27,9 +23,9 @@
 <ul id="place-list" data-fade="none" use:fadeEdges>
   {#if rows.length === 0}
     <li class="row-empty">
-      {near || viewport.narrow
-        ? 'Nessun luogo da mostrare, perché i filtri qui sopra li stanno escludendo tutti.'
-        : 'Nessun luogo in questa parte di mappa.'}
+      <!-- l'elenco non guarda più il riquadro, quindi se è vuoto mentre la
+           mappa ha dei luoghi l'unica ragione sono i filtri -->
+      Nessun luogo da mostrare, perché i filtri qui sopra li escludono tutti.
     </li>
   {:else}
     {#each rows as { place, distance } (place.key)}
@@ -52,8 +48,7 @@
              * grande, invece, la riga e il pin sono la stessa cosa vista da
              * due parti, e toccare la riga porta lì.
              */
-            if (!viewport.narrow) return mapBridge.focus(place);
-            ui.panelWish = 'closed';
+            if (viewport.hasMap) return mapBridge.focus(place);
             ui.openPlace(place);
           }}
         >
@@ -65,20 +60,11 @@
               {place.note || category?.name || ''}
             </span>
           </span>
-          {#if place.private}
-            <span class="row-lock" title="Luogo privato">
-              <Icon name="lock" />
-            </span>
-          {/if}
-          <!-- La distanza si scrive solo quando si sa da dove si misura: da
-               te, o dal centro di quello che stai guardando. Sul telefono
-               senza mappa e senza posizione non si misura da niente, e uno
-               zero sarebbe una bugia precisa. -->
-          {#if near || !viewport.narrow}
-            <span
-              class="row-dist"
-              title={formatDistance(distance) + (near ? ' da dove sei' : ' dal centro della mappa')}
-            >
+          <!-- La distanza si misura dal centro di quello che stai
+               guardando. Sul telefono, dove mappa non ce n'è, non si misura
+               da niente, e uno zero sarebbe una bugia precisa. -->
+          {#if viewport.hasMap}
+            <span class="row-dist" title={formatDistance(distance) + ' dal centro della mappa'}>
               {formatDistance(distance)}
             </span>
           {/if}
@@ -116,14 +102,6 @@
   font-weight: 560;
   color: var(--ink-2);
 }
-
-.row-lock {
-  display: inline-flex;
-  flex: none;
-  color: var(--ink-3);
-}
-
-.row-lock :global(.ico) { width: 12px; height: 12px; }
 
 #place-list {
   list-style: none;

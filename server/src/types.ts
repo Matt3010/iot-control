@@ -4,17 +4,11 @@ export interface User {
   id: string;
   /** Minuscola e ripulita: è la chiave con cui si entra. */
   email: string;
-  /** Il nome nel link pubblico del profilo: /u/<handle>. */
+  /** Il nome con cui ti vedi scritto nell'app: @tu. */
   handle: string;
   /** scrypt: sale e derivata, mai la password. */
   salt: string;
   hash: string;
-  /** Quante volte è stato aperto /u/<handle>. Le tue visite non contano. */
-  profileViews: number;
-  /** Quante persone diverse: impronte distinte, contate una volta al giorno. */
-  profileViewers: number;
-  /** Di quelle visite, quante hanno poi aperto una delle tue mappe. */
-  profileFollowed: number;
   createdAt: string;
 }
 
@@ -27,16 +21,6 @@ export interface PlaceMap {
   id: string;
   ownerId: string;
   name: string;
-  /** Il nome nel link pubblico della mappa: /m/<slug>. */
-  slug: string;
-  /** Finché è falso la mappa non esiste per nessuno tranne che per te. */
-  published: boolean;
-  /** Quante volte è stato aperto il suo link pubblico. */
-  views: number;
-  /** Quante persone diverse: impronte distinte, contate una volta al giorno. */
-  viewers: number;
-  /** Di quelle, quante venivano dal profilo: la stessa persona, poco prima. */
-  viewsFromProfile: number;
   /**
    * Chi può modificarla oltre a chi ce l'ha.
    *
@@ -89,8 +73,6 @@ export interface Place {
   lat: number;
   lng: number;
   note: string;
-  /** Un posto privato resta fuori da quello che si pubblica. */
-  private: boolean;
   /**
    * Gli agenti appesi a questo luogo. Più d'uno quando le reti sono separate —
    * la sala e la cucina, due edifici — e ognuno porta i suoi dispositivi. Un

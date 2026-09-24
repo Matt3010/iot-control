@@ -1,13 +1,12 @@
 import { Router } from 'express';
 import { resolveActing } from '../auth/acting.js';
-import { maybeUser, requireUser } from '../auth/strategy.js';
+import { requireUser } from '../auth/strategy.js';
 import { agentController } from '../controllers/AgentController.js';
 import { alertController } from '../controllers/AlertController.js';
 import { AlertDto, AlertOffDto } from '../dto/alert.dto.js';
 import { authController } from '../controllers/AuthController.js';
 import { deviceController } from '../controllers/DeviceController.js';
 import { mapController } from '../controllers/MapController.js';
-import { publicController } from '../controllers/PublicController.js';
 import { categoryController } from '../controllers/CategoryController.js';
 import { groupController } from '../controllers/GroupController.js';
 import { placeController } from '../controllers/PlaceController.js';
@@ -32,16 +31,6 @@ apiRouter.get('/auth/state', authController.state);
 apiRouter.post('/auth/register', validateBody(RegisterDto), authController.register);
 apiRouter.post('/auth/login', validateBody(CredentialsDto), authController.login);
 apiRouter.post('/auth/logout', authController.logout);
-
-// quello che si può guardare senza entrare: solo mappe pubblicate
-// Su queste si prova a capire chi sta guardando, senza pretenderlo: serve a
-// dire a chi è entrato quali luoghi può correggere, e agli altri niente.
-apiRouter.use('/public', maybeUser);
-
-apiRouter.get('/public/u/:handle', publicController.profile);
-apiRouter.get('/public/u/:handle/:slug', publicController.map);
-// l'indirizzo di prima, senza handle: vive per non rompere i link già in giro
-apiRouter.get('/public/m/:slug', publicController.map);
 
 // quello che scarica una macchina appena accesa: non è entrata da
 // nessuna parte, e l'unica prova che porta è il token nell'indirizzo — lo

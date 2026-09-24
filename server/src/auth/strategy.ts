@@ -25,17 +25,6 @@ export function configurePassport(): void {
   );
 }
 
-/**
- * Come `requireUser`, ma non chiude la porta: se il token c'è e vale, si sa
- * chi è; se non c'è, si tira avanti lo stesso. Serve alle pagine pubbliche,
- * dove la domanda non è «puoi entrare?» ma «sei qualcuno che conosco?».
- */
-export const maybeUser: RequestHandler = (req: Request, res: Response, next: NextFunction) =>
-  passport.authenticate('jwt', { session: false }, (_error: unknown, user: Express.User | false) => {
-    if (user) req.user = user;
-    next();
-  })(req, res, next);
-
 /** Un rifiuto deve arrivare come JSON: il client parla solo quella lingua. */
 export const requireUser: RequestHandler = (req: Request, res: Response, next: NextFunction) =>
   passport.authenticate('jwt', { session: false }, (error: unknown, user: Express.User | false) => {

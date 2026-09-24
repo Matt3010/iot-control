@@ -24,7 +24,7 @@ export interface PushKeys {
   privateKey: string;
   /**
    * Chi siamo, per il servizio di consegna. Sta nel file per le installazioni
-   * vecchie, ma non si usa più da lì: vedi `subject()`.
+   * vecchie, ma non si usa più da lì: vedi `subject()`.
    */
   subject?: string;
 }
@@ -32,10 +32,10 @@ export interface PushKeys {
 /**
  * L'indirizzo del sito, imparato dalla prima richiesta che arriva.
  *
- * Serve a firmare le notifiche, e non si può sapere da qui: questo
+ * Serve a firmare le notifiche, e non si può sapere da qui: questo
  * programma gira dietro un tunnel, dentro un container, e il nome con cui lo
  * si raggiunge lo conosce solo chi bussa. Chiederlo a chi installa sarebbe
- * una domanda in più a cui si può rispondere da soli.
+ * una domanda in più a cui si può rispondere da soli.
  */
 let bussato = '';
 

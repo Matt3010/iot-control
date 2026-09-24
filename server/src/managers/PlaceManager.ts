@@ -39,7 +39,6 @@ export class PlaceManager {
         lat: dto.lat,
         lng: dto.lng,
         note: dto.note ?? '',
-        private: dto.private ?? false,
         agentIds,
       });
     });

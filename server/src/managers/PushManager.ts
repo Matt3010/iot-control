@@ -79,7 +79,7 @@ export class PushManager {
 
     const payload = JSON.stringify(note);
     // Chi firma si dichiara a ogni invio e non una volta all'avvio: il nome
-    // del sito si impara dalla prima richiesta, che può arrivare dopo.
+    // del sito si impara dalla prima richiesta, che può arrivare dopo.
     const vapidDetails = {
       subject: subject(),
       publicKey: keys.publicKey,

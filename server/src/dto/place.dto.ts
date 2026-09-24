@@ -2,7 +2,6 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
-  IsBoolean,
   IsLatitude,
   IsLongitude,
   IsNotEmpty,
@@ -52,11 +51,6 @@ export class CreatePlaceDto {
   @MaxLength(500)
   note?: string;
 
-  /** Un posto privato resta fuori da quello che si pubblica. */
-  @IsOptional()
-  @IsBoolean()
-  private?: boolean;
-
 
   /** Gli agenti che stanno a questo indirizzo: reti separate, agenti separati. */
   @IsOptional()
@@ -104,10 +98,6 @@ export class UpdatePlaceDto {
   @IsString()
   @MaxLength(500)
   note?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  private?: boolean;
 
 
   /** Un elenco vuoto li stacca tutti: il luogo resta, i fili si tagliano. */

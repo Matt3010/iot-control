@@ -5,6 +5,16 @@
 
   const isMac = /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
   const noCategories = $derived(store.categories.length === 0);
+
+  /**
+   * Dove si tocca, le istruzioni erano due bugie.
+   *
+   * «Clicca sulla mappa dove si trova»: su un telefono la mappa non c'è, e
+   * chi legge cerca una cosa che non può trovare. «Oppure Ctrl K»: non c'è
+   * nessun Ctrl da premere. Un'istruzione che non si può seguire è peggio di
+   * nessuna istruzione — fa credere di aver sbagliato qualcosa.
+   */
+  const conIlDito = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
 </script>
 
 <div class="empty">
@@ -19,8 +29,13 @@
   {:else}
     <p class="empty-title">Nessun luogo, per ora.</p>
     <ol class="empty-steps">
-      <li><b>Aggiungi luogo</b>, poi clicca sulla mappa dove si trova.</li>
-      <li>Oppure <kbd>{isMac ? '⌘K' : 'Ctrl K'}</kbd> e cerca un indirizzo.</li>
+      {#if conIlDito}
+        <li>Premi <b>Aggiungi luogo</b> e cerca l'indirizzo.</li>
+        <li>Oppure cercalo da qui sopra, e scegli «aggiungi qui».</li>
+      {:else}
+        <li><b>Aggiungi luogo</b>, poi clicca sulla mappa dove si trova.</li>
+        <li>Oppure <kbd>{isMac ? '⌘K' : 'Ctrl K'}</kbd> e cerca un indirizzo.</li>
+      {/if}
     </ol>
   {/if}
 </div>

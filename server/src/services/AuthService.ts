@@ -12,7 +12,6 @@ export interface KeyRef {
   handle: string;
   mapId: string;
   mapName: string;
-  slug: string;
 }
 
 export interface UserView {
@@ -27,12 +26,6 @@ export interface UserView {
    * toccare; un elenco vuol dire soltanto quelli, e gli altri si guardano.
    */
   actingAs: { ownerId: string; handle: string; places: string[] | null } | null;
-  /** Quante volte hanno aperto il tuo /u/<handle>. */
-  profileViews: number;
-  /** Quante persone diverse, contate una volta al giorno. */
-  profileViewers: number;
-  /** Di quelle, quante hanno poi aperto una delle tue mappe. */
-  profileFollowed: number;
   createdAt: string;
 }
 
@@ -47,9 +40,6 @@ const toUserView = (user: User): UserView => ({
   handle: user.handle,
   keys: [],
   actingAs: null,
-  profileViews: user.profileViews ?? 0,
-  profileViewers: user.profileViewers ?? 0,
-  profileFollowed: user.profileFollowed ?? 0,
   createdAt: user.createdAt,
 });
 
@@ -88,7 +78,6 @@ export class AuthService {
       handle: owner.handle,
       mapId: map.id,
       mapName: map.name,
-      slug: map.slug,
     }));
     const here = acting ? keys.find((key) => key.ownerId === acting.ownerId) : undefined;
     return {

@@ -89,21 +89,24 @@
   }
 </script>
 
-<svelte:window
-  onkeydown={(event: KeyboardEvent) => event.key === 'Escape' && onclose()}
-  onpointerdown={elsewhere}
-/>
+<!-- Esc non si ascolta qui. Lo sente l'applicazione, che è l'unica a sapere
+     cos'altro c'è aperto e in che ordine sta: sentendolo tutti e due, un Esc
+     chiudeva questo foglietto e insieme la finestra sotto. -->
+<svelte:window onpointerdown={elsewhere} />
 
+<!-- la posizione passa da delle variabili e non da `left` e `top` scritti
+     dritti qui: uno stile scritto sull'elemento vince su qualunque regola, e
+     su un telefono questo foglietto non deve stare dove dice il conto -->
 <div
   {id}
   {role}
   data-pop
   class="surface pop"
   aria-label={label}
-  style:left="{at.left}px"
-  style:top="{at.top}px"
-  style:width="{width}px"
-  style:max-height="{at.max}px"
+  style:--pop-x="{at.left}px"
+  style:--pop-y="{at.top}px"
+  style:--pop-w="{width}px"
+  style:--pop-h="{at.max}px"
 >
   {@render children()}
 </div>
@@ -111,12 +114,43 @@
 <style>
   .pop {
     position: fixed;
+    left: var(--pop-x);
+    top: var(--pop-y);
+    width: var(--pop-w);
+    max-height: var(--pop-h);
     z-index: var(--z-popover);
-    /* lo spazio intorno a quello che ci sta dentro lo mette il guscio: un
-       foglietto senza un nome suo non deve restare senza */
+    /* lo spazio intorno a quello che ci sta dentro lo mette il guscio, perché
+       un foglietto senza un nome suo non deve restare senza */
     padding: 9px;
-    /* più alto di quello che ha non diventa: scorre */
+    /* più alto di quello che ha non diventa, e scorre */
     overflow-y: auto;
     animation: rise 0.16s var(--ease);
+  }
+
+  /*
+   * Su un telefono non insegue il suo tasto: si appoggia in fondo.
+   *
+   * Inseguire ha senso dove il tasto è uno fra tanti e il foglietto è un
+   * francobollo di fianco. Qui il tasto è largo ventiquattro pixel, il
+   * foglietto ne prende trecento su trecentonovanta — un terzo di schermo —
+   * e cade dove capita, spesso sopra la cosa che stavi guardando, con dentro
+   * quaranta bersagli troppo piccoli per un dito. In fondo allo schermo,
+   * largo quanto lo schermo, è dove il pollice arriva e dove c'è spazio per
+   * far crescere quello che c'è dentro.
+   */
+  @media (max-width: 600px) {
+    .pop {
+      left: 0;
+      top: auto;
+      bottom: 0;
+      width: auto;
+      right: 0;
+      max-height: min(70dvh, 560px);
+      border-bottom: 0;
+      border-radius: var(--r-lg) var(--r-lg) 0 0;
+      padding: var(--card-pad);
+      padding-bottom: calc(var(--card-pad) + env(safe-area-inset-bottom));
+      animation: sheet-in-mobile 0.26s var(--ease);
+    }
   }
 </style>

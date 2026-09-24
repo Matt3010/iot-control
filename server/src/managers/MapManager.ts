@@ -32,9 +32,6 @@ export class MapManager {
 
       const patch: Partial<PlaceMap> = {};
       if (dto.name !== undefined) patch.name = dto.name;
-      if (dto.published !== undefined) patch.published = dto.published;
-      // l'indirizzo pubblico lo scegli tu, ma unico resta
-      if (dto.slug !== undefined) patch.slug = await maps.freeSlug(scope.ownerId, dto.slug, id);
       // le chiavi le da' chi la mappa ce l'ha: un ospite non ne fa altri
       if (dto.editors !== undefined && scope.maps === null) {
         const owner = await new UserRepository(tx).findById(scope.ownerId);
