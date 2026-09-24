@@ -82,3 +82,10 @@ export function salute(agentUp: boolean, online: boolean): Salute {
       state === 'live' ? 'Raggiungibile' : state === 'lost' ? 'Non risponde' : 'Non si sa, perché l’agente non è collegato',
   };
 }
+
+/** Da quanto, detto a parole: «da oggi», «da ieri», «da 5 giorni». */
+export function daQuando(iso: string): string {
+  const giorni = Math.floor((Date.now() - Date.parse(iso)) / 86_400_000);
+  if (!Number.isFinite(giorni) || giorni <= 0) return 'da oggi';
+  return giorni === 1 ? 'da ieri' : `da ${giorni} giorni`;
+}

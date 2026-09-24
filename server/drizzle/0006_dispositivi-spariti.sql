@@ -1,0 +1,1 @@
+ALTER TABLE "devices" ADD COLUMN "gone_at" timestamp with time zone;

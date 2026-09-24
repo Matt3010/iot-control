@@ -4,6 +4,7 @@
   import { devices, type Device } from '../lib/devices.svelte';
   import type { Capability, DeviceValue } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
+  import { toast } from '../lib/toast.svelte';
   import Chip from './Chip.svelte';
   import DeviceFrame from './DeviceFrame.svelte';
   import Button from './Button.svelte';
@@ -104,7 +105,7 @@
   }
 </script>
 
-<div class="dev" class:is-lit={lit} class:is-off={!device.online}>
+<div class="dev" class:is-lit={lit} class:is-off={!device.online || !!device.goneAt}>
   <div class="dev-head">
     <!-- il pallino dice se la cosa risponde, non se è accesa: quello lo
          dicono la riga che si scalda e il suo interruttore -->
@@ -219,6 +220,29 @@
       {/if}
   {/snippet}
 
+  {#if device.goneAt}
+    <!-- Sparito: niente comandi, che non arriverebbero. Resta con le sue
+         scene e i suoi avvisi, e torna com'era se lo ricolleghi; «Rimuovi»
+         lo toglie davvero, e con lui quello che lo nominava. -->
+    <div class="dev-gone">
+      <span class="dev-gone-say">{stato.says}. Torna com’era se ricolleghi il servizio da cui veniva.</span>
+      <Button
+        look="link"
+        tone="danger"
+        onclick={(event: MouseEvent) =>
+          ui.askSure(event.currentTarget as HTMLElement, {
+            title: `Rimuovere «${device.name}»?`,
+            detail: 'Se ne vanno anche le righe delle scene e gli avvisi che lo nominano.',
+            verb: 'Rimuovi',
+            no: 'Annulla',
+            onYes: () =>
+              void devices.remove(device).catch((error: Error) => toast.show(error.message)),
+          })}
+      >
+        Rimuovi
+      </Button>
+    </div>
+  {:else}
   <div class="dev-body">
     {#each principali as capability (capability.code)}
       {@render controllo(capability)}
@@ -240,6 +264,7 @@
         {/each}
       </div>
     {/if}
+  {/if}
   {/if}
 
 </div>
@@ -301,6 +326,11 @@
   /* i controlli ------------------------------------------------------------ */
 
   .dev-body { display: grid; gap: 9px; }
+
+  /* sparito: una riga che lo dice, e il tasto per toglierlo */
+  .dev-gone { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+
+  .dev-gone-say { font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
 
   /* il tasto delle impostazioni: piccolo e in disparte, come una nota */
   .dev-more {

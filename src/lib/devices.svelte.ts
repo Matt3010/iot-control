@@ -1,5 +1,5 @@
 import { rimpiazza } from './rimpiazza';
-import { healthOf, salute, type Salute } from './health';
+import { daQuando, healthOf, salute, type Salute } from './health';
 import { api } from './api';
 import { toast } from './toast.svelte';
 import type { Capability, DeviceValue, Health, LinkedAccount, PairingStep } from './types';
@@ -26,6 +26,11 @@ export interface Device {
   online: boolean;
   state: Record<string, DeviceValue>;
   lastSeenAt: string;
+  /**
+   * Da quando l'agente non lo racconta più. Resta con le sue scene e i suoi
+   * avvisi, e se lo ricolleghi torna com'era; se ne va solo con «Rimuovi».
+   */
+  goneAt?: string;
 }
 
 /** Una riga del registro di un agente: cosa è successo, e quando. */
@@ -236,7 +241,23 @@ class Devices {
     const mine = (agentIds ?? []).map((id) => this.agents.find((agent) => agent.id === id)).filter((a) => !!a);
     // La regola sta in un file suo, senza rune: un colore che si guarda tutti
     // i giorni dev'essere verificabile senza aprire un browser.
-    return healthOf(mine, this.list);
+    return healthOf(mine, this.presenti);
+  }
+
+  /**
+   * I dispositivi che ci sono, senza quelli spariti. Uno sparito non è un
+   * guasto da segnare sul pin, e non si sceglie per una scena nuova: resta
+   * solo nella sua scheda, ad aspettare di tornare o di essere rimosso.
+   */
+  get presenti(): Device[] {
+    return this.list.filter((device) => !device.goneAt);
+  }
+
+  /** «Rimuovi», per uno sparito: se ne va con le righe, le partenze e gli avvisi che lo nominavano. */
+  async remove(device: Device): Promise<void> {
+    await api.delete(`/devices/${device.id}`);
+    this.list = this.list.filter((one) => one.id !== device.id);
+    await this.load();
   }
 
   /** Se l'agente di un dispositivo è collegato adesso. */
@@ -246,13 +267,15 @@ class Devices {
 
   /** Se risponde, con le parole per dirlo. Dipende anche dal suo agente. */
   saluteDi(device: Device | undefined): Salute {
+    // sparito non è «non risponde»: non c'è, e si dice da quando
+    if (device?.goneAt) return { state: 'unknown', says: `Non c’è più ${daQuando(device.goneAt)}` };
     return salute(device ? this.agentUp(device.agentId) : false, device?.online ?? false);
   }
 
   /** Quanti ne sono accesi su quanti se ne possono accendere. */
   tally(agentId: string): { on: number; total: number } {
-    const theirs = this.ofAgent(agentId).filter((device) =>
-      device.capabilities.some((capability) => capability.kind !== 'sensor'),
+    const theirs = this.ofAgent(agentId).filter(
+      (device) => !device.goneAt && device.capabilities.some((capability) => capability.kind !== 'sensor'),
     );
     return { on: theirs.filter((device) => this.isOn(device)).length, total: theirs.length };
   }

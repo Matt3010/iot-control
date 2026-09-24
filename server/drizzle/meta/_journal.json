@@ -43,6 +43,13 @@
       "when": 1790252458876,
       "tag": "0005_condizioni-a-gruppi",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790266377394,
+      "tag": "0006_dispositivi-spariti",
+      "breakpoints": true
     }
   ]
 }

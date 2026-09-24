@@ -76,6 +76,8 @@ export class DeviceManager {
        * viene. Tolto dopo, se li porterebbe via.
        */
       const perEsterno = new Map((await repository.findAllOfAgent(agentId)).map((one) => [one.externalId, one]));
+      /** Quelli entrati dentro a un altro: scene e avvisi sono già passati a lui, e loro se ne vanno subito. */
+      const assorbiti: string[] = [];
       for (const snapshot of snapshots) {
         const casa = perEsterno.get(snapshot.externalId);
         for (const assorbito of snapshot.absorbs ?? []) {
@@ -83,29 +85,23 @@ export class DeviceManager {
           if (!casa || !vecchio || vecchio.id === casa.id) continue;
           await new SceneRepository(tx).moveDevice(ownerId, vecchio.id, casa.id, assorbito);
           await new AlertRepository(tx).moveDevice(vecchio.id, casa.id, assorbito);
+          assorbiti.push(vecchio.id);
         }
       }
+      await repository.deleteMany(assorbiti);
 
       /*
-       * Prima si conta chi li nominava, e solo dopo si tolgono.
-       *
-       * Adesso un dispositivo che sparisce si porta via da sé le regole
-       * scritte su di lui — lo dice lo schema — e contarle dopo vorrebbe dire
-       * contarne sempre zero, cioè dire a chi guarda che non è caduto niente.
+       * Chi non c'è più non si cancella: si segna da quando manca, e resta
+       * con le sue scene e i suoi avvisi. Un account scollegato e
+       * ricollegato riporta gli stessi dispositivi, e ritrovano tutto com'era.
+       * Se ne vanno davvero solo con «Rimuovi», dalla loro scheda.
        */
       const lost = completo
         ? await repository.lostOfAgent(agentId, new Set(snapshots.map((snapshot) => snapshot.externalId)))
         : [];
+      const appena = await repository.markGone(lost);
 
-      // chi sparisce esce anche dagli insiemi che lo tenevano: un insieme
-      // che prova a comandare un fantasma non si capisce perché non va
-      const scene = await new SceneRepository(tx).pruneDevices(ownerId, new Set(lost));
-      // e le regole che lo guardavano: una regola su un fantasma non
-      // scattera' mai, e resterebbe li' a far credere di essere coperti
-      await new AlertRepository(tx).pruneDevices(new Set(lost));
-      await repository.deleteMany(lost);
-
-      return { devices: kept, gone: lost, scenes: scene, before: was, tutti: await repository.findAllOfAgent(agentId) };
+      return { devices: kept, gone: appena, scenes: 0, before: was, tutti: await repository.findAllOfAgent(agentId) };
     });
 
     // l'indice li tiene tutti, anche quelli che una presentazione non ha nominato
@@ -118,7 +114,7 @@ export class DeviceManager {
     // fantasmi di quelli spariti o non vede quelli nuovi.
     // Nel registro ci finisce solo se è cambiato qualcosa: un agente che si
     // ricollega e racconta le stesse cose non è una notizia.
-    if (gone.length || tutti.length !== before) {
+    if (gone || tutti.length !== before) {
       logManager.note({
         ownerId,
         agentId,
@@ -128,17 +124,36 @@ export class DeviceManager {
         // legge di sfuggita la mattina dopo.
         detail: [
           tutti.length > before ? `ha trovato ${conta(tutti.length - before)} in più` : '',
-          gone.length ? `non trova più ${conta(gone.length)}` : '',
+          gone ? `non trova più ${conta(gone)}` : '',
         ]
           .filter(Boolean)
           .join(', e '),
       });
     }
 
-    if (gone.length || devices.length) hub.changed(ownerId, { kind: 'devices' });
+    if (gone || devices.length) hub.changed(ownerId, { kind: 'devices' });
     // gli insiemi cambiati si rileggono insieme ai dispositivi: è la stessa lista
     if (scenes) hub.changed(ownerId, { kind: 'devices' });
     return devices;
+  }
+
+  /**
+   * «Rimuovi», dalla scheda di un dispositivo sparito: se ne va davvero, con
+   * le righe, le partenze e le condizioni delle scene che lo nominavano e gli
+   * avvisi scritti su di lui. Uno che c'è ancora non si toglie da qui, perché
+   * al prossimo inventario tornerebbe, nuovo e senza niente.
+   */
+  async remove(ownerId: string, id: string): Promise<void> {
+    await store.transaction(async (tx) => {
+      const devices = new DeviceRepository(tx);
+      const device = await devices.findById(id);
+      if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
+      if (!device.goneAt) throw badRequest('c’è ancora, per toglierlo si scollega il servizio da cui viene');
+      await new SceneRepository(tx).pruneDevices(ownerId, new Set([id]));
+      await new AlertRepository(tx).pruneDevices(new Set([id]));
+      await devices.deleteMany([id]);
+    });
+    hub.changed(ownerId, { kind: 'devices' });
   }
 
   /**

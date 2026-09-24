@@ -182,6 +182,12 @@ export const devices = pgTable(
     /** Se vuoi essere avvisato quando questo smette di rispondere. */
     watch: boolean('watch').notNull().default(false),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Da quando l'agente non lo racconta più. Non si cancella: se lo
+     * ricolleghi torna lo stesso, con le sue scene e i suoi avvisi. Se ne va
+     * davvero solo quando qualcuno preme «Rimuovi».
+     */
+    goneAt: timestamp('gone_at', { withTimezone: true }),
   },
   (table) => [
     // lo stesso agente non racconta due volte la stessa cosa: prima era una

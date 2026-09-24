@@ -108,7 +108,7 @@
     ui.askPick(tasto, {
       title: 'Di quale cosa?',
       options: () =>
-        devices.list
+        devices.presenti
           .filter((device) => restaDa(device, rules).length)
           .sort((a, b) => a.name.localeCompare(b.name, 'it'))
           .map((device) => ({ id: device.id, label: device.name, note: dove(device), salute: devices.saluteDi(device) })),

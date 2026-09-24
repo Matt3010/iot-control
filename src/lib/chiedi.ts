@@ -22,7 +22,7 @@ export function chiediProva(
   // una funzione e non un elenco, così l'elenco aperto segue chi riprende
   // a rispondere e chi smette
   const buoni = () =>
-    devices.list
+    devices.presenti
       .filter((device) => scelteDi(device, modo).some((one) => !gia(device.id, one.id)))
       .sort((a, b) => a.name.localeCompare(b.name, 'it'))
       .map((device) => ({ id: device.id, label: device.name, salute: devices.saluteDi(device) }));

@@ -29,6 +29,16 @@ export class DeviceController {
     }
   };
 
+  /** «Rimuovi», per un dispositivo sparito: se ne va con quello che lo nominava. */
+  remove = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await deviceService.remove(ownerOf(req), req.params.id as string);
+      res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  };
+
   /**
    * Un fotogramma, adesso. Non si mette in cache da nessuna parte: quello che
    * si guarda è quello che c'è, e un'immagine di casa tua rimasta in un proxy

@@ -61,6 +61,8 @@ export interface DeviceView {
   lastSeenAt: string;
   /** Se vuoi essere avvisato quando smette di rispondere. */
   watch?: boolean;
+  /** Da quando l'agente non lo racconta più. */
+  goneAt?: string;
 }
 
 /** Una scena come esce di qui: il nome, le righe, e quando parte da sola. */
@@ -140,6 +142,7 @@ export const toDeviceView = (device: Device, live: { online: boolean; state: Rec
   lastSeenAt: device.lastSeenAt,
   // se vuoi che ti si dica quando tace: spento non si scrive
   ...(device.watch ? { watch: true } : {}),
+  ...(device.goneAt ? { goneAt: device.goneAt } : {}),
 });
 
 export const toStateView = ({ maps, categories, groups, places }: OwnerState): StateView => ({

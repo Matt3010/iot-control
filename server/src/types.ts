@@ -118,6 +118,8 @@ export interface Device {
    * telecamera del cancello.
    */
   watch?: boolean;
+  /** Da quando l'agente non lo racconta più. C'è solo per chi è sparito. */
+  goneAt?: string;
   id: string;
   ownerId: string;
   agentId: string;

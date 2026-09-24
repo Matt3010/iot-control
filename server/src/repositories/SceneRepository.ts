@@ -120,7 +120,8 @@ export class SceneRepository {
   }
 
   /**
-   * Un dispositivo che non esiste più si porta via le righe che lo nominavano.
+   * Un dispositivo che non esiste più si porta via le righe, le partenze e
+   * le condizioni che lo nominavano.
    *
    * Succede quando un agente smette di raccontarlo — l'hai staccato, l'hai
    * tolto da Home Assistant. Lasciarle lì vorrebbe dire una scena che prova a
@@ -136,12 +137,30 @@ export class SceneRepository {
 
     const rows = await this.tx.db.select().from(scenes).where(eq(scenes.ownerId, ownerId));
 
+    /*
+     * Anche le partenze e le condizioni. Toglievamo solo le righe, e una
+     * partenza su un dispositivo sparito restava lì: la scena non partiva
+     * più e non diceva perché. Un gruppo di condizioni rimasto vuoto se ne
+     * va con loro, tranne quello più esterno.
+     */
+    const pota = (condizione: SceneCondition): SceneCondition | null => {
+      if (condizione.kind === 'device') return gone.has(condizione.deviceId) ? null : condizione;
+      if (condizione.kind !== 'group') return condizione;
+      const items = condizione.items.map(pota).filter((one): one is SceneCondition => one !== null);
+      return items.length ? { ...condizione, items } : null;
+    };
+
     let touched = 0;
     for (const row of rows) {
       // le righe che mandano un avviso non nominano nessun dispositivo
-      const kept = row.steps.filter((step) => !step.deviceId || !gone.has(step.deviceId));
-      if (kept.length === row.steps.length) continue;
-      await this.tx.db.update(scenes).set({ steps: kept }).where(eq(scenes.id, row.id));
+      const steps = row.steps.filter((step) => !step.deviceId || !gone.has(step.deviceId));
+      const triggers = (row.triggers ?? []).filter((trigger) => !gone.has(trigger.deviceId));
+      const only: SceneConditionGroup = {
+        ...row.only,
+        items: row.only.items.map(pota).filter((one): one is SceneCondition => one !== null),
+      };
+      if (JSON.stringify([steps, triggers, only]) === JSON.stringify([row.steps, row.triggers, row.only])) continue;
+      await this.tx.db.update(scenes).set({ steps, triggers, only }).where(eq(scenes.id, row.id));
       touched += 1;
     }
     return touched;

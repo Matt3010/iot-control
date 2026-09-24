@@ -20,7 +20,8 @@
   /** Per quale dispositivo si sta scegliendo l'azione. */
   let picking = $state<string | null>(null);
 
-  const all = $derived(devices.list);
+  // per le righe nuove solo quelli che ci sono: uno sparito resta nelle righe che aveva
+  const all = $derived(devices.presenti);
 
   /** Le azioni che un dispositivo sa fare, come righe gia' pronte da aggiungere. */
   function choices(device: Device): { what: string; step: SceneStep }[] {

@@ -114,7 +114,7 @@ export class SceneManager {
    * un giro senza fine muove le tende per sempre.
    */
   async run(ownerId: string, id: string, who?: string, chiamanti: string[] = []): Promise<void> {
-    const { scene, steps } = await store.transaction(async (tx) => {
+    const { scene, steps, saltati } = await store.transaction(async (tx) => {
       const found = await new SceneRepository(tx).findById(id);
       if (!found || found.ownerId !== ownerId) throw notFound('scena inesistente');
 
@@ -124,12 +124,20 @@ export class SceneManager {
        * fra un comando e un avviso e' quello che si e' scritto.
        */
       const devices = await new DeviceRepository(tx).findAllOf(ownerId);
-      const ready = found.steps
-        .map((step) => ({ step, device: devices.find((one) => one.id === step.deviceId) }))
-        .filter((pair) => !!pair.device || !!pair.step.notify || !!pair.step.scene);
-      return { scene: found, steps: ready as { step: SceneStep; device?: Device }[] };
+      const tutte = found.steps.map((step) => ({ step, device: devices.find((one) => one.id === step.deviceId) }));
+      /*
+       * Una riga su un dispositivo sparito si salta, e resta scritta: se lo
+       * ricolleghi torna a partire. Mandargli il comando lo contava fra quelli
+       * che non hanno risposto, che non è vero: non c'è.
+       */
+      const saltati = tutte.filter((pair) => pair.device?.goneAt).map((pair) => (pair.device as Device).name);
+      const ready = tutte.filter((pair) => (!!pair.device && !pair.device.goneAt) || !!pair.step.notify || !!pair.step.scene);
+      return { scene: found, steps: ready as { step: SceneStep; device?: Device }[], saltati };
     });
 
+    if (!steps.length && saltati.length) {
+      throw badRequest(`La scena «${scene.name}» comanda solo dispositivi che non ci sono più. Tornano se ricolleghi il servizio da cui venivano.`);
+    }
     if (!steps.length) throw badRequest(`La scena «${scene.name}» è vuota, non c'è niente da fare`);
 
     /*
@@ -218,9 +226,15 @@ export class SceneManager {
     /** Com'è andata, in una frase che si regge da sola. */
     const detto = (quanti: number, zitti: number): string => {
       const quanti_ = (n: number) => `${n} ${n === 1 ? 'dispositivo' : 'dispositivi'}`;
-      if (!zitti) return `parte — ${quanti_(quanti)}`;
-      if (zitti === quanti) return 'non parte, non ha risposto nessuno';
-      return `parte a metà — ${quanti_(quanti - zitti)} su ${quanti}`;
+      // quello che si è saltato perché non c'è più, detto con un nome nostro davanti
+      const salta = !saltati.length
+        ? ''
+        : saltati.length === 1
+          ? `, e salta il dispositivo «${saltati[0]}», che non c’è più`
+          : `, e salta ${saltati.length} dispositivi che non ci sono più`;
+      if (!zitti) return `parte — ${quanti_(quanti)}${salta}`;
+      if (zitti === quanti) return `non parte, non ha risposto nessuno${salta}`;
+      return `parte a metà — ${quanti_(quanti - zitti)} su ${quanti}${salta}`;
     };
 
     /**

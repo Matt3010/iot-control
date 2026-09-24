@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, inArray, notInArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull, notInArray } from 'drizzle-orm';
 import type { Capability } from '../../../shared/protocol.js';
 import { iso, type Transaction } from '../persistence/db.js';
 import { devices, placeAgents, places } from '../persistence/schema.js';
@@ -24,6 +24,7 @@ const toDevice = (row: Row): Device => ({
   capabilities: row.capabilities,
   lastSeenAt: iso(row.lastSeenAt) as string,
   ...(row.watch ? { watch: true } : {}),
+  ...(row.goneAt ? { goneAt: iso(row.goneAt) as string } : {}),
 });
 
 export class DeviceRepository {
@@ -61,7 +62,8 @@ export class DeviceRepository {
       .from(devices)
       .leftJoin(placeAgents, eq(placeAgents.agentId, devices.agentId))
       .leftJoin(places, eq(places.id, placeAgents.placeId))
-      .where(eq(devices.watch, true));
+      // uno sparito non «smette di rispondere»: non c'è, e lo dice già la sua scheda
+      .where(and(eq(devices.watch, true), isNull(devices.goneAt)));
 
     const visti = new Map<string, { device: Device; luogo?: string }>();
     for (const row of rows) {
@@ -110,7 +112,8 @@ export class DeviceRepository {
       })
       .onConflictDoUpdate({
         target: [devices.agentId, devices.externalId],
-        set: { name, capabilities, lastSeenAt: new Date() },
+        // raccontato di nuovo: se era sparito è tornato, lo stesso di prima
+        set: { name, capabilities, lastSeenAt: new Date(), goneAt: null },
       })
       .returning();
     return toDevice(row as Row);
@@ -143,6 +146,17 @@ export class DeviceRepository {
    * nominava: una regola scritta su un dispositivo se ne va insieme a lui, e
    * per poter dire quante ne sono cadute bisogna contarle finché esistono.
    */
+  /** Non raccontati più: si segna da quando, e si tengono. Quelli già segnati restano con la loro data. */
+  async markGone(ids: string[]): Promise<number> {
+    if (!ids.length) return 0;
+    const rows = await this.tx.db
+      .update(devices)
+      .set({ goneAt: new Date() })
+      .where(and(inArray(devices.id, ids), isNull(devices.goneAt)))
+      .returning({ id: devices.id });
+    return rows.length;
+  }
+
   async deleteMany(ids: string[]): Promise<number> {
     if (!ids.length) return 0;
     const rows = await this.tx.db

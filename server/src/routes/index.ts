@@ -171,3 +171,4 @@ apiRouter.get('/devices/:id/live', deviceController.live);
 apiRouter.post('/devices/:id/command', validateBody(CommandDto), deviceController.command);
 // «avvisami se questo smette di rispondere», acceso o spento
 apiRouter.put('/devices/:id/watch', validateBody(WatchDto), deviceController.watch);
+apiRouter.delete('/devices/:id', deviceController.remove);

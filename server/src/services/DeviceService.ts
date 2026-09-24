@@ -54,6 +54,10 @@ export class DeviceService {
    * Stesse regole del fotogramma singolo: un ospite non sa nemmeno che esista.
    * Cambia solo che qui non torna un'immagine ma chi la sa mandare.
    */
+  remove(ownerId: string, id: string): Promise<void> {
+    return deviceManager.remove(ownerId, id);
+  }
+
   async watchable(ownerId: string, id: string, guest = false): Promise<Device> {
     if (guest) throw notFound('dispositivo inesistente');
     return deviceManager.camera(ownerId, id);

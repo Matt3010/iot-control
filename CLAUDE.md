@@ -124,10 +124,14 @@ Si può collegare tutto il catalogo della centrale. I registri
 bisogno di qualcosa in più: un'integrazione da installare, istruzioni scritte
 da noi, un lettore di impulsi.
 
-La presentazione di un agente aggiunge e aggiorna dispositivi, mai li toglie:
-arriva prima che l'agente abbia letto la centrale. Toglie solo l'inventario
-completo, e un dispositivo che ne assorbe un altro si porta dietro le scene e
-gli avvisi scritti su di lui.
+Un dispositivo non si cancella da solo. La presentazione di un agente
+aggiunge e aggiorna, perché arriva prima che l'agente abbia letto la
+centrale. L'inventario completo segna come spariti quelli che mancano
+(`goneAt`), e restano con le loro scene e i loro avvisi: se tornano, con lo
+stesso nome interno, sono gli stessi di prima. Se ne vanno solo con
+«Rimuovi», e allora si portano via le righe, le partenze e le condizioni che
+li nominavano. Un dispositivo che ne assorbe un altro si porta dietro le
+scene e gli avvisi scritti su di lui.
 
 ## Le prove sui dispositivi
 
