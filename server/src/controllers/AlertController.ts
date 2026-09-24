@@ -5,6 +5,7 @@ import { alertManager } from '../managers/AlertManager.js';
 import { noticeManager } from '../managers/NoticeManager.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import { askOf } from '../persistence/page.js';
+import { ORDINI_AVVISI } from '../repositories/NoticeRepository.js';
 
 /**
  * Gli avvisi avvenuti, e le regole che li fanno avvenire.
@@ -17,7 +18,7 @@ import { askOf } from '../persistence/page.js';
 export class AlertController {
   list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await noticeManager.mine(whoIs(req).id, askOf(req, 8)));
+      res.json(await noticeManager.mine(whoIs(req).id, askOf(req, 8, 100, ORDINI_AVVISI)));
     } catch (error) {
       next(error);
     }

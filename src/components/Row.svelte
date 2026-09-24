@@ -148,4 +148,11 @@
     color: var(--ink-3);
     white-space: nowrap;
   }
+
+  /* Dove si tocca, il nome si prende col dito: trentadue pixel si vedono e
+     si mancano. Lo spazio si aggiunge dentro al campo, così la riga cresce
+     di poco e il nome resta allineato al segno accanto. */
+  @media (hover: none) {
+    .row :global(input) { padding-top: 10px; padding-bottom: 10px; }
+  }
 </style>

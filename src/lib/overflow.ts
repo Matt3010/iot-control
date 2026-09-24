@@ -18,6 +18,9 @@ export function fadeEdges(node: HTMLElement) {
     const atStart = at <= 2;
     const atEnd = span - at <= 2;
 
+    // il verso serve al disegno: «both» per lungo e per largo non è la stessa
+    // sfumatura, e con il verso scritto qui una regola sola le copre tutte
+    node.dataset.fadeAxis = sideways ? 'x' : 'y';
     node.dataset.fade =
       atStart && atEnd
         ? 'none'

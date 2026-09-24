@@ -3,6 +3,7 @@
   import { fraseDi, restaDa, SILENZIO, TACE } from '../lib/rules';
   import { store } from '../lib/store.svelte';
   import type { Column } from '../lib/table';
+  import { Vista } from '../lib/vista.svelte';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
@@ -46,9 +47,25 @@
     off: boolean;
   }
 
+  /*
+   * In che ordine, dall'intestazione della tabella. La vista sta qui e non con
+   * le altre dell'app perché le righe sono fatte apposta per questa tabella:
+   * una cosa con due regole ha due righe, e altrove non esistono.
+   */
+  const confronta = (a: string, b: string): number =>
+    a.localeCompare(b, 'it', { numeric: true, sensitivity: 'base' });
+  const vista = new Vista<Riga>({
+    chiave: 'regole',
+    criteri: [
+      { id: 'cosa', label: 'Cosa', per: (a, b) => confronta(a.device.name, b.device.name) || confronta(a.quando, b.quando) },
+      { id: 'quando', label: 'Ti avviso quando', per: (a, b) => confronta(a.quando, b.quando) || confronta(a.device.name, b.device.name) },
+      { id: 'dove', label: 'Dove', per: (a, b) => confronta(dove(a.device), dove(b.device)) || confronta(a.device.name, b.device.name) },
+    ],
+  });
+
   const righe = $derived(
-    [...devices.list]
-      .sort((a, b) => a.name.localeCompare(b.name, 'it'))
+    vista.applica(
+    devices.list
       .flatMap((device): Riga[] => [
         ...(device.watch ? [{ id: `tace:${device.id}`, device, quando: TACE, off: false }] : []),
         ...rules
@@ -61,6 +78,7 @@
             off: !!rule.off,
           })),
       ]),
+    ),
   );
 
   /*
@@ -69,10 +87,10 @@
    * il nome e cosa ti arriverà. Dove sta è la domanda dopo.
    */
   const COLONNE: Column[] = [
-    { label: 'Cosa', width: 'fit' },
+    { label: 'Cosa', width: 'fit', ordina: 'cosa' },
     // l'unica che ha da dire: lo spazio che avanza è suo
-    { label: 'Ti avviso quando' },
-    { label: 'Dove', width: 'fit' },
+    { label: 'Ti avviso quando', ordina: 'quando' },
+    { label: 'Dove', width: 'fit', ordina: 'dove' },
     { label: '', width: 'fit', align: 'end' },
   ];
 
@@ -133,7 +151,7 @@
       </Button>
     </div>
 
-    <Table columns={COLONNE} rows={righe} label="Gli avvisi che hai chiesto">
+    <Table columns={COLONNE} rows={righe} {vista} label="Gli avvisi che hai chiesto">
       {#snippet row(riga: Riga)}
         <td class="chi fit" class:is-off={riga.off}>{riga.device.name}</td>
         <td class="quando" class:is-off={riga.off}>{riga.quando}</td>

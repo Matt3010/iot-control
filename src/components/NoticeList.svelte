@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { alerts, type Notice } from '../lib/alerts.svelte';
   import { devices } from '../lib/devices.svelte';
   import Pager from './Pager.svelte';
@@ -17,8 +18,11 @@
    * respinta, e questa pagina è l'unico posto dove un avviso che non è
    * arrivato esiste lo stesso.
    */
+  // si rilegge dalla prima pagina anche quando cambia l'ordine: la terza
+  // pagina di un altro ordine è un'altra fetta di elenco
   $effect(() => {
-    void alerts.load(0);
+    void alerts.vista.richiesta;
+    untrack(() => void alerts.load(0));
   });
 
   /*
@@ -28,12 +32,12 @@
    * lo dice, e dove — e chi lo dice può non stare da nessuna parte.
    */
   const COLONNE: Column[] = [
-    { label: 'Quando', width: 'fit' },
-    { label: 'Chi', width: 'fit' },
-    { label: 'Luogo', width: 'fit' },
+    { label: 'Quando', width: 'fit', ordina: 'quando' },
+    { label: 'Chi', width: 'fit', ordina: 'chi' },
+    { label: 'Luogo', width: 'fit', ordina: 'luogo' },
     // l'unica che ha da dire: lo spazio che avanza è suo
-    { label: 'Cosa' },
-    { label: 'Consegna', width: 'fit', align: 'end' },
+    { label: 'Cosa', ordina: 'cosa' },
+    { label: 'Consegna', width: 'fit', align: 'end', ordina: 'consegna' },
   ];
 
   /**
@@ -98,14 +102,14 @@
          mentre si sta ancora chiedendo è una bugia che dura un secondo -->
     <p class="say">Un momento…</p>
   {:else}
-    <Table columns={COLONNE} rows={alerts.rows} label="Gli avvisi avvenuti">
+    <Table columns={COLONNE} rows={alerts.rows} vista={alerts.vista} label="Gli avvisi avvenuti">
       {#snippet row(one: Notice)}
         {@const esito = delivery(one)}
         <td class="quando fit">{when(one.at)}</td>
         <td class="chi fit">
           <!-- il pallino, come sui luoghi e sugli agenti: giallo quando c'e'
                qualcosa che non va, verde quando e' rientrato -->
-          <span class="segno" class:is-back={one.kind === 'back'}></span>
+          <span class="segno" class:is-back={one.kind === 'back'} class:is-scene={one.kind === 'scene'}></span>
           {#each chi(one) as pezzo, at (at)}
             {#if at}<span class="sep">/</span>{/if}
             <span class="tipo">{pezzo.tipo}</span><span class="sep">/</span>{pezzo.nome}
@@ -168,6 +172,10 @@
 
   /* il ritorno non è un allarme: stesso posto, colore diverso */
   .segno.is-back { background: var(--ok); }
+
+  /* e nemmeno il messaggio di una scena, che hai scritto tu: grigio, come
+     una cosa detta e non una cosa successa */
+  .segno.is-scene { background: var(--ink-3); }
 
   /* l'esito è un dato, non una frase: sta in una pastiglia e non compete con
      quello che l'avviso diceva */

@@ -1,4 +1,5 @@
 import { api } from './api';
+import { Vista } from './vista.svelte';
 
 /** Un avviso avvenuto, come arriva dal server. */
 export interface Notice {
@@ -44,6 +45,22 @@ const QUANTI = 8;
  * però arriva sempre, se no «avanti» sarebbe un salto nel buio.
  */
 class Alerts {
+  /**
+   * In che ordine. I criteri non hanno un confronto: gli avvisi arrivano a
+   * pagine, e mettere in fila la pagina che si ha davanti mentirebbe sulle
+   * altre. La vista dice cosa chiedere, e il server mette in fila.
+   */
+  readonly vista = new Vista<Notice>({
+    chiave: 'avvisi',
+    criteri: [
+      { id: 'quando', label: 'Quando', verso: 'desc' },
+      { id: 'chi', label: 'Chi' },
+      { id: 'luogo', label: 'Luogo' },
+      { id: 'cosa', label: 'Cosa' },
+      { id: 'consegna', label: 'Consegna', verso: 'desc' },
+    ],
+  });
+
   rows = $state<Notice[]>([]);
   total = $state(0);
   offset = $state(0);
@@ -66,7 +83,9 @@ class Alerts {
   async load(offset = this.offset): Promise<void> {
     this.busy = true;
     try {
-      const page = await api.get<Page<Notice>>(`/alerts?offset=${offset}&limit=${this.limit}`);
+      const page = await api.get<Page<Notice>>(
+        `/alerts?offset=${offset}&limit=${this.limit}&${this.vista.richiesta}`,
+      );
       this.rows = page.rows;
       this.total = page.total;
       this.offset = page.offset;

@@ -3,6 +3,7 @@
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui } from '../lib/ui.svelte';
+  import { vistaMappe } from '../lib/viste.svelte';
   import AddRow from './AddRow.svelte';
   import Button from './Button.svelte';
   import TextField from './TextField.svelte';
@@ -11,6 +12,7 @@
   import PageShell from './PageShell.svelte';
   import Row from './Row.svelte';
   import ShareField from './ShareField.svelte';
+  import ViewControls from './ViewControls.svelte';
 
   /**
    * La pagina delle mappe.
@@ -59,7 +61,9 @@
   lead="Ogni mappa tiene i suoi luoghi. Categorie e gruppi invece sono tuoi e valgono su tutte, quindi eliminarne una porta via soltanto i luoghi che ci stavano dentro."
 >
 
-  {#each store.maps as map (map.id)}
+  {#snippet tools()}<ViewControls vista={vistaMappe} label="In che ordine le mappe" />{/snippet}
+
+  {#each vistaMappe.applica(store.maps) as map (map.id)}
     {@const open = map.id === store.activeMap?.id}
     {@const places = store.places.filter((place) => place.mapId === map.id).length}
     <section class="card">
@@ -285,4 +289,9 @@
 
   /* la riga del nome è un titolo finché non la tocchi, come nelle altre liste */
   .card :global(.link-row) { background: var(--sunken); box-shadow: none; }
+
+  /* dove si tocca, il pin che sceglie la mappa è alto quanto un dito */
+  @media (hover: none) {
+    .map-open { width: 40px; height: 40px; }
+  }
 </style>

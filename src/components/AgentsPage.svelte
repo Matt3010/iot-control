@@ -4,6 +4,7 @@
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui } from '../lib/ui.svelte';
+  import { vistaAgenti } from '../lib/viste.svelte';
   import PageCard from './PageCard.svelte';
   import PageShell from './PageShell.svelte';
   import AddRow from './AddRow.svelte';
@@ -12,6 +13,7 @@
   import AgentPairing from './AgentPairing.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
+  import ViewControls from './ViewControls.svelte';
 
   /**
    * La pagina degli agenti.
@@ -92,7 +94,9 @@
   title="Agenti"
   lead="Un agente è il servizio che installi su una macchina accesa in un luogo. Trova i dispositivi sulla rete di casa e si collega qui da solo. Ne servono due quando le reti sono separate."
 >
-  {#each devices.agents as agent (agent.id)}
+  {#snippet tools()}<ViewControls vista={vistaAgenti} label="In che ordine gli agenti" />{/snippet}
+
+  {#each vistaAgenti.applica(devices.agents) as agent (agent.id)}
     {@const where = placeOf(agent)}
     <section class="card">
       <AgentControls {agent}>

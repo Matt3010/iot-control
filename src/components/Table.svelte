@@ -1,6 +1,8 @@
 <script lang="ts" generics="T extends { id: string }">
   import type { Snippet } from 'svelte';
   import type { Column } from '../lib/table';
+  import type { Vista } from '../lib/vista.svelte';
+  import Icon from './Icon.svelte';
 
   /**
    * Una tabella di righe corte.
@@ -22,6 +24,7 @@
     empty,
     foot,
     label,
+    vista,
   }: {
     columns: Column[];
     rows: T[];
@@ -40,7 +43,24 @@
     foot?: Snippet;
     /** Come si chiama questa tabella, per chi non la vede. */
     label?: string;
+    /**
+     * In che ordine stanno le righe, e con cosa si cambia.
+     *
+     * La tabella non mette in fila niente da sé, come non pagina da sé: le
+     * righe arrivano già in ordine. Qui tocca l'intestazione e dice alla
+     * vista cosa è stato scelto, e chi ha le righe le rimette in fila — in
+     * memoria, o chiedendole di nuovo al server.
+     */
+    vista?: Vista<T>;
   } = $props();
+
+  /** Il verso di una colonna, per chi legge lo schermo ad alta voce. */
+  const versoDi = (column: Column): 'ascending' | 'descending' | undefined =>
+    vista && column.ordina === vista.ordine
+      ? vista.verso === 'asc'
+        ? 'ascending'
+        : 'descending'
+      : undefined;
 </script>
 
 {#if rows.length}
@@ -62,8 +82,29 @@
       <thead>
         <tr>
           {#each columns as column, at (at)}
-            <th scope="col" class:end={column.align === 'end'} class:fit={column.width === 'fit'}>
-              {column.label}
+            <th
+              scope="col"
+              class:end={column.align === 'end'}
+              class:fit={column.width === 'fit'}
+              aria-sort={versoDi(column)}
+            >
+              {#if vista && column.ordina}
+                <button
+                  type="button"
+                  class="ordina"
+                  class:is-on={column.ordina === vista.ordine}
+                  onclick={() => vista.ordina(column.ordina as string)}
+                >
+                  {column.label}
+                  <!-- la freccia c'è solo sulla colonna scelta: sulle altre
+                       direbbe un verso che non stanno seguendo -->
+                  {#if column.ordina === vista.ordine}
+                    <Icon name={vista.verso === 'asc' ? 'sortAsc' : 'sortDesc'} />
+                  {/if}
+                </button>
+              {:else}
+                {column.label}
+              {/if}
             </th>
           {/each}
         </tr>
@@ -167,4 +208,36 @@
      stringerla fino alla parola più lunga e poi spezzare le altre */
   th.fit,
   tbody :global(td.fit) { white-space: nowrap; }
+
+  /* L'intestazione che si tocca resta un'intestazione: stesse lettere
+     maiuscole e smorte delle altre, e solo quella scelta si accende. Un
+     tasto vestito da tasto in cima a ogni colonna farebbe della testata
+     una fila di comandi. */
+  .ordina {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: inherit;
+    cursor: pointer;
+    transition: color 0.14s;
+  }
+
+  .ordina:hover,
+  .ordina.is-on { color: var(--ink); }
+
+  .ordina :global(.ico) { width: 12px; height: 12px; }
+
+  th.end .ordina { flex-direction: row-reverse; }
+
+  /* dove si tocca, l'intestazione è alta quanto un dito senza spostare la
+     riga: lo spazio si aggiunge dentro e si toglie fuori */
+  @media (hover: none) {
+    .ordina { padding: 12px 0; margin: -12px 0; }
+  }
 </style>

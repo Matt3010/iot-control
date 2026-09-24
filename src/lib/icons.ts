@@ -3,6 +3,8 @@ import {
   BellOff,
   BellRing,
   ArrowRight,
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
   AtSign,
   Check,
   Eye,
@@ -67,6 +69,9 @@ export const ICONS = {
   eyeOff: EyeOff,
   check: Check,
   key: KeyRound,
+  // il verso di un elenco: dal più piccolo, o dal più grande
+  sortAsc: ArrowUpNarrowWide,
+  sortDesc: ArrowDownWideNarrow,
 } as const;
 
 export type IconName = keyof typeof ICONS;

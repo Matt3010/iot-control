@@ -361,27 +361,10 @@
 
 .strisce :global(.chip) { flex: none; }
 
-/* Una pastiglia tagliata di netto sul bordo sembra un disegno sbagliato
-   invece che una fila che continua, e il bordo sfumato è lo stesso segno che
-   usano gli elenchi qui sotto, che di quel mestiere vivono da sempre.
-
-   A destra sfuma più a lungo perché lì dentro ci sono anche i quattordici
-   pixel di riempimento che tengono la striscia staccata dal bordo: contati
-   quelli, sulla pastiglia ne restavano otto, e otto non si vedono. */
-.strisce:global([data-fade='right']) {
-  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
-  mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
-}
-
-.strisce:global([data-fade='left']) {
-  -webkit-mask-image: linear-gradient(270deg, #000 calc(100% - 22px), transparent);
-  mask-image: linear-gradient(270deg, #000 calc(100% - 22px), transparent);
-}
-
-.strisce:global([data-fade='both']) {
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 36px), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 36px), transparent);
-}
+/* La striscia ha a destra i quattordici pixel che la staccano dal bordo:
+   la sfumatura in fondo li conta, se no sulla pastiglia ne restavano otto,
+   e otto non si vedono. Il disegno è quello comune, in base.css. */
+.strisce { --fade-end: 36px; }
 
 @media (max-width: 600px) {
   /* Su un telefono il pannello e' l'applicazione, non una card appoggiata

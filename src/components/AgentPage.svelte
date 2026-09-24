@@ -6,6 +6,8 @@
   import DeviceControls from './DeviceControls.svelte';
   import DeviceFrame from './DeviceFrame.svelte';
   import PageShell from './PageShell.svelte';
+  import ViewControls from './ViewControls.svelte';
+  import { vistaDispositivi } from '../lib/viste.svelte';
 
   /**
    * Un agente solo, grande.
@@ -20,7 +22,9 @@
   let { id }: { id: string } = $props();
 
   const agent = $derived(devices.agents.find((one) => one.id === id));
-  const theirs = $derived(agent ? devices.ofAgent(agent.id) : []);
+  // nello stesso ordine della sua scheda nella pagina degli agenti: la vista
+  // è una sola per tutti i dispositivi
+  const theirs = $derived(agent ? vistaDispositivi.applica(devices.ofAgent(agent.id)) : []);
 
   /** Quelle che si guardano, separate da quelle che si premono. */
   const watches = (device: Device): boolean =>
@@ -51,6 +55,9 @@
   layout="rows"
   lead={agent ? undefined : 'Questo agente non esiste più, o non è mai stato tuo.'}
 >
+  {#snippet tools()}
+    {#if theirs.length > 3}<ViewControls vista={vistaDispositivi} label="In che ordine i dispositivi" />{/if}
+  {/snippet}
   {#snippet meta()}
     {#if agent}
       <div class="stato">

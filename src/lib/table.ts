@@ -19,6 +19,14 @@ export interface Column {
   width?: string | 'fit';
   /** I numeri e le date stanno a destra: si leggono in colonna. */
   align?: 'start' | 'end';
+  /**
+   * Il criterio della vista con cui questa colonna mette in fila le righe.
+   *
+   * Chi non ce l'ha non si tocca: la colonna dei tasti non ha un ordine, e
+   * un'intestazione che si preme senza fare niente è peggio di una che non
+   * si preme.
+   */
+  ordina?: string;
 }
 
 /** Una voce da scegliere: un identificativo, come si legge, e un'aggiunta. */

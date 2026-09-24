@@ -2,6 +2,8 @@
   import type { Snippet } from 'svelte';
   import { devices, type Agent } from '../lib/devices.svelte';
   import DeviceControls from './DeviceControls.svelte';
+  import { vistaDispositivi } from '../lib/viste.svelte';
+  import ViewControls from './ViewControls.svelte';
 
   /**
    * Un agente e quello che ha sotto di sé, in una card sola — la stessa forma
@@ -33,7 +35,7 @@
     things?: boolean;
   } = $props();
 
-  const theirs = $derived(devices.ofAgent(agent.id));
+  const theirs = $derived(vistaDispositivi.applica(devices.ofAgent(agent.id)));
   const tally = $derived(devices.tally(agent.id));
 
   /**
@@ -83,6 +85,13 @@
 
   {#if things}
     {#if theirs.length}
+      <!-- l'ordine si sceglie quando c'è qualcosa da mettere in fila: con due
+           o tre dispositivi il comando sarebbe più lungo dell'elenco -->
+      {#if theirs.length > 3}
+        <div class="list-tools">
+          <ViewControls vista={vistaDispositivi} label="In che ordine i dispositivi" />
+        </div>
+      {/if}
       <div class="list">
         {#each theirs as device (device.id)}
           <DeviceControls {device} />
@@ -212,5 +221,11 @@
     min-width: 0;
     padding: 10px 12px 11px;
     border-top: 1px solid var(--hairline-soft);
+  }
+
+  .list-tools {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 10px 0;
   }
 </style>

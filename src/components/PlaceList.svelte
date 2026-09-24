@@ -77,21 +77,6 @@
 <style>
 /* index ------------------------------------------------------------------- */
 
-:global(#place-list[data-fade='bottom']) {
-  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 22px), transparent);
-  mask-image: linear-gradient(180deg, #000 calc(100% - 22px), transparent);
-}
-
-:global(#place-list[data-fade='top']) {
-  -webkit-mask-image: linear-gradient(0deg, #000 calc(100% - 22px), transparent);
-  mask-image: linear-gradient(0deg, #000 calc(100% - 22px), transparent);
-}
-
-:global(#place-list[data-fade='both']) {
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
-  mask-image: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
-}
-
 /* con più mappe accese, ogni posto dice da quale viene */
 .row-map {
   padding: 1px 6px;

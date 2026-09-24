@@ -1,10 +1,12 @@
 <script lang="ts">
   import { devices } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
+  import { vistaScene } from '../lib/viste.svelte';
   import AddRow from './AddRow.svelte';
   import PageCard from './PageCard.svelte';
   import PageShell from './PageShell.svelte';
   import SceneCard from './SceneCard.svelte';
+  import ViewControls from './ViewControls.svelte';
 
   /**
    * Le scene, una scheda per scena.
@@ -31,7 +33,9 @@
   count={devices.scenes.length}
   lead="Più cose che partono insieme, ognuna con la sua azione, così che «sera» chiuda le tende e accenda l'abat-jour. Una scena può toccare dispositivi di agenti diversi."
 >
-  {#each devices.scenes as scene (scene.id)}
+  {#snippet tools()}<ViewControls vista={vistaScene} label="In che ordine le scene" />{/snippet}
+
+  {#each vistaScene.applica(devices.scenes) as scene (scene.id)}
     <!-- il riquadro lo disegna gia' il comando della scena, come per gli
          agenti: un secondo bordo intorno sarebbe una scheda dentro l'altra -->
     <section class="card">

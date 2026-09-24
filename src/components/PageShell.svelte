@@ -26,6 +26,7 @@
     meta,
     back = { href: '/', label: 'Torna alla mappa' },
     layout = 'columns',
+    tools,
     children,
   }: {
     title: string;
@@ -64,6 +65,12 @@
      * di due misure diverse a seconda di dove guardi.
      */
     layout?: 'columns' | 'rows';
+    /**
+     * I comandi che valgono per tutta la pagina, accanto alle linguette:
+     * oggi in che ordine stanno le schede. Stanno lì perché riguardano
+     * quello che c'è sotto tutto intero, non una scheda.
+     */
+    tools?: Snippet;
     children: Snippet;
   } = $props();
 
@@ -94,7 +101,12 @@
          che esistono le scene senza doverle cercare, e chi si è sbagliato di
          porta non deve tornare alla mappa per rimediare. Sono le linguette
          dell'app, con gli indirizzi dentro: un disegno solo per tutt'e due. -->
-    {#if siblings}<Tabs value={here} options={DOVE} label="Le altre pagine" />{/if}
+    {#if siblings || tools}
+      <div class="naviga">
+        {#if siblings}<Tabs value={here} options={DOVE} label="Le altre pagine" />{/if}
+        {#if tools}<span class="strumenti">{@render tools()}</span>{/if}
+      </div>
+    {/if}
   </header>
 
   <!-- A colonne, non a griglia: una scheda collegata e' alta, una appena
@@ -193,4 +205,16 @@
     row-gap: 0;
     align-items: stretch;
   }
+
+  /* le linguette a sinistra, i comandi della pagina all'altro capo della
+     stessa riga: una riga in più solo per loro sarebbe spazio preso alle
+     schede */
+  .naviga {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .strumenti { margin-left: auto; }
 </style>

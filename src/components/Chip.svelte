@@ -69,14 +69,17 @@
 /* Dove si tocca, una pastiglia è alta quanto un dito. Trenta pixel bastano a
    un puntatore che arriva preciso; un polpastrello ne copre quaranta, e fra
    due filtri vicini prende quello sbagliato. */
-@media (hover: none) {
-  .chip { height: 36px; }
-  .chip.is-sm { height: 32px; }
-}
-
 /* La misura piccola. Sta qui e non in chi la ospita, se no ogni schermata si
    inventa la sua e poi divergono di un pixel per volta. */
 .chip.is-sm { height: 26px; padding: 0 10px 0 9px; font-size: 11.5px; }
+
+/* Dove si tocca, anche la piccola è alta quanto un dito. Scritta dopo e non
+   prima: stava sopra alla misura piccola, che a parità di peso vinceva lei,
+   e «Apri, Ferma, Chiudi» di una tenda restavano alti ventisei pixel. */
+@media (hover: none) {
+  .chip { height: 40px; }
+  .chip.is-sm { height: 36px; }
+}
 
 /* il segno dentro alla pillola: un disegno prende il colore del testo, e
    un'emoji di quelle vecchie si porta ancora i suoi */

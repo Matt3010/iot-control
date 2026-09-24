@@ -1,0 +1,178 @@
+import { normalise } from './format';
+import { readJSON, writeJSON } from './storage';
+
+/**
+ * Come si guarda un elenco.
+ *
+ * Oggi vuol dire in che ordine. Ma è la stessa domanda di «solo quelli che
+ * non rispondono» o «per luogo»: cambiare come si guarda una cosa senza
+ * cambiare la cosa. Se ognuna di queste scelte nascesse dove serve, ogni
+ * elenco avrebbe i suoi metodi e le sue chiavi nel browser, e due elenchi
+ * della stessa roba si comporterebbero in due modi. Qui ce n'è uno solo:
+ * una vista sa quali criteri ha, quale è scelto, se lo ricorda, e li
+ * applica tutti in fila con `applica`.
+ *
+ * I pezzi sono due, e ognuno si accende solo se chi crea la vista gli dà
+ * quello che serve: l'ordine (`criteri`) e la ricerca per parola
+ * (`testoDi`). Un terzo — un filtro, un raggruppamento — sarà un'opzione in
+ * più e un passo in più dentro `applica`, e chi usa una vista non cambierà
+ * una riga.
+ *
+ * A mostrarla ci pensano due pezzi diversi, perché si toccano in modo
+ * diverso: in una tabella si tocca l'intestazione della colonna, in un
+ * elenco di schede un comando sopra l'elenco (`ViewControls`). Lo stato è
+ * lo stesso, e per questo le due cose non possono divergere.
+ */
+
+export type Verso = 'asc' | 'desc';
+
+/** Un modo di mettere in fila. */
+export interface Criterio<T> {
+  id: string;
+  /** Come si legge nel comando: «Nome», «Stato». */
+  label: string;
+  /**
+   * Come si confrontano due voci, nel verso naturale.
+   *
+   * Manca negli elenchi che si mettono in fila sul server — gli avvisi
+   * avvenuti arrivano a pagine, e mettere in fila una pagina sola
+   * mentirebbe su tutte le altre. Lì la vista dice cosa chiedere, e basta.
+   */
+  per?: (a: T, b: T) => number;
+  /** Il verso della prima volta: una data si legge dalla più recente. */
+  verso?: Verso;
+}
+
+interface Scelta {
+  ordine: string;
+  verso: Verso;
+}
+
+export interface OpzioniVista<T> {
+  /**
+   * Il nome sotto cui questo browser se la ricorda. Due elenchi della stessa
+   * roba — i dispositivi di un agente, quelli della sua pagina — condividono
+   * la chiave e si ordinano insieme.
+   */
+  chiave: string;
+  /** I modi di metterli in fila. Il primo è quello di partenza. */
+  criteri: Criterio<T>[];
+  iniziale?: string;
+  /**
+   * Dove si cerca quando si scrive una parola. Senza, la vista non cerca.
+   *
+   * La parola scritta non si ricorda: tornare su un elenco e trovarlo
+   * ristretto a una ricerca di ieri farebbe credere che manchi qualcosa.
+   */
+  testoDi?: (voce: T) => string;
+}
+
+export class Vista<T> {
+  readonly criteri: readonly Criterio<T>[];
+  readonly #testoDi?: (voce: T) => string;
+  #chiave: string;
+  #scelta = $state<Scelta>({ ordine: '', verso: 'asc' });
+
+  /** Quello che si sta cercando, così com'è scritto. */
+  cerca = $state('');
+
+  constructor({ chiave, criteri, iniziale = criteri[0]?.id ?? '', testoDi }: OpzioniVista<T>) {
+    this.criteri = criteri;
+    this.#testoDi = testoDi;
+    this.#chiave = `pi.vista.${chiave}`;
+
+    // una scelta ricordata vale solo se quel criterio c'è ancora: un nome
+    // cambiato fra una versione e l'altra non deve lasciare l'elenco senza
+    // ordine
+    const ricordata = readJSON<Scelta | null>(this.#chiave, null);
+    const primo = criteri.find((one) => one.id === iniziale);
+    this.#scelta =
+      ricordata && criteri.some((one) => one.id === ricordata.ordine)
+        ? ricordata
+        : { ordine: iniziale, verso: primo?.verso ?? 'asc' };
+  }
+
+  get ordine(): string {
+    return this.#scelta.ordine;
+  }
+
+  get verso(): Verso {
+    return this.#scelta.verso;
+  }
+
+  get criterio(): Criterio<T> | undefined {
+    return this.criteri.find((one) => one.id === this.#scelta.ordine);
+  }
+
+  /**
+   * Mette in fila per quel criterio.
+   *
+   * Scegliere di nuovo quello già scelto lo gira: è quello che ci si aspetta
+   * toccando due volte l'intestazione di una colonna, e il comando degli
+   * elenchi fa lo stesso invece di inventarsi un gesto suo.
+   */
+  ordina(id: string): void {
+    if (id === this.#scelta.ordine) return this.gira();
+    const criterio = this.criteri.find((one) => one.id === id);
+    if (!criterio) return;
+    this.#salva({ ordine: id, verso: criterio.verso ?? 'asc' });
+  }
+
+  gira(): void {
+    this.#salva({ ...this.#scelta, verso: this.#scelta.verso === 'asc' ? 'desc' : 'asc' });
+  }
+
+  /**
+   * L'elenco come va guardato. Una copia: l'originale resta com'è, perché è
+   * di qualcun altro e altri lo leggono nel suo ordine.
+   */
+  applica(voci: readonly T[]): T[] {
+    let dopo = [...voci];
+
+    // prima si cerca: mettere in fila cose che poi si buttano è lavoro perso
+    const parola = normalise(this.cerca.trim());
+    const testoDi = this.#testoDi;
+    if (parola && testoDi) dopo = dopo.filter((voce) => normalise(testoDi(voce)).includes(parola));
+
+    const per = this.criterio?.per;
+    if (per) {
+      const segno = this.#scelta.verso === 'asc' ? 1 : -1;
+      dopo.sort((a, b) => segno * per(a, b));
+    }
+    return dopo;
+  }
+
+  /** Se la vista sa cercare: chi la mostra ci mette il campo solo allora. */
+  get cercabile(): boolean {
+    return this.#testoDi !== undefined;
+  }
+
+  /** Per gli elenchi che si mettono in fila sul server: cosa chiedere. */
+  get richiesta(): string {
+    return `ordine=${encodeURIComponent(this.#scelta.ordine)}&verso=${this.#scelta.verso}`;
+  }
+
+  #salva(scelta: Scelta): void {
+    this.#scelta = scelta;
+    writeJSON(this.#chiave, scelta);
+  }
+}
+
+/* ----------------------------------------------------------- confronti */
+
+/**
+ * Per nome, come si leggono: «Tenda 2» prima di «Tenda 10», e le accentate
+ * insieme alle altre invece che in fondo.
+ */
+export const perNome = <T extends { name: string }>(a: T, b: T): number =>
+  a.name.localeCompare(b.name, 'it', { numeric: true, sensitivity: 'base' });
+
+/**
+ * Un confronto che, a parità, passa al nome. Due cose ugualmente accese si
+ * leggono in ordine alfabetico, non nell'ordine in cui il server le ha
+ * trovate — che cambierebbe da una volta all'altra.
+ */
+export const poiPerNome =
+  <T extends { name: string }>(prima: (a: T, b: T) => number) =>
+  (a: T, b: T): number =>
+    prima(a, b) || perNome(a, b);

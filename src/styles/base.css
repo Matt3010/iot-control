@@ -190,3 +190,48 @@ h2 {
     animation-name: sheet-in-mobile;
   }
 }
+
+/* ------------------------------------------------------------------ fades */
+
+/*
+ * Il bordo sfumato di tutto quello che scorre.
+ *
+ * Una riga tagliata a metà sul bordo sembra un errore, una sfumatura dice
+ * «ce n'è ancora». Lo calcola `fadeEdges` (lib/overflow.ts), che scrive da
+ * che parte continua e in che verso. Qui c'è il disegno, una volta sola: era
+ * scritto uguale nell'elenco dei luoghi, in categorie e gruppi e nelle
+ * strisce dei filtri, tre copie da tenere d'accordo a mano.
+ *
+ * `--fade` è quanto è lunga la sfumatura, e `--fade-end` quella in fondo:
+ * chi ha un riempimento sul lato dove finisce la allunga, se no la
+ * sfumatura si consuma sullo spazio vuoto invece che sul contenuto.
+ */
+[data-fade-axis='y'][data-fade='bottom'] {
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - var(--fade-end, var(--fade, 22px))), transparent);
+  mask-image: linear-gradient(180deg, #000 calc(100% - var(--fade-end, var(--fade, 22px))), transparent);
+}
+
+[data-fade-axis='y'][data-fade='top'] {
+  -webkit-mask-image: linear-gradient(0deg, #000 calc(100% - var(--fade, 22px)), transparent);
+  mask-image: linear-gradient(0deg, #000 calc(100% - var(--fade, 22px)), transparent);
+}
+
+[data-fade-axis='y'][data-fade='both'] {
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 var(--fade, 22px), #000 calc(100% - var(--fade-end, var(--fade, 22px))), transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 var(--fade, 22px), #000 calc(100% - var(--fade-end, var(--fade, 22px))), transparent);
+}
+
+[data-fade-axis='x'][data-fade='right'] {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - var(--fade-end, var(--fade, 22px))), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - var(--fade-end, var(--fade, 22px))), transparent);
+}
+
+[data-fade-axis='x'][data-fade='left'] {
+  -webkit-mask-image: linear-gradient(270deg, #000 calc(100% - var(--fade, 22px)), transparent);
+  mask-image: linear-gradient(270deg, #000 calc(100% - var(--fade, 22px)), transparent);
+}
+
+[data-fade-axis='x'][data-fade='both'] {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fade, 22px), #000 calc(100% - var(--fade-end, var(--fade, 22px))), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--fade, 22px), #000 calc(100% - var(--fade-end, var(--fade, 22px))), transparent);
+}

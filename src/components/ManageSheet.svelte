@@ -1,11 +1,12 @@
 <script lang="ts">
   import { auth } from '../lib/auth.svelte';
-  import { DEFAULT_MARK, normalise, SUGGESTED } from '../lib/format';
+  import { DEFAULT_MARK, SUGGESTED } from '../lib/format';
   import { fadeEdges } from '../lib/overflow';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
+  import { vistaCategorie, vistaGruppi } from '../lib/viste.svelte';
   import AddRow from './AddRow.svelte';
   import Icon from './Icon.svelte';
   import Mark from './Mark.svelte';
@@ -13,6 +14,7 @@
   import Tabs from './Tabs.svelte';
   import Button from './Button.svelte';
   import TextField from './TextField.svelte';
+  import ViewControls from './ViewControls.svelte';
 
   /** Una volta sola, perché le domande parlino tutte la stessa lingua. */
   const conta = (n: number): string => (n === 1 ? 'un luogo' : `${n} luoghi`);
@@ -38,7 +40,6 @@
 
   /** Oltre una decina di voci scorrerle non basta più: serve poterle cercare. */
   const MANY = 8;
-  let categoryFilter = $state('');
   let categoryInput = $state<HTMLInputElement>();
   let groupInput = $state<HTMLInputElement>();
 
@@ -47,19 +48,12 @@
     if (ui.manageIntent !== 'add' || viewport.narrow) return;
     (ui.manageTab === 'groups' ? groupInput : categoryInput)?.focus();
   });
-  let groupFilter = $state('');
 
-  const match = (name: string, needle: string) =>
-    normalise(name).includes(normalise(needle.trim()));
-
-  const visibleCategories = $derived(
-    categoryFilter.trim() ? store.categories.filter((c) => match(c.name, categoryFilter)) : store.categories,
-  );
+  /* cercare e mettere in fila lo fa la vista, come in ogni altro elenco */
+  const visibleCategories = $derived(vistaCategorie.applica(store.categories));
   /** I gruppi sono tuoi: qui ci sono tutti, non solo quelli della mappa aperta. */
   const mapGroups = $derived(store.groups);
-  const visibleGroups = $derived(
-    groupFilter.trim() ? mapGroups.filter((g) => match(g.name, groupFilter)) : mapGroups,
-  );
+  const visibleGroups = $derived(vistaGruppi.applica(mapGroups));
 
   async function addCategory(name: string) {
     try {
@@ -107,9 +101,14 @@
 
 {#if ui.manageTab === 'categories'}
   <div class="tab-panel">
-    {#if store.categories.length > MANY}
-      <TextField extra="list-filter" kind="search" placeholder="Cerca categoria" bind:value={categoryFilter} />
-    {/if}
+    <div class="list-tools">
+      {#if store.categories.length > MANY}
+        <TextField extra="list-filter" kind="search" placeholder="Cerca categoria" bind:value={vistaCategorie.cerca} />
+      {/if}
+      {#if store.categories.length > 1}
+        <ViewControls vista={vistaCategorie} label="In che ordine le categorie" />
+      {/if}
+    </div>
     <ul id="category-list" data-fade="none" use:fadeEdges>
       {#each visibleCategories as category (category.id)}
         <li>
@@ -214,9 +213,14 @@
   </div>
 {:else}
   <div class="tab-panel">
-    {#if mapGroups.length > MANY}
-      <TextField extra="list-filter" kind="search" placeholder="Cerca gruppo" bind:value={groupFilter} />
-    {/if}
+    <div class="list-tools">
+      {#if mapGroups.length > MANY}
+        <TextField extra="list-filter" kind="search" placeholder="Cerca gruppo" bind:value={vistaGruppi.cerca} />
+      {/if}
+      {#if mapGroups.length > 1}
+        <ViewControls vista={vistaGruppi} label="In che ordine i gruppi" />
+      {/if}
+    </div>
     <ul id="group-list" data-fade="none" use:fadeEdges>
       {#each visibleGroups as group (group.id)}
         <li>
@@ -324,17 +328,6 @@
 
 :global(.row.is-dashed) .swatch { width: 22px; height: 22px; margin: 0 3px; }
 
-/* Dove si tocca, il segno e il colore di una categoria tornano prendibili.
-   Ventotto e ventidue pixel si vedono bene e si mancano col dito, e sono i
-   due tasti che in questa scheda si premono di più. */
-@media (hover: none) {
-  :global(#category-list) .mark-btn,
-  :global(.row.is-dashed) .mark-btn { width: 40px; height: 40px; font-size: 18px; }
-
-  :global(#category-list) .swatch,
-  :global(.row.is-dashed) .swatch { width: 34px; height: 34px; margin: 0; }
-}
-
 .sheet-note {
   margin: 12px 2px 0;
   font-size: 11.5px;
@@ -361,20 +354,7 @@
   overscroll-behavior: contain;
 }
 
-:global(#category-list[data-fade='bottom']), :global(#group-list[data-fade='bottom']) {
-  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 20px), transparent);
-  mask-image: linear-gradient(180deg, #000 calc(100% - 20px), transparent);
-}
-
-:global(#category-list[data-fade='top']), :global(#group-list[data-fade='top']) {
-  -webkit-mask-image: linear-gradient(0deg, #000 calc(100% - 20px), transparent);
-  mask-image: linear-gradient(0deg, #000 calc(100% - 20px), transparent);
-}
-
-:global(#category-list[data-fade='both']), :global(#group-list[data-fade='both']) {
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
-  mask-image: linear-gradient(180deg, transparent, #000 20px, #000 calc(100% - 20px), transparent);
-}
+:global(#category-list), :global(#group-list) { --fade: 20px; }
 
 :global(.list-filter) {
   margin-bottom: 8px;
@@ -423,4 +403,30 @@
 }
 
 .group-mark :global(.ico) { width: 15px; height: 15px; }
+
+/* Dove si tocca, il segno e il colore di una categoria tornano prendibili.
+   Ventotto e ventidue pixel si vedono bene e si mancano col dito, e sono i
+   due tasti che in questa scheda si premono di più. In fondo al foglio,
+   perché sopra perdeva contro le misure della lista, che hanno lo stesso
+   peso e venivano dopo. */
+@media (hover: none) {
+  :global(#category-list) .mark-btn,
+  :global(.row.is-dashed) .mark-btn { width: 40px; height: 40px; font-size: 18px; }
+
+  :global(#category-list) .swatch,
+  :global(.row.is-dashed) .swatch { width: 34px; height: 34px; margin: 0; }
+}
+
+/* la ricerca prende quello che avanza, l'ordine sta all'altro capo; senza
+   ricerca l'ordine resta a destra da solo */
+.list-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.list-tools:empty { display: none; }
+
+.list-tools :global(.list-filter) { flex: 1; min-width: 0; }
 </style>

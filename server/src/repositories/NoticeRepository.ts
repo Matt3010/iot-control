@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, sql, type AnyColumn } from 'drizzle-orm';
 import { iso, when, type Transaction } from '../persistence/db.js';
 import type { Ask, Page } from '../persistence/page.js';
 import { notices } from '../persistence/schema.js';
@@ -33,6 +33,17 @@ const toNotice = (row: Row): Notice => ({
   ...(row.since === null ? {} : { since: iso(row.since) as string }),
 });
 
+/** I criteri che l'elenco degli avvisi sa usare, e la colonna di ognuno. */
+const ORDINI: Record<string, AnyColumn> = {
+  quando: notices.at,
+  chi: notices.who,
+  luogo: notices.placeName,
+  cosa: notices.short,
+  consegna: notices.sent,
+};
+
+export const ORDINI_AVVISI = Object.keys(ORDINI);
+
 export class NoticeRepository {
   constructor(private readonly tx: Transaction) {}
 
@@ -45,11 +56,16 @@ export class NoticeRepository {
    * un collegamento per poi scartarle.
    */
   async pageOf(ownerId: string, ask: Ask): Promise<Page<Notice>> {
+    // il criterio scelto, e a parità dal più recente: senza un secondo
+    // criterio due righe uguali cambierebbero posto da una pagina all'altra
+    const colonna = ask.ordine ? ORDINI[ask.ordine.per] : undefined;
+    const prima = colonna ? [ask.ordine?.verso === 'asc' ? asc(colonna) : desc(colonna)] : [];
+
     const rows = await this.tx.db
       .select()
       .from(notices)
       .where(eq(notices.ownerId, ownerId))
-      .orderBy(desc(notices.at))
+      .orderBy(...prima, desc(notices.at))
       .limit(ask.limit)
       .offset(ask.offset);
 
