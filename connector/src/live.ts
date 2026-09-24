@@ -40,6 +40,52 @@ interface Looking {
 
 const eyes = new Map<string, Looking>();
 
+/**
+ * Quanti stanno guardando ogni flusso nostro.
+ *
+ * Il flusso è uno per telecamera, e non uno per chi guarda: due persone
+ * sulla stessa telecamera costano un ffmpeg solo. Per questo si chiude
+ * quando smette l'ultimo, e non il primo: prima, chi chiudeva la sua
+ * finestra spegneva la diretta anche all'altro.
+ */
+const spettatori = new Map<string, number>();
+
+/**
+ * Le aperture e le chiusure di ogni flusso, in fila. Una chiusura partita
+ * quando smetteva l'ultimo spettatore può arrivare a chi smista i flussi
+ * dopo l'apertura chiesta da uno nuovo, e chiudergli il flusso sotto gli
+ * occhi: due richieste sullo stesso nome non si sorpassano.
+ */
+const file = new Map<string, Promise<unknown>>();
+function inFila<T>(name: string, lavoro: () => Promise<T>): Promise<T> {
+  const prima = file.get(name) ?? Promise.resolve();
+  const questo = prima.catch(() => undefined).then(lavoro);
+  const coda = questo.catch(() => undefined);
+  file.set(name, coda);
+  // l'ultimo della fila, finito, si porta via la fila
+  void coda.then(() => {
+    if (file.get(name) === coda) file.delete(name);
+  });
+  return questo;
+}
+
+/** Uno in più a guardare quel flusso. */
+const entra = (name: string): void => void spettatori.set(name, (spettatori.get(name) ?? 0) + 1);
+
+/** Uno in meno; se era l'ultimo, il flusso si chiude. */
+const esce = (name: string): void => {
+  const restano = (spettatori.get(name) ?? 1) - 1;
+  if (restano > 0) {
+    spettatori.set(name, restano);
+    return;
+  }
+  spettatori.delete(name);
+  // quando tocca a lei, la chiusura si fa solo se nel frattempo non è arrivato nessuno
+  void inFila(name, async () => {
+    if (!spettatori.has(name)) await forget(name);
+  });
+};
+
 /** Da dove sale il video: la stessa porta di casa, la stanza accanto. */
 function videoUrl(config: ConnectorConfig, session: string): string {
   const base = config.backendUrl.replace(/\/link$/, '/live');
@@ -120,7 +166,10 @@ export async function look(
         headers: { authorization: `Bearer ${config.haToken}` },
         nostra: false,
       };
-  if (raw && !(await remember(name, `ffmpeg:${raw}#video=mjpeg`))) {
+  // si conta prima di aprire: chi smette mentre questo apre non deve chiuderlo sotto di lui
+  if (sorgente.nostra) entra(name);
+  if (raw && !(await inFila(name, () => remember(name, `ffmpeg:${raw}#video=mjpeg`)))) {
+    esce(name);
     throw new Error('non si riesce ad aprire il flusso della telecamera');
   }
 
@@ -137,7 +186,7 @@ export async function look(
     eyes.delete(session);
     halt.abort();
     if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) socket.close();
-    if (sorgente.nostra) void forget(name);
+    if (sorgente.nostra) esce(name);
   };
 
   eyes.set(session, { stop });

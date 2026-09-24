@@ -78,7 +78,7 @@ async function createOwner(config: ConnectorConfig): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error(`home assistant non ha creato l'utente: ${response.status} ${await response.text()}`);
+    throw new Error(`home assistant non ha creato l'utente (risposta ${response.status}, ${await response.text()})`);
   }
   return ((await response.json()) as { auth_code: string }).auth_code;
 }
@@ -91,7 +91,7 @@ async function exchange(config: ConnectorConfig, code: string): Promise<string> 
     body: new URLSearchParams({ grant_type: 'authorization_code', code, client_id: config.haUrl }).toString(),
   });
 
-  if (!response.ok) throw new Error(`scambio del codice fallito: ${response.status}`);
+  if (!response.ok) throw new Error(`lo scambio del codice non è riuscito (risposta ${response.status})`);
   return ((await response.json()) as { access_token: string }).access_token;
 }
 
@@ -152,7 +152,7 @@ function mintLongLived(config: ConnectorConfig, access: string): Promise<string>
           socket.close();
           resolve(message.result as string);
         } else {
-          fail(`token non concesso: ${JSON.stringify(message.error)}`);
+          fail(`il token non è stato concesso (${JSON.stringify(message.error)})`);
         }
       }
     });

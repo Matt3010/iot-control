@@ -1,15 +1,15 @@
 import type { Handler } from '../../shared/protocol.js';
 import type { Extra } from './extras.js';
-import { EWELINK, type LettoreImpulsi } from './impulsi.js';
 
 /**
  * I provider che l'agente sa collegare, e cosa sa di ognuno.
  *
- * Stavano in tre elenchi — cosa installare, quali collegamenti mostrare,
- * chi sa dire se una presa è a impulso — e un provider nuovo andava
- * ricordato in tutti e tre. Adesso è una voce qui, con dentro solo quello
- * che gli serve. Come si spiega a una persona lo sa il sito, nel suo
- * registro (src/lib/providers.ts): qui c'è come si installa e come si legge.
+ * Stavano in più elenchi — cosa installare, quali collegamenti mostrare —
+ * e un provider nuovo andava ricordato in tutti. Adesso è una voce qui, con
+ * dentro solo quello che gli serve. Come si spiega a una persona lo sa il
+ * sito, nel suo registro (src/lib/providers.ts): qui c'è come si installa.
+ * Se una presa è a impulso non lo dice la marca: si guarda succedere
+ * (connector/src/impulsi.ts).
  */
 export interface Provider {
   handler: Handler;
@@ -17,8 +17,6 @@ export interface Provider {
   label: string;
   /** Se Home Assistant non lo ha di serie: cosa installare, e da dove. */
   extra?: Extra;
-  /** Se sa dire quali interruttori sono a impulso, e come. */
-  impulsi?: LettoreImpulsi;
 }
 
 export const PROVIDERS: Record<Handler, Provider> = {
@@ -34,7 +32,6 @@ export const PROVIDERS: Record<Handler, Provider> = {
       ref: 'v3.13.0',
       source: 'custom_components/sonoff',
     },
-    impulsi: EWELINK,
   },
   // una telecamera: un collegamento per canale, e niente da installare
   generic: { handler: 'generic', label: 'Telecamera' },
@@ -44,6 +41,3 @@ export const PROVIDERS: Record<Handler, Provider> = {
 export const providerDi = (handler: string | undefined): Provider | undefined =>
   handler && handler in PROVIDERS ? PROVIDERS[handler as Handler] : undefined;
 
-/** Tutti i lettori di impulsi, dai provider che ne hanno uno. */
-export const lettoriImpulsi = (): LettoreImpulsi[] =>
-  Object.values(PROVIDERS).flatMap((provider) => (provider.impulsi ? [provider.impulsi] : []));

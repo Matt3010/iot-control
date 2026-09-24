@@ -28,6 +28,13 @@ export interface Extra {
 }
 
 
+/**
+ * Quanto si aspetta GitHub, per ogni domanda. Senza un limite una rete che
+ * si pianta a metà lascerebbe l'installazione appesa per sempre, e chi sta
+ * guardando la finestra non saprebbe mai che non arriva.
+ */
+const GITHUB_MS = 30_000;
+
 interface Entry {
   name: string;
   type: 'file' | 'dir';
@@ -36,8 +43,11 @@ interface Entry {
 
 async function listing(extra: Extra, inside: string): Promise<Entry[]> {
   const url = `https://api.github.com/repos/${extra.repo}/contents/${inside}?ref=${extra.ref}`;
-  const response = await fetch(url, { headers: { accept: 'application/vnd.github+json' } });
-  if (!response.ok) throw new Error(`github: ${response.status} su ${inside}`);
+  const response = await fetch(url, {
+    headers: { accept: 'application/vnd.github+json' },
+    signal: AbortSignal.timeout(GITHUB_MS),
+  });
+  if (!response.ok) throw new Error(`GitHub risponde ${response.status} per ${inside}`);
   return (await response.json()) as Entry[];
 }
 
@@ -55,8 +65,8 @@ async function copyTree(extra: Extra, inside: string, into: string): Promise<num
     }
     if (!entry.download_url) continue;
 
-    const file = await fetch(entry.download_url);
-    if (!file.ok) throw new Error(`github: ${file.status} su ${entry.name}`);
+    const file = await fetch(entry.download_url, { signal: AbortSignal.timeout(GITHUB_MS) });
+    if (!file.ok) throw new Error(`GitHub risponde ${file.status} per ${entry.name}`);
     await fs.writeFile(here, Buffer.from(await file.arrayBuffer()));
     written += 1;
   }
@@ -92,7 +102,7 @@ export async function install(config: ConnectorConfig, extra: Extra): Promise<vo
   await fs.rm(scratch, { recursive: true, force: true });
 
   const files = await copyTree(extra, extra.source, scratch);
-  if (!files) throw new Error(`${extra.label}: non ho trovato niente da installare`);
+  if (!files) throw new Error(`Per ${extra.label} non c'è niente da installare`);
 
   await fs.rm(into, { recursive: true, force: true });
   await fs.rename(scratch, into);
@@ -103,6 +113,6 @@ export async function install(config: ConnectorConfig, extra: Extra): Promise<vo
     headers: { authorization: `Bearer ${config.haToken}`, 'content-type': 'application/json' },
     body: '{}',
   });
-  if (!response.ok) throw new Error(`il servizio in casa non si riavvia: ${response.status}`);
+  if (!response.ok) throw new Error(`il servizio in casa non si riavvia (risposta ${response.status})`);
   console.log('home assistant si sta riavviando');
 }

@@ -44,7 +44,7 @@ function fromFile(file: string): Partial<ConnectorConfig> {
     return JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<ConnectorConfig>;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {};
-    throw new ConfigError(`${file} non si legge: ${(error as Error).message}`);
+    throw new ConfigError(`${file} non si legge (${(error as Error).message})`);
   }
 }
 

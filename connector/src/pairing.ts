@@ -719,22 +719,31 @@ export async function resumePairing(config: ConnectorConfig, flowId: string): Pr
  * «quella giusta» e' un indovinello. Quello che le distingue e' il canale,
  * che poi e' esattamente quello che la persona ha scritto per collegarle:
  * si rimette li' davanti.
+ *
+ * Vale per ogni collegamento che porta una telecamera e nient'altro, di
+ * qualunque integrazione: quel collegamento *e'* la telecamera, e il suo
+ * pallino e il suo nome sono i suoi. Uno che porta anche altro — un
+ * campanello con i suoi sensori, un account con dieci telecamere — e' un
+ * account, e il suo stato e' quello del collegamento: che un fotogramma non
+ * arrivi non vuol dire che l'account sia perso.
  */
 export async function titled(
   list: LinkedAccount[],
   born: Map<string, string>,
+  /** Se un'entità è una telecamera: lo dice la sua forma, che ha un'immagine, non il nome del dominio. */
+  occhio: (entityId: string) => boolean,
 ): Promise<LinkedAccount[]> {
-  if (!list.some((one) => one.handler === 'generic')) return list;
-
-  const eyes = new Map<string, string>();
-  for (const [entityId, entryId] of born) {
-    if (entityId.startsWith('camera.') && !eyes.has(entryId)) eyes.set(entryId, entityId);
-  }
+  const perCollegamento = new Map<string, string[]>();
+  for (const [entityId, entryId] of born) perCollegamento.set(entryId, [...(perCollegamento.get(entryId) ?? []), entityId]);
+  const eyes = new Map(
+    [...perCollegamento].flatMap(([entryId, entita]) =>
+      entita.length === 1 && entita[0] && occhio(entita[0]) ? [[entryId, entita[0]] as const] : [],
+    ),
+  );
+  if (!list.some((one) => eyes.has(one.entryId))) return list;
 
   return Promise.all(
     list.map(async (one) => {
-      if (one.handler !== 'generic') return one;
-
       const eye = eyes.get(one.entryId);
       if (!eye) return one;
 
@@ -781,7 +790,7 @@ export async function unlink(config: ConnectorConfig, entryId: string): Promise<
     method: 'DELETE',
     headers: { authorization: `Bearer ${config.haToken}` },
   });
-  if (!response.ok) throw new Error(`non si riesce a scollegare: ${response.status}`);
+  if (!response.ok) throw new Error(`non si riesce a scollegare (risposta ${response.status})`);
 }
 
 /** Lasciare a metà una conversazione la lascia aperta in HA: meglio chiuderla. */
