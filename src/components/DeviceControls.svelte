@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { numero } from '../lib/prove';
   import HealthDot from './HealthDot.svelte';
   import { devices, type Device } from '../lib/devices.svelte';
   import type { Capability, DeviceValue } from '../lib/types';
@@ -110,7 +111,29 @@
 
   <div class="dev-body">
     {#each device.capabilities as capability (capability.code)}
-      {#if capability.kind === 'switch'}
+      {#if capability.kind === 'switch' && capability.pulse}
+        <!-- A impulso non c'è un acceso da mostrare: torna spento da solo
+             dopo mezzo secondo, e quello che comanda cambia a ogni impulso.
+             C'è un tasto da premere, e quanto dura l'impulso. -->
+        <div class="line choice">
+          <span class="line-name">A impulso · {numero(capability.pulse / 1000, 's')}</span>
+          <span class="choices">
+            <Chip
+              label="Premi"
+              look="off"
+              size="sm"
+              disabled={!device.online || devices.isBusy(device.id, capability.code)}
+              onclick={(event: MouseEvent) =>
+                confirm(
+                  event.currentTarget as HTMLElement,
+                  `Premere «${device.name}»?`,
+                  'Premi',
+                  () => void devices.command(device, capability.code, true),
+                )}
+            />
+          </span>
+        </div>
+      {:else if capability.kind === 'switch'}
         <!-- Il clic si ferma qui: lo Switch non arriva a cambiare, e questo
              riquadro è anche l'ancora a cui si attacca la domanda. -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->

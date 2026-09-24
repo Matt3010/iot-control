@@ -19,6 +19,8 @@ export function check(capability: Capability, value: DeviceValue): void {
 
   if (capability.kind === 'switch') {
     if (typeof value !== 'boolean') throw badRequest(`«${capability.label}» si accende o si spegne`);
+    // a impulso si spegne da solo: «spegni» non arriverebbe a niente
+    if (capability.pulse && !value) throw badRequest('è a impulso, si preme e si spegne da solo');
     return;
   }
 
@@ -50,6 +52,10 @@ export function check(capability: Capability, value: DeviceValue): void {
 export const SOLO_ORDINI = new Set(['move']);
 
 export function provabile(capability: Capability, deviceName: string): void {
+  // a impulso torna spento dopo mezzo secondo, qualunque cosa abbia fatto
+  if (capability.kind === 'switch' && capability.pulse) {
+    throw badRequest(`«${deviceName}» è a impulso e non si sa com’è rimasto, quindi non si può chiedere in una condizione`);
+  }
   if (!SOLO_ORDINI.has(capability.code)) return;
   throw badRequest(
     `di «${deviceName}» si sa solo l’ultimo ordine dato e non com’è adesso, quindi non si può chiedere in una condizione`,

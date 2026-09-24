@@ -26,7 +26,10 @@
   function choices(device: Device): { what: string; step: SceneStep }[] {
     const out: { what: string; step: SceneStep }[] = [];
     for (const capability of device.capabilities as Capability[]) {
-      if (capability.kind === 'switch') {
+      if (capability.kind === 'switch' && capability.pulse) {
+        // a impulso si preme e basta, e si spegne da solo
+        out.push({ what: 'Premi', step: { deviceId: device.id, code: capability.code, value: true } });
+      } else if (capability.kind === 'switch') {
         out.push({ what: 'Accendi', step: { deviceId: device.id, code: capability.code, value: true } });
         out.push({ what: 'Spegni', step: { deviceId: device.id, code: capability.code, value: false } });
       } else if (capability.kind === 'enum') {

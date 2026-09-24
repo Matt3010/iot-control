@@ -205,7 +205,9 @@ class Devices {
 
   /** Acceso o spento, per chi deve solo saperlo: la riga, il pallino. */
   isOn(device: Device | undefined): boolean {
-    return device?.online === true && device.state.power === true;
+    // a impulso «acceso» dura mezzo secondo e non dice niente di quello che comanda
+    const impulso = (device?.capabilities as Capability[] | undefined)?.some((one) => one.kind === 'switch' && one.pulse);
+    return device?.online === true && device.state.power === true && !impulso;
   }
 
   /**
@@ -354,6 +356,10 @@ class Devices {
     const who = device.name;
 
     if (!capability) return { who, what: step.value === undefined ? '' : String(step.value) };
+    if (capability.kind === 'switch' && capability.pulse) {
+      // una riga scritta prima di sapere che è a impulso: spegnere non arriva a niente
+      return { who, what: step.value ? 'Premi' : 'Spegni, che a impulso non fa niente' };
+    }
     if (capability.kind === 'switch') return { who, what: step.value ? 'Accendi' : 'Spegni' };
     if (capability.kind === 'enum') return { who, what: String(step.value) };
     if (capability.kind !== 'range') return { who, what: String(step.value) };

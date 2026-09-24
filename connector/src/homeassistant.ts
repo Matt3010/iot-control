@@ -238,6 +238,39 @@ export class HomeAssistant {
     throw new Error(said ? 'la telecamera non ha risposto' : 'la telecamera non ha mandato niente');
   }
 
+  /**
+   * Le entità di un'integrazione, con il nome che le dà lei (`unique_id`).
+   *
+   * L'`entity_id` lo può cambiare chi usa Home Assistant. Il nome interno
+   * no, ed è quello che dice a quale dispositivo del provider — e a quale
+   * suo canale — corrisponde un'entità.
+   */
+  async entitiesOf(platform: string): Promise<{ entityId: string; uniqueId: string; entryId: string | null }[]> {
+    const entities = (await this.#call({ type: 'config/entity_registry/list' })) as {
+      entity_id: string;
+      platform: string;
+      unique_id: string;
+      config_entry_id: string | null;
+    }[];
+    return entities
+      .filter((one) => one.platform === platform)
+      .map((one) => ({ entityId: one.entity_id, uniqueId: one.unique_id, entryId: one.config_entry_id }));
+  }
+
+  /**
+   * I dati di diagnostica di un collegamento: quello che l'integrazione sa
+   * del provider, anche quello che non trasforma in entità. È da lì che si
+   * legge, per esempio, se una presa è a impulso.
+   */
+  async diagnostics(entryId: string): Promise<unknown> {
+    const response = await fetch(`${this.config.haUrl}/api/diagnostics/config_entry/${encodeURIComponent(entryId)}`, {
+      headers: { authorization: `Bearer ${this.config.haToken}` },
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`diagnostica ${response.status}`);
+    return ((await response.json()) as { data?: unknown }).data;
+  }
+
   async callService(domain: string, service: string, entityId: string, data: Record<string, unknown> = {}): Promise<void> {
     await this.#call({
       type: 'call_service',

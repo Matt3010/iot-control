@@ -17,7 +17,19 @@ export type DeviceValue = string | number | boolean;
  * cursore, un `sensor` è un numero che si guarda e basta.
  */
 export type Capability =
-  | { code: string; kind: 'switch'; label: string }
+  | {
+      code: string;
+      kind: 'switch';
+      label: string;
+      /**
+       * A impulso: dopo l'accensione si spegne da sola, fra tanti
+       * millisecondi. Si comanda premendola, e com'è rimasto quello che
+       * comanda non lo sa nessuno, perché un impulso a un relè passo-passo
+       * accende o spegne a seconda di com'era. Lo dice il provider, quando
+       * lo sa (connector/src/impulsi.ts).
+       */
+      pulse?: number;
+    }
   /**
    * Non si comanda: si guarda. Una telecamera non ha interruttori, ha
    * un'immagine — e l'immagine non sta nello stato, perche' lo stato viaggia

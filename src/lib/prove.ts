@@ -99,7 +99,11 @@ const SOLO_ORDINI = new Set(['move']);
 /** Le cose di un dispositivo su cui si può scrivere una prova. */
 export const provabili = (device: Device): Capability[] =>
   (device.capabilities as Capability[]).filter(
-    (capability) => capability.kind !== 'image' && !SOLO_ORDINI.has(capability.code),
+    (capability) =>
+      capability.kind !== 'image' &&
+      !SOLO_ORDINI.has(capability.code) &&
+      // a impulso torna spento subito, e com'è rimasto quello che comanda non si sa
+      !(capability.kind === 'switch' && capability.pulse),
   );
 
 /**

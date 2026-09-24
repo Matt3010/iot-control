@@ -14,7 +14,7 @@ import type { Op } from '../types.js';
  * italiano ha un genere, mentre i dispositivi si chiamano come capita.
  */
 export function says(capability: Capability, value: DeviceValue): string {
-  if (capability.kind === 'switch') return value ? 'accendi' : 'spegni';
+  if (capability.kind === 'switch') return capability.pulse ? 'premi' : value ? 'accendi' : 'spegni';
   if (capability.kind === 'enum') return String(value);
   if (capability.kind === 'range')
     return `${capability.label.toLocaleLowerCase('it')} ${value}${capability.unit ?? ''}`;

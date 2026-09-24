@@ -15,6 +15,7 @@ import { channelOf } from './go2rtc.js';
 import { HomeAssistant } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
 import { blind, look } from './live.js';
+import { leggiImpulsi } from './impulsi.js';
 import { ensureToken } from './onboarding.js';
 import { cancelPairing, listLinked, startPairing, submitPairing, titled, unlink } from './pairing.js';
 
@@ -46,6 +47,8 @@ async function main(): Promise<void> {
    * compaiono appena aggiungi l'integrazione, senza riavviare niente.
    */
   let real = new Map<string, { deviceId: string; deviceName: string }>();
+  /** Gli interruttori a impulso, e per quanti millisecondi. Lo dice il provider. */
+  let impulsi = new Map<string, number>();
 
   /**
    * Un dispositivo come esce di qui.
@@ -58,10 +61,22 @@ async function main(): Promise<void> {
    * restava rossa finché HA non si ricordava di mandare un aggiornamento
    * suo, che può voler dire fra un minuto o domani.
    */
-  const fuori = (device: DeviceSnapshot): DeviceSnapshot => ({
-    ...device,
-    online: vero(device.externalId, device.online),
-  });
+  const fuori = (device: DeviceSnapshot): DeviceSnapshot => {
+    const pulse = impulsi.get(device.externalId);
+    return {
+      ...device,
+      online: vero(device.externalId, device.online),
+      // a impulso lo sa il provider e non Home Assistant: si aggiunge qui,
+      // come quello che si sa in più delle telecamere
+      ...(pulse
+        ? {
+            capabilities: device.capabilities.map((capability) =>
+              capability.kind === 'switch' ? { ...capability, pulse } : capability,
+            ),
+          }
+        : {}),
+    };
+  };
 
   const hello = (): HelloMessage => ({
     type: 'hello',
@@ -92,6 +107,7 @@ async function main(): Promise<void> {
    */
   async function refill(): Promise<void> {
     real = await ha.devices();
+    impulsi = await leggiImpulsi(ha);
     const entities = await ha.states();
 
     devices.clear();
@@ -365,6 +381,22 @@ async function main(): Promise<void> {
       fail((error as Error).message);
     }
   };
+
+  /*
+   * L'impulso si cambia dall'app del provider, e Home Assistant non se ne
+   * accorge: nessun evento dice che la durata è cambiata. Si rilegge ogni
+   * dieci minuti, e si manda solo se è cambiato qualcosa.
+   */
+  const rileggi = setInterval(() => {
+    if (!ha.connected) return;
+    void leggiImpulsi(ha).then((adesso) => {
+      const prima = JSON.stringify([...impulsi].sort());
+      if (JSON.stringify([...adesso].sort()) === prima) return;
+      impulsi = adesso;
+      announceAll();
+    });
+  }, 10 * 60_000);
+  rileggi.unref?.();
 
   ha.start();
   link.start();
