@@ -37,8 +37,27 @@
     busy: false,
   });
 
-  /** La conversazione aperta adesso, se ce n'è una, e se riprende quella di un account scaduto. */
-  let open = $state<{ provider: Provider; riprendi?: string } | null>(null);
+  /**
+   * La conversazione per collegare, in una finestra come tutto il resto che
+   * si apre davanti. Se riprende quella di un account scaduto, lo dice il
+   * titolo. Prende il posto della finestra da cui si è partiti.
+   */
+  function apri(provider: Provider, riprendi?: string): void {
+    ui.openModal({
+      title: riprendi ? `Ricollega ${provider.label}` : provider.label,
+      view: PairingFlow,
+      props: {
+        agent,
+        provider,
+        riprendi,
+        onquit: () => ui.closeModal(),
+        ondone: () => {
+          ui.closeModal();
+          void reread();
+        },
+      },
+    });
+  }
 
   $effect(() => {
     if (!agent.online) return;
@@ -57,12 +76,12 @@
   /** Collegati e da collegare, nella stessa finestra. */
   function cerca(): void {
     ui.openModal({
-      title: 'Collega qualcosa',
+      title: 'Collega un servizio',
       view: CatalogPicker,
       props: {
         agent,
         stato,
-        onpick: (provider: Provider) => (open = { provider }),
+        onpick: (provider: Provider) => apri(provider),
         onoff: (joint: LinkedAccount, label: string) => void detach(joint, label),
         onricollega: ricollega,
       },
@@ -70,25 +89,27 @@
   }
 
   /** Rientrare in un account scaduto: si riprende la conversazione che la centrale ha aperto. */
-  const ricollega = (joint: LinkedAccount, provider: Provider): void => {
-    ui.closeModal();
-    open = { provider, riprendi: joint.ricollega };
-  };
+  const ricollega = (joint: LinkedAccount, provider: Provider): void => apri(provider, joint.ricollega);
 
   /*
    * Gli account da ricollegare stanno anche nella scheda, sopra a «Collega
-   * qualcosa»: un account scaduto nascosto dentro una finestra è un account
+   * un servizio»: un account scaduto nascosto dentro una finestra è un account
    * che nessuno ricollega. Gli altri guasti — una telecamera spenta — non
    * hanno niente da premere: li dice il pallino, e il dettaglio è nella
    * finestra.
    */
   const guasti = $derived(stato.linked.filter((one) => !!one.ricollega));
 
-  /** Il peggiore fra tutti, per il pallino della riga: rosso batte arancione, che batte verde. */
+  /*
+   * Come stanno tutti insieme, per il pallino della riga: verde se funziona
+   * tutto, arancione se almeno uno no, rosso se non ne funziona nessuno.
+   * Un rosso per una telecamera spenta fra sei collegamenti sani diceva
+   * «non funziona niente», che non era vero.
+   */
   const riassunto = $derived.by((): Health | undefined => {
     if (!stato.linked.length) return undefined;
-    const stati = stato.linked.map((one) => one.health ?? 'live');
-    return stati.includes('lost') ? 'lost' : stati.includes('degraded') ? 'degraded' : stati.includes('new') ? 'new' : 'live';
+    const fermi = stato.linked.filter((one) => (one.health ?? 'live') !== 'live' || !!one.ricollega).length;
+    return fermi === 0 ? 'live' : fermi === stato.linked.length ? 'lost' : 'degraded';
   });
   const loro = $derived(
     [...new Set(guasti.map((one) => one.handler))].map((handler) =>
@@ -113,18 +134,6 @@
   }
 </script>
 
-{#if open}
-  <PairingFlow
-    {agent}
-    provider={open.provider}
-    riprendi={open.riprendi}
-    onquit={() => (open = null)}
-    ondone={() => {
-      open = null;
-      void reread();
-    }}
-  />
-{:else}
-  <!-- nella scheda una riga sola: cosa è collegato e cosa si può collegare stanno nella finestra -->
-  <AccountList {agent} accounts={loro} linked={guasti} busy={stato.busy} altre={cerca} onricollega={ricollega} {riassunto} />
-{/if}
+<!-- nella scheda una riga sola: cosa è collegato e cosa si può collegare stanno nella finestra -->
+<AccountList {agent} accounts={loro} linked={guasti} busy={stato.busy} altre={cerca} onricollega={ricollega} {riassunto} />
+

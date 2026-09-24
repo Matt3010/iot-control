@@ -2,7 +2,6 @@
   import type { Agent } from '../lib/devices.svelte';
   import { nelRegistro, providerDa, PROVIDERS, type Provider } from '../lib/providers';
   import type { CatalogEntry, LinkedAccount } from '../lib/types';
-  import { ui } from '../lib/ui.svelte';
   import AccountList from './AccountList.svelte';
   import SearchPicker from './SearchPicker.svelte';
 
@@ -48,9 +47,8 @@
   );
 
   function scegli(handler: string): void {
-    // prima la scelta, poi la finestra: chiusa per prima, si portava via chi doveva riceverla
+    // la conversazione apre la sua finestra al posto di questa: chiuderla qui chiuderebbe quella
     onpick(providerDa(handler, voci.find((voce) => voce.id === handler)?.name));
-    ui.closeModal();
   }
 </script>
 

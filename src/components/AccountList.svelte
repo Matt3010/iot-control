@@ -35,7 +35,7 @@
     altre?: () => void;
     /**
      * Come stanno tutti i collegamenti insieme, per il pallino della riga
-     * «Collega qualcosa»: il peggiore, con gli stessi colori delle righe.
+     * «Collega un servizio»: verde, arancione o rosso come le righe.
      */
     riassunto?: Health;
     /** Riprende il rientro in un account scaduto. Senza, niente «Ricollega». */
@@ -43,6 +43,16 @@
   } = $props();
 
   const joined = (handler: string) => linked.filter((one) => one.handler === handler);
+
+  /** Lo stesso pallino, detto per tutti i collegamenti insieme. */
+  const insieme = (health: Health | undefined): string =>
+    health === 'live'
+      ? 'Funziona tutto'
+      : health === 'degraded'
+        ? 'Qualcosa non funziona'
+        : health === 'lost'
+          ? 'Non funziona niente'
+          : 'Niente di collegato';
 
   /** Il colore da solo non basta a chi non lo distingue: la parola sta qui. */
   const says = (health: Health | undefined): string =>
@@ -63,12 +73,12 @@
   e scritti una volta sola. Due copie della stessa riga diventano due righe
   diverse alla prima correzione fatta di fretta su una sola.
 -->
-{#snippet segno(label: string, as: string, health: Health | undefined)}
+{#snippet segno(label: string, as: string, health: Health | undefined, detto?: string)}
   <!-- Lo stesso pallino dell'agente, con lo stesso significato: verde parla e
        risponde, arancione ci sta riprovando, rosso non ce la fa, grigio non
        c'è. Un verde che resta verde mentre l'account è scaduto è una bugia
        che si guarda tutti i giorni. -->
-  <span class="mark {health ?? 'none'}" title={says(health)} role="img" aria-label={says(health)}></span>
+  <span class="mark {health ?? 'none'}" title={detto ?? says(health)} role="img" aria-label={detto ?? says(health)}></span>
   <span class="who">
     <b>{label}</b>
     {#if as}<span class="as">{as}</span>{/if}
@@ -122,7 +132,7 @@
        da collegare si vedono nella finestra che apre. -->
   {#if altre}
     <div class="account">
-      {@render segno('Collega qualcosa', '', riassunto)}
+      {@render segno('Collega un servizio', '', riassunto, insieme(riassunto))}
       <Button
         look="link"
         disabled={!agent.online || busy}

@@ -3,6 +3,8 @@
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
   import { nelRegistro, type Provider } from '../lib/providers';
+  import { tasti } from '../lib/fondo.svelte';
+  import type { ModalAction } from '../lib/ui.svelte';
   import type { PairingStep } from '../lib/types';
   import Button from './Button.svelte';
   import TextField from './TextField.svelte';
@@ -260,10 +262,48 @@
       return field.yesno ? value === true : typeof value === 'string' && value.trim() !== '';
     }),
   );
+
+  /*
+   * I tasti in fondo, secondo il passo. Dentro una finestra li disegna lei
+   * (`tasti()`), fuori si disegnano qui sotto. Un tasto che torna `false`
+   * lascia la finestra aperta: la conversazione va avanti dentro.
+   */
+  function azioni(): ModalAction[] {
+    const annulla: ModalAction = { label: 'Annulla', look: 'ghost', disabled: busy, onpick: () => void go('cancel') };
+    if (avvisoPrima && !avvisato) {
+      return [
+        { label: 'Annulla', look: 'ghost', onpick: () => onquit() },
+        { label: 'Comincia', look: 'primary', onpick: () => (comincia(), false) },
+      ];
+    }
+    if (!step) return [annulla];
+    if (step.kind === 'failed') {
+      return [
+        { label: 'Annulla', look: 'ghost', disabled: busy, onpick: () => onquit() },
+        { label: 'Riprova', look: 'primary', disabled: busy, onpick: () => (restart(), false) },
+      ];
+    }
+    if (step.kind === 'busy') {
+      return [
+        { label: 'Più tardi', look: 'ghost', disabled: busy, onpick: () => onquit() },
+        { label: 'Riprova', look: 'primary', disabled: busy, onpick: () => (restart(), false) },
+      ];
+    }
+    if (step.qr) return [annulla, { label: 'Ho inquadrato', look: 'primary', disabled: busy, onpick: () => (submit(), false) }];
+    if (step.fields.length) {
+      return [annulla, { label: 'Continua', look: 'primary', disabled: busy || !ready, onpick: () => (submit(), false) }];
+    }
+    return [annulla];
+  }
+
+  const inFinestra = tasti(azioni);
 </script>
 
 <div class="pair" class:is-busy={busy}>
-  <span class="eyebrow">{riprendi ? `Ricollega ${provider.label}` : provider.label}</span>
+  <!-- in una finestra il nome sta già nel titolo -->
+  {#if !inFinestra}
+    <span class="eyebrow">{riprendi ? `Ricollega ${provider.label}` : provider.label}</span>
+  {/if}
 
   {#if step?.error}
     <p class="wrong">{step.error}</p>
@@ -271,33 +311,18 @@
 
   {#if avvisoPrima && !avvisato}
     <p class="say">{provider.warns}</p>
-    <div class="acts">
-      <Button look="primary" size="sm" onclick={comincia}>Comincia</Button>
-      <Button look="link" onclick={onquit}>Annulla</Button>
-    </div>
   {:else if !step}
     <p class="say">Un momento…</p>
   {:else if step.kind === 'failed'}
-    <div class="acts">
-      <Button look="ghost" size="sm" disabled={busy} onclick={restart}>Riprova</Button>
-      <Button look="link" disabled={busy} onclick={onquit}>Annulla</Button>
-    </div>
+    <!-- cosa non è andato lo dice l'errore qui sopra; cosa fare, i tasti in fondo -->
   {:else if step.kind === 'busy'}
     <p class="say">{step.note}</p>
-    <div class="acts">
-      <Button look="ghost" size="sm" disabled={busy} onclick={restart}>Riprova</Button>
-      <Button look="link" disabled={busy} onclick={onquit}>Più tardi</Button>
-    </div>
   {:else if step.qr}
     <!-- il testo è della marca, perché l'app con cui si inquadra è la sua -->
     <p class="say">
       {@html provider.qr ?? 'Inquadra questo codice con l’app del servizio. Quando ha finito, conferma qui sotto.'}
     </p>
     <Qr data={step.qr} label="Codice da inquadrare" />
-    <div class="acts">
-      <Button look="primary" size="sm" disabled={busy} onclick={submit}>Ho inquadrato</Button>
-      <Button look="link" disabled={busy} onclick={() => go('cancel')}>Annulla</Button>
-    </div>
   {:else if step.fields.length}
     <!-- Le istruzioni servono a chi deve riempire il modulo. Al passo dove si
          guarda e basta non c'entrano più niente: dire ancora dove trovare
@@ -372,22 +397,17 @@
       {/if}
     {/each}
 
-    <div class="acts">
-      <Button
-        look="primary"
-        size="sm"
-        disabled={busy || !ready}
-        title={ready ? '' : 'Manca ancora qualcosa'}
-        onclick={submit}
-      >
-        Continua
-      </Button>
-      <Button look="link" disabled={busy} onclick={() => go('cancel')}>Annulla</Button>
-    </div>
   {:else}
     <p class="say">Sto aspettando {provider.label}…</p>
+  {/if}
+
+  {#if !inFinestra}
     <div class="acts">
-      <Button look="link" disabled={busy} onclick={() => go('cancel')}>Annulla</Button>
+      {#each azioni() as azione (azione.label)}
+        <Button look={azione.look} size="sm" disabled={azione.disabled} onclick={(event: MouseEvent) => void azione.onpick(event.currentTarget as HTMLElement)}>
+          {azione.label}
+        </Button>
+      {/each}
     </div>
   {/if}
 </div>
