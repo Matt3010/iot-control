@@ -1,5 +1,5 @@
 import { rimpiazza } from './rimpiazza';
-import { nomeColore } from './colori';
+import { nomeAzione } from './azioni';
 import { daQuando, healthOf, salute, type Salute } from './health';
 import { api } from './api';
 import { toast } from './toast.svelte';
@@ -60,19 +60,12 @@ export interface SceneStep {
 }
 
 /**
- * Più cose che partono insieme, ognuna con la sua azione.
- *
- * «Sera» chiude le tende e accende l'abat-jour: due azioni diverse su due
- * cose diverse, premute una volta. Non ha uno stato suo — due tende possono
- * stare una aperta e una chiusa, e per quello non c'è una parola sola.
- */
-/**
  * Quando una scena parte da sola.
  *
- * Un'ora come la si legge su un orologio e i giorni in cui vale, con il fuso
- * in cui quell'ora è scritta: «le sette di sera» deve restare le sette anche
- * dopo il cambio dell'ora, e chi la scrive da un'altra città non deve fare i
- * conti a mente.
+ * Un'ora come la si legge su un orologio e i giorni in cui vale. Il fuso è
+ * quello dell'account, non scritto qui: «le sette di sera» restano le sette
+ * anche dopo il cambio dell'ora, e chi guarda da un'altra città le legge
+ * all'ora di chi le ha scritte.
  */
 export interface Timing {
   at: string;
@@ -80,7 +73,6 @@ export interface Timing {
   on?: string;
   /** Da domenica (0) a sabato (6). Vuoto vuol dire tutti i giorni. */
   days: number[];
-  tz: string;
   /** Sospesa senza cancellarla, per l'estate o per una settimana fuori. */
   off?: boolean;
 }
@@ -114,6 +106,13 @@ export interface SceneConditionGroup {
   items: SceneCondition[];
 }
 
+/**
+ * Più cose che partono insieme, ognuna con la sua azione.
+ *
+ * «Sera» chiude le tende e accende l'abat-jour: due azioni diverse su due
+ * cose diverse, premute una volta. Non ha uno stato suo — due tende possono
+ * stare una aperta e una chiusa, e per quello non c'è una parola sola.
+ */
 export interface Scene {
   id: string;
   name: string;
@@ -124,7 +123,13 @@ export interface Scene {
   /** L'ultima volta che è partita, a mano o da sola. Mai, se manca. */
   ranAt?: string;
   /** Se stava andando quando la pagina l'ha chiesta. Dopo lo dice `devices.running`. */
-  corre?: { at: number; of: number; resta?: number };
+  corre?: { run: string; at: number; of: number; resta?: number };
+  /**
+   * Quando il fusibile l'ha fermata: ripartiva da sola di continuo. Resta
+   * ferma, orario compreso, finché qualcuno non la cambia o non la fa
+   * partire a mano.
+   */
+  blownAt?: string;
 }
 
 /**
@@ -210,11 +215,27 @@ class Devices {
     return this.busy.includes(`${deviceId}:${code}`);
   }
 
+  /**
+   * L'interruttore di un dispositivo: la prima levetta che non è
+   * un'impostazione né un tasto a impulso, comunque si chiami.
+   *
+   * Si guardava `power` e basta. Una presa che dice `on`, o una ciabatta con
+   * `switch_1`, restavano spente per sempre; e contando tutto quello che non
+   * era un sensore, telecamere, tende e pulsanti finivano nel totale come
+   * cose spente — «1 di 7 accesi» in una casa con due luci. A impulso
+   * «acceso» dura mezzo secondo e non dice niente di quello che comanda; una
+   * spia o lo stato dopo un blackout non sono la cosa accesa.
+   */
+  interruttore(device: Device | undefined): Capability | undefined {
+    return (device?.capabilities as Capability[] | undefined)?.find(
+      (one) => one.kind === 'switch' && !one.setting && !one.pulse,
+    );
+  }
+
   /** Acceso o spento, per chi deve solo saperlo: la riga, il pallino. */
   isOn(device: Device | undefined): boolean {
-    // a impulso «acceso» dura mezzo secondo e non dice niente di quello che comanda
-    const impulso = (device?.capabilities as Capability[] | undefined)?.some((one) => one.kind === 'switch' && one.pulse);
-    return device?.online === true && device.state.power === true && !impulso;
+    const levetta = this.interruttore(device);
+    return !!levetta && device?.online === true && device.state[levetta.code] === true;
   }
 
   /**
@@ -225,8 +246,23 @@ class Devices {
    */
   anyOn(agentIds: string[] | undefined): boolean {
     if (!agentIds?.length) return false;
-    return this.list.some((device) => agentIds.includes(device.agentId) && this.isOn(device));
+    const sotto = this.#accesi.split(' ');
+    return agentIds.some((id) => sotto.includes(id));
   }
+
+  /*
+   * Gli agenti sotto cui è acceso qualcosa, in una stringa.
+   *
+   * Ogni lettura di un sensore riscrive lo stato di un dispositivo, e chi
+   * chiedeva `anyOn` guardava dentro a tutti: sulla mappa ogni grado in più
+   * di un termometro ridisegnava tutti i pin, luoghi per dispositivi. Qui
+   * lo stato si guarda una volta per cambiamento, e fuori arriva una stringa
+   * che resta uguale — e non sveglia nessuno — finché non si accende o si
+   * spegne qualcosa.
+   */
+  #accesi = $derived(
+    [...new Set(this.list.filter((device) => this.isOn(device)).map((device) => device.agentId))].sort().join(' '),
+  );
 
 
   /**
@@ -273,15 +309,53 @@ class Devices {
     return salute(device ? this.agentUp(device.agentId) : false, device?.online ?? false);
   }
 
-  /** Quanti ne sono accesi su quanti se ne possono accendere. */
+  /** Quanti ne sono accesi su quanti se ne possono accendere: solo chi ha un interruttore. */
   tally(agentId: string): { on: number; total: number } {
-    const theirs = this.ofAgent(agentId).filter(
-      (device) => !device.goneAt && device.capabilities.some((capability) => capability.kind !== 'sensor'),
-    );
+    const theirs = this.ofAgent(agentId).filter((device) => !device.goneAt && !!this.interruttore(device));
     return { on: theirs.filter((device) => this.isOn(device)).length, total: theirs.length };
   }
 
-  async load(): Promise<void> {
+  /**
+   * Perché l'ultima lettura non è arrivata, finché la prossima non ce la fa.
+   * Quello che c'era resta sullo schermo: è vecchio, non sbagliato.
+   */
+  loadError = $state<string | null>(null);
+
+  /**
+   * Se almeno una lettura è arrivata. Senza, quello che c'è sullo schermo
+   * non è vecchio: non c'è proprio, e va detto in un altro modo.
+   */
+  letto = $state(false);
+
+  /** I dispositivi di cui è arrivato un evento senza che fossero nell'elenco. */
+  #ignoti = new Set<string>();
+
+  #giro: Promise<void> | null = null;
+  #coda: Promise<void> | null = null;
+
+  /**
+   * Rileggere agenti, dispositivi e scene.
+   *
+   * Le richieste arrivano a mucchi — il filo dice «agenti» e «dispositivi»
+   * insieme, e chi rimuove un dispositivo rilegge anche lui mentre il filo
+   * sta già rileggendo — e ognuna erano tre richieste al server. Adesso ce
+   * n'è una in corso e al massimo una in coda: chi arriva mentre si legge
+   * aspetta quella dopo, che vede anche quello che è appena cambiato.
+   */
+  load(): Promise<void> {
+    if (this.#coda) return this.#coda;
+    if (this.#giro) {
+      this.#coda = this.#giro.then(() => {
+        this.#coda = null;
+        return this.load();
+      });
+      return this.#coda;
+    }
+    this.#giro = this.#leggi().finally(() => (this.#giro = null));
+    return this.#giro;
+  }
+
+  async #leggi(): Promise<void> {
     try {
       const [agents, list, scenes] = await Promise.all([
         api.get<Agent[]>('/agents'),
@@ -291,20 +365,24 @@ class Devices {
       this.agents = agents;
       this.list = list;
       this.scenes = scenes;
+      this.loadError = null;
+      this.letto = true;
       // quelle che stanno andando, per chi ha aperto la pagina a metà
       this.running = Object.fromEntries(
         scenes
           .filter((scene) => scene.corre)
           .map((scene) => {
-            const { at, of, resta } = scene.corre!;
-            return [scene.id, { at, of, ...(resta ? { fino: Date.now() + resta } : {}) }];
+            const { run, at, of, resta } = scene.corre!;
+            return [scene.id, { run, at, of, ...(resta ? { fino: Date.now() + resta } : {}) }];
           }),
       );
-    } catch {
-      // Un indice senza agenti è un indice normale: non si disturba nessuno.
-      this.agents = [];
-      this.list = [];
-      this.scenes = [];
+    } catch (error) {
+      /*
+       * Si tiene quello che c'era. Svuotare voleva dire far sparire le scene
+       * da sotto a chi le stava scrivendo, e chiudergli la finestra, per un
+       * server che non ha risposto una volta.
+       */
+      this.loadError = (error as Error).message;
     } finally {
       this.loading = false;
     }
@@ -312,16 +390,31 @@ class Devices {
 
   /* -------------------------------------------------------------- registro */
 
+  /**
+   * I registri che qualcuno sta guardando, detti prima che arrivino le
+   * righe. La risposta può arrivare dopo che la finestra si è già chiusa:
+   * senza saperlo, il registro finiva fra quelli aperti e restava lì per
+   * sempre, riletto a ogni riga nuova per nessuno.
+   */
+  #guardati = new Set<string>();
+
   /** Aprire il registro di un agente: si legge adesso e si tiene aggiornato. */
   async openLog(agentId: string): Promise<void> {
+    this.#guardati.add(agentId);
+    await this.#leggiLog(agentId);
+  }
+
+  async #leggiLog(agentId: string): Promise<void> {
     try {
-      this.logs = { ...this.logs, [agentId]: await api.get<LogEntry[]>(`/agents/${agentId}/log`) };
+      const righe = await api.get<LogEntry[]>(`/agents/${agentId}/log`);
+      if (this.#guardati.has(agentId)) this.logs = { ...this.logs, [agentId]: righe };
     } catch (error) {
-      toast.show((error as Error).message);
+      if (this.#guardati.has(agentId)) toast.show(`Il registro dell’agente non si è letto. ${(error as Error).message}`);
     }
   }
 
   closeLog(agentId: string): void {
+    this.#guardati.delete(agentId);
     const { [agentId]: _via, ...rest } = this.logs;
     this.logs = rest;
   }
@@ -381,21 +474,8 @@ class Devices {
     const who = device.name;
 
     if (!capability) return { who, what: step.value === undefined ? '' : String(step.value) };
-    if (capability.kind === 'switch' && capability.pulse) {
-      // una riga scritta prima di sapere che è a impulso: spegnere non arriva a niente
-      return { who, what: step.value ? 'Premi' : 'Spegni, che a impulso non fa niente' };
-    }
-    if (capability.kind === 'switch') {
-      const di = capability.setting ? ` ${capability.label}` : '';
-      return { who, what: `${step.value ? 'Accendi' : 'Spegni'}${di}` };
-    }
-    if (capability.kind === 'enum') {
-      const detta = capability.labels?.[String(step.value)] ?? String(step.value);
-      return { who, what: capability.setting ? `${capability.label} ${detta}` : detta };
-    }
-    if (capability.kind === 'color') return { who, what: `Colore ${nomeColore(Number(step.value)).toLocaleLowerCase('it')}` };
-    if (capability.kind !== 'range') return { who, what: String(step.value) };
-    return { who, what: `${capability.label} ${step.value}${capability.unit ?? ''}` };
+    // la stessa parola della pastiglia da cui è nata (lib/azioni.ts)
+    return { who, what: nomeAzione(device, capability as Capability, step.value) };
   }
 
   /* ----------------------------------------------------------- le regole */
@@ -459,9 +539,14 @@ class Devices {
     }
   }
 
-  /** Se almeno uno risponde: una scena tutta spenta non parte. */
+  /**
+   * Se si può far partire. Con dei dispositivi dentro basta che uno
+   * risponda: una scena tutta spenta non parte. Senza, parte sempre — una
+   * scena fatta di avvisi e di altre scene non ha nessuno da aspettare.
+   */
   reachable(scene: Scene): boolean {
-    return this.membersOf(scene).some((device) => device.online);
+    const loro = this.membersOf(scene);
+    return !loro.length || loro.some((device) => device.online);
   }
 
   async createScene(name: string, steps: SceneStep[]): Promise<Scene> {
@@ -534,15 +619,14 @@ class Devices {
     this.busy = this.busy.filter((held) => held !== key);
   }
 
+  /** Le scene che stanno andando: a che momento, e quando finisce l'attesa di adesso. */
+  running = $state<Record<string, { run: string; at: number; of: number; fino?: number }>>({});
+
   /**
    * Quello che arriva dal filo. Il filo non è suo: è uno solo per tutta
    * l'app, e sta in `live`. Qui si applica soltanto la parte che riguarda
    * quello che si accende.
    */
-  /** Le scene che stanno partendo adesso, e a che momento sono arrivate. */
-  /** Le scene che stanno andando: a che momento, e quando finisce l'attesa di adesso. */
-  running = $state<Record<string, { at: number; of: number; fino?: number }>>({});
-
   apply(
     event: { kind: 'device' | 'agent' | 'devices' | 'agents' | 'scene' | 'running' | 'log' } & Record<
       string,
@@ -559,10 +643,17 @@ class Devices {
      */
     if (event.kind === 'running') {
       const sceneId = event.sceneId as string;
-      if (event.done) delete this.running[sceneId];
-      else {
+      const run = event.run as string;
+      /*
+       * La stessa scena può andare due volte insieme. Si mostra l'ultima
+       * partita, e la fine di quella di prima non la cancella.
+       */
+      if (event.done) {
+        if (this.running[sceneId]?.run === run) delete this.running[sceneId];
+      } else {
         const resta = event.resta as number | undefined;
         this.running[sceneId] = {
+          run,
           at: event.at as number,
           of: event.of as number,
           ...(resta ? { fino: Date.now() + resta } : {}),
@@ -581,7 +672,7 @@ class Devices {
     // una riga nuova nel registro di qualcuno: se lo stiamo leggendo, si rilegge
     if (event.kind === 'log') {
       const agentId = event.agentId as string;
-      if (this.logs[agentId]) void this.openLog(agentId);
+      if (this.#guardati.has(agentId)) void this.#leggiLog(agentId);
       return;
     }
 
@@ -607,7 +698,17 @@ class Devices {
 
     const device = this.byId(event.deviceId as string);
     if (!device) {
-      // Un dispositivo che non conoscevamo: l'agente ne ha trovato uno nuovo.
+      /*
+       * Un dispositivo che non conosciamo: forse l'agente ne ha trovato uno
+       * nuovo, e allora si rilegge — una volta sola per quel dispositivo.
+       * Se dopo la rilettura non c'è ancora, non è nostro da vedere (a un
+       * ospite le telecamere non si mostrano, ma i loro eventi arrivano lo
+       * stesso) e rileggere tutto a ogni suo messaggio non lo farebbe
+       * comparire.
+       */
+      const id = event.deviceId as string;
+      if (this.#ignoti.has(id)) return;
+      this.#ignoti.add(id);
       void this.load();
       return;
     }
@@ -722,7 +823,11 @@ class Devices {
       .then((list) => list ?? []);
   }
 
-  /** Staccare un account: Home Assistant si porta via anche i suoi dispositivi. */
+  /**
+   * Staccare un account. I suoi dispositivi non se ne vanno: al prossimo
+   * inventario restano come spariti, con le loro scene e i loro avvisi,
+   * finché non li rimuovi o non torna.
+   */
   unlink(agent: Agent, entryId: string): Promise<LinkedAccount[]> {
     return api
       .post<LinkedAccount[] | null>(`/agents/${agent.id}/pair`, { action: 'unlink', entryId })
@@ -739,16 +844,18 @@ class Devices {
    * tenevano restano dove sono: erano luoghi prima di essere interruttori.
    */
   async removeAgent(agent: Agent): Promise<void> {
-    const index = this.agents.indexOf(agent);
+    // per identità e non per oggetto: una rilettura nel frattempo li ha sostituiti
     const theirs = this.ofAgent(agent.id);
-    this.agents.splice(index, 1);
+    this.agents = this.agents.filter((one) => one.id !== agent.id);
     this.list = this.list.filter((device) => device.agentId !== agent.id);
 
     try {
       await api.delete(`/agents/${agent.id}`);
     } catch (error) {
-      this.agents.splice(index, 0, agent);
-      this.list = [...this.list, ...theirs];
+      // si rimette solo quello che nel frattempo non è tornato da sé
+      if (!this.agents.some((one) => one.id === agent.id)) this.agents = [...this.agents, agent];
+      const ci = new Set(this.list.map((device) => device.id));
+      this.list = [...this.list, ...theirs.filter((device) => !ci.has(device.id))];
       toast.show((error as Error).message);
     }
   }

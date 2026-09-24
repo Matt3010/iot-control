@@ -25,6 +25,9 @@
     untrack(() => void alerts.load(0));
   });
 
+  // finché questo elenco è sullo schermo, un avviso nuovo lo fa rileggere
+  $effect(() => alerts.guarda());
+
   /*
    * «Chi» e non «agente»: qui ci finisce anche il nome di una scena o di un
    * dispositivo, e chiamarli agente era dire una cosa falsa su due righe su
@@ -104,6 +107,9 @@
          mentre si sta ancora chiedendo è una bugia che dura un secondo -->
     <p class="say">Un momento…</p>
   {:else}
+    {#if alerts.errore}
+      <p class="say">Gli avvisi non si sono letti. {alerts.errore}</p>
+    {/if}
     <Table columns={COLONNE} rows={alerts.rows} vista={alerts.vista} label="Gli avvisi avvenuti">
       {#snippet row(one: Notice)}
         {@const esito = delivery(one)}
@@ -136,10 +142,14 @@
       {/snippet}
 
       {#snippet empty()}
+        <!-- con la lettura andata male l'elenco vuoto non vuol dire niente:
+             lo dice la riga qui sopra -->
+        {#if !alerts.errore}
         <p class="say">
           Non è ancora successo niente. Quando un agente smetterà di rispondere lo troverai scritto
           qui, anche se la notifica non fosse arrivata.
         </p>
+        {/if}
       {/snippet}
     </Table>
   {/if}

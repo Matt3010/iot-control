@@ -1,6 +1,6 @@
 <script lang="ts">
   import { offriIlFondo } from '../lib/fondo.svelte';
-  import { ui, type ModalAction } from '../lib/ui.svelte';
+  import { ui, type ModalAction, type ModalRequest } from '../lib/ui.svelte';
   import { swipeToClose } from '../lib/swipe';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
@@ -26,7 +26,14 @@
    * quale porta via qualcosa — lo sceglie con le stesse parole che userebbe
    * ovunque.
    */
-  const request = $derived(ui.modal!);
+  let {
+    request,
+    davanti = true,
+  }: {
+    request: ModalRequest;
+    /** Sotto a un'altra resta montata e nascosta, con tutto quello che ha dentro. */
+    davanti?: boolean;
+  } = $props();
 
   /*
    * I tasti in fondo, che può dettare anche chi sta dentro.
@@ -37,7 +44,14 @@
    * qui si richiama ogni volta che qualcosa dentro si muove.
    */
   let dettati = $state<(() => ModalAction[]) | null>(null);
-  offriIlFondo({ detta: (azioni) => (dettati = azioni) });
+
+  /* il guscio si fa conoscere, così chi apre da qui dentro ci si appoggia
+     sopra e chiusa quella il fuoco torna qui */
+  let guscio = $state<HTMLElement>();
+  $effect(() => {
+    if (guscio) ui.registra(request, guscio);
+  });
+  offriIlFondo({ detta: (azioni) => (dettati = azioni), chiudi: () => ui.closeModal(request) });
 
   const azioni = $derived(dettati ? dettati() : (request.actions ?? []));
 
@@ -47,7 +61,8 @@
     if (!azione) return;
 
     const resta = await azione.onpick(anchor);
-    if (resta !== false) ui.closeModal();
+    // questa, non quella davanti: mentre si aspettava poteva essersene aperta un'altra
+    if (resta !== false) ui.closeModal(request);
   }
 </script>
 
@@ -56,14 +71,18 @@
      una finestra, non un margine della pagina -->
 <div
   class="surface modal"
+  class:is-full={request.intera}
   role="dialog"
   aria-modal="true"
   aria-label={request.title}
-  use:swipeToClose={() => ui.closeModal()}
+  hidden={!davanti}
+  tabindex="-1"
+  bind:this={guscio}
+  use:swipeToClose={() => ui.closeModal(request)}
 >
   <header>
     <h2>{request.title}</h2>
-    <Button look="icon" title="Chiudi" onclick={() => ui.closeModal()}>
+    <Button look="icon" title="Chiudi" onclick={() => ui.closeModal(request)}>
       <Icon name="close" />
     </Button>
   </header>
@@ -105,6 +124,15 @@
     /* la scatola la lascia scorrere tutta; qui scorre solo il corpo, se no
        il tasto che conferma se ne va mentre scrivi */
     overflow: hidden;
+  }
+
+  /* il fuoco ci torna quando si chiude quella sopra, ma è un posto di
+     passaggio e non un campo: nessun anello intorno a tutta la finestra */
+  .modal:focus { outline: none; }
+
+  /* quella sotto a un'altra: `display: flex` qui sopra vincerebbe su `hidden` */
+  .modal[hidden] {
+    display: none;
   }
 
   header {
@@ -151,6 +179,69 @@
     gap: 8px;
     padding-top: 12px;
     border-top: 1px solid var(--hairline-soft);
+  }
+
+  /*
+   * A tutto schermo: nero intorno, e il titolo con la chiusura sopra
+   * all'immagine, su una sfumatura. Sopra a un'inquadratura chiara il bianco
+   * su bianco non si legge, e una testata piena ruberebbe una fascia
+   * all'immagine. Tre classi per vincere sulla scatola di base.css, che su
+   * un telefono ne ha due.
+   */
+  .modal.is-full {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-sheet);
+    width: auto;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    gap: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: #000;
+    box-shadow: none;
+    backdrop-filter: none;
+    animation: none;
+  }
+
+  /* da installata su iPhone anche lei ha bisogno di `lvh` per arrivare in
+     fondo (vedi base.css) */
+  @media (display-mode: standalone) {
+    .modal.is-full { height: 100lvh; }
+  }
+
+  /* la maniglia da trascinare che la scatola mette su un telefono */
+  .modal.is-full::before { display: none; }
+
+  .modal.is-full header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    padding: max(10px, env(safe-area-inset-top)) 12px 18px;
+    background: linear-gradient(180deg, rgb(0 0 0 / 0.55), transparent);
+  }
+
+  .modal.is-full h2 {
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .modal.is-full header :global(.btn) { color: #fff; }
+
+  .modal.is-full .modal-body {
+    display: block;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
   }
 
   @media (max-width: 600px) {

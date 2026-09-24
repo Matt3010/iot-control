@@ -1,6 +1,6 @@
 import type { Map as LeafletMap, Marker } from 'leaflet';
 import { here } from './here.svelte';
-import { CLUSTER_OFF_AT, metersBetween } from './mapkit';
+import { CLUSTER_OFF_AT, metersBetween } from './distanza';
 import type { LocalPlace } from './types';
 
 /**

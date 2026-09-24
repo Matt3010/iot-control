@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { domandaAzione } from '../lib/azioni';
   import { nomeColore } from '../lib/colori';
+  import { leggiValore } from '../lib/valori';
   import { numero } from '../lib/prove';
   import HealthDot from './HealthDot.svelte';
   import { devices, type Device } from '../lib/devices.svelte';
@@ -44,20 +46,21 @@
 
   const numberOf = (value: DeviceValue | undefined): number => (typeof value === 'number' ? value : 0);
 
-  /** Quello che si legge a destra dell'etichetta, mentre trascini. */
-  const readout = (capability: Capability & { kind: 'range' }): string =>
-    `${Math.round(numberOf(device.state[capability.code]))}${capability.unit ?? ''}`;
-
-  /** Il valore di un sensore: un numero si arrotonda, una parola resta com'è. */
-  function sensorText(code: string): string {
-    const value = device.state[code];
-    if (typeof value === 'number') return `${Math.round(value * 10) / 10}`;
-    if (typeof value === 'boolean') return value ? 'sì' : 'no';
-    if (value === undefined || value === '') return '—';
-    // una parola da macchina si legge con la sua etichetta: «in carica», non `charging`
-    const capability = (device.capabilities as Capability[]).find((one) => one.code === code);
-    return (capability?.kind === 'sensor' && capability.labels?.[String(value)]) || String(value);
+  /**
+   * Quello che si legge a destra dell'etichetta, mentre trascini. Un valore
+   * che l'agente non conosce non arriva, e «0» direbbe una cosa falsa.
+   */
+  function readout(capability: Capability & { kind: 'range' }): string {
+    const value = device.state[capability.code];
+    return typeof value === 'number' ? `${Math.round(value)}${capability.unit ?? ''}` : '—';
   }
+
+  /** Il valore di un sensore, letto come si legge ovunque nell'app (`lib/valori.ts`). */
+  const sensorText = (code: string): string =>
+    leggiValore(
+      (device.capabilities as Capability[]).find((one) => one.code === code),
+      device.state[code],
+    );
 
   /**
    * Mentre trascini il cursore il numero deve seguire il dito, ma il comando
@@ -97,9 +100,7 @@
 
     confirm(
       event.currentTarget as HTMLElement,
-      capability.setting
-        ? `${wanted ? 'Accendere' : 'Spegnere'} «${capability.label}» di «${device.name}»?`
-        : `${wanted ? 'Accendere' : 'Spegnere'} «${device.name}»?`,
+      domandaAzione(device, capability, wanted),
       wanted ? 'Accendi' : 'Spegni',
       () => void devices.command(device, capability.code, wanted),
     );
@@ -139,7 +140,7 @@
               onclick={(event: MouseEvent) =>
                 confirm(
                   event.currentTarget as HTMLElement,
-                  `Premere «${device.name}»?`,
+                  domandaAzione(device, capability, true),
                   'Premi',
                   () => void devices.command(device, capability.code, true),
                 )}
@@ -220,9 +221,7 @@
                 onclick={(event: MouseEvent) =>
                   confirm(
                     event.currentTarget as HTMLElement,
-                    capability.setting
-                      ? `Impostare «${capability.label}» a «${capability.labels?.[value] ?? value}»?`
-                      : `${value} «${device.name}»?`,
+                    domandaAzione(device, capability, value),
                     capability.labels?.[value] ?? value,
                     () => void devices.command(device, capability.code, value),
                   )}

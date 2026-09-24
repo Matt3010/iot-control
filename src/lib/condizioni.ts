@@ -1,4 +1,5 @@
 import type { SceneCondition, SceneConditionGroup } from './devices.svelte';
+import { senza as potaDa } from '../../shared/regole.js';
 
 /**
  * L'albero delle condizioni di una scena.
@@ -22,16 +23,10 @@ export function quante(condizione: SceneCondition): number {
 
 /**
  * Lo stesso albero senza le condizioni che non vanno più bene. I gruppi
- * rimasti vuoti se ne vanno anche loro, tranne quello più esterno.
+ * rimasti vuoti se ne vanno anche loro, tranne quello più esterno. È la
+ * stessa potatura che fa il server quando un dispositivo se ne va.
  */
-export function senza(gruppo: SceneConditionGroup, via: (one: SceneCondition) => boolean): SceneConditionGroup {
-  const pota = (one: SceneCondition): SceneCondition | null => {
-    if (one.kind !== 'group') return via(one) ? null : one;
-    const items = one.items.map(pota).filter((x): x is SceneCondition => x !== null);
-    return items.length ? { ...one, items } : null;
-  };
-  return { ...gruppo, items: gruppo.items.map(pota).filter((x): x is SceneCondition => x !== null) };
-}
+export const senza: (gruppo: SceneConditionGroup, via: (one: SceneCondition) => boolean) => SceneConditionGroup = potaDa;
 
 /** Giorni e fasce orarie, che valgono solo per le partenze da un dispositivo. */
 export const diTempo = (one: SceneCondition): boolean => one.kind === 'days' || one.kind === 'hours';

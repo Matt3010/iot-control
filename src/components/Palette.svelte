@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { formatDistance, normalise } from '../lib/format';
+  import { formatDistance } from '../lib/format';
+  import { Vista } from '../lib/vista.svelte';
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { store } from '../lib/store.svelte';
   import type { LocalPlace } from '../lib/types';
@@ -26,43 +27,36 @@
     pick: () => void;
   }
 
-  let query = $state('');
   let addresses = $state<Hit[]>([]);
   let searching = $state(false);
   let selected = $state(0);
   let input = $state<HTMLInputElement>();
   let results = $state<HTMLDivElement>();
 
-  /** Your own places, ranked: name first, then category, then group, then notes. */
-  const matches = $derived.by(() => {
-    const needle = normalise(query.trim());
-    const scored: { place: LocalPlace; rank: number; distance: number }[] = [];
-
-    for (const place of store.currentPlaces) {
-      const name = normalise(place.name);
-      let rank = Number.POSITIVE_INFINITY;
-      if (!needle) rank = 5;
-      else if (name.startsWith(needle)) rank = 0;
-      else if (name.includes(needle)) rank = 1;
-      else if (normalise(store.categoryOf(place.categoryId)?.name ?? '').includes(needle)) rank = 2;
-      else if (place.groupIds.some((id) => normalise(store.groupOf(id)?.name ?? '').includes(needle))) rank = 3;
-      else if (normalise(place.note ?? '').includes(needle)) rank = 4;
-      if (rank === Number.POSITIVE_INFINITY) continue;
-      // `null` vuol dire dal centro del riquadro, che e' l'origine dell'elenco
-      // qui sotto. Misurate da due punti diversi, le due distanze dello stesso
-      // luogo si contraddicono sulla stessa schermata
-      scored.push({
-        place,
-        rank,
-        distance: mapBridge.distanceFrom(place.lat, place.lng, null),
-      });
-    }
-
-    return scored.sort((a, b) => a.rank - b.rank || a.distance - b.distance).slice(0, 8);
+  /*
+   * I tuoi luoghi, con la stessa vista di ogni altro elenco: si cerca nel
+   * nome, poi nella categoria, nei gruppi e nella nota, e chi risponde col
+   * nome viene prima. A parità vince il più vicino al centro del riquadro —
+   * `null` vuol dire da lì, che è l'origine dell'elenco qui sotto: misurate
+   * da due punti diversi, le due distanze dello stesso luogo si
+   * contraddirebbero sulla stessa schermata.
+   */
+  const lontano = (place: LocalPlace): number => mapBridge.distanceFrom(place.lat, place.lng, null);
+  const vista = new Vista<LocalPlace>({
+    criteri: [{ id: 'vicini', label: 'Distanza', per: (a, b) => lontano(a) - lontano(b) }],
+    testoDi: (place) => [
+      place.name,
+      store.categoryOf(place.categoryId)?.name ?? '',
+      place.groupIds.map((id) => store.groupOf(id)?.name ?? '').join(' '),
+      place.note ?? '',
+    ],
   });
 
+  /** Otto bastano: chi non trova il suo fra otto scrive una lettera in più. */
+  const matches = $derived(vista.applica(store.currentPlaces).slice(0, 8));
+
   const placeRows = $derived<Row[]>(
-    matches.map(({ place, distance }) => {
+    matches.map((place) => {
       const category = store.categoryOf(place.categoryId);
       const groups = place.groupIds.map((id) => store.groupOf(id)?.name).filter(Boolean);
       return {
@@ -72,7 +66,7 @@
         note: [groups.join(', '), place.note || category?.name].filter(Boolean).join(' · '),
         // Una distanza si scrive solo se si sa da dove: senza mappa e senza
         // posizione, «0 m» sarebbe una bugia precisa.
-        meta: viewport.hasMap ? formatDistance(distance) : '',
+        meta: viewport.hasMap ? formatDistance(lontano(place)) : '',
         pick: () => {
           ui.paletteOpen = false;
           store.reveal(place);
@@ -122,7 +116,7 @@
 
   /** Addresses cost a round trip, so they follow the typing at a distance. */
   $effect(() => {
-    const needle = query.trim();
+    const needle = vista.cerca.trim();
     if (needle.length < 3) {
       addresses = [];
       searching = false;
@@ -196,7 +190,7 @@
         spellcheck="false"
         placeholder="Cerca tra i tuoi luoghi, o un indirizzo"
         bind:element={input}
-        bind:value={query}
+        bind:value={vista.cerca}
         onkeydown={onKeydown}
       />
       {#if searching}<span id="palette-spinner"></span>{/if}
@@ -207,7 +201,7 @@
       {#if placeRows.length}
         <div class="palette-section">
           <span class="eyebrow">I tuoi luoghi</span>
-          {#if !query.trim() && viewport.hasMap}
+          {#if !vista.cerca.trim() && viewport.hasMap}
             <span class="palette-meta">i più vicini</span>
           {/if}
         </div>
@@ -241,7 +235,7 @@
 
       {#if rows.length === 0}
         <p class="palette-empty">
-          {query.trim().length < 3
+          {vista.cerca.trim().length < 3
             ? 'Scrivi almeno tre lettere per cercare anche tra gli indirizzi.'
             : 'Nessun luogo e nessun indirizzo con questo nome.'}
         </p>

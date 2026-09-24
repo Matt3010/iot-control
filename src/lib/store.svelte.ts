@@ -12,7 +12,21 @@ type LiveChange =
   | { kind: 'category'; id: string; value: Category | null }
   | { kind: 'group'; id: string; value: Group | null };
 
-const withKey = (place: Place): LocalPlace => ({ ...place, key: crypto.randomUUID() });
+/**
+ * Un luogo con la sua chiave del browser.
+ *
+ * Quella di un luogo già noto resta la sua. La chiave è quello che tiene
+ * attaccati il pin e la scheda aperta al loro luogo, e ogni rilettura — a
+ * ogni ritorno della rete — ne inventava una nuova: la scheda non trovava
+ * più il suo luogo, si chiudeva, e quello che ci avevi scritto se ne andava.
+ */
+const withKey = (place: Place, known?: Map<string, string>): LocalPlace => ({
+  ...place,
+  key: known?.get(place.id) ?? crypto.randomUUID(),
+});
+
+/** «un luogo», «3 luoghi»: con uno solo il numero si legge male. */
+const luoghi = (quanti: number): string => (quanti === 1 ? 'un luogo' : `${quanti} luoghi`);
 
 /**
  * Mettere nell'elenco una cosa che il server ha confermato, senza farne due.
@@ -44,7 +58,7 @@ const placePayload = (mapId: string, draft: Required<Pick<Draft, 'lat' | 'lng'>>
 });
 
 interface PendingDelete {
-  commit: (options?: RequestInit) => void;
+  commit: (options?: RequestInit) => Promise<unknown>;
 }
 
 class Store {
@@ -71,7 +85,8 @@ class Store {
     // Leaving the page confirms whatever is still waiting: the UI already said it was gone.
     if (typeof window !== 'undefined') {
       window.addEventListener('pagehide', () => {
-        for (const entry of this.#pending) entry.commit({ keepalive: true });
+        // la pagina se ne va: a un rifiuto non c'è più nessuno a cui dirlo
+        for (const entry of this.#pending) entry.commit({ keepalive: true }).catch(() => undefined);
         this.#pending.clear();
       });
     }
@@ -179,20 +194,31 @@ class Store {
       writeJSON('pi.map', this.activeMapId);
     }
 
-    const cancel = this.#defer((options) => api.delete(`/maps/${map.id}`, options).catch(() => undefined));
-
-    toast.show(places.length ? `"${map.name}" e ${places.length} luoghi eliminati` : `"${map.name}" eliminata`, {
-      label: 'Annulla',
-      run: () => {
-        cancel();
-        this.maps.splice(index, 0, map);
-        this.places = [...this.places, ...places];
-        this.activeMapId = wasActive;
-        this.extraMapIds = wasExtra;
-        writeJSON('pi.map', wasActive);
-        writeJSON('pi.maps', wasExtra);
-      },
+    const rimetti = () => {
+      if (!this.maps.some((one) => one.id === map.id)) this.maps.splice(Math.min(index, this.maps.length), 0, map);
+      this.places = [...this.places, ...places];
+      this.activeMapId = wasActive;
+      this.extraMapIds = wasExtra;
+      writeJSON('pi.map', wasActive);
+      writeJSON('pi.maps', wasExtra);
+    };
+    const cancel = this.#defer((options) => api.delete(`/maps/${map.id}`, options), {
+      rimetti,
+      frase: `La mappa «${map.name}» non si è potuta eliminare, ed è tornata al suo posto.`,
     });
+
+    toast.show(
+      places.length
+        ? `Mappa «${map.name}» eliminata, e con lei ${luoghi(places.length)}`
+        : `Mappa «${map.name}» eliminata`,
+      {
+        label: 'Annulla',
+        run: () => {
+          cancel();
+          rimetti();
+        },
+      },
+    );
   }
 
   #forget(id: string): void {
@@ -325,7 +351,8 @@ class Store {
       this.maps = snapshot.maps ?? [];
       this.categories = snapshot.categories;
       this.groups = snapshot.groups ?? [];
-      this.places = snapshot.places.map(withKey);
+      const known = new Map(this.places.map((place) => [place.id, place.key]));
+      this.places = snapshot.places.map((place) => withKey(place, known));
 
       // le mappe scelte l'altra volta potrebbero non esserci più
       const alive = new Set(this.maps.map((map) => map.id));
@@ -376,12 +403,25 @@ class Store {
 
   /* ----------------------------------------------- deletes, with a way back */
 
-  #defer(commit: (options?: RequestInit) => void): () => void {
+  /**
+   * Una cancellazione che parte quando «Annulla» non c'è più.
+   *
+   * Se il server dice di no, la cosa torna dov'era e si dice perché: prima
+   * l'errore si perdeva, lo schermo diceva «eliminato» e alla prima
+   * rilettura il luogo ricompariva, senza una parola.
+   */
+  #defer(
+    commit: (options?: RequestInit) => Promise<unknown>,
+    fallita: { rimetti: () => void; frase: string },
+  ): () => void {
     const entry: PendingDelete = { commit };
     this.#pending.add(entry);
     const timer = setTimeout(() => {
       this.#pending.delete(entry);
-      commit();
+      commit().catch((error: Error) => {
+        fallita.rimetti();
+        toast.show(`${fallita.frase} ${error.message}`);
+      });
     }, UNDO_MS);
 
     return () => {
@@ -421,19 +461,24 @@ class Store {
     this.categories.splice(index, 1);
     this.places = this.places.filter((place) => place.categoryId !== category.id);
 
-    const cancel = this.#defer((options) =>
-      api.delete(`/categories/${category.id}`, options).catch(() => undefined),
-    );
+    const rimetti = () => {
+      this.categories.splice(Math.min(index, this.categories.length), 0, category);
+      this.places = [...this.places, ...orphans];
+    };
+    const cancel = this.#defer((options) => api.delete(`/categories/${category.id}`, options), {
+      rimetti,
+      frase: `La categoria «${category.name}» non si è potuta eliminare, ed è tornata al suo posto.`,
+    });
 
-    const swept = orphans.length === 1 ? 'un luogo' : `${orphans.length} luoghi`;
     toast.show(
-      orphans.length ? `"${category.name}" e ${swept} eliminati` : `"${category.name}" eliminata`,
+      orphans.length
+        ? `Categoria «${category.name}» eliminata, e con lei ${luoghi(orphans.length)}`
+        : `Categoria «${category.name}» eliminata`,
       {
         label: 'Annulla',
         run: () => {
           cancel();
-          this.categories.splice(index, 0, category);
-          this.places = [...this.places, ...orphans];
+          rimetti();
         },
       },
     );
@@ -464,18 +509,25 @@ class Store {
     for (const place of members) place.groupIds = place.groupIds.filter((id) => id !== group.id);
     if (this.activeGroup === group.id) this.setGroup(null);
 
-    const cancel = this.#defer((options) =>
-      api.delete(`/groups/${group.id}`, options).catch(() => undefined),
-    );
+    const rimetti = () => {
+      this.groups.splice(Math.min(index, this.groups.length), 0, group);
+      for (const place of members) {
+        if (!place.groupIds.includes(group.id)) place.groupIds = [...place.groupIds, group.id];
+      }
+    };
+    const cancel = this.#defer((options) => api.delete(`/groups/${group.id}`, options), {
+      rimetti,
+      frase: `Il gruppo «${group.name}» non si è potuto eliminare, ed è tornato al suo posto.`,
+    });
 
     const freed = members.length === 1 ? 'un luogo resta' : `${members.length} luoghi restano`;
-    toast.show(members.length ? `"${group.name}" sciolto, ${freed}` : `"${group.name}" eliminato`,
+    toast.show(
+      members.length ? `Gruppo «${group.name}» sciolto, ${freed}` : `Gruppo «${group.name}» eliminato`,
       {
         label: 'Annulla',
         run: () => {
           cancel();
-          this.groups.splice(index, 0, group);
-          for (const place of members) place.groupIds = [...place.groupIds, group.id];
+          rimetti();
         },
       },
     );
@@ -572,15 +624,19 @@ class Store {
     if (index < 0) return;
     this.places.splice(index, 1);
 
-    const cancel = this.#defer((options) =>
-      api.delete(`/places/${place.id}`, options).catch(() => undefined),
-    );
+    const rimetti = () => {
+      if (!this.places.some((one) => one.id === place.id)) this.places.splice(Math.min(index, this.places.length), 0, place);
+    };
+    const cancel = this.#defer((options) => api.delete(`/places/${place.id}`, options), {
+      rimetti,
+      frase: `Il luogo «${place.name}» non si è potuto eliminare, ed è tornato al suo posto.`,
+    });
 
-    toast.show(`"${place.name}" eliminato`, {
+    toast.show(`Luogo «${place.name}» eliminato`, {
       label: 'Annulla',
       run: () => {
         cancel();
-        this.places.splice(index, 0, place);
+        rimetti();
       },
     });
   }

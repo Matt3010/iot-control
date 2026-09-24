@@ -61,7 +61,7 @@
       else if (failed) toast.show('La consegna è stata respinta, e non dipende da questa macchina');
       else toast.show('Nessuna macchina iscritta. Spegni e riaccendi la levetta.');
     } catch (error) {
-      toast.show(`Prova non riuscita: ${(error as Error).message}`);
+      toast.show(`Prova non riuscita. ${(error as Error).message}`);
     }
   }
 </script>

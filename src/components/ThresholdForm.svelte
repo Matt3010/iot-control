@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { tasti } from '../lib/fondo.svelte';
-  import { ui } from '../lib/ui.svelte';
+  import { chiusura, tasti } from '../lib/fondo.svelte';
   import TextField from './TextField.svelte';
 
   /**
@@ -33,13 +32,15 @@
     return true;
   }
 
+  const chiudi = chiusura();
+
   tasti(() => [
     { label: 'Annulla', look: 'ghost', onpick: () => undefined },
     { label: 'Aggiungi', look: 'primary', disabled: !valida, onpick: () => (salva() ? undefined : false) },
   ]);
 </script>
 
-<form class="soglia" onsubmit={(event) => (event.preventDefault(), salva() && ui.closeModal())}>
+<form class="soglia" onsubmit={(event) => (event.preventDefault(), salva() && chiudi())}>
   <span class="domanda">{domanda}</span>
   <div class="campo">
     <!-- svelte-ignore a11y_autofocus -->

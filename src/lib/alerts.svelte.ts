@@ -68,18 +68,40 @@ class Alerts {
   /** Prima di sapere: l'elenco vuoto e «non è successo niente» non sono uguali. */
   loaded = $state(false);
   busy = $state(false);
+  /** Perché l'ultima lettura non è arrivata. Quello che c'era resta, è vecchio e non sbagliato. */
+  errore = $state<string | null>(null);
 
   /**
-   * E' successo qualcosa: se qualcuno sta guardando l'elenco, si rilegge.
+   * Quanti elenchi sono sullo schermo adesso.
+   *
+   * «Letto una volta» non vuol dire «qualcuno sta guardando»: uscendo dalla
+   * pagina l'elenco restava letto, e ogni avviso nuovo lo faceva rileggere
+   * per nessuno. Lo dice chi lo mostra, con `guarda`.
+   */
+  #guardato = 0;
+
+  /** Chi mostra l'elenco lo dice entrando; la funzione che torna lo dice uscendo. */
+  guarda(): () => void {
+    this.#guardato += 1;
+    return () => {
+      this.#guardato -= 1;
+    };
+  }
+
+  /**
+   * E' successo qualcosa: se qualcuno sta guardando l'elenco, si rilegge la
+   * pagina dove sta. Riportarlo alla prima voleva dire strappare dalla terza
+   * chi stava leggendo, a ogni avviso che arriva.
    *
    * Chi non ha la pagina aperta non deve andare a chiedere niente: l'avviso
    * gli arriva sul telefono, e l'elenco lo troverà quando lo aprirà.
    */
   async seen(): Promise<void> {
-    if (!this.loaded) return;
-    await this.load(0).catch(() => undefined);
+    if (!this.#guardato) return;
+    await this.load();
   }
 
+  /** Non solleva mai: se non arriva, lo dice `errore` a chi guarda. */
   async load(offset = this.offset): Promise<void> {
     this.busy = true;
     try {
@@ -89,6 +111,9 @@ class Alerts {
       this.rows = page.rows;
       this.total = page.total;
       this.offset = page.offset;
+      this.errore = null;
+    } catch (error) {
+      this.errore = (error as Error).message;
     } finally {
       this.busy = false;
       this.loaded = true;

@@ -8,6 +8,7 @@
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
+  import Alert from './Alert.svelte';
   import StepRail from './StepRail.svelte';
 
   /**
@@ -38,16 +39,6 @@
   /** Quanti non rispondono: si dice, perché una scena può partire a metà. */
   const mute = $derived(members.filter((device) => !device.online).length);
 
-  /**
-   * Come sta il dispositivo di una riga, con le stesse tre parole e gli
-   * stessi tre colori che ha nella sua scheda.
-   *
-   * In testa alla scena c'era un punto esclamativo che diceva che qualcosa
-   * non rispondeva, e non serviva a niente: la domanda vera è «quale?», e la
-   * risposta stava in un suggerimento che su un telefono non si apre nemmeno.
-   * Si dice sulla riga, che è dove si guarda — e si dice come altrove, se no
-   * la stessa cosa avrebbe due facce a seconda della pagina.
-   */
   /**
    * A che punto è, se sta partendo adesso.
    *
@@ -99,9 +90,40 @@
       .filter((step) => !step.vuota),
   );
 
+  /**
+   * Come sta il dispositivo di una riga, con le stesse tre parole e gli
+   * stessi tre colori che ha nella sua scheda.
+   *
+   * In testa alla scena c'era un punto esclamativo che diceva che qualcosa
+   * non rispondeva, e non serviva a niente: la domanda vera è «quale?», e la
+   * risposta stava in un suggerimento che su un telefono non si apre nemmeno.
+   * Si dice sulla riga, che è dove si guarda — e si dice come altrove, se no
+   * la stessa cosa avrebbe due facce a seconda della pagina.
+   */
   const how = (deviceId: string): Salute => devices.saluteDi(devices.list.find((one) => one.id === deviceId));
 
   const busy = $derived(devices.busy.includes(`scena:${scene.id}`));
+
+  /*
+   * Cosa succede premendo, contato per quello che è: i dispositivi si
+   * muovono, gli avvisi si mandano, le scene si fanno partire. Contarle
+   * tutte come «cose» mosse diceva «muove 3 cose» di una scena che manda
+   * tre avvisi.
+   */
+  function cosaFa(): string {
+    const avvisi = scene.steps.filter((step) => !!step.notify).length;
+    const chiamate = scene.steps.filter((step) => !!step.scene).length;
+    const parti = [
+      members.length ? `muove ${members.length === 1 ? 'un dispositivo' : `${members.length} dispositivi`}` : '',
+      avvisi ? `manda ${avvisi === 1 ? 'un avviso' : `${avvisi} avvisi`}` : '',
+      chiamate ? `fa partire ${chiamate === 1 ? 'un’altra scena' : `altre ${chiamate} scene`}` : '',
+    ].filter(Boolean);
+    if (!parti.length) return 'Non fa ancora niente.';
+
+    const frase = parti.length > 1 ? `${parti.slice(0, -1).join(', ')} e ${parti.at(-1)}` : parti[0]!;
+    const zitti = mute ? ` ${mute === 1 ? 'Uno dei dispositivi non risponde' : `${mute} dispositivi non rispondono`}.` : '';
+    return `${frase[0]!.toUpperCase()}${frase.slice(1)}.${zitti}`;
+  }
 
   /**
    * Niente parte senza un sì, come per un dispositivo solo — e qui ancora di
@@ -109,10 +131,9 @@
    */
   function ask(event: MouseEvent): void {
     if (busy || !live) return;
-    const quante = scene.steps.length === 1 ? 'una cosa' : `${scene.steps.length} cose`;
     ui.askSure(event.currentTarget as HTMLElement, {
       title: `Far partire «${scene.name}»?`,
-      detail: `Muove ${quante}${mute ? `, ma ${mute} non rispond${mute === 1 ? 'e' : 'ono'}` : ''}.`,
+      detail: cosaFa(),
       verb: 'Parti',
       tone: 'plain',
       no: 'Annulla',
@@ -139,6 +160,14 @@
     </Button>
   </div>
 
+  <!-- ferma dal fusibile: prima di tutto il resto, perché finché non la
+       tocchi l'orario e le partenze qui sotto non valgono -->
+  {#if scene.blownAt}
+    <Alert
+      message="Ferma, perché ripartiva da sola di continuo. Riparte quando la cambi o la fai partire a mano."
+    />
+  {/if}
+
   <!-- A che punto è non si scrive qui: lo dice la linea qui sotto, che si
        colora fin dove è arrivata e batte sul passo di adesso. Contarli in
        cima voleva dire leggere «passo 2 di 2» e poi cercare da soli quale
@@ -163,7 +192,10 @@
       <span class="detto">quando {fraseDiProva(devices.list, trigger, 'quando')}</span>
     </p>
   {/each}
-  {#if scene.only && quante(scene.only) && (scene.when || (scene.triggers ?? []).length)}
+  <!-- solo quando parte da sola davvero: con l'orario sospeso e niente
+       dal quale partire le condizioni non servono a niente, e lo dice
+       anche il passo che le scrive -->
+  {#if scene.only && quante(scene.only) && ((scene.when && !scene.when.off) || (scene.triggers ?? []).length)}
     <p class="auto is-se">
       <span class="detto">solo se {fraseCondizione(devices.list, scene.only)}</span>
     </p>
@@ -193,7 +225,7 @@
       {/snippet}
     </StepRail>
   {:else}
-    <p class="set-none">Non c’è ancora niente dentro. Aggiungi una riga qui sotto.</p>
+    <p class="set-none">Non c’è ancora niente dentro. Le righe si aggiungono con la matita qui sopra.</p>
   {/if}
 </div>
 

@@ -5,17 +5,48 @@ export const onUnauthorized = (handler: () => void): void => {
   unauthorized = handler;
 };
 
+/**
+ * Cosa dire quando il server non ha scritto il motivo.
+ *
+ * «errore 500» e «Failed to fetch» arrivavano sullo schermo così com'erano:
+ * uno in gergo, l'altro in inglese, e nessuno dei due diceva quale pezzo
+ * mancava. Qui si dice: la rete di chi guarda, il server che non si
+ * raggiunge, il server che si è inceppato, o la cosa che non c'è più.
+ */
+function motivo(status: number): string {
+  if (status === 403) return 'Questa cosa non ti è aperta, e il server l’ha rifiutata.';
+  if (status === 404) return 'Quello che cercavi sul server non c’è più. Ricarica la pagina per vedere com’è adesso.';
+  if (status === 502 || status === 503 || status === 504) {
+    return 'Il server non si raggiunge adesso. Riprova fra poco.';
+  }
+  if (status >= 500) return `Il server si è inceppato mentre rispondeva (codice ${status}). Riprova fra poco.`;
+  return `Il server ha rifiutato la richiesta senza dire perché (codice ${status}).`;
+}
+
+/** Quando la richiesta non è nemmeno arrivata: la rete di qui, o il server là. */
+const senzaRisposta = (): string =>
+  typeof navigator !== 'undefined' && navigator.onLine === false
+    ? 'Questo dispositivo è senza rete, e la richiesta non è partita.'
+    : 'Il server non risponde, e la richiesta non è arrivata. Controlla la rete e riprova.';
+
 /** Every call the client makes, in one place, with the server's error text kept. */
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    headers: options.body ? { 'content-type': 'application/json' } : undefined,
-    ...options,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
+      headers: options.body ? { 'content-type': 'application/json' } : undefined,
+      ...options,
+    });
+  } catch (error) {
+    // chi ha interrotto apposta lo sa già: non è un guasto da raccontare
+    if ((error as Error).name === 'AbortError') throw error;
+    throw new Error(senzaRisposta());
+  }
 
   if (!response.ok) {
     const detail = (await response.json().catch(() => ({}))) as { error?: string };
     if (response.status === 401) unauthorized?.();
-    throw new Error(detail.error ?? `errore ${response.status}`);
+    throw new Error(detail.error ?? motivo(response.status));
   }
   return (response.status === 204 ? null : await response.json()) as T;
 }

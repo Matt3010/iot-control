@@ -1,5 +1,6 @@
 import L, { type Marker, type MarkerCluster } from 'leaflet';
 import 'leaflet.markercluster';
+import { CLUSTER_OFF_AT } from './distanza';
 import { createElement } from 'lucide';
 import { ICONS, type IconName } from './icons';
 import { signOf } from './marks';
@@ -16,8 +17,7 @@ const ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 export const DEFAULT_COLOR = '#6b7280';
-/** Oltre questo zoom ogni marker sta per sé, quindi un popup può aprirsi. */
-export const CLUSTER_OFF_AT = 17;
+export { CLUSTER_OFF_AT };
 
 /** Un'icona di lucide come elemento, per quando il markup non è di Svelte. */
 export function glyph(name: IconName): SVGElement {
@@ -91,10 +91,6 @@ function locateControl(onLocate: () => void): L.Control {
   return control;
 }
 
-/** Quanti metri ci sono fra due punti, senza tirare in ballo una mappa. */
-export function metersBetween(from: L.LatLngExpression, to: L.LatLngExpression): number {
-  return L.latLng(from).distanceTo(to);
-}
 
 /** Il puntino di dove sei: non si clicca, sta sotto ai pin. */
 export function meIcon(): L.DivIcon {

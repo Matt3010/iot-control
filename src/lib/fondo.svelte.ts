@@ -25,6 +25,8 @@ const CHIAVE = Symbol('tasti in fondo');
 
 interface Fondo {
   detta: (azioni: () => ModalAction[]) => void;
+  /** Chiude questa finestra, e non quella che le si è aperta sopra. */
+  chiudi: () => void;
 }
 
 /** Lo apre il guscio, che di cosa ci finirà dentro non sa niente. */
@@ -39,4 +41,17 @@ export function tasti(azioni: () => ModalAction[]): boolean {
 
   fondo.detta(azioni);
   return true;
+}
+
+/**
+ * Come chiudere la finestra in cui si sta.
+ *
+ * Chi si chiude da sé dopo aver aspettato qualcosa — un salvataggio, una
+ * scena sparita — non può chiudere «quella davanti»: nel frattempo gliene
+ * può essere comparsa un'altra sopra, e se ne andrebbe lei. Fuori da una
+ * finestra non c'è niente da chiudere, e la risposta non fa niente.
+ */
+export function chiusura(): () => void {
+  const fondo = getContext<Fondo | undefined>(CHIAVE);
+  return fondo ? fondo.chiudi : () => undefined;
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { COLORI } from '../lib/colori';
   import { devices, type Device, type Scene, type SceneStep } from '../lib/devices.svelte';
+  import { nomeAzione } from '../lib/azioni';
   import { ATTESE, saysWait } from '../lib/timing';
   import type { Capability } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
@@ -25,43 +26,44 @@
   const all = $derived(devices.presenti);
 
   /** Le azioni che un dispositivo sa fare, come righe gia' pronte da aggiungere. */
-  function choices(device: Device): { what: string; step: SceneStep }[] {
-    const out: { what: string; step: SceneStep }[] = [];
+  function choices(device: Device): { key: string; what: string; step: SceneStep }[] {
+    /*
+     * Una sola scelta per ogni cosa da fare. Su un cursore corto i valori
+     * tondi, arrotondati al passo, cadevano più volte sullo stesso numero, e
+     * due pastiglie uguali che fanno la stessa cosa sono una di troppo.
+     */
+    const out: { key: string; what: string; step: SceneStep }[] = [];
+    const visti = new Set<string>();
+    const push = (one: { what: string; step: SceneStep }) => {
+      const key = `${one.step.code}=${String(one.step.value)}`;
+      if (visti.has(key)) return;
+      visti.add(key);
+      out.push({ key, ...one });
+    };
+    // come si chiama ogni pastiglia lo dice la regola di tutte le azioni (lib/azioni.ts)
+    const riga = (capability: Capability, value: SceneStep['value']) => ({
+      what: nomeAzione(device, capability, value),
+      step: { deviceId: device.id, code: capability.code, value },
+    });
     for (const capability of device.capabilities as Capability[]) {
       if (capability.kind === 'switch' && capability.pulse) {
         // a impulso si preme e basta, e si spegne da solo
-        out.push({ what: 'Premi', step: { deviceId: device.id, code: capability.code, value: true } });
+        push(riga(capability, true));
       } else if (capability.kind === 'switch') {
-        // un'impostazione dice quale: «Accendi Luce spia», non un altro «Accendi»
-        const di = capability.setting ? ` ${capability.label}` : '';
-        out.push({ what: `Accendi${di}`, step: { deviceId: device.id, code: capability.code, value: true } });
-        out.push({ what: `Spegni${di}`, step: { deviceId: device.id, code: capability.code, value: false } });
+        push(riga(capability, true));
+        push(riga(capability, false));
       } else if (capability.kind === 'enum') {
-        for (const value of capability.values) {
-          const detta = capability.labels?.[value] ?? value;
-          out.push({
-            what: capability.setting ? `${capability.label} ${detta}` : detta,
-            step: { deviceId: device.id, code: capability.code, value },
-          });
-        }
+        for (const value of capability.values) push(riga(capability, value));
       } else if (capability.kind === 'color') {
         // un colore si sceglie per nome: «imposta a 230» non lo legge nessuno
-        for (const colore of COLORI) {
-          out.push({
-            what: `Colore ${colore.nome.toLocaleLowerCase('it')}`,
-            step: { deviceId: device.id, code: capability.code, value: colore.tinta },
-          });
-        }
+        for (const colore of COLORI) push(riga(capability, colore.tinta));
       } else if (capability.kind === 'range') {
         // i valori tondi, perche' una scena non si scrive al pixel
         for (const quota of [0, 25, 50, 75, 100]) {
           // arrotondato al passo del cursore: 3300 K e non 3275 K
           const passo = capability.step > 0 ? capability.step : 1;
           const value = Math.round((capability.min + ((capability.max - capability.min) * quota) / 100) / passo) * passo;
-          out.push({
-            what: `${capability.label} ${value}${capability.unit ?? ''}`,
-            step: { deviceId: device.id, code: capability.code, value },
-          });
+          push(riga(capability, value));
         }
       }
     }
@@ -84,9 +86,7 @@
      * Le righe dell'ultimo momento sono quelle che partirebbero insieme a
      * questa: dopo l'ultima attesa non c'è più niente che le separi.
      */
-    const dopoAttesa = scene.steps.map((one) => one.after ?? 0).lastIndexOf(0) === 0
-      ? 0
-      : scene.steps.reduce((at, one, index) => ((one.after ?? 0) > 0 ? index : at), 0);
+    const dopoAttesa = scene.steps.reduce((at, one, index) => ((one.after ?? 0) > 0 ? index : at), 0);
     const insieme = scene.steps.slice(dopoAttesa);
 
     // Cambiare idea su una riga che non è ancora partita la corregge al suo
@@ -110,9 +110,8 @@
   /**
    * Una riga che non muove niente: manda un avviso.
    *
-   * È l'unica azione che non riguarda una cosa in casa, e per ora l'unica
-   * che non sia un comando. Nasce con delle parole già dentro, perché un
-   * campo vuoto in mezzo a una sequenza non dice cosa farsene.
+   * È l'unica azione che non riguarda una cosa in casa, e con la scena
+   * chiamata l'unica che non sia un comando.
    */
   function addNotify(): void {
     /*
@@ -318,7 +317,7 @@
         {@const able = choices(device)}
         {#if able.length}
           <div class="chips is-what">
-            {#each able as choice (choice.what)}
+            {#each able as choice (choice.key)}
               {@const scelta = already(choice.step.deviceId, choice.step.code) === choice.step.value}
               <!-- quella già scelta si vede: premerne un'altra la sostituisce,
                    invece di aggiungere una riga che la contraddice -->

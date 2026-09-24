@@ -115,7 +115,7 @@
           onclick={(event: MouseEvent) =>
             ui.askSure(event.currentTarget as HTMLElement, {
               title: account.many ? `Scollegare «${joint.title}»?` : `Scollegare ${account.label}?`,
-              detail: "L'agente si porta via i suoi dispositivi. Il collegamento si rifà quando vuoi.",
+              detail: 'I dispositivi restano, segnati come spariti, con le loro scene e i loro avvisi. Ricollegando tornano come prima, se no li togli con «Rimuovi».',
               verb: 'Scollega',
               onYes: () => onoff?.(joint, account.many ? joint.title : account.label),
             })}

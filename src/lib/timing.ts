@@ -1,3 +1,4 @@
+import { auth } from './auth.svelte';
 import type { Timing } from './devices.svelte';
 import { dopoGiorni, istante, oraIn } from './fuso';
 
@@ -22,20 +23,26 @@ const uguali = (days: number[], other: number[]): boolean =>
 /** I mesi, come si dicono parlando. */
 const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 
-/** Una data come la si direbbe: «oggi», «domani», «giovedì 25 settembre». */
-export function saysDay(iso: string): string {
-  const quando = new Date(`${iso}T12:00:00`);
-  const oggi = new Date();
-  const giorni = Math.round((quando.getTime() - new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate(), 12).getTime()) / 86_400_000);
+/**
+ * Una data come la si direbbe: «oggi», «domani», «giovedì 25 settembre».
+ *
+ * «Oggi» è quello del fuso dell'account, come per tutto quello che riguarda
+ * le scene: a mezzanotte di Roma, da New York, «domani» è già oggi.
+ */
+export function saysDay(iso: string, tz = auth.tz, now = new Date()): string {
+  const oggi = oraIn(tz, now).date;
+  const giorni = Math.round((Date.parse(`${iso}T12:00:00Z`) - Date.parse(`${oggi}T12:00:00Z`)) / 86_400_000);
 
   if (giorni === 0) return 'oggi';
   if (giorni === 1) return 'domani';
   if (giorni === 2) return 'dopodomani';
 
-  const esteso = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'][quando.getDay()];
+  // la data scritta non ha un fuso: letta a mezzogiorno di Greenwich è quella
+  const quando = new Date(`${iso}T12:00:00Z`);
+  const esteso = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'][quando.getUTCDay()];
   // l'anno si dice solo quando non e' questo: dirlo sempre e' burocrazia
-  const anno = quando.getFullYear() === oggi.getFullYear() ? '' : ` ${quando.getFullYear()}`;
-  return `${esteso} ${quando.getDate()} ${MESI[quando.getMonth()]}${anno}`;
+  const anno = iso.slice(0, 4) === oggi.slice(0, 4) ? '' : ` ${quando.getUTCFullYear()}`;
+  return `${esteso} ${quando.getUTCDate()} ${MESI[quando.getUTCMonth()]}${anno}`;
 }
 
 /**
@@ -65,30 +72,21 @@ export function saysDays(giorni: number[]): string {
   return days.map((day) => GIORNI[day]).join(' ');
 }
 
-/** Il fuso di questo browser: «le sette» vuol dire le sette dove sei. */
-const hereTz = (): string =>
-  Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome';
+/**
+ * Quello che si propone a chi accende l'orario la prima volta. Il fuso non
+ * c'è: è quello dell'account, e sta lì.
+ */
+export const defaultWhen = (): Timing => ({ at: '19:00', days: [] });
 
-/** Quello che si propone a chi accende l'orario la prima volta. */
-export const defaultWhen = (): Timing => ({ at: '19:00', days: [], tz: hereTz() });
-
-/** Oggi, come lo scrive un calendario: `2026-09-25`. */
-export function today(): string {
-  const now = new Date();
-  const due = (value: number) => String(value).padStart(2, '0');
-  return `${now.getFullYear()}-${due(now.getMonth() + 1)}-${due(now.getDate())}`;
+/** Oggi nel fuso dell'account, come lo scrive un calendario: `2026-09-25`. */
+export function today(tz = auth.tz): string {
+  return oraIn(tz).date;
 }
 
-/** I prossimi giorni, per chi deve sceglierne uno solo. */
-export function nextDays(quanti = 30): string[] {
-  const out: string[] = [];
-  const now = new Date();
-  for (let at = 0; at < quanti; at += 1) {
-    const quando = new Date(now.getFullYear(), now.getMonth(), now.getDate() + at);
-    const due = (value: number) => String(value).padStart(2, '0');
-    out.push(`${quando.getFullYear()}-${due(quando.getMonth() + 1)}-${due(quando.getDate())}`);
-  }
-  return out;
+/** I prossimi giorni, da oggi dell'account, per chi deve sceglierne uno solo. */
+export function nextDays(quanti = 30, tz = auth.tz): string[] {
+  const oggi = today(tz);
+  return Array.from({ length: quanti }, (_, at) => dopoGiorni(oggi, at));
 }
 
 /**
@@ -123,12 +121,6 @@ export function nextRun(when: Timing | undefined, tz: string, now = new Date()):
 export const ATTESE = [0, 5, 10, 30, 60, 120, 300, 600, 1800] as const;
 
 /**
- * Un'attesa detta a parole.
- *
- * Zero non è un'attesa ed è il caso normale: «insieme» dice quello che
- * succede, mentre «0 secondi» fa contare a chi legge.
- */
-/**
  * Quanto manca, da leggere mentre passa: «42 s», «4:05», «1 h 20». Corto
  * perché cambia ogni secondo, e una frase che si riscrive sotto gli occhi
  * si legge male.
@@ -140,6 +132,12 @@ export function saysLeft(seconds: number): string {
   return `${Math.floor(s / 3600)} h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`;
 }
 
+/**
+ * Un'attesa detta a parole.
+ *
+ * Zero non è un'attesa ed è il caso normale: «insieme» dice quello che
+ * succede, mentre «0 secondi» fa contare a chi legge.
+ */
 export function saysWait(seconds: number | undefined): string {
   if (!seconds) return 'insieme';
   if (seconds < 60) return `dopo ${seconds}s`;

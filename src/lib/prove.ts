@@ -1,6 +1,9 @@
 import type { Device, DeviceTest, Op, SceneCondition } from './devices.svelte';
 import { saysDay, saysDays } from './timing';
 import type { Capability } from './types';
+import { daNominare } from './azioni';
+import { leggiValore } from './valori';
+import { nonProvabile, numero, siMisura, statoDi } from '../../shared/regole.js';
 
 /**
  * Le prove sui dispositivi dette a parole, per scene e avvisi.
@@ -20,76 +23,48 @@ import type { Capability } from './types';
 export type Modo = 'quando' | 'se';
 
 /**
- * Se si chiede con un numero — «sopra 25» — o con una parola. Un sensore
- * che dichiara le sue parole (una porta, un movimento, un campanello) è una
- * parola: la stessa regola la usa il server (managers/check.ts, `siMisura`).
+ * Se si chiede con un numero — «sopra 25» — o con una parola. La stessa
+ * regola la usa il server, da `shared/regole.js`.
  */
-export const numerica = (capability: Capability): boolean =>
-  capability.kind === 'range' || (capability.kind === 'sensor' && !capability.values?.length);
+export const numerica = siMisura;
 
 const unitaDi = (capability: Capability): string | undefined =>
   capability.kind === 'range' || capability.kind === 'sensor' ? capability.unit : undefined;
 
-/** Un numero come si legge in Italia: la virgola, e l'unità dopo uno spazio. */
-export function numero(value: string | number, unit?: string): string {
-  const n = Number(value);
-  const scritto = Number.isFinite(n) ? n.toLocaleString('it', { maximumFractionDigits: 1 }) : String(value);
-  return unit ? `${scritto} ${unit}` : scritto;
-}
-
-/** Come si legge un valore di stato: «acceso», o la parola del dispositivo detta per bene. */
-const valore = (capability: Capability, value: string | number): string => {
-  if (capability.kind === 'switch') return String(value) === 'true' ? 'acceso' : 'spento';
-  if (capability.kind === 'sensor' || capability.kind === 'enum') return capability.labels?.[String(value)] ?? String(value);
-  return String(value);
-};
-
-/**
- * Le cose che si comandano con un ordine e si leggono con uno stato.
- *
- * Una serratura si comanda con «Apri» e «Chiudi a chiave», e lo stesso
- * valore dice com'è rimasta. In un «solo se» l'ordine si leggeva come
- * un'azione, quindi per le prove si scrive a parole di stato. Il valore
- * resta quello del dispositivo, perché è quello che arriva.
- */
-const STATI: Record<string, Record<string, { se: string; quando: string }>> = {
-  valve: {
-    Apri: { se: 'aperto', quando: 'si apre' },
-    Chiudi: { se: 'chiuso', quando: 'si chiude' },
-  },
-  lock: {
-    Apri: { se: 'aperto', quando: 'si apre' },
-    'Chiudi a chiave': { se: 'chiuso a chiave', quando: 'si chiude a chiave' },
-  },
-};
+/** Un numero come si legge in Italia, lo stesso che scrive il server. */
+export { numero };
 
 /**
  * La prova su quella capacità, senza il nome del dispositivo davanti.
  *
- * Un interruttore non porta la sua etichetta: la chiama il dispositivo, e
- * spesso si chiama proprio «Acceso», che dava «Acceso su «acceso»». Per lui
- * basta la parola, «si accende» o «acceso», col nome del dispositivo
- * davanti quando serve.
+ * Un interruttore porta la sua etichetta solo quando da sola la parola non
+ * basta, con la stessa regola delle azioni (`lib/azioni.ts`): su una TV «si
+ * accende» e «Muto si accende» sono due prove diverse, su una lampadina
+ * basta «si accende», col nome del dispositivo davanti.
  */
-export function fraseProva(capability: Capability, op: Op, value: string | number, modo: Modo): string {
+export function fraseProva(device: Device, capability: Capability, op: Op, value: string | number, modo: Modo): string {
   if (op !== 'is') {
     const soglia = numero(value, unitaDi(capability));
     if (modo === 'quando') return `${capability.label} ${op === 'above' ? 'sale sopra' : 'scende sotto'} ${soglia}`;
     return `${capability.label} ${op === 'above' ? 'sopra' : 'sotto'} ${soglia}`;
   }
   // a impulso si chiede solo che scatti, e «scatta» non si accorda col nome
-  if (capability.kind === 'switch' && capability.pulse) return 'scatta';
+  const di = daNominare(device, capability) ? `${capability.label} ` : '';
+  if (capability.kind === 'switch' && capability.pulse) return `${di}scatta`;
   if (capability.kind === 'switch') {
     const acceso = String(value) === 'true';
-    if (modo === 'quando') return acceso ? 'si accende' : 'si spegne';
-    return valore(capability, value);
+    if (modo === 'quando') return `${di}${acceso ? 'si accende' : 'si spegne'}`;
+    // la parola di stato fra virgolette, come la scritta di un selettore: non si accorda con l'etichetta
+    return di ? `${di}«${leggiValore(capability, value)}»` : leggiValore(capability, value);
   }
-  const stato = STATI[capability.code]?.[String(value)];
+  // una serratura si comanda con «Apri» e con lo stesso valore dice com'è
+  // rimasta: in una prova si legge a parole di stato (`shared/regole.js`)
+  const stato = statoDi(capability, value);
   if (stato) return stato[modo];
   // un evento non «diventa» niente: succede, e si dice che cosa
-  if (capability.kind === 'sensor' && capability.event) return `${capability.label} «${valore(capability, value)}»`;
-  if (modo === 'quando') return `${capability.label} diventa «${valore(capability, value)}»`;
-  return `${capability.label} «${valore(capability, value)}»`;
+  if (capability.kind === 'sensor' && capability.event) return `${capability.label} «${leggiValore(capability, value)}»`;
+  if (modo === 'quando') return `${capability.label} diventa «${leggiValore(capability, value)}»`;
+  return `${capability.label} «${leggiValore(capability, value)}»`;
 }
 
 /** La prima lettera grande, per le voci da scegliere: «Si accende». */
@@ -101,35 +76,16 @@ export function fraseDiProva(devices: Device[], prova: DeviceTest, modo: Modo): 
   if (!device) return 'un dispositivo che non c’è più';
   const capability = (device.capabilities as Capability[]).find((one) => one.code === prova.code);
   if (!capability) return `${device.name}, una cosa che non sa più fare`;
-  return `${device.name} · ${fraseProva(capability, prova.op, prova.value, modo)}`;
+  return `${device.name} · ${fraseProva(device, capability, prova.op, prova.value, modo)}`;
 }
 
 /**
- * Quello che si comanda e basta, senza sapere com'è rimasto. Il movimento
- * di una tenda è l'ultimo ordine dato da qui, e se la si apre dal pulsante
- * a muro nessuno lo racconta. Il server lo rifiuta per la stessa ragione
- * (server/src/managers/check.ts).
- */
-const SOLO_ORDINI = new Set(['move', 'volume_step', 'playback', 'press', 'activate', 'vacuum', 'mower']);
-
-/**
- * Le cose di un dispositivo su cui si può scrivere una prova. Un interruttore
- * a impulso torna spento subito e com'è rimasto quello che comanda non si
- * sa, quindi non sta in un «solo se». Che scatti invece si vede.
+ * Le cose di un dispositivo su cui si può scrivere una prova. Lo decide
+ * `nonProvabile` in `shared/regole.js`, la stessa risposta che il server usa
+ * per rifiutare quello che qui non si mostra.
  */
 export const provabili = (device: Device, modo: Modo): Capability[] =>
-  (device.capabilities as Capability[]).filter(
-    (capability) =>
-      capability.kind !== 'image' &&
-      // un colore non si chiede: rosso e viola sono ai due capi del cerchio e quasi uguali
-      capability.kind !== 'color' &&
-      // un'impostazione si cambia, ma non è una cosa che succede in casa
-      !capability.setting &&
-      // un evento succede e basta: nel «solo se» non c'è un «com'è» da chiedere
-      !(modo === 'se' && capability.kind === 'sensor' && capability.event) &&
-      !SOLO_ORDINI.has(capability.code) &&
-      !(modo === 'se' && capability.kind === 'switch' && capability.pulse),
-  );
+  (device.capabilities as Capability[]).filter((capability) => !nonProvabile(capability, modo));
 
 /**
  * Le prove che si possono scegliere su quel dispositivo.
@@ -151,7 +107,8 @@ export function scelteDi(device: Device, modo: Modo): { id: string; label: strin
             { id: `${capability.code}:<`, label: `${capability.label} sotto…` },
           ];
     }
-    const stati = STATI[capability.code];
+    // di un elenco con le sue parole di stato si provano solo le voci che ne hanno
+    const stati = capability.kind === 'enum' ? capability.detti : undefined;
     const valori =
       capability.kind === 'switch'
         ? capability.pulse
@@ -164,7 +121,7 @@ export function scelteDi(device: Device, modo: Modo): { id: string; label: strin
             : [];
     return valori.map((value) => ({
       id: `${capability.code}:=${value}`,
-      label: grande(fraseProva(capability, 'is', value, modo)),
+      label: grande(fraseProva(device, capability, 'is', value, modo)),
     }));
   });
 }

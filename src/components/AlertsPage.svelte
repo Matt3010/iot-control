@@ -1,10 +1,10 @@
 <script lang="ts">
   import { devices, type Device, type Rule } from '../lib/devices.svelte';
-  import { completa } from '../lib/chiedi';
+  import { completa, sceltaDispositivo } from '../lib/chiedi';
   import { fraseDi, restaDa, SILENZIO, TACE } from '../lib/rules';
   import { store } from '../lib/store.svelte';
   import type { Column } from '../lib/table';
-  import { Vista } from '../lib/vista.svelte';
+  import { perTesto, Vista } from '../lib/vista.svelte';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
@@ -53,14 +53,12 @@
    * le altre dell'app perché le righe sono fatte apposta per questa tabella:
    * una cosa con due regole ha due righe, e altrove non esistono.
    */
-  const confronta = (a: string, b: string): number =>
-    a.localeCompare(b, 'it', { numeric: true, sensitivity: 'base' });
   const vista = new Vista<Riga>({
     chiave: 'regole',
     criteri: [
-      { id: 'cosa', label: 'Cosa', per: (a, b) => confronta(a.device.name, b.device.name) || confronta(a.quando, b.quando) },
-      { id: 'quando', label: 'Ti avviso quando', per: (a, b) => confronta(a.quando, b.quando) || confronta(a.device.name, b.device.name) },
-      { id: 'dove', label: 'Dove', per: (a, b) => confronta(dove(a.device), dove(b.device)) || confronta(a.device.name, b.device.name) },
+      { id: 'cosa', label: 'Cosa', per: (a, b) => perTesto(a.device.name, b.device.name) || perTesto(a.quando, b.quando) },
+      { id: 'quando', label: 'Ti avviso quando', per: (a, b) => perTesto(a.quando, b.quando) || perTesto(a.device.name, b.device.name) },
+      { id: 'dove', label: 'Dove', per: (a, b) => perTesto(dove(a.device), dove(b.device)) || perTesto(a.device.name, b.device.name) },
     ],
   });
 
@@ -106,12 +104,8 @@
   function aggiungi(event: MouseEvent): void {
     const tasto = event.currentTarget as HTMLElement;
     ui.askPick(tasto, {
-      title: 'Di quale cosa?',
-      options: () =>
-        devices.presenti
-          .filter((device) => restaDa(device, rules).length)
-          .sort((a, b) => a.name.localeCompare(b.name, 'it'))
-          .map((device) => ({ id: device.id, label: device.name, note: dove(device), salute: devices.saluteDi(device) })),
+      title: 'Quale dispositivo?',
+      options: sceltaDispositivo((device) => restaDa(device, rules).length > 0, dove),
       onPick: (id: string) => chiedi(tasto, id),
     });
   }

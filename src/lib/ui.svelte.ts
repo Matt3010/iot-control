@@ -1,8 +1,9 @@
 import type { Choice } from './table';
-import type { Component } from 'svelte';
+import { tick, type Component } from 'svelte';
 import { auth } from './auth.svelte';
 import type { IconName } from './icons';
 import { readJSON, writeJSON } from './storage';
+import { toast } from './toast.svelte';
 import type { Draft } from './types';
 
 export type ManageTab = 'categories' | 'groups';
@@ -108,6 +109,22 @@ export interface ModalRequest {
    * su una.
    */
   onclose?: () => void;
+  /**
+   * Se si appoggia sulla finestra davanti invece di prenderne il posto:
+   * chiusa questa, si torna a quella con tutto com'era.
+   *
+   * Di solito non lo dice nessuno, e lo decide `openModal` guardando da dove
+   * è partita: da dentro la finestra davanti ci si appoggia sopra, da fuori
+   * se ne prende il posto. Lo si scrive solo per cambiare quella scelta.
+   */
+  sopra?: boolean;
+  /**
+   * A tutto schermo invece che di lato: una telecamera, dove quello che si
+   * guarda è l'immagine e il resto della pagina è solo d'intralcio. È la
+   * stessa finestra, nella stessa pila — un Esc chiude lei e basta, e sotto
+   * resta quello che c'era.
+   */
+  intera?: boolean;
 }
 
 export interface ColorRequest {
@@ -157,11 +174,45 @@ class Ui {
   color = $state<ColorRequest | null>(null);
   sure = $state<SureRequest | null>(null);
   pick = $state<PickRequest | null>(null);
-  modal = $state<ModalRequest | null>(null);
+  /**
+   * Le finestre aperte, una sopra l'altra, e si vede solo l'ultima.
+   *
+   * Una finestra aperta da dentro un'altra — la soglia chiesta mentre si
+   * scrive una scena, categorie e gruppi mentre si aggiunge un luogo — ci
+   * si appoggia sopra, e quella sotto resta montata e nascosta: quando la
+   * nuova si chiude si torna a quella di prima con quello che c'era scritto.
+   * Sostituendola, il lavoro fatto dentro se ne andava con lei.
+   *
+   * `raw` perché qui dentro si cercano le richieste per identità, e un
+   * elenco vivo le avvolgerebbe in un'altra cosa.
+   */
+  modals = $state.raw<ModalRequest[]>([]);
+
+  /** Quella davanti, l'unica che si vede. */
+  get modal(): ModalRequest | null {
+    return this.modals.at(-1) ?? null;
+  }
+
+  /** Il guscio di ogni finestra, per sapere cosa ci sta dentro. */
+  #gusci = new WeakMap<ModalRequest, HTMLElement>();
+  /** Da dove è stata aperta ogni finestra, per tornarci col fuoco quando si chiude. */
+  #origini = new WeakMap<ModalRequest, Element>();
+
+  /** Lo dice il guscio quando si disegna: `Modal.svelte`. */
+  registra(request: ModalRequest, guscio: HTMLElement): void {
+    this.#gusci.set(request, guscio);
+  }
+
+  /** Il guscio della finestra davanti, per chi deve cercarci dentro. */
+  get guscioDavanti(): HTMLElement | undefined {
+    return this.modal ? this.#gusci.get(this.modal) : undefined;
+  }
   /** 'add' significa: ho premuto + , mettimi il cursore nel campo giusto. */
   manageIntent = $state<'browse' | 'add'>('browse');
-  /** Vero finché la scheda di un luogo si è solo fatta da parte. */
-  #placePaused = false;
+  /** La finestra della scheda di un luogo, per toglierla anche da sotto un'altra. */
+  #place: ModalRequest | null = null;
+  /** E quella di categorie e gruppi. */
+  #manage: ModalRequest | null = null;
 
   /**
    * La scheda di un luogo è una finestra, come categorie e gruppi.
@@ -174,27 +225,38 @@ class Ui {
    * perché dipendono da com'è messa lei.
    */
   openPlace(draft: Draft): void {
-    this.draft = draft;
-    this.#placePaused = false;
+    /*
+     * Una copia, sempre. Dall'elenco del telefono e dalla ricerca arrivava il
+     * luogo vero dell'archivio, e la scheda ci scriveva sopra mentre digitavi:
+     * «Annulla» non annullava niente, e al salvataggio il «com'era prima» da
+     * rimettere se il server diceva di no era già quello modificato.
+     */
+    this.draft = $state.snapshot(draft) as Draft;
     this.picking = false;
     if (!this.placeView) return;
 
     const suo = !draft.id || auth.canTouch(draft.id);
-    this.openModal({
+    const finestra: ModalRequest = {
       title: !suo ? 'Luogo' : draft.id ? 'Modifica luogo' : 'Nuovo luogo',
       view: this.placeView,
-      // farsi da parte per categorie e gruppi non è chiudere: la bozza resta
-      // dov'è, e torna davanti quando quella finestra si chiude
-      onclose: () => !this.#placePaused && this.closePlace(),
-    });
+      // la bozza è una sola: una seconda scheda sopra alla prima scriverebbe nella stessa
+      sopra: false,
+      onclose: () => {
+        if (this.#place !== finestra) return;
+        this.#place = null;
+        this.draft = null;
+      },
+    };
+    this.#place = finestra;
+    this.openModal(finestra);
   }
 
   closePlace(): void {
     this.draft = null;
-    this.#placePaused = false;
-    // solo se davanti c'è lei: chiudere un luogo mentre guardi categorie e
-    // gruppi portava via quella finestra insieme al resto
-    if (this.placeOpen) this.modal = null;
+    const finestra = this.#place;
+    this.#place = null;
+    // solo lei: se sopra c'è categorie e gruppi, quella resta dov'è
+    if (finestra) this.modals = this.modals.filter((one) => one !== finestra);
   }
 
   /** Quale delle due finestre è davanti, per chi deve saperlo. */
@@ -202,10 +264,6 @@ class Ui {
     return this.placeView !== null && this.modal?.view === this.placeView;
   }
 
-  /**
-   * One sheet at a time, but a draft in progress survives: you open this very
-   * panel to create the category the place you are adding still needs.
-   */
   /**
    * Cosa mostrare quando si aprono categorie e gruppi.
    *
@@ -221,38 +279,33 @@ class Ui {
   placeView: Component<any> | null = null;
 
   openManage(tab: ManageTab = 'categories', intent: 'browse' | 'add' = 'browse'): void {
-    // una sola finestra alla volta: la scheda di un luogo aperta si fa da
-    // parte, e la sua bozza resta dov'è per essere ripresa dopo
-    this.#placePaused = this.draft !== null;
     this.#tab = tab;
     this.manageIntent = intent;
     this.#ricorda();
+    if (!this.manageView) return;
+    // già aperta: si cambia linguetta e basta
+    if (this.#manage && this.modals.includes(this.#manage)) return;
+
     // e si vede dentro a una finestra, che di cosa ci sia dentro non sa niente
-    if (this.manageView) {
-      this.openModal({
-        title: 'Categorie e gruppi',
-        view: this.manageView,
-        /* Chiusa la finestra, anche la scheda dietro deve risultare chiusa.
-           Con Esc si chiudeva solo la finestra e lo stato restava su
-           'manage': niente in mezzo allo schermo, ma l'applicazione si
-           credeva con una scheda aperta, e il tasto che aggiunge un luogo
-           spariva dietro a niente. */
-        onclose: () => this.closeManage(),
-      });
-    }
+    const finestra: ModalRequest = {
+      title: 'Categorie e gruppi',
+      view: this.manageView,
+      /* Dalla scheda di un luogo le ci si appoggia sopra: la bozza resta
+         dov'è, e chiusa questa torna davanti con dentro la categoria appena
+         creata. */
+      sopra: this.placeOpen,
+      onclose: () => {
+        if (this.#manage === finestra) this.#manage = null;
+        this.mark = null;
+        this.color = null;
+      },
+    };
+    this.#manage = finestra;
+    this.openModal(finestra);
   }
 
   closeManage(): void {
-    this.mark = null;
-    this.color = null;
-    this.modal = null;
-
-    const riprendi = this.#placePaused ? this.draft : null;
-    this.#placePaused = false;
-    this.#ricorda();
-    // la scheda che si era fatta da parte torna davanti, con dentro la
-    // categoria appena creata
-    if (riprendi) this.openPlace(riprendi);
+    if (this.#manage) this.closeModal(this.#manage);
   }
 
   toggleManage(tab: ManageTab = 'categories', intent: 'browse' | 'add' = 'browse'): void {
@@ -302,19 +355,88 @@ class Ui {
    * Si chiama da dove serve, senza che chi chiama debba tenersi uno stato
    * suo e un `{#if}` da qualche parte: è lo stesso modo in cui si chiede una
    * conferma o si fa scegliere una voce.
+   *
+   * Con `sopra` si appoggia su quella davanti; senza, prende il posto di
+   * tutte, e quelle che se ne vanno hanno le loro cose da rimettere a posto
+   * come se le avessi chiuse tu.
    */
   openModal(request: ModalRequest): void {
-    const prima = this.modal;
-    this.modal = request;
-    // una finestra che ne rimpiazza un'altra: quella che se ne va ha le sue
-    // cose da rimettere a posto come se l'avessi chiusa tu
-    if (prima && prima !== request) prima.onclose?.();
+    /*
+     * Da dove parte la si guarda qui, e non la dice chi chiama.
+     *
+     * Chi apre una finestra da un pezzo che sta anche dentro un'altra — il
+     * catalogo dei servizi dalla scheda di un agente, che vive anche nella
+     * scheda di un luogo — non sa dove sta, e ogni volta che se n'è
+     * dimenticato la finestra nuova ha preso il posto di quella sotto,
+     * portandosi via la bozza.
+     */
+    const origine = daDove();
+    const sopra = request.sopra ?? (!!origine && !!this.guscioDavanti?.contains(origine));
+    if (origine) this.#origini.set(request, origine);
+
+    // un foglietto aperto resta attaccato a quello che adesso finisce coperto
+    this.#chiudiFoglietti(() => true);
+
+    if (sopra) {
+      this.modals = [...this.modals.filter((one) => one !== request), request];
+      return;
+    }
+    const prima = this.modals.filter((one) => one !== request).reverse();
+    this.modals = [request];
+    for (const chiusa of prima) chiusa.onclose?.();
   }
 
-  closeModal(): void {
-    const chiusa = this.modal;
-    this.modal = null;
-    chiusa?.onclose?.();
+  /**
+   * Chiude quella davanti, o quella che dici e quelle che le stanno sopra.
+   *
+   * Chi chiude dopo aver aspettato qualcosa dice quale: nel frattempo
+   * poteva essersene aperta un'altra, e sarebbe stata lei a sparire. Una
+   * finestra già chiusa non chiude niente.
+   */
+  closeModal(which: ModalRequest | undefined = this.modal ?? undefined): void {
+    const at = which ? this.modals.indexOf(which) : -1;
+    if (at < 0) return;
+    const chiuse = this.modals.slice(at).reverse();
+    this.modals = this.modals.slice(0, at);
+    for (const chiusa of chiuse) {
+      const guscio = this.#gusci.get(chiusa);
+      this.#chiudiFoglietti((anchor) => !!guscio?.contains(anchor));
+      chiusa.onclose?.();
+    }
+    if (which) this.#rendiIlFuoco(which);
+  }
+
+  /**
+   * Il fuoco torna dove si era, quando una finestra si chiude.
+   *
+   * Sul tasto che l'ha aperta, se c'è ancora e sta nella finestra che torna
+   * davanti; se no sulla finestra stessa. Lasciato sul guscio appena
+   * smontato, finiva in fondo alla pagina, e con la tastiera si
+   * ricominciava da capo.
+   */
+  #rendiIlFuoco(chiusa: ModalRequest): void {
+    const origine = this.#origini.get(chiusa);
+    const davanti = this.modal;
+    void tick().then(() => {
+      // nel frattempo se n'è aperta un'altra: il fuoco è suo
+      if (this.modal !== davanti) return;
+      const guscio = davanti ? this.#gusci.get(davanti) : undefined;
+      const torna = origine?.isConnected && (!guscio || guscio.contains(origine)) ? origine : guscio;
+      if (torna instanceof HTMLElement) torna.focus({ preventScroll: true });
+    });
+  }
+
+  /** Chiude le domande a foglietto attaccate a un tasto che `via` sceglie. */
+  #chiudiFoglietti(via: (anchor: HTMLElement) => boolean): void {
+    if (this.sure && via(this.sure.anchor)) this.sure = null;
+    if (this.pick && via(this.pick.anchor)) this.pick = null;
+    if (this.mark && via(this.mark.anchor)) this.mark = null;
+    if (this.color && via(this.color.anchor)) this.color = null;
+  }
+
+  /** Tutte, per chi cambia pagina: sopra a un'altra schermata non c'entrano più. */
+  closeAll(): void {
+    this.closeModal(this.modals[0]);
   }
 
   /** Questo browser e basta: su quale linguetta eri. */
@@ -346,3 +468,50 @@ class Ui {
 }
 
 export const ui = new Ui();
+
+/**
+ * Il componente di una finestra che si scarica quando la si apre.
+ *
+ * Se la rete cade proprio allora lo si dice, e la finestra non si apre: una
+ * finestra vuota direbbe che lì dentro non c'è niente.
+ */
+export async function scarica(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  load: () => Promise<{ default: Component<any> }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<Component<any> | null> {
+  try {
+    return (await load()).default;
+  } catch {
+    toast.show('Questa finestra non si è scaricata, forse perché la rete è caduta. Riprova fra poco.');
+    return null;
+  }
+}
+
+/**
+ * Da dove è partita l'ultima cosa fatta: un tocco, un clic, un tasto.
+ *
+ * Serve a `openModal` per sapere se chi apre sta dentro la finestra
+ * davanti. Il fuoco da solo non basta, perché un tasto premuto col dito su
+ * un telefono non lo prende. E una voce scelta da un foglietto conta come
+ * il tasto a cui il foglietto è attaccato: il foglietto sta fuori da tutto,
+ * ma la domanda è nata lì.
+ */
+let tocco: Element | null = null;
+
+function segna(event: Event): void {
+  if (!(event.target instanceof Element)) return;
+  const foglietto = event.target.closest('[data-pop]') ? (ui.sure ?? ui.pick ?? ui.mark ?? ui.color) : null;
+  tocco = foglietto?.anchor ?? event.target;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pointerdown', segna, true);
+  window.addEventListener('keydown', segna, true);
+}
+
+/** L'ultimo tocco se c'è ancora, se no quello che ha il fuoco. */
+function daDove(): Element | null {
+  if (tocco?.isConnected) return tocco;
+  return typeof document !== 'undefined' ? document.activeElement : null;
+}

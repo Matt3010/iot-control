@@ -15,8 +15,11 @@
   interface Voce {
     id: string;
     name: string;
-    /** Quello che si legge a destra: l'ora di un fuso. */
-    note?: string;
+    /**
+     * Quello che si legge a destra: l'ora di un fuso. Come funzione quando
+     * costa ricavarla, così si chiede solo per le righe che si vedono.
+     */
+    note?: string | (() => string);
   }
 
   let {
@@ -48,7 +51,28 @@
     testoDi: (voce) => voce.name,
   });
 
-  const elenco = $derived(vista.applica(voci));
+  /*
+   * Quante righe si disegnano al massimo.
+   *
+   * Il catalogo ha quasi mille voci, e disegnarle tutte a ogni apertura
+   * faceva aspettare la finestra per mostrare righe che nessuno scorre fino
+   * in fondo: chi cerca una marca scrive il suo nome. Le altre si dicono
+   * con un numero, e arrivano scrivendo.
+   */
+  const MASSIMO = 60;
+
+  const trovate = $derived(vista.applica(voci));
+  /* La voce scelta resta anche oltre il taglio, in fondo alle altre: aprire
+     la finestra dei fusi e non trovarci il proprio, finché non lo si
+     scrive, faceva credere che non fosse scelto niente. */
+  const elenco = $derived.by(() => {
+    const prime = trovate.slice(0, MASSIMO);
+    const sua = scelta === undefined || prime.some((voce) => voce.id === scelta) ? undefined : trovate.find((voce) => voce.id === scelta);
+    return sua ? [...prime, sua] : prime;
+  });
+  const altre = $derived(trovate.length - elenco.length);
+
+  const nota = (voce: Voce): string | undefined => (typeof voce.note === 'function' ? voce.note() : voce.note);
 </script>
 
 <!-- svelte-ignore a11y_autofocus -->
@@ -58,16 +82,20 @@
 
 <ul class="elenco">
   {#each elenco as voce (voce.id)}
+    {@const detto = nota(voce)}
     <li>
       <button type="button" class="voce" class:is-on={voce.id === scelta} onclick={() => onpick(voce.id)}>
         <span class="nome">{voce.name}</span>
-        {#if voce.note}<span class="nota">{voce.note}</span>{/if}
+        {#if detto}<span class="nota">{detto}</span>{/if}
         {#if voce.id === scelta}<Icon name="check" />{/if}
       </button>
     </li>
   {:else}
     <li class="vuoto">{vuoto}</li>
   {/each}
+  {#if altre > 0}
+    <li class="vuoto">{altre === 1 ? 'Ne resta fuori un’altra' : `Ne restano fuori altre ${altre}`}, scrivi per restringere l’elenco.</li>
+  {/if}
 </ul>
 
 <style>

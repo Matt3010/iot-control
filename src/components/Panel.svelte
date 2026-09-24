@@ -6,6 +6,7 @@
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
+  import { perNome, Vista } from '../lib/vista.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import Icon from './Icon.svelte';
@@ -42,6 +43,11 @@
    * leggono dal più vicino al centro di quello che stai guardando; sul
    * telefono, dove mappa non ce n'è, in ordine alfabetico.
    */
+  type Misurato = { place: (typeof store.currentPlaces)[number]; distance: number };
+  // due ordini fissi, e quale dei due lo decide la mappa, non chi guarda
+  const vicini = new Vista<Misurato>({ criteri: [{ id: 'vicino', label: 'Vicinanza', per: (a, b) => a.distance - b.distance }] });
+  const perNomi = new Vista<Misurato>({ criteri: [{ id: 'nome', label: 'Nome', per: (a, b) => perNome(a.place, b.place) }] });
+
   const rows = $derived.by(() => {
     mapBridge.view.moves; // re-read whenever the map settles somewhere new
 
@@ -52,9 +58,7 @@
         distance: mapBridge.distanceFrom(place.lat, place.lng, null),
       }));
 
-    return viewport.hasMap
-      ? misurati.sort((a, b) => a.distance - b.distance)
-      : misurati.sort((a, b) => a.place.name.localeCompare(b.place.name, 'it'));
+    return (viewport.hasMap ? vicini : perNomi).applica(misurati);
   });
 
   function pickGroup(id: string | null) {

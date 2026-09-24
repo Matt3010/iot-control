@@ -1,13 +1,12 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
   import type { CatalogEntry } from '../../shared/protocol';
   import { providerDa, type Provider } from '../lib/providers';
-  import { ui } from '../lib/ui.svelte';
-  import CatalogPicker from './CatalogPicker.svelte';
+  import { scarica, ui, type ModalRequest } from '../lib/ui.svelte';
   import type { Health, LinkedAccount } from '../lib/types';
   import AccountList from './AccountList.svelte';
-  import PairingFlow from './PairingFlow.svelte';
 
   /**
    * Collegare qualcosa a un agente, senza uscire da qui.
@@ -40,48 +39,73 @@
   /**
    * La conversazione per collegare, in una finestra come tutto il resto che
    * si apre davanti. Se riprende quella di un account scaduto, lo dice il
-   * titolo. Prende il posto della finestra da cui si è partiti.
+   * titolo. Partita dal catalogo, ci si appoggia sopra (lo decide
+   * `ui.openModal`), e chiusa questa si torna lì, con l'elenco già riletto.
+   *
+   * Chiude la sua finestra e non quella davanti: la conversazione aspetta
+   * l'agente, e nel frattempo se ne poteva aprire un'altra.
    */
-  function apri(provider: Provider, riprendi?: string): void {
-    ui.openModal({
+  async function apri(provider: Provider, riprendi?: string): Promise<void> {
+    // la conversazione e il suo QR si scaricano la prima volta che servono
+    const PairingFlow = await scarica(() => import('./PairingFlow.svelte'));
+    if (!PairingFlow) return;
+    const finestra: ModalRequest = {
       title: riprendi ? `Ricollega ${provider.label}` : provider.label,
       view: PairingFlow,
       props: {
         agent,
         provider,
         riprendi,
-        onquit: () => ui.closeModal(),
+        onquit: () => ui.closeModal(finestra),
         ondone: () => {
-          ui.closeModal();
+          ui.closeModal(finestra);
           void reread();
         },
       },
-    });
+    };
+    ui.openModal(finestra);
   }
 
+  /*
+   * Cosa c'è e cosa si può collegare, chiesto all'agente quando si collega e
+   * di nuovo ogni volta che il server dice che gli account sono cambiati.
+   *
+   * Dipende dall'identità dell'agente e dal suo essere collegato, non
+   * dall'oggetto: ogni rilettura dell'elenco ne porta uno nuovo, e le due
+   * domande ripartivano a ogni evento del filo. E vince l'ultima domanda
+   * fatta, non l'ultima risposta arrivata: una lenta di prima non deve
+   * coprirne una fresca.
+   */
+  const agentId = $derived(agent.id);
+  const online = $derived(agent.online);
+  let giro = 0;
+
   $effect(() => {
-    if (!agent.online) return;
-    // e di nuovo ogni volta che il server dice che gli account sono cambiati
-    void devices.versioniAccount[agent.id];
+    if (!online) return;
+    void devices.versioniAccount[agentId];
+    const mio = ++giro;
+    const questo = untrack(() => agent);
     void devices
-      .linked(agent)
-      .then((list) => (stato.linked = list))
+      .linked(questo)
+      .then((list) => mio === giro && (stato.linked = list))
       .catch(() => undefined);
     void devices
-      .catalog(agent)
-      .then((list) => (stato.catalogo = list))
+      .catalog(questo)
+      .then((list) => mio === giro && (stato.catalogo = list))
       .catch(() => undefined);
   });
 
   /** Collegati e da collegare, nella stessa finestra. */
-  function cerca(): void {
+  async function cerca(): Promise<void> {
+    const CatalogPicker = await scarica(() => import('./CatalogPicker.svelte'));
+    if (!CatalogPicker) return;
     ui.openModal({
       title: 'Collega un servizio',
       view: CatalogPicker,
       props: {
         agent,
         stato,
-        onpick: (provider: Provider) => apri(provider),
+        onpick: (provider: Provider) => void apri(provider),
         onoff: (joint: LinkedAccount, label: string) => void detach(joint, label),
         onricollega: ricollega,
       },
@@ -89,7 +113,7 @@
   }
 
   /** Rientrare in un account scaduto: si riprende la conversazione che la centrale ha aperto. */
-  const ricollega = (joint: LinkedAccount, provider: Provider): void => apri(provider, joint.ricollega);
+  const ricollega = (joint: LinkedAccount, provider: Provider): void => void apri(provider, joint.ricollega);
 
   /*
    * Gli account da ricollegare stanno anche nella scheda, sopra a «Collega
@@ -118,14 +142,19 @@
   );
 
   const reread = async (): Promise<void> => {
-    stato.linked = await devices.linked(agent).catch(() => stato.linked);
+    const mio = ++giro;
+    const list = await devices.linked(agent).catch(() => null);
+    if (list && mio === giro) stato.linked = list;
   };
 
   async function detach(joint: LinkedAccount, label: string): Promise<void> {
     stato.busy = true;
     try {
-      stato.linked = await devices.unlink(agent, joint.entryId);
-      toast.show(`${label} si scollega, e i suoi dispositivi se ne vanno`);
+      const list = await devices.unlink(agent, joint.entryId);
+      // la risposta di chi ha appena scollegato è la più fresca di tutte
+      giro += 1;
+      stato.linked = list;
+      toast.show(`${label} si scollega. I dispositivi restano come spariti finché non li rimuovi.`);
     } catch (error) {
       toast.show((error as Error).message);
     } finally {

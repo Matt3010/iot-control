@@ -13,6 +13,7 @@
   let {
     wide = false,
     dashed = false,
+    bare = false,
     children,
   }: {
     /**
@@ -32,11 +33,20 @@
      * una cosa tua, c'è un posto per farla».
      */
     dashed?: boolean;
+    /**
+     * Senza vestito: il posto nella colonna e basta.
+     *
+     * La scheda di un agente, di una scena, di una mappa ha già il suo
+     * riquadro, e un bordo intorno a un bordo è una cornice alla cornice. Il
+     * resto — non spezzarsi fra due colonne, lo spazio sotto, la griglia —
+     * è lo stesso, e ogni pagina lo riscriveva per conto suo.
+     */
+    bare?: boolean;
     children: Snippet;
   } = $props();
 </script>
 
-<section class="card" class:wide class:dashed>
+<section class="card" class:wide class:dashed class:bare>
   {@render children()}
 </section>
 
@@ -65,6 +75,13 @@
   .card.wide {
     column-span: all;
     grid-column: 1 / -1;
+  }
+
+  .card.bare {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
   }
 
   .card.dashed {

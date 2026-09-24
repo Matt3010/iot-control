@@ -1,4 +1,5 @@
 <script lang="ts">
+  import StaleNote from './StaleNote.svelte';
   import { devices } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
   import { vistaScene } from '../lib/viste.svelte';
@@ -34,14 +35,15 @@
   count={devices.scenes.length}
   lead="Più cose che partono insieme, ognuna con la sua azione, così che «sera» chiuda le tende e accenda l'abat-jour. Una scena può toccare dispositivi di agenti diversi."
 >
+  {#snippet meta()}<StaleNote />{/snippet}
   {#snippet tools()}<ViewControls vista={vistaScene} label="In che ordine le scene" />{/snippet}
 
   {#each vistaScene.applica(devices.scenes) as scene (scene.id)}
     <!-- il riquadro lo disegna gia' il comando della scena, come per gli
          agenti: un secondo bordo intorno sarebbe una scheda dentro l'altra -->
-    <section class="card">
+    <PageCard bare>
       <SceneCard {scene} />
-    </section>
+    </PageCard>
   {/each}
 
   <PageCard dashed>
@@ -57,17 +59,5 @@
 </PageShell>
 
 <style>
-  .card {
-    /* una scheda non si spezza fra due colonne, si sposta intera */
-    break-inside: avoid;
-    display: grid;
-    align-content: start;
-    gap: 10px;
-    min-width: 0;
-    /* lo stacco verticale è suo, non della colonna */
-    margin: 0 0 14px;
-  }
-
-
   .once { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
 </style>

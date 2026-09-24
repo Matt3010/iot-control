@@ -23,7 +23,7 @@ export const TACE = 'Se smette di rispondere';
  */
 export function fraseDi(device: Device, code: string, becomes: string, op: Op = 'is'): string | undefined {
   const capability = (device.capabilities as Capability[]).find((one) => one.code === code);
-  return capability ? fraseProva(capability, op, becomes, 'quando') : undefined;
+  return capability ? fraseProva(device, capability, op, becomes, 'quando') : undefined;
 }
 
 /**

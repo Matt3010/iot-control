@@ -66,7 +66,7 @@
   {#each vistaMappe.applica(store.maps) as map (map.id)}
     {@const open = map.id === store.activeMap?.id}
     {@const places = store.places.filter((place) => place.mapId === map.id).length}
-    <section class="card">
+    <PageCard bare>
       <Row active={open}>
         {#snippet lead()}
           <button
@@ -146,7 +146,7 @@
           {/if}
         {/snippet}
       </Row>
-    </section>
+    </PageCard>
   {/each}
 
   <!-- Una mappa nuova la fa solo chi l'indice ce l'ha: da ospite nascerebbe
@@ -202,15 +202,6 @@
 </PageShell>
 
 <style>
-  .card {
-    break-inside: avoid;
-    margin-bottom: 14px;
-    display: grid;
-    gap: 10px;
-    min-width: 0;
-  }
-
-
   .note { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
 
   .note b { font-weight: 600; color: var(--ink-2); }
@@ -235,9 +226,9 @@
 
   .map-open :global(.ico) { width: 15px; height: 15px; }
 
-  .card :global(.map-eye) { color: var(--ink-3); }
+  :global(.row .btn.map-eye) { color: var(--ink-3); }
 
-  .card :global(.map-eye.is-shown) { color: var(--ink); }
+  :global(.row .btn.map-eye.is-shown) { color: var(--ink); }
 
   .map-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
@@ -288,7 +279,7 @@
   .here { padding: 0 8px; font-size: 11.5px; color: var(--ink-3); }
 
   /* la riga del nome è un titolo finché non la tocchi, come nelle altre liste */
-  .card :global(.link-row) { background: var(--sunken); box-shadow: none; }
+  .map-keys :global(.link-row) { background: var(--sunken); box-shadow: none; }
 
   /* dove si tocca, il pin che sceglie la mappa è alto quanto un dito */
   @media (hover: none) {

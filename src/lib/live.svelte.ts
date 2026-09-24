@@ -3,7 +3,8 @@ import { auth } from './auth.svelte';
 import { devices, type Scene } from './devices.svelte';
 import { store } from './store.svelte';
 import { toast } from './toast.svelte';
-import type { Category, DeviceValue, Group, Place, PlaceMap } from './types';
+import type { LiveEvent as Evento } from '../../shared/live';
+import type { Category, Group, Place, PlaceMap } from './types';
 
 /**
  * Il filo aperto verso il server, uno solo per tutta l'app.
@@ -13,29 +14,11 @@ import type { Category, DeviceValue, Group, Place, PlaceMap } from './types';
  * dall'altra scheda o dal telefono. Prima ce l'avevano solo i dispositivi, e
  * due finestre aperte mostravano due mondi diversi.
  *
- * `value: null` vuol dire che quella cosa non c'è più.
+ * `value: null` vuol dire che quella cosa non c'è più. La forma degli
+ * eventi è quella che manda il server, scritta una volta sola in
+ * `shared/live.d.ts`.
  */
-export type LiveEvent =
-  | { kind: 'device'; deviceId: string; online: boolean; state: Record<string, DeviceValue> }
-  | { kind: 'agent'; agentId: string; online: boolean }
-  | { kind: 'devices' }
-  /** E quello degli agenti: uno nuovo, uno rinominato, uno che se n'è andato. */
-  | { kind: 'agents' }
-  | { kind: 'place'; id: string; value: Place | null }
-  | { kind: 'map'; id: string; value: PlaceMap | null }
-  | { kind: 'category'; id: string; value: Category | null }
-  | { kind: 'group'; id: string; value: Group | null }
-  | { kind: 'scene'; id: string; value: Scene | null }
-  | { kind: 'running'; sceneId: string; at: number; of: number; done?: boolean }
-  | { kind: 'notice' }
-  /** Il registro di un agente ha una riga in più: chi lo legge lo rilegga. */
-  | { kind: 'log'; agentId: string }
-  /** Le regole degli avvisi sono cambiate da un'altra parte. */
-  | { kind: 'rules' }
-  /** L'account è cambiato da un'altra scheda: nome o fuso. */
-  | { kind: 'account' }
-  /** Gli account di un agente sono cambiati: uno scaduto, uno ricollegato. */
-  | { kind: 'accounts'; agentId: string };
+export type LiveEvent = Evento<{ place: Place; map: PlaceMap; category: Category; group: Group; scene: Scene }>;
 
 class Live {
   #stream: EventSource | null = null;

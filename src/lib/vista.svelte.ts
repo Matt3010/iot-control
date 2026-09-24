@@ -60,8 +60,12 @@ export interface OpzioniVista<T> {
    * Il nome sotto cui questo browser se la ricorda. Due elenchi della stessa
    * roba — i dispositivi di un agente, quelli della sua pagina — condividono
    * la chiave e si ordinano insieme.
+   *
+   * Senza, non si ricorda niente: è un ordine fisso, che nessuno sceglie —
+   * i dispositivi fra cui sceglierne uno, le prossime partenze in fila come
+   * avverranno — e passa di qui perché resti scritto in un posto solo.
    */
-  chiave: string;
+  chiave?: string;
   /** I modi di metterli in fila. Il primo è quello di partenza. */
   criteri: Criterio<T>[];
   iniziale?: string;
@@ -70,14 +74,19 @@ export interface OpzioniVista<T> {
    *
    * La parola scritta non si ricorda: tornare su un elenco e trovarlo
    * ristretto a una ricerca di ieri farebbe credere che manchi qualcosa.
+   *
+   * Più campi, in ordine d'importanza — il nome, poi la categoria, poi la
+   * nota — vogliono dire anche un ordine: mentre si cerca viene prima chi
+   * risponde col primo campo, e fra quelli chi comincia con la parola. Il
+   * criterio scelto decide fra chi risponde allo stesso modo.
    */
-  testoDi?: (voce: T) => string;
+  testoDi?: (voce: T) => string | string[];
 }
 
 export class Vista<T> {
   readonly criteri: readonly Criterio<T>[];
-  readonly #testoDi?: (voce: T) => string;
-  #chiave: string;
+  readonly #testoDi?: (voce: T) => string | string[];
+  #chiave: string | null;
   #scelta = $state<Scelta>({ ordine: '', verso: 'asc' });
 
   /** Quello che si sta cercando, così com'è scritto. */
@@ -86,12 +95,12 @@ export class Vista<T> {
   constructor({ chiave, criteri, iniziale = criteri[0]?.id ?? '', testoDi }: OpzioniVista<T>) {
     this.criteri = criteri;
     this.#testoDi = testoDi;
-    this.#chiave = `pi.vista.${chiave}`;
+    this.#chiave = chiave ? `pi.vista.${chiave}` : null;
 
     // una scelta ricordata vale solo se quel criterio c'è ancora: un nome
     // cambiato fra una versione e l'altra non deve lasciare l'elenco senza
     // ordine
-    const ricordata = readJSON<Scelta | null>(this.#chiave, null);
+    const ricordata = this.#chiave ? readJSON<Scelta | null>(this.#chiave, null) : null;
     const primo = criteri.find((one) => one.id === iniziale);
     this.#scelta =
       ricordata && criteri.some((one) => one.id === ricordata.ordine)
@@ -139,13 +148,29 @@ export class Vista<T> {
     // prima si cerca: mettere in fila cose che poi si buttano è lavoro perso
     const parola = normalise(this.cerca.trim());
     const testoDi = this.#testoDi;
-    if (parola && testoDi) dopo = dopo.filter((voce) => normalise(testoDi(voce)).includes(parola));
+    let pertinenza: Map<T, number> | null = null;
+    if (parola && testoDi) {
+      pertinenza = new Map();
+      for (const voce of dopo) {
+        const campi = testoDi(voce);
+        const quanto = Array.isArray(campi) ? rispondeA(campi, parola) : normalise(campi).includes(parola) ? 0 : -1;
+        if (quanto >= 0) pertinenza.set(voce, quanto);
+      }
+      const trovate = pertinenza;
+      dopo = dopo.filter((voce) => trovate.has(voce));
+    }
 
     const per = this.criterio?.per;
-    if (per) {
+    if (per || pertinenza) {
       const segno = this.#scelta.verso === 'asc' ? 1 : -1;
       const inFondo = this.criterio?.inFondo;
+      const quanto = pertinenza;
       dopo.sort((a, b) => {
+        if (quanto) {
+          const prima = quanto.get(a)! - quanto.get(b)!;
+          if (prima) return prima;
+        }
+        if (!per) return 0;
         if (inFondo) {
           const giuA = inFondo(a);
           const giuB = inFondo(b);
@@ -170,18 +195,36 @@ export class Vista<T> {
 
   #salva(scelta: Scelta): void {
     this.#scelta = scelta;
-    writeJSON(this.#chiave, scelta);
+    if (this.#chiave) writeJSON(this.#chiave, scelta);
   }
+}
+
+/**
+ * Quanto bene una voce risponde alla parola: 0 se il primo campo comincia
+ * con lei, 1 se la contiene, 2 e 3 per il secondo campo, e così via. -1 se
+ * non risponde da nessuna parte.
+ */
+function rispondeA(campi: string[], parola: string): number {
+  for (const [at, campo] of campi.entries()) {
+    const detto = normalise(campo);
+    if (detto.startsWith(parola)) return at * 2;
+    if (detto.includes(parola)) return at * 2 + 1;
+  }
+  return -1;
 }
 
 /* ----------------------------------------------------------- confronti */
 
 /**
- * Per nome, come si leggono: «Tenda 2» prima di «Tenda 10», e le accentate
- * insieme alle altre invece che in fondo.
+ * Due parole come si leggono: «Tenda 2» prima di «Tenda 10», e le accentate
+ * insieme alle altre invece che in fondo. Per chi mette in fila qualcosa
+ * che non si chiama `name`.
  */
-export const perNome = <T extends { name: string }>(a: T, b: T): number =>
-  a.name.localeCompare(b.name, 'it', { numeric: true, sensitivity: 'base' });
+export const perTesto = (a: string, b: string): number =>
+  a.localeCompare(b, 'it', { numeric: true, sensitivity: 'base' });
+
+/** Per nome, come si leggono (`perTesto`). */
+export const perNome = <T extends { name: string }>(a: T, b: T): number => perTesto(a.name, b.name);
 
 /**
  * Un confronto che, a parità, passa al nome. Due cose ugualmente accese si

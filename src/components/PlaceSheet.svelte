@@ -88,7 +88,7 @@
     if (store.hiddenCategories.includes(draft.categoryId)) store.toggleCategory(draft.categoryId);
     if (store.activeGroup && !(draft.groupIds ?? []).includes(store.activeGroup)) store.setGroup(null);
     ui.closePlace();
-    toast.show(editing ? `"${name}" aggiornato` : `"${name}" salvato`);
+    toast.show(editing ? `Luogo «${name}» aggiornato` : `Luogo «${name}» salvato`);
   }
 
   /** Groups are labels: a place wears as many as you like. */

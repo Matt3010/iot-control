@@ -1,6 +1,6 @@
 <script lang="ts">
   import { devices } from '../lib/devices.svelte';
-  import { ui } from '../lib/ui.svelte';
+  import { chiusura } from '../lib/fondo.svelte';
   import SceneConditionsEditor from './SceneConditionsEditor.svelte';
   import SceneStepsEditor from './SceneStepsEditor.svelte';
   import SceneWhenEditor from './SceneWhenEditor.svelte';
@@ -25,8 +25,10 @@
   const scene = $derived(devices.scenes.find((one) => one.id === sceneId));
 
   // eliminata da un'altra parte mentre la si scriveva: non c'è più niente da scrivere
+  // questa finestra e non quella davanti, che può essere una soglia chiesta da qui
+  const chiudi = chiusura();
   $effect(() => {
-    if (!scene) ui.closeModal();
+    if (!scene) chiudi();
   });
 
   type Passo = { id: 'cosa' | 'quando' | 'se'; titolo: string };

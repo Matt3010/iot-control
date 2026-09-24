@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
   import { nelRegistro, type Provider } from '../lib/providers';
@@ -146,23 +146,38 @@
     if (guess) answers = { ...answers, country_code: guess };
   });
 
-  async function go(action: 'start' | 'submit' | 'cancel', input: Record<string, string | boolean> = {}) {
+  /**
+   * Una conversazione che la centrale tiene aperta, e che se ne va solo se
+   * qualcuno le dice di chiudersi. Quella di un ricollegamento no: l'ha
+   * aperta la centrale e resta lì, e chiudendola «Ricollega» sparirebbe
+   * finché lei non ne apre un'altra.
+   */
+  const aperta = (passo: PairingStep | null): passo is PairingStep =>
+    !riprendi && passo?.kind === 'form' && !!passo.flowId;
+
+  const lascia = (passo: PairingStep) =>
+    void devices.pair(agent, 'cancel', { handler: provider.handler, flowId: passo.flowId }).catch(() => undefined);
+
+  /** Se questo pezzo c'è ancora: la risposta dell'agente può arrivare dopo. */
+  let vivo = true;
+
+  /*
+   * Andarsene annulla, da qualunque parte si esca — «Annulla», la crocetta,
+   * Esc, il dito che spinge via la finestra, un'altra pagina. Era solo
+   * «Annulla» a chiuderla, e le altre strade lasciavano di là una
+   * conversazione a metà che teneva occupata la marca.
+   */
+  onDestroy(() => {
+    vivo = false;
+    if (aperta(step)) lascia(step);
+  });
+
+  async function go(action: 'start' | 'submit', input: Record<string, string | boolean> = {}) {
     busy = true;
     // Prima di partire si mette da parte quello che c'è scritto adesso: se si
     // torna a chiedere le stesse cose — un errore, una conversazione scaduta,
     // un «riprova» — deve ritrovarsi lì.
-    if (action !== 'cancel') kept = { ...kept, ...answers };
-
-    /*
-     * Annullare un ricollegamento chiude la finestra e basta. La conversazione
-     * l'ha aperta la centrale e resta lì: chiudendola, «Ricollega» sparirebbe
-     * finché lei non ne apre un'altra.
-     */
-    if (action === 'cancel' && riprendi) {
-      busy = false;
-      onquit();
-      return;
-    }
+    kept = { ...kept, ...answers };
 
     const flowId = step?.flowId || riprendi;
     try {
@@ -172,9 +187,9 @@
         ...(action === 'submit' ? { input } : {}),
       });
 
-      if (action === 'cancel') {
-        // Annullare è una scelta, non un incidente: qui si butta via davvero.
-        onquit();
+      // chiusa mentre si aspettava: quello che è appena nato di là si chiude
+      if (!vivo) {
+        if (aperta(next)) lascia(next);
         return;
       }
 
@@ -187,7 +202,7 @@
         ondone();
       }
     } catch (error) {
-      toast.show((error as Error).message);
+      if (vivo) toast.show((error as Error).message);
     } finally {
       busy = false;
     }
@@ -269,7 +284,8 @@
    * lascia la finestra aperta: la conversazione va avanti dentro.
    */
   function azioni(): ModalAction[] {
-    const annulla: ModalAction = { label: 'Annulla', look: 'ghost', disabled: busy, onpick: () => void go('cancel') };
+    // chiudersi basta: la conversazione aperta la annulla chi se ne va
+    const annulla: ModalAction = { label: 'Annulla', look: 'ghost', onpick: () => onquit() };
     if (avvisoPrima && !avvisato) {
       return [
         { label: 'Annulla', look: 'ghost', onpick: () => onquit() },

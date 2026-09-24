@@ -1,4 +1,6 @@
 <script lang="ts">
+  import StaleNote from './StaleNote.svelte';
+  import { saysAgent } from '../lib/health';
   import { devices, type Agent, type Device } from '../lib/devices.svelte';
   import { AGENTS_PATH } from '../lib/routing';
   import { store } from '../lib/store.svelte';
@@ -37,15 +39,7 @@
   const place = $derived(store.places.find((one) => (one.agentIds ?? []).includes(id))?.name);
 
   const health = $derived(devices.health([id]) ?? 'new');
-  const says = $derived(
-    health === 'live'
-      ? 'Collegato'
-      : health === 'degraded'
-        ? 'Collegato, ma qualcosa non risponde'
-        : health === 'lost'
-          ? 'Non collegato'
-          : 'Mai collegato',
-  );
+  const says = $derived(saysAgent(health));
 </script>
 
 <PageShell
@@ -59,6 +53,7 @@
     {#if theirs.length > 3}<ViewControls vista={vistaDispositivi} label="In che ordine i dispositivi" />{/if}
   {/snippet}
   {#snippet meta()}
+    <StaleNote />
     {#if agent}
       <div class="stato">
         <span class="mark {health}" title={says} role="img" aria-label={says}></span>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { auth } from './lib/auth.svelte';
   import { devices } from './lib/devices.svelte';
   import { live } from './lib/live.svelte';
@@ -12,13 +13,7 @@
   import MarkPopover from './components/MarkPopover.svelte';
   import PickPopover from './components/PickPopover.svelte';
   import Hint from './components/Hint.svelte';
-  import LoginScreen from './components/LoginScreen.svelte';
-  import AgentPage from './components/AgentPage.svelte';
-  import AccountPage from './components/AccountPage.svelte';
-  import AgentsPage from './components/AgentsPage.svelte';
-  import MapsPage from './components/MapsPage.svelte';
-  import ScenesPage from './components/ScenesPage.svelte';
-  import AlertsPage from './components/AlertsPage.svelte';
+  import Lazy from './components/Lazy.svelte';
   import ManageSheet from './components/ManageSheet.svelte';
   import Modal from './components/Modal.svelte';
 
@@ -32,7 +27,6 @@
    */
   ui.manageView = ManageSheet;
   ui.placeView = PlaceSheet;
-  import MapCanvas from './components/MapCanvas.svelte';
   import Palette from './components/Palette.svelte';
   import Panel from './components/Panel.svelte';
   import PlaceSheet from './components/PlaceSheet.svelte';
@@ -52,20 +46,40 @@
   // agenti restava bianca, perché nessuno aveva chiesto chi fosse.
   auth.load();
 
-  $effect(() => {
-    if (!auth.account) return;
-    // di chi è l'indice che stiamo per caricare: se non è quello di prima,
-    // questo browser dimentica cosa guardava
-    store.settle(auth.account.actingAs?.ownerId ?? auth.account.id);
-    store.load().catch((error: Error) => toast.show(`Caricamento fallito: ${error.message}`));
+  /*
+   * Di chi è l'indice, e basta.
+   *
+   * L'account si riscrive intero a ogni rilettura — un nome cambiato, il
+   * fuso, un evento dal filo — e l'effetto qui sotto dipendeva da tutto lui:
+   * ogni volta si rileggevano luoghi, dispositivi e regole, il filo si
+   * chiudeva e si riapriva e la scheda aperta si perdeva. Quello che conta è
+   * chi sei e in casa di chi stai, e una stringa uguale non fa ripartire
+   * niente.
+   */
+  const indice = $derived(
+    auth.account ? `${auth.account.id} ${auth.account.actingAs?.ownerId ?? auth.account.id}` : null,
+  );
 
-    // Si chiede una volta com'è messo il mondo, e da lì in poi arriva tutto
-    // da un filo aperto: gli interruttori, e anche i luoghi che cambi da
-    // un'altra scheda.
-    void devices.load();
-    // le regole sono poche e non cambiano da sole: si leggono una volta
-    void devices.loadRules();
-    live.start();
+  $effect(() => {
+    if (!indice) return;
+    untrack(() => {
+      // di chi è l'indice che stiamo per caricare: se non è quello di prima,
+      // questo browser dimentica cosa guardava
+      store.settle(auth.account?.actingAs?.ownerId ?? auth.account?.id ?? '');
+      store
+        .load()
+        .catch((error: Error) => toast.show(`Le mappe e i luoghi non si sono letti. ${error.message}`));
+
+      // Si chiede una volta com'è messo il mondo, e da lì in poi arriva tutto
+      // da un filo aperto: gli interruttori, e anche i luoghi che cambi da
+      // un'altra scheda.
+      void devices.load();
+      // le regole sono poche e non cambiano da sole: si leggono una volta
+      devices
+        .loadRules()
+        .catch((error: Error) => toast.show(`Gli avvisi scritti sui dispositivi non si sono letti. ${error.message}`));
+      live.start();
+    });
     return () => live.stop();
   });
 
@@ -82,7 +96,9 @@
     const siamo = nav.path;
     if (siamo === eravamo) return;
     eravamo = siamo;
-    ui.closeModal();
+    ui.closeAll();
+    // la ricerca è della mappa: fuori di lì non c'è niente da cercare
+    ui.paletteOpen = false;
   });
 
   // Il cursore della mappa e le regole del fondo schermo si leggono da qui.
@@ -94,14 +110,20 @@
   });
 
   function onKeydown(event: KeyboardEvent) {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    // la ricerca vive sulla mappa: altrove accenderla voleva dire uno stato
+    // senza niente sullo schermo, che si mangiava il primo Esc e si
+    // presentava da solo al ritorno sulla mappa
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && route.kind === 'app' && auth.account) {
       event.preventDefault();
       ui.paletteOpen = !ui.paletteOpen;
       return;
     }
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && ui.draft) {
+    // la scheda di un luogo si salva da tastiera solo quando è lei davanti:
+    // sotto a categorie e gruppi si sarebbe salvata di nascosto
+    const scheda = ui.guscioDavanti?.querySelector<HTMLFormElement>('#place-form');
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && scheda) {
       event.preventDefault();
-      document.querySelector<HTMLFormElement>('#place-form')?.requestSubmit();
+      scheda.requestSubmit();
       return;
     }
     if (event.key === 'Escape') ui.escape();
@@ -115,24 +137,25 @@
 {#if auth.checking}
   <!-- un istante di niente: meglio del lampo della porta a chi è già dentro -->
 {:else if !auth.account}
-  <LoginScreen />
+  <!-- le pagine di servizio, e la porta, si scaricano quando si aprono (Lazy) -->
+  <Lazy load={() => import('./components/LoginScreen.svelte')} />
 {:else if route.kind === 'agents'}
   <GuestBar />
-  <AgentsPage />
+  <Lazy load={() => import('./components/AgentsPage.svelte')} />
 {:else if route.kind === 'agent'}
   <GuestBar />
-  <AgentPage id={route.id} />
+  <Lazy load={() => import('./components/AgentPage.svelte')} props={{ id: route.id }} />
 {:else if route.kind === 'maps'}
   <GuestBar />
-  <MapsPage />
+  <Lazy load={() => import('./components/MapsPage.svelte')} />
 {:else if route.kind === 'scenes'}
   <GuestBar />
-  <ScenesPage />
+  <Lazy load={() => import('./components/ScenesPage.svelte')} />
 {:else if route.kind === 'alerts'}
   <GuestBar />
-  <AlertsPage />
+  <Lazy load={() => import('./components/AlertsPage.svelte')} />
 {:else if route.kind === 'account'}
-  <AccountPage />
+  <Lazy load={() => import('./components/AccountPage.svelte')} />
 {:else}
   <GuestBar />
   <!--
@@ -144,7 +167,9 @@
     smette di essere l'inquilino di mezzo pannello e prende tutto lo schermo.
   -->
   {#if viewport.hasMap}
-    <MapCanvas />
+    <!-- Leaflet arriva con lei: su un telefono, dove la mappa non c'è, non
+         si scarica affatto -->
+    <Lazy load={() => import('./components/MapCanvas.svelte')} />
   {/if}
   <Panel />
   <AddButton />
@@ -169,12 +194,14 @@
      tutta l'app: stava dentro al ramo della mappa, e nelle pagine degli
      agenti, delle mappe, delle scene e degli avvisi chi la apriva non vedeva
      comparire niente. -->
-<!-- `key` e non solo `if`: una finestra nuova è un guscio nuovo. Tenendo lo
-     stesso, i tasti in fondo restavano quelli dettati da chi c'era prima, e
-     categorie e gruppi si ritrovava in fondo «Elimina luogo». -->
-{#key ui.modal}
-  {#if ui.modal}<Modal />{/if}
-{/key}
+<!-- Una per richiesta, tutte montate e si vede solo l'ultima: chi sta sotto
+     tiene quello che avevi scritto mentre rispondi a quella sopra. E un
+     guscio per richiesta, perché i tasti in fondo sono di chi ci sta dentro:
+     tenendo lo stesso, categorie e gruppi si ritrovava in fondo «Elimina
+     luogo». -->
+{#each ui.modals as request (request)}
+  <Modal {request} davanti={request === ui.modal} />
+{/each}
 
 {#if ui.sure}<SurePopover />{/if}
 <!-- E la scelta fra cose che hai creato tu, che e' la stessa domanda con dei

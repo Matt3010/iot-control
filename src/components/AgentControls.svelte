@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saysAgent } from '../lib/health';
   import type { Snippet } from 'svelte';
   import { devices, type Agent } from '../lib/devices.svelte';
   import DeviceControls from './DeviceControls.svelte';
@@ -51,15 +52,7 @@
   const health = $derived(devices.health([agent.id]) ?? 'new');
 
   /** Il colore da solo non basta a chi non lo distingue: la parola sta qui. */
-  const says = $derived(
-    health === 'live'
-      ? 'Collegato'
-      : health === 'degraded'
-        ? 'Collegato, ma qualcosa non risponde'
-        : health === 'lost'
-          ? 'Non collegato'
-          : 'Mai collegato',
-  );
+  const says = $derived(saysAgent(health));
 </script>
 
 <div class="agent">

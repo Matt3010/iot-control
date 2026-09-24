@@ -53,6 +53,16 @@ export const vistaAgenti = new Vista<Agent>({
  */
 const quandoPartita = (scena: Scene): number => (scena.ranAt ? new Date(scena.ranAt).getTime() : 0);
 
+/**
+ * Quando partirà da sola, nel fuso dell'account, o mai.
+ *
+ * Una scena fermata dal fusibile ha ancora il suo orario, ma il server la
+ * salta finché qualcuno non la tocca (`SceneClock`): messa fra le prossime
+ * partenze avrebbe promesso una cosa che non succede.
+ */
+export const prossimaDi = (scena: Scene, adesso?: Date): number | undefined =>
+  scena.blownAt ? undefined : nextRun(scena.when, auth.tz, adesso);
+
 export const vistaScene = new Vista<Scene>({
   chiave: 'scene',
   criteri: [
@@ -67,8 +77,8 @@ export const vistaScene = new Vista<Scene>({
     {
       id: 'prossima',
       label: 'Prossima esecuzione',
-      per: poiPerNome((a, b) => (nextRun(a.when, auth.tz) ?? 0) - (nextRun(b.when, auth.tz) ?? 0)),
-      inFondo: (scena) => nextRun(scena.when, auth.tz) === undefined,
+      per: poiPerNome((a, b) => (prossimaDi(a) ?? 0) - (prossimaDi(b) ?? 0)),
+      inFondo: (scena) => prossimaDi(scena) === undefined,
     },
   ],
 });

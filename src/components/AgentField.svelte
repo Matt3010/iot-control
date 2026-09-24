@@ -1,14 +1,14 @@
 <script lang="ts">
   import { devices, type Agent } from '../lib/devices.svelte';
   import { store } from '../lib/store.svelte';
-  import { toast } from '../lib/toast.svelte';
   import { AGENTS_PATH } from '../lib/routing';
-  import { ui } from '../lib/ui.svelte';
+  import { chiediElimina, chiediRigenera, chiediStacca, Installazione } from '../lib/agenti.svelte';
   import AddRow from './AddRow.svelte';
   import AgentControls from './AgentControls.svelte';
   import AgentPairing from './AgentPairing.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
+  import InstallCommand from './InstallCommand.svelte';
 
   /**
    * Gli agenti di un luogo, dall'inizio alla fine: li crei qui, qui copi il
@@ -43,68 +43,30 @@
     }),
   );
 
-  /**
-   * Il comando si vede una volta sola, perché dentro c'è il token e del token
-   * qui resta solo un'impronta. Vale per l'ultimo creato o rigenerato, vive in
-   * questa schermata e se ne va con lei.
-   */
-  let fresh = $state<{ id: string; install: string } | null>(null);
+  /** Il comando dell'ultimo creato o rigenerato: vive in questa schermata e se ne va con lei. */
+  const installa = new Installazione();
 
   /** Il campo per crearne uno si apre chiedendolo, se ce n'è già qualcuno. */
   let creating = $state(false);
   let newName = $state('');
-  let copied = $state(false);
-  let timer: ReturnType<typeof setTimeout> | undefined;
 
   const attach = (id: string) => onchange([...agentIds, id]);
   const detach = (id: string) => {
-    if (fresh?.id === id) fresh = null;
+    installa.forget(id);
     onchange(agentIds.filter((held) => held !== id));
   };
 
-  async function copy() {
-    if (!fresh) return;
-    try {
-      await navigator.clipboard.writeText(fresh.install);
-      copied = true;
-      clearTimeout(timer);
-      timer = setTimeout(() => (copied = false), 1600);
-    } catch {
-      toast.show('Copia non riuscita, il comando è quello che vedi');
-    }
-  }
-
   async function create(name: string) {
-    try {
-      const made = await devices.createAgent(name);
-      newName = '';
-      creating = false;
-      fresh = { id: made.agent.id, install: made.install };
-      attach(made.agent.id);
-    } catch (error) {
-      toast.show((error as Error).message);
-    }
-  }
-
-  async function rotate(agent: Agent) {
-    try {
-      fresh = { id: agent.id, install: (await devices.newToken(agent)).install };
-      toast.show("Token nuovo. L'agente va reinstallato con questo comando.");
-    } catch (error) {
-      toast.show((error as Error).message);
-    }
+    const made = await installa.create(name);
+    if (!made) return;
+    newName = '';
+    creating = false;
+    attach(made.id);
   }
 
   function remove(agent: Agent) {
     detach(agent.id);
     void devices.removeAgent(agent);
-  }
-
-  /** Cosa porta via eliminarlo: i suoi dispositivi. Il luogo resta un luogo. */
-  function takesAway(agent: Agent): string {
-    const count = devices.ofAgent(agent.id).length;
-    if (!count) return 'Non ha ancora raccontato nessun dispositivo.';
-    return `Se ne ${count === 1 ? 'va' : 'vanno'} ${count} dispositiv${count === 1 ? 'o' : 'i'}. Il luogo resta dov'è.`;
   }
 </script>
 
@@ -119,15 +81,7 @@
     look="icon"
     title="Rigenera il token"
     onclick={(event: MouseEvent) =>
-      ui.askSure(event.currentTarget as HTMLElement, {
-        title: 'Rigenerare il token?',
-        detail:
-          'Quello di adesso smette di funzionare subito, e quella macchina resta scollegata finché non la reinstalli con il comando nuovo.',
-        verb: 'Rigenera',
-        tone: 'plain',
-        no: 'Annulla',
-        onYes: () => void rotate(agent),
-      })}
+      chiediRigenera(event.currentTarget as HTMLElement, () => void installa.rotate(agent))}
   >
     <Icon name="refresh" />
   </Button>
@@ -137,15 +91,7 @@
       look="icon"
       title="Stacca dal luogo"
       onclick={(event: MouseEvent) =>
-        ui.askSure(event.currentTarget as HTMLElement, {
-          title: 'Staccarlo da questo luogo?',
-          detail:
-            "L'agente resta e continua a funzionare. Questo luogo smette solo di mostrarlo, e lo puoi rimettere qui o altrove.",
-          verb: 'Stacca',
-          tone: 'plain',
-          no: 'Annulla',
-          onYes: () => detach(agent.id),
-        })}
+        chiediStacca(event.currentTarget as HTMLElement, null, () => detach(agent.id))}
     >
       <Icon name="logout" />
     </Button>
@@ -157,33 +103,12 @@
     extra="kill"
     title="Elimina agente"
     onclick={(event: MouseEvent) =>
-      ui.askSure(event.currentTarget as HTMLElement, {
-        title: `Eliminare “${agent.name}”?`,
-        detail: takesAway(agent),
-        verb: 'Elimina',
-        onYes: () => remove(agent),
-      })}
+      chiediElimina(event.currentTarget as HTMLElement, agent, () => remove(agent))}
   >
     <Icon name="trash" />
   </Button>
 {/snippet}
 
-{#snippet command()}
-  <div class="install">
-    <span class="eyebrow">Da lanciare su quella macchina</span>
-    <div class="cmd">
-      <code>{fresh?.install}</code>
-      <Button look="icon" title="Copia il comando" onclick={copy}>
-        <Icon name={copied ? 'check' : 'link'} />
-      </Button>
-    </div>
-    <p class="once">
-      Si vede una volta sola, perché dentro c'è il token e qui ne resta solo un'impronta.
-      Vuole <b>Linux</b>: su Windows incollala dentro WSL, su Mac dentro una macchina virtuale.
-      Fuori di lì Docker non sta sulla rete di casa, e l'agente i dispositivi non li vedrebbe.
-    </p>
-  </div>
-{/snippet}
 
 <div class="field">
   <!-- il titolo del campo e la via d'uscita verso la pagina intera: la
@@ -201,7 +126,7 @@
       {#snippet trail()}{@render controls(agent, true)}{/snippet}
 
       {#snippet foot()}
-        {#if fresh?.id === agent.id}{@render command()}{/if}
+        {#if installa.fresh?.id === agent.id}<InstallCommand install={installa.fresh.install} />{/if}
 
         <!-- collegare l'account sta qui e non in Home Assistant: è la cosa
              che manca a un agente appena installato, e chiederla altrove
@@ -250,12 +175,7 @@
             title="Elimina agente"
             aria-label={`Elimina ${agent.name}`}
             onclick={(event: MouseEvent) =>
-              ui.askSure(event.currentTarget as HTMLElement, {
-                title: `Eliminare “${agent.name}”?`,
-                detail: takesAway(agent),
-                verb: 'Elimina',
-                onYes: () => void devices.removeAgent(agent),
-              })}
+              chiediElimina(event.currentTarget as HTMLElement, agent, () => void devices.removeAgent(agent))}
           >
             <Icon name="close" />
           </button>
@@ -374,39 +294,6 @@
 
   .all:hover { color: var(--ink-2); }
 
-
-  /* il comando da incollare: si legge come un terminale perché è un terminale.
-     I `min-width` non sono decorativi: dentro una griglia una cella non scende
-     sotto la larghezza del suo contenuto, e una riga di `curl` senza a capo è
-     larga quanto vuole — è così che sfondava il bordo della scheda. */
-  .install { display: grid; gap: 6px; min-width: 0; }
-
-  .cmd {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    min-width: 0;
-    padding: 4px 4px 4px 9px;
-    border-radius: var(--r-sm);
-    background: var(--sunken-hover);
-    box-shadow: inset 0 0 0 1px var(--hairline-soft);
-  }
-
-  .cmd code {
-    flex: 1;
-    min-width: 0;
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-    font-size: 11px;
-    line-height: 1.5;
-    color: var(--ink);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .once { margin: 0; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
-
-  .once b { font-weight: 600; color: var(--ink-2); }
 
   /* i comandi piccoli in fondo a una card: su una riga, senza urtarsi */
   .acts {

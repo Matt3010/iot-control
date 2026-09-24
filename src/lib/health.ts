@@ -55,6 +55,18 @@ export function healthOf(agents: Speaker[], things: Thing[]): Health | null {
 }
 
 /**
+ * Come sta un agente, a parole: il colore da solo non basta a chi non lo
+ * distingue. Una frase sola per tutte le pagine che lo mostrano, se no la
+ * stessa cosa si dice in due modi il giorno che qualcuno ne corregge uno.
+ */
+export function saysAgent(health: Health): string {
+  if (health === 'live') return 'Collegato';
+  if (health === 'degraded') return 'Collegato, ma qualcosa non risponde';
+  if (health === 'lost') return 'Non collegato';
+  return 'Mai collegato';
+}
+
+/**
  * Come sta una cosa appesa a un agente. Tre stati, non due.
  *
  * Verde risponde. Rosso non risponde, e quello è un guasto vero: l'agente c'è,

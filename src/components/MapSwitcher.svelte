@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { portal } from '../lib/portal';
   import { MAPS_PATH } from '../lib/routing';
   import { store } from '../lib/store.svelte';
@@ -28,13 +29,22 @@
     open = true;
   }
 
-  /** Se sotto non ci sta, si apre all'insu': meglio sopra che fuori schermo. */
+  /**
+   * Se sotto non ci sta, si apre all'insu': meglio sopra che fuori schermo.
+   *
+   * La posizione si calcola dal tasto, non da quella di prima. Leggendo `at`
+   * e riscrivendolo, un menu più alto della finestra non stava né sotto né
+   * sopra, e l'effetto si rincorreva da solo finché Svelte non lo fermava.
+   */
   $effect(() => {
     if (!open || !menu) return;
     const alto = menu.offsetHeight;
-    if (at.top + alto <= window.innerHeight - 8) return;
     const r = anchor!.getBoundingClientRect();
-    at = { ...at, top: Math.max(8, r.top - 8 - alto) };
+    const sotto = r.bottom + 8;
+    const top = sotto + alto <= window.innerHeight - 8 ? sotto : Math.max(8, r.top - 8 - alto);
+    untrack(() => {
+      if (at.top !== top) at = { ...at, top };
+    });
   });
 
   $effect(() => {
@@ -142,12 +152,6 @@
 </div>
 
 <style>
-  /* il nome della mappa si preme per cambiarla: dove si tocca, è alto
-     quanto un dito */
-  @media (hover: none) {
-    .current { min-height: 36px; }
-  }
-
   /* il nome della mappa si prende tutto lo spazio che avanza in testata */
   .switcher { position: relative; flex: 1 1 auto; min-width: 0; }
 
@@ -168,6 +172,12 @@
   }
 
   .current:hover { background: var(--sunken-hover); }
+
+  /* il nome della mappa si preme per cambiarla: dove si tocca, è alto
+     quanto un dito. Dopo `.current`, se no a parità di peso perde. */
+  @media (hover: none) {
+    .current { min-height: 36px; }
+  }
 
   .current-name {
     flex: 1 1 auto;
@@ -196,6 +206,9 @@
   .menu {
     position: absolute;
     max-width: calc(100vw - 16px);
+    /* in una finestra bassa non ci sta né sotto né sopra: scorre dentro */
+    max-height: calc(100vh - 16px);
+    overflow: auto;
     padding: 10px;
     display: grid;
     gap: 6px;

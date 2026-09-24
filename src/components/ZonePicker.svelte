@@ -2,7 +2,7 @@
   import { auth } from '../lib/auth.svelte';
   import { fusi, fusoDelBrowser } from '../lib/fuso';
   import { toast } from '../lib/toast.svelte';
-  import { ui } from '../lib/ui.svelte';
+  import { chiusura } from '../lib/fondo.svelte';
   import SearchPicker from './SearchPicker.svelte';
 
   /**
@@ -16,13 +16,16 @@
   const ora = (tz: string): string =>
     new Date().toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit', timeZone: tz });
 
-  const voci = fusi().map((id) => ({ id, name: id.replaceAll('_', ' '), note: ora(id) }));
+  // l'ora si chiede solo per le righe che si vedono: per più di quattrocento
+  // fusi a ogni apertura era la finestra ad aspettare
+  const voci = fusi().map((id) => ({ id, name: id.replaceAll('_', ' '), note: () => ora(id) }));
+  const chiudi = chiusura();
   const qui = fusoDelBrowser();
 
   async function scegli(tz: string): Promise<void> {
     try {
       await auth.update({ tz });
-      ui.closeModal();
+      chiudi();
       toast.show(`Le scene partono all'ora di ${tz.replaceAll('_', ' ')}`);
     } catch (error) {
       toast.show((error as Error).message);

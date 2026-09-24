@@ -49,7 +49,7 @@
   );
 
   function scegli(handler: string): void {
-    // la conversazione apre la sua finestra al posto di questa: chiuderla qui chiuderebbe quella
+    // la conversazione si apre sopra a questa finestra, e chiusa si torna qui
     onpick(providerDa(handler, voci.find((voce) => voce.id === handler)?.name));
   }
 </script>

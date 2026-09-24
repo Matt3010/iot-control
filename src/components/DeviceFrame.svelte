@@ -3,6 +3,7 @@
   import Button from './Button.svelte';
   import CameraSheet from './CameraSheet.svelte';
   import Icon from './Icon.svelte';
+  import { ui } from '../lib/ui.svelte';
 
   /**
    * Quello che si vede da una telecamera.
@@ -60,18 +61,42 @@
    * Un riquadro da quattro centimetri su un telefono non serve a niente: di
    * una telecamera si guarda un dettaglio, e il dettaglio in piccolo non c'e'.
    *
-   * Si apre come finestra di sistema — `showModal` — e non come un riquadro
-   * grande: cosi' sta sopra a tutto senza dipendere da dove si trovava nella
-   * pagina, si chiude con Esc, e su un telefono copre davvero lo schermo.
-   */
-  let full = $state(false);
-  /**
+   * Si apre come una finestra dell'app, a tutto schermo, e non come un
+   * riquadro grande: così sta sopra a tutto senza dipendere da dove si
+   * trovava nella pagina, e su un telefono copre davvero lo schermo.
+   *
    * E quando quella grande ha disegnato il primo fotogramma, la piccola si
    * ferma: sono due richieste della stessa cosa, e tenerle aperte tutte e due
    * vorrebbe dire il doppio della banda per guardare una sola immagine. Ci si
    * ferma dopo, non prima, se no in mezzo resta un buco nero.
    */
   let fullReady = $state(false);
+
+  /**
+   * Nella pila delle finestre, a tutto schermo e appoggiata sopra a quello
+   * che c'è: chiusa lei, sotto resta la finestra che era aperta.
+   *
+   * L'indirizzo si legge quando serve e non una volta sola: ripiegando sulle
+   * fotografie cambia ogni cinque secondi, e la grande deve seguirlo.
+   */
+  function grande(): void {
+    fullReady = false;
+    const vista = {
+      name: device.name,
+      get src() {
+        return noLive ? src : liveUrl;
+      },
+      onready: () => (fullReady = true),
+    };
+    ui.openModal({
+      title: device.name,
+      view: CameraSheet,
+      props: vista,
+      intera: true,
+      sopra: true,
+      onclose: () => (fullReady = false),
+    });
+  }
 
   /**
    * Se la diretta è stata chiesta.
@@ -313,10 +338,7 @@
         look="glass"
         extra="hud-btn"
         title="A tutto schermo"
-        onclick={() => {
-          full = true;
-          fullReady = false;
-        }}
+        onclick={grande}
       >
         <Icon name="full" />
       </Button>
@@ -324,17 +346,6 @@
   </div>
 </div>
 
-{#if full}
-  <CameraSheet
-    name={device.name}
-    src={noLive ? src : liveUrl}
-    onready={() => (fullReady = true)}
-    onclose={() => {
-      full = false;
-      fullReady = false;
-    }}
-  />
-{/if}
 
 <style>
   .cam {

@@ -85,7 +85,8 @@
     edit.append(glyph('edit'), document.createTextNode('Modifica'));
     edit.addEventListener('click', () => {
       map.closePopup();
-      ui.openPlace({ ...place });
+      // la copia la fa la scheda: la bozza non tocca l'archivio finché non salvi
+      ui.openPlace(place);
     });
 
     const directions = document.createElement('a');
@@ -159,8 +160,40 @@
       mapBridge.detach(map);
       map.remove();
       markers.clear();
+      disegnate.clear();
     };
   });
+
+  /*
+   * Come si presenta il pin di ogni luogo, e una firma per sapere se è
+   * cambiato. Una lettura di un sensore non tocca niente di quello che si
+   * guarda qui (`devices.anyOn` legge una stringa che resta uguale), e un
+   * cambiamento vero rifà l'icona dei soli pin che cambiano: prima ogni
+   * giro le rifaceva tutte.
+   */
+  const aspetti = $derived.by(() => {
+    const out = new Map<string, { look: ReturnType<typeof lookOf>; colour: string; firma: string }>();
+    for (const place of store.currentPlaces) {
+      const category = store.categoryOf(place.categoryId);
+      const colour = category?.color ?? DEFAULT_COLOR;
+      // un agente sotto cui è rimasto acceso qualcosa si vede da lontano
+      const lit = devices.anyOn(place.agentIds) ? 'lit' : '';
+      // quanti agenti stanno a questo indirizzo: il numero nell'altro angolo.
+      // Sono loro e non i dispositivi, perché un agente appena creato non ne
+      // ha ancora nessuno, e un bollino che compare due giorni dopo non serve.
+      const count = place.agentIds?.length ?? 0;
+      const health = devices.health(place.agentIds);
+      out.set(place.key, {
+        look: lookOf(category, lit, count, health),
+        colour,
+        firma: [colour, category?.emoji, lit, count, health].join('|'),
+      });
+    }
+    return out;
+  });
+
+  /** L'ultima firma disegnata su ogni pin: un'icona si rifà solo se cambia. */
+  const disegnate = new Map<string, string>();
 
   /** Markers follow the places, the filters, and whatever is being edited. */
   $effect(() => {
@@ -171,34 +204,32 @@
       if (!living.has(key)) {
         clusters.removeLayer(marker);
         markers.delete(key);
+        disegnate.delete(key);
       }
     }
 
     for (const place of store.currentPlaces) {
-      const category = store.categoryOf(place.categoryId);
+      const aspetto = aspetti.get(place.key);
+      if (!aspetto) continue;
       let marker = markers.get(place.key);
-
-      const colour = category?.color ?? DEFAULT_COLOR;
-      // un agente sotto cui è rimasto acceso qualcosa si vede da lontano
-      const lit = devices.anyOn(place.agentIds) ? 'lit' : '';
-      // quanti agenti stanno a questo indirizzo: il numero nell'altro angolo.
-      // Sono loro e non i dispositivi, perché un agente appena creato non ne
-      // ha ancora nessuno, e un bollino che compare due giorni dopo non serve.
-      const count = place.agentIds?.length ?? 0;
-      const health = devices.health(place.agentIds);
 
       if (!marker) {
         marker = L.marker([place.lat, place.lng], {
-          icon: pinIcon(lookOf(category, lit, count, health)),
+          icon: pinIcon(aspetto.look),
           riseOnHover: true,
-          colour,
+          colour: aspetto.colour,
         } as L.MarkerOptions);
         markers.set(place.key, marker);
+        disegnate.set(place.key, aspetto.firma);
       } else {
-        marker.setLatLng([place.lat, place.lng]);
-        marker.setIcon(pinIcon(lookOf(category, lit, count, health)));
+        const dove = marker.getLatLng();
+        if (dove.lat !== place.lat || dove.lng !== place.lng) marker.setLatLng([place.lat, place.lng]);
+        if (disegnate.get(place.key) !== aspetto.firma) {
+          marker.setIcon(pinIcon(aspetto.look));
+          disegnate.set(place.key, aspetto.firma);
+        }
         // il grappolo legge il colore da qui: se cambia categoria deve saperlo
-        (marker.options as { colour?: string }).colour = colour;
+        (marker.options as { colour?: string }).colour = aspetto.colour;
       }
       // Il popup si lega una volta sola: il contenuto lo fa la funzione, ogni
       // volta che si apre. Rilegarlo a ogni giro butterebbe via quello aperto.

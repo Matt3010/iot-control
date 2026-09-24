@@ -56,7 +56,7 @@ function excuse(error: unknown): string {
   if (/applicationServerKey|subscribe|push service/i.test(detto))
     return 'Il servizio di consegna del browser ha rifiutato l’iscrizione. Succede quando il telefono è senza rete o quando il sito era stato iscritto con una chiave diversa. Spegni e riaccendi.';
 
-  return `Non si è riusciti ad accenderli: ${detto}`;
+  return `Non si è riusciti ad accenderli. Il browser risponde «${detto}».`;
 }
 
 class Push {

@@ -2,7 +2,9 @@
   import { auth } from '../lib/auth.svelte';
   import type { Scene } from '../lib/devices.svelte';
   import { fadeEdges } from '../lib/overflow';
-  import { nextRun, saysShortDay } from '../lib/timing';
+  import { saysShortDay } from '../lib/timing';
+  import { prossimaDi } from '../lib/viste.svelte';
+  import { Vista } from '../lib/vista.svelte';
 
   /**
    * Le prossime partenze automatiche, in fila come avverranno.
@@ -26,11 +28,17 @@
     return () => clearInterval(battito);
   });
 
+  type Tappa = { scene: Scene; at: number };
+
+  // dalla più vicina alla più lontana, e nessuno sceglie un altro ordine
+  const inFila = new Vista<Tappa>({ criteri: [{ id: 'quando', label: 'Quando', per: (a, b) => a.at - b.at }] });
+
   const tappe = $derived(
-    scenes
-      .map((scene) => ({ scene, at: nextRun(scene.when, auth.tz, new Date(adesso)) }))
-      .filter((tappa): tappa is { scene: Scene; at: number } => tappa.at !== undefined)
-      .sort((a, b) => a.at - b.at),
+    inFila.applica(
+      scenes
+        .map((scene) => ({ scene, at: prossimaDi(scene, new Date(adesso)) }))
+        .filter((tappa): tappa is Tappa => tappa.at !== undefined),
+    ),
   );
 
   // le ore di casa, non quelle del browser: è a quest'ora che partirà
