@@ -68,6 +68,9 @@
   </div>
 
   {#each only as condizione, at (condizione.id ?? at)}
+    <!-- giorni e ore senza un dispositivo che la fa partire non valgono, e
+         non si mostrano come se valessero -->
+    {#if daDispositivo || (condizione.kind !== 'days' && condizione.kind !== 'hours')}
     <div class="riga is-condizione">
       {#if condizione.kind === 'days'}
         <div class="giorni">
@@ -96,6 +99,7 @@
         <Icon name="close" />
       </Button>
     </div>
+    {/if}
   {/each}
 
   <!-- una condizione per genere sul tempo: due fasce orarie insieme valgono

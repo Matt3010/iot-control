@@ -41,7 +41,7 @@
 {#if tappe.length}
   <!-- una riga sola, in fondo alla pagina: si legge di passaggio, come la
        barra di stato di un'app, e non ruba spazio alle schede -->
-  <section class="banner" aria-label="Le prossime partenze automatiche">
+  <section class="banner" data-banner aria-label="Le prossime partenze automatiche">
     <!-- il fondo va da bordo a bordo, quello che dice sta in riga con le
          schede: sul grande la pagina è una colonna in mezzo -->
     <div class="dentro">

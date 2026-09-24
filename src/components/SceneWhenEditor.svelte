@@ -46,7 +46,18 @@
   }
 
   const triggers = $derived(scene.triggers ?? []);
-  const salvaTrigger = (lista: SceneTrigger[]) => void devices.patchScene(scene, { triggers: lista });
+  /*
+   * Tolto l'ultimo dispositivo, giorni e ore del «solo se» non varrebbero più
+   * per niente, perché l'orario ha già i suoi. Se ne vanno con lui, invece di
+   * restare scritti a dire una cosa che non succede.
+   */
+  const salvaTrigger = (lista: SceneTrigger[]) =>
+    void devices.patchScene(
+      scene,
+      lista.length
+        ? { triggers: lista }
+        : { triggers: lista, only: (scene.only ?? []).filter((one) => one.kind !== 'days' && one.kind !== 'hours') },
+    );
 
   function aggiungiTrigger(event: MouseEvent): void {
     chiediProva(

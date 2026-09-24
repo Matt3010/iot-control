@@ -38,8 +38,15 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  /* una riga sola è una pillola, e un messaggio lungo va a capo dentro allo
+     schermo restando un rettangolo: con un raggio da pillola, su tre righe,
+     diventava un cerchio */
+  width: max-content;
+  max-width: min(440px, calc(100vw - 32px));
+  box-sizing: border-box;
   padding: 10px 18px;
-  border-radius: 99px;
+  border-radius: 19px;
+  line-height: 1.4;
   background: rgb(14 17 22 / 0.88);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
@@ -49,10 +56,15 @@
   animation: toast-in 0.3s var(--ease);
 }
 
+/* un banner fermo in fondo alla pagina — le prossime partenze — resta
+   leggibile: il messaggio gli sta sopra */
+:global(body:has([data-banner])) #toast { bottom: calc(68px + env(safe-area-inset-bottom)); }
+
 /* room for the button, but only when there is one: otherwise the text sits off-centre */
 #toast:has(.toast-action) { padding-right: 12px; }
 
 .toast-action {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -82,6 +94,8 @@
 @media (max-width: 600px) {
   #toast { bottom: var(--sopra-al-tasto); }
 
-  :global(.sheet-open) #toast { bottom: calc(12px + env(safe-area-inset-bottom)); }
+  /* con una finestra aperta in fondo ci sono i suoi tasti, e un messaggio lì
+     sopra copre proprio quello che si stava per premere: va in cima */
+  :global(body.sheet-open) #toast, :global(body.sheet-open:has([data-banner])) #toast { top: calc(12px + env(safe-area-inset-top)); bottom: auto; }
 }
 </style>
