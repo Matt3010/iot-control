@@ -1,5 +1,5 @@
 import net from 'node:net';
-import { sourceOf } from './go2rtc.js';
+import { askSource, sourceOf } from './go2rtc.js';
 import { frameFrom } from './homeassistant.js';
 
 /**
@@ -58,10 +58,19 @@ function knock(host: string, port: number): Promise<boolean> {
   });
 }
 
-/** L'indirizzo da cui esce il video, chiesto una volta e tenuto da parte. */
+/**
+ * L'indirizzo da cui esce il video, chiesto una volta e tenuto da parte.
+ * Si tiene da parte anche «non ce l'ha», ma non «non ho potuto chiederlo»:
+ * quello si richiede al giro dopo.
+ */
 async function doorFor(entityId: string): Promise<{ host: string; port: number } | null> {
   if (!doors.has(entityId)) {
-    const raw = await sourceOf(entityId);
+    let raw: string | undefined;
+    try {
+      raw = await askSource(entityId);
+    } catch {
+      return null;
+    }
     doors.set(entityId, raw ? doorOf(raw) : null);
   }
   return doors.get(entityId) ?? null;
@@ -134,13 +143,24 @@ const EVERY_MS = 60_000;
  * adesso sarebbe la bugia peggiore.
  */
 export function watchEyes(which: () => string[], changed: (entityId: string, up: boolean) => void): void {
+  // Un giro con una telecamera lenta può durare più di un minuto. Un secondo
+  // giro accanto chiederebbe gli stessi fotogrammi due volte e potrebbe dire
+  // «cambiata» sulla base di un ricordo che l'altro sta ancora scrivendo: si
+  // salta, e si guarda al minuto dopo.
+  let inGiro = false;
   setInterval(() => {
+    if (inGiro) return;
+    inGiro = true;
     void (async () => {
       for (const entityId of which()) {
         const prima = seen.get(entityId);
         const adesso = await look(entityId);
         if (adesso !== undefined && adesso !== prima) changed(entityId, adesso);
       }
-    })().catch((error: Error) => console.warn(`giro delle telecamere: ${error.message}`));
+    })()
+      .catch((error: Error) => console.warn(`giro delle telecamere: ${error.message}`))
+      .finally(() => {
+        inGiro = false;
+      });
   }, EVERY_MS).unref();
 }

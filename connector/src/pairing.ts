@@ -2,7 +2,7 @@ import type { Handler, Health, LinkedAccount, PairingStep } from '../../shared/p
 import { PROVIDERS, providerDi } from './providers.js';
 import fs from 'node:fs';
 import { stateFile, type ConnectorConfig } from './config.js';
-import { install, installed } from './extras.js';
+import { ensureInstalled } from './extras.js';
 import { lastSeen } from './eyes.js';
 import { channelOf, forget } from './go2rtc.js';
 import { frameFrom } from './homeassistant.js';
@@ -21,6 +21,20 @@ import { frameFrom } from './homeassistant.js';
  */
 
 const FLOWS = '/api/config/config_entries/flow';
+
+/**
+ * Un id della centrale da mettere in un indirizzo: una conversazione, un
+ * collegamento. Arriva dal sito, quindi da fuori, e va dentro un indirizzo
+ * chiamato con il token dell'agente. Un id con dentro «../» porterebbe
+ * quella chiamata dove vuole chi l'ha scritto — sbloccare una porta,
+ * spegnere la macchina — saltando il controllo che fa comandare solo i
+ * dispositivi dell'agente. Gli id veri sono lettere, cifre e trattini; il
+ * resto si rifiuta, e quello che passa si codifica comunque.
+ */
+function idSicuro(id: string): string {
+  if (!/^[A-Za-z0-9_-]{1,80}$/.test(id)) throw new Error('questo collegamento non esiste, perché il suo nome non è uno che la centrale usa');
+  return encodeURIComponent(id);
+}
 
 /**
  * Lo schema dell'ultimo passo, per conversazione.
@@ -48,7 +62,7 @@ async function schemaOf(config: ConnectorConfig, flowId: string): Promise<unknow
   const known = SCHEMAS.get(flowId);
   if (known) return known;
 
-  const flow = await ask(config, `${FLOWS}/${flowId}`).catch(() => undefined);
+  const flow = await ask(config, `${FLOWS}/${idSicuro(flowId)}`).catch(() => undefined);
   if (!flow || !Array.isArray(flow.data_schema)) return undefined;
 
   SCHEMAS.set(flowId, flow.data_schema);
@@ -108,11 +122,31 @@ interface HaFlow {
   message?: string;
 }
 
+/**
+ * Una domanda alla centrale, con il token dell'agente.
+ *
+ * Passano tutte da qui perché quando la centrale è spenta o si sta
+ * riavviando `fetch` dice «fetch failed», e quella frase arrivava così com'è
+ * sullo schermo di chi stava collegando un account. Qui diventa il pezzo che
+ * manca, detto una volta sola per tutti; il motivo tecnico resta nel registro
+ * di questa macchina.
+ */
+async function allaCentrale(config: ConnectorConfig, path: string, options: RequestInit = {}): Promise<Response> {
+  try {
+    return await fetch(`${config.haUrl}${path}`, {
+      ...options,
+      headers: { authorization: `Bearer ${config.haToken}`, ...options.headers },
+    });
+  } catch (error) {
+    console.warn(`centrale ${path}: ${(error as Error).message}`);
+    throw new Error('la centrale in casa non risponde, forse è spenta o si sta riavviando');
+  }
+}
+
 async function ask(config: ConnectorConfig, path: string, options: RequestInit = {}): Promise<HaFlow> {
-  const response = await fetch(`${config.haUrl}${path}`, {
+  const response = await allaCentrale(config, path, {
     ...options,
     headers: {
-      authorization: `Bearer ${config.haToken}`,
       ...(options.body ? { 'content-type': 'application/json' } : {}),
       ...options.headers,
     },
@@ -486,9 +520,7 @@ function listed(schema: unknown[] | undefined): string {
 
 /** Quali account Home Assistant sa collegare, adesso. */
 async function handlers(config: ConnectorConfig): Promise<string[]> {
-  const response = await fetch(`${config.haUrl}/api/config/config_entries/flow_handlers`, {
-    headers: { authorization: `Bearer ${config.haToken}` },
-  });
+  const response = await allaCentrale(config, '/api/config/config_entries/flow_handlers');
   return response.ok ? ((await response.json()) as string[]) : [];
 }
 
@@ -506,7 +538,7 @@ export async function startPairing(config: ConnectorConfig, handler: string | un
   // prima volta che qualcuno le chiede, e non prima.
   const extra = provider?.extra;
   if (extra && !(await handlers(config)).includes(chi)) {
-    if (!(await installed(config, extra))) await install(config, extra);
+    await ensureInstalled(config, extra);
     return {
       flowId: '',
       kind: 'busy',
@@ -590,7 +622,7 @@ export async function submitPairing(
 ): Promise<PairingStep> {
   const schema = await schemaOf(config, flowId);
   const body = JSON.stringify(withDefaults(schema, input));
-  const flow = await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body });
+  const flow = await ask(config, `${FLOWS}/${idSicuro(flowId)}`, { method: 'POST', body });
   const step = translate(flow, { flowId, schema });
 
   // Finita o andata storta, quella conversazione non e' piu' aperta: non c'e'
@@ -609,7 +641,7 @@ export async function submitPairing(
     const altre = [...APERTE].filter(([id, chi]) => chi === handler && id !== flowId).map(([id]) => id);
     if (altre.length) {
       await Promise.all(altre.map((id) => cancelPairing(config, id)));
-      const ancora = await ask(config, `${FLOWS}/${flowId}`, { method: 'POST', body });
+      const ancora = await ask(config, `${FLOWS}/${idSicuro(flowId)}`, { method: 'POST', body });
       const dopo = translate(ancora, { flowId, schema });
       if (dopo.kind === 'done' || dopo.kind === 'failed') scorda(config, flowId);
       return ourShot(await pictured(config, ancora, dopo), input);
@@ -644,9 +676,7 @@ export async function listLinked(
   /** I collegamenti da cui vengono dispositivi dell'app: ci sono sempre, anche fuori dal catalogo. */
   conDispositivi: Set<string> = new Set(),
 ): Promise<LinkedAccount[]> {
-  const response = await fetch(`${config.haUrl}/api/config/config_entries/entry`, {
-    headers: { authorization: `Bearer ${config.haToken}` },
-  });
+  const response = await allaCentrale(config, '/api/config/config_entries/entry');
   if (!response.ok) return [];
 
   const entries = (await response.json()) as {
@@ -684,9 +714,7 @@ export async function listLinked(
  * Finendola, i dispositivi restano quelli di prima.
  */
 async function ricollegamenti(config: ConnectorConfig): Promise<Map<string, string>> {
-  const response = await fetch(`${config.haUrl}${FLOWS}`, {
-    headers: { authorization: `Bearer ${config.haToken}` },
-  }).catch(() => undefined);
+  const response = await allaCentrale(config, FLOWS).catch(() => undefined);
   if (!response?.ok) return new Map();
   const flussi = (await response.json().catch(() => [])) as {
     flow_id: string;
@@ -705,7 +733,7 @@ async function ricollegamenti(config: ConnectorConfig): Promise<Map<string, stri
  * per un collegamento nuovo.
  */
 export async function resumePairing(config: ConnectorConfig, flowId: string): Promise<PairingStep> {
-  const flow = await ask(config, `${FLOWS}/${encodeURIComponent(flowId)}`);
+  const flow = await ask(config, `${FLOWS}/${idSicuro(flowId)}`);
   if (flow.flow_id && flow.handler && flow.type === 'form') ricorda(config, flow.flow_id, flow.handler);
   return translate(flow);
 }
@@ -786,9 +814,8 @@ function howIs(state: string | undefined): Health {
  * sale è già senza.
  */
 export async function unlink(config: ConnectorConfig, entryId: string): Promise<void> {
-  const response = await fetch(`${config.haUrl}/api/config/config_entries/entry/${entryId}`, {
+  const response = await allaCentrale(config, `/api/config/config_entries/entry/${idSicuro(entryId)}`, {
     method: 'DELETE',
-    headers: { authorization: `Bearer ${config.haToken}` },
   });
   if (!response.ok) throw new Error(`non si riesce a scollegare (risposta ${response.status})`);
 }
@@ -797,8 +824,5 @@ export async function unlink(config: ConnectorConfig, entryId: string): Promise<
 export async function cancelPairing(config: ConnectorConfig, flowId: string): Promise<void> {
   SCHEMAS.delete(flowId);
   APERTE.delete(flowId);
-  await fetch(`${config.haUrl}${FLOWS}/${flowId}`, {
-    method: 'DELETE',
-    headers: { authorization: `Bearer ${config.haToken}` },
-  }).catch(() => undefined);
+  await allaCentrale(config, `${FLOWS}/${idSicuro(flowId)}`, { method: 'DELETE' }).catch(() => undefined);
 }

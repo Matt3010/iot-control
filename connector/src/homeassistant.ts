@@ -282,13 +282,21 @@ export class HomeAssistant {
         signal: AbortSignal.timeout(SNAPSHOT_TIMEOUT_MS),
       });
 
+    // Una centrale che non risponde o ci mette troppo è un motivo in più per
+    // andare dritti, non un motivo per fermarsi: il video non passa da lei.
     let said = 0;
+    let muta = false;
     if (!dritte.has(entityId)) {
-      const response = await take();
-      said = response.status;
-      if (response.ok) {
-        const bytes = Buffer.from(await response.arrayBuffer());
-        if (bytes.length) return bytes;
+      try {
+        const response = await take();
+        said = response.status;
+        if (response.ok) {
+          const bytes = Buffer.from(await response.arrayBuffer());
+          if (bytes.length) return bytes;
+        }
+      } catch (error) {
+        muta = true;
+        console.warn(`fotogramma da ${entityId}: la centrale non risponde (${(error as Error).message})`);
       }
     }
 
@@ -308,6 +316,7 @@ export class HomeAssistant {
     // macchina: a schermo sarebbe una cifra in mezzo a una frase, che non
     // dice niente a chi la legge e non aiuta a fare niente.
     if (said) console.warn(`fotogramma da ${entityId}: risposta ${said}`);
+    if (muta) throw new Error('la centrale non risponde, e la telecamera non manda niente nemmeno chiesta direttamente');
     throw new Error(said ? 'la telecamera non ha risposto' : 'la telecamera non ha mandato niente');
   }
 

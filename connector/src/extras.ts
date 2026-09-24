@@ -116,3 +116,35 @@ export async function install(config: ConnectorConfig, extra: Extra): Promise<vo
   if (!response.ok) throw new Error(`il servizio in casa non si riavvia (risposta ${response.status})`);
   console.log('home assistant si sta riavviando');
 }
+
+/**
+ * Le installazioni in corso, per cartella.
+ *
+ * Due persone che collegano lo stesso account nello stesso momento, o un
+ * doppio clic, facevano partire due installazioni nella stessa cartella: una
+ * cancellava i file che l'altra stava scrivendo, e la centrale si riavviava
+ * due volte. Qui ne gira una alla volta; chi arriva dopo aspetta la prima e
+ * poi guarda di nuovo, e di solito trova tutto già fatto.
+ */
+const inCorso = new Map<string, Promise<void>>();
+
+/** Installa se non c'è già, una volta sola anche se lo chiedono in tanti. */
+export async function ensureInstalled(config: ConnectorConfig, extra: Extra): Promise<void> {
+  const into = folderFor(config, extra.domain);
+  const prima = inCorso.get(into);
+  if (prima) await prima.catch(() => undefined);
+
+  // di nuovo, perché nel frattempo potrebbe aver cominciato qualcun altro
+  const altra = inCorso.get(into);
+  if (altra && altra !== prima) return ensureInstalled(config, extra);
+
+  const turno = (async () => {
+    if (!(await installed(config, extra))) await install(config, extra);
+  })();
+  inCorso.set(into, turno);
+  try {
+    await turno;
+  } finally {
+    if (inCorso.get(into) === turno) inCorso.delete(into);
+  }
+}

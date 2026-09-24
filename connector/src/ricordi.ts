@@ -11,6 +11,8 @@ import fs from 'node:fs';
  */
 export class Ricordi<T> {
   #scrivi: NodeJS.Timeout | null = null;
+  /** Cosa scrivere quando scade l'attesa, finché non è scritto. */
+  #adesso: (() => Iterable<[string, T]>) | null = null;
 
   /**
    * `valido` tiene solo le voci che hanno la forma giusta: il file può venire
@@ -43,10 +45,9 @@ export class Ricordi<T> {
    */
   salva(adesso: () => Iterable<[string, T]>, attesaMs = 2_000): void {
     if (!this.file || this.#scrivi) return;
-    this.#scrivi = setTimeout(() => {
-      this.#scrivi = null;
-      this.#scriviOra(adesso);
-    }, attesaMs);
+    this.#adesso = adesso;
+    inAttesa.add(this as Ricordi<unknown>);
+    this.#scrivi = setTimeout(() => this.salvaSubito(adesso), attesaMs);
     this.#scrivi.unref?.();
   }
 
@@ -55,14 +56,44 @@ export class Ricordi<T> {
     if (!this.file) return;
     if (this.#scrivi) clearTimeout(this.#scrivi);
     this.#scrivi = null;
+    this.#adesso = null;
+    inAttesa.delete(this as Ricordi<unknown>);
     this.#scriviOra(adesso);
   }
 
+  /** Scrive adesso quello che stava aspettando, se c'è. */
+  finisci(): void {
+    if (this.#adesso) this.salvaSubito(this.#adesso);
+  }
+
+  /**
+   * Si scrive su un file accanto e poi lo si mette al posto del vecchio. Un
+   * disco pieno o uno spegnimento a metà scrittura lasciavano un file
+   * troncato, che al riavvio non si leggeva più: si perdeva tutto, non solo
+   * l'ultima modifica. Lo spostamento invece o avviene o no, e nel secondo
+   * caso resta il file di prima, intero.
+   */
   #scriviOra(adesso: () => Iterable<[string, T]>): void {
+    const file = this.file as string;
+    const accanto = `${file}.${process.pid}.nuovo`;
     try {
-      fs.writeFileSync(this.file as string, JSON.stringify(Object.fromEntries(adesso())), { mode: 0o600 });
+      fs.writeFileSync(accanto, JSON.stringify(Object.fromEntries(adesso())), { mode: 0o600 });
+      fs.renameSync(accanto, file);
     } catch (error) {
+      fs.rmSync(accanto, { force: true });
       console.warn(`${this.nome}: non riesco a scrivere il file (${(error as Error).message})`);
     }
   }
 }
+
+/**
+ * I file con una scrittura rimandata. Un agente che si ferma — SIGTERM da un
+ * aggiornamento, un errore che lo fa ripartire — usciva subito e quello che
+ * aspettava i suoi due secondi non veniva scritto mai: le forme viste
+ * nell'ultimo giro sparivano proprio al riavvio, che è quando servono.
+ * All'uscita, qualunque sia la strada, si scrive tutto quello che aspetta.
+ */
+const inAttesa = new Set<Ricordi<unknown>>();
+process.on('exit', () => {
+  for (const ricordi of [...inAttesa]) ricordi.finisci();
+});

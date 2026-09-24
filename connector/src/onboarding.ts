@@ -83,6 +83,34 @@ async function createOwner(config: ConnectorConfig): Promise<string> {
   return ((await response.json()) as { auth_code: string }).auth_code;
 }
 
+/**
+ * Rientra con nome e password, come farebbe una persona dalla pagina di
+ * accesso, e torna lo stesso codice usa e getta che dà la creazione
+ * dell'utente.
+ *
+ * Serve quando il primo avvio si è fermato a metà: l'utente è nato, ma il
+ * token no. Senza questo, a ogni riavvio l'agente chiedeva un token scritto a
+ * mano, anche se le chiavi per rientrare le aveva già.
+ */
+async function logIn(config: ConnectorConfig): Promise<string> {
+  const start = await ask(`${config.haUrl}/auth/login_flow`, {
+    method: 'POST',
+    body: JSON.stringify({ client_id: config.haUrl, handler: ['homeassistant', null], redirect_uri: `${config.haUrl}/` }),
+  });
+  if (!start.ok) throw new Error(`home assistant non apre l'accesso (risposta ${start.status})`);
+  const { flow_id: flowId } = (await start.json()) as { flow_id: string };
+
+  const sent = await ask(`${config.haUrl}/auth/login_flow/${encodeURIComponent(flowId)}`, {
+    method: 'POST',
+    body: JSON.stringify({ client_id: config.haUrl, username: config.haUser, password: config.haPassword }),
+  });
+  const said = (await sent.json().catch(() => ({}))) as { type?: string; result?: string };
+  if (!sent.ok || said.type !== 'create_entry' || !said.result) {
+    throw new Error(`home assistant non accetta il nome "${config.haUser}" con la password che ho`);
+  }
+  return said.result;
+}
+
 /** Il codice usa e getta diventa un permesso vero, che dura mezz'ora. */
 async function exchange(config: ConnectorConfig, code: string): Promise<string> {
   const response = await ask(`${config.haUrl}/auth/token`, {
@@ -178,15 +206,18 @@ export async function ensureToken(config: ConnectorConfig): Promise<string> {
   const steps = await waitForHa(config);
   const onboarded = steps.find((step) => step.step === 'user')?.done;
 
-  if (onboarded) {
+  if (onboarded && !config.haPassword) {
     throw new Error(
-      'home assistant ha già un utente, ma noi non abbiamo il suo token: ' +
-        'creane uno di lunga durata dal tuo profilo e mettilo in HA_TOKEN',
+      'home assistant ha già un utente e noi non abbiamo il suo token. ' +
+        'Creane uno di lunga durata dal tuo profilo e mettilo in HA_TOKEN',
     );
   }
 
-  console.log('home assistant è nuovo, faccio io il primo avvio');
-  const access = await exchange(config, await createOwner(config));
+  // Con un utente già nato si rientra con la password: è il caso del primo
+  // avvio interrotto dopo la creazione, e dei passi rimasti si finisce qui.
+  if (onboarded) console.log(`home assistant ha già un utente, rientro come "${config.haUser}"`);
+  else console.log('home assistant è nuovo, faccio io il primo avvio');
+  const access = await exchange(config, onboarded ? await logIn(config) : await createOwner(config));
   await finishSteps(config, access, steps);
 
   const token = await mintLongLived(config, access);

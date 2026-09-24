@@ -33,10 +33,22 @@ const known = new Map<string, string>();
 
 /** L'indirizzo vero di una telecamera, come lo conosce chi smista i flussi. */
 export async function sourceOf(entityId: string): Promise<string | undefined> {
+  return askSource(entityId).catch(() => undefined);
+}
+
+/**
+ * Come `sourceOf`, ma se chi smista i flussi non risponde lo dice invece di
+ * tornare vuoto. Serve a chi si ricorda la risposta: «non ha un indirizzo» si
+ * può tenere da parte, «non ho potuto chiederlo» no, se no una telecamera
+ * resta senza controllo per colpa di un attimo in cui lui era giù.
+ */
+export async function askSource(entityId: string): Promise<string | undefined> {
   const said = await fetch(`${STREAMS}?src=${encodeURIComponent(entityId)}`, {
     signal: AbortSignal.timeout(NEARBY_MS),
-  }).catch(() => undefined);
-  if (!said?.ok) return undefined;
+  });
+  // un flusso che non conosce è un'assenza vera, il resto è un guasto suo
+  if (said.status === 404) return undefined;
+  if (!said.ok) throw new Error(`chi smista i flussi risponde ${said.status}`);
 
   const info = (await said.json().catch(() => undefined)) as { producers?: { url?: string }[] } | undefined;
   for (const one of info?.producers ?? []) {
