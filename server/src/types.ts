@@ -248,15 +248,31 @@ export interface SceneTrigger extends DeviceTest {
 /**
  * Una cosa che deve essere vera perché una scena parta da sola.
  *
- * Tutte insieme, nel momento in cui qualcosa la farebbe partire. Valgono
- * solo per le partenze automatiche: chi la preme la vuole adesso, e basta.
+ * Si guardano nel momento in cui qualcosa la farebbe partire, legate in
+ * gruppi (`SceneConditionGroup`). Valgono solo per le partenze automatiche: chi la preme la vuole adesso, e basta.
  * I giorni, le ore e le date si leggono nel fuso di chi ha la scena (`User.tz`).
  */
 export type SceneCondition =
   | ({ id: string; kind: 'device' } & DeviceTest)
   | { id: string; kind: 'days'; days: number[] }
   | { id: string; kind: 'hours'; from: string; to: string }
-  | { id: string; kind: 'dates'; from: string; to: string };
+  | { id: string; kind: 'dates'; from: string; to: string }
+  | SceneConditionGroup;
+
+/**
+ * Più condizioni legate insieme: devono valere tutte (`all`) o ne basta una
+ * (`any`). Un gruppo può stare dentro un altro, ed è così che si scrive
+ * «la prima e la seconda, oppure la terza» senza parentesi.
+ */
+export interface SceneConditionGroup {
+  id: string;
+  kind: 'group';
+  match: 'all' | 'any';
+  items: SceneCondition[];
+}
+
+/** Un gruppo vuoto che chiede tutto: non chiede niente. */
+export const NESSUNA_CONDIZIONE: SceneConditionGroup = { id: 'radice', kind: 'group', match: 'all', items: [] };
 
 export interface Scene {
   id: string;
@@ -267,8 +283,8 @@ export interface Scene {
   when?: Timing;
   /** Le cose di casa che la fanno partire. Ne basta una. */
   triggers?: SceneTrigger[];
-  /** Quello che deve essere vero perché parta da sola. Tutto. */
-  only?: SceneCondition[];
+  /** Quello che deve essere vero perché parta da sola, come un gruppo solo. */
+  only?: SceneConditionGroup;
   /**
    * L'ultimo minuto in cui e' partita da sola.
    *

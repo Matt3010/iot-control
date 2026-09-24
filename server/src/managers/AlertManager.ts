@@ -10,6 +10,16 @@ import { noticeManager } from './NoticeManager.js';
 import { number, says, saysThreshold } from './says.js';
 
 /**
+ * Come si dice che una cosa comandata a ordini è cambiata. È la stessa
+ * tabella che la pagina usa per scrivere le prove (src/lib/prove.ts), ma
+ * qui serve solo il «quando», perché un avviso arriva quando succede.
+ */
+const STATI: Record<string, Record<string, string>> = {
+  move: { Apri: 'si apre', Chiudi: 'si chiude' },
+  lock: { Apri: 'si apre', 'Chiudi a chiave': 'si chiude a chiave' },
+};
+
+/**
  * Le regole scritte sui dispositivi, e chi le fa scattare.
  *
  * Una regola guarda una cosa sola — «quando la porta diventa aperta» — e
@@ -143,6 +153,10 @@ export class AlertManager {
     if (op !== 'is') return saysThreshold(capability, op, value);
 
     if (capability.kind === 'switch') return value === 'true' ? 'si accende' : 'si spegne';
+    // una tenda si comanda con «Apri» e con lo stesso valore dice com'è
+    // rimasta: letto come un ordine, l'avviso sembrava chiederle di aprirsi
+    const stato = STATI[code]?.[value];
+    if (stato) return stato;
     /*
      * Il valore fra virgolette e com'e' scritto. Smontato in minuscolo
      * diventava «diventa apri», che non e' italiano: quelle parole le

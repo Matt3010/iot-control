@@ -11,7 +11,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import type { Capability } from '../../../shared/protocol.js';
-import type { LogEntry, MapEditor, Notice, Op, SceneCondition, SceneStep, SceneTrigger, Timing } from '../types.js';
+import { NESSUNA_CONDIZIONE, type LogEntry, type MapEditor, type Notice, type Op, type SceneConditionGroup, type SceneStep, type SceneTrigger, type Timing } from '../types.js';
 
 /**
  * Le tabelle, e perché sono fatte così.
@@ -222,10 +222,11 @@ export const scenes = pgTable(
     /** Le cose di casa che la fanno partire: ne basta una. */
     triggers: jsonb('triggers').$type<SceneTrigger[]>().notNull().default([]),
     /**
-     * Quello che deve essere vero perché parta da sola: tutto.
-     * La colonna non si chiama «only»: è parola di SQL, come «when».
+     * Quello che deve essere vero perché parta da sola, come un gruppo solo
+     * che può contenerne altri. La colonna non si chiama «only», perché è
+     * una parola di SQL come «when».
      */
-    only: jsonb('conditions').$type<SceneCondition[]>().notNull().default([]),
+    only: jsonb('conditions').$type<SceneConditionGroup>().notNull().default(NESSUNA_CONDIZIONE),
   },
   (table) => [index('scenes_owner').on(table.ownerId)],
 );

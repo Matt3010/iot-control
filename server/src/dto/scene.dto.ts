@@ -1,4 +1,4 @@
-import { Transform, Type } from 'class-transformer';
+import { plainToInstance, Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -149,8 +149,23 @@ export class SceneConditionDto {
   @MaxLength(80)
   id?: string;
 
-  @IsIn(['device', 'days', 'hours', 'dates'], { message: 'una condizione è su un dispositivo, dei giorni, delle ore o delle date' })
-  kind!: 'device' | 'days' | 'hours' | 'dates';
+  @IsIn(['device', 'days', 'hours', 'dates', 'group'], {
+    message: 'una condizione è su un dispositivo, dei giorni, delle ore, delle date, o un gruppo di condizioni',
+  })
+  kind!: 'device' | 'days' | 'hours' | 'dates' | 'group';
+
+  /** Per un gruppo, se devono valere tutte o ne basta una. */
+  @IsOptional()
+  @IsIn(['all', 'any'])
+  match?: 'all' | 'any';
+
+  /** Per un gruppo, quello che ci sta dentro. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ValidateNested({ each: true })
+  @Type(() => SceneConditionDto)
+  items?: SceneConditionDto[];
 
   @IsOptional()
   @IsString()
@@ -215,10 +230,18 @@ export class SceneDto {
   @Type(() => SceneTriggerDto)
   triggers?: SceneTriggerDto[];
 
+  /**
+   * Tutte le condizioni, come un gruppo solo. Un elenco semplice è come le
+   * mandava la pagina prima dei gruppi, e un telefono con quella ancora in
+   * memoria le manda così: vuol dire «tutte», e diventa quel gruppo.
+   */
   @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(10)
-  @ValidateNested({ each: true })
+  @Transform(({ obj, value }) =>
+    Array.isArray(obj.only)
+      ? plainToInstance(SceneConditionDto, { kind: 'group', match: 'all', items: obj.only })
+      : value,
+  )
+  @ValidateNested()
   @Type(() => SceneConditionDto)
-  only?: SceneConditionDto[];
+  only?: SceneConditionDto;
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { chiediProva } from '../lib/chiedi';
+  import { diTempo, gruppoDi, senza } from '../lib/condizioni';
   import { devices, type Scene, type SceneTrigger, type Timing } from '../lib/devices.svelte';
   import { fraseDiProva } from '../lib/prove';
   import { defaultWhen, GIORNI, today } from '../lib/timing';
@@ -56,7 +57,7 @@
       scene,
       lista.length
         ? { triggers: lista }
-        : { triggers: lista, only: (scene.only ?? []).filter((one) => one.kind !== 'days' && one.kind !== 'hours') },
+        : { triggers: lista, only: senza(gruppoDi(scene.only), diTempo) },
     );
 
   function aggiungiTrigger(event: MouseEvent): void {

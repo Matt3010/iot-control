@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { devices, type Scene } from '../lib/devices.svelte';
   import { thingHealth } from '../lib/health';
+  import { quante } from '../lib/condizioni';
   import { fraseCondizione, fraseDiProva } from '../lib/prove';
   import { saysWait, saysWhen } from '../lib/timing';
   import { ui } from '../lib/ui.svelte';
@@ -162,9 +163,9 @@
       <span class="detto">quando {fraseDiProva(devices.list, trigger, 'quando')}</span>
     </p>
   {/each}
-  {#if (scene.only ?? []).length && (scene.when || (scene.triggers ?? []).length)}
+  {#if scene.only && quante(scene.only) && (scene.when || (scene.triggers ?? []).length)}
     <p class="auto is-se">
-      <span class="detto">solo se {(scene.only ?? []).map((one) => fraseCondizione(devices.list, one)).join(', ')}</span>
+      <span class="detto">solo se {fraseCondizione(devices.list, scene.only)}</span>
     </p>
   {/if}
 

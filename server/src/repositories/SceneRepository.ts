@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { and, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import { iso, type Transaction } from '../persistence/db.js';
 import { scenes } from '../persistence/schema.js';
-import type { Scene, SceneStep } from '../types.js';
+import { NESSUNA_CONDIZIONE, type Scene, type SceneStep } from '../types.js';
 
 type Row = typeof scenes.$inferSelect;
 
@@ -15,7 +15,7 @@ const toScene = (row: Row): Scene => ({
   ...(row.lastRunAt ? { lastRunAt: row.lastRunAt } : {}),
   ...(row.ranAt ? { ranAt: iso(row.ranAt) as string } : {}),
   triggers: row.triggers ?? [],
-  only: row.only ?? [],
+  only: row.only ?? NESSUNA_CONDIZIONE,
 });
 
 export class SceneRepository {

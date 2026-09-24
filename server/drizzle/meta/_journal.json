@@ -36,6 +36,13 @@
       "when": 1790250214169,
       "tag": "0004_giorni-dentro-l-orario",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790252458876,
+      "tag": "0005_condizioni-a-gruppi",
+      "breakpoints": true
     }
   ]
 }

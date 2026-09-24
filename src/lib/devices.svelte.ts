@@ -96,7 +96,16 @@ export type SceneCondition =
   | ({ id?: string; kind: 'device' } & DeviceTest)
   | { id?: string; kind: 'days'; days: number[] }
   | { id?: string; kind: 'hours'; from: string; to: string }
-  | { id?: string; kind: 'dates'; from: string; to: string };
+  | { id?: string; kind: 'dates'; from: string; to: string }
+  | SceneConditionGroup;
+
+/** Più condizioni legate: tutte (`all`) o almeno una (`any`). Può contenerne altri. */
+export interface SceneConditionGroup {
+  id?: string;
+  kind: 'group';
+  match: 'all' | 'any';
+  items: SceneCondition[];
+}
 
 export interface Scene {
   id: string;
@@ -104,7 +113,7 @@ export interface Scene {
   steps: SceneStep[];
   when?: Timing;
   triggers?: SceneTrigger[];
-  only?: SceneCondition[];
+  only?: SceneConditionGroup;
   /** L'ultima volta che è partita, a mano o da sola. Mai, se manca. */
   ranAt?: string;
 }
@@ -424,7 +433,7 @@ class Devices {
       steps?: SceneStep[];
       when?: Timing | null;
       triggers?: SceneTrigger[];
-      only?: SceneCondition[];
+      only?: SceneConditionGroup;
     },
   ): Promise<void> {
     const before = { ...scene, steps: [...scene.steps] };

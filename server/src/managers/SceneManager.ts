@@ -10,7 +10,7 @@ import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { logManager } from './LogManager.js';
 import { randomUUID } from 'node:crypto';
-import type { Device, DeviceTest, Op, Scene, SceneCondition, SceneStep, SceneTrigger } from '../types.js';
+import type { Device, DeviceTest, Op, Scene, SceneCondition, SceneConditionGroup, SceneStep, SceneTrigger } from '../types.js';
 import { toSceneView } from '../dto/views.js';
 import { ordiniDiversi, partonoInsieme } from '../rules/scontri.js';
 
@@ -401,15 +401,37 @@ export class SceneManager {
     return triggers.map((trigger) => ({ id: trigger.id || `trg-${randomUUID()}`, ...this.#test(devices, trigger) }));
   }
 
-  /** Le condizioni, ognuna con quello che le serve e niente di più. */
-  async #cleanConditions(tx: Transaction, ownerId: string, only: SceneConditionDto[]): Promise<SceneCondition[]> {
+  /**
+   * Le condizioni, ognuna con quello che le serve e niente di più.
+   *
+   * Arrivano come un gruppo solo, che può contenerne altri. Oltre tre livelli
+   * non si va: su un telefono un gruppo dentro un gruppo dentro un gruppo non
+   * si legge più, e nessuna casa ha bisogno di una domanda così.
+   */
+  async #cleanConditions(tx: Transaction, ownerId: string, radice: SceneConditionDto): Promise<SceneConditionGroup> {
     const devices = await new DeviceRepository(tx).findAllOf(ownerId);
     const ORA = /^([01]\d|2[0-3]):[0-5]\d$/;
     const DATA = /^\d{4}-\d{2}-\d{2}$/;
+    const PROFONDITA = 3;
+    let quante = 0;
 
-    return only.map((condizione): SceneCondition => {
+    const gruppo = (condizione: SceneConditionDto, livello: number): SceneConditionGroup => {
+      if (livello > PROFONDITA) throw badRequest('un gruppo può stare dentro un altro al massimo due volte');
+      return {
+        id: condizione.id || `cnd-${randomUUID()}`,
+        kind: 'group',
+        match: condizione.match === 'any' ? 'any' : 'all',
+        items: (condizione.items ?? []).map((one) => una(one, livello)),
+      };
+    };
+
+    const una = (condizione: SceneConditionDto, livello: number): SceneCondition => {
+      quante += 1;
+      if (quante > 30) throw badRequest('al massimo trenta condizioni per scena');
       const id = condizione.id || `cnd-${randomUUID()}`;
       switch (condizione.kind) {
+        case 'group':
+          return gruppo(condizione, livello + 1);
         case 'device':
           return { id, kind: 'device', ...this.#test(devices, condizione) };
         case 'days':
@@ -427,7 +449,10 @@ export class SceneManager {
           return { id, kind: 'dates', from, to };
         }
       }
-    });
+    };
+
+    if (radice.kind !== 'group') throw badRequest('le condizioni arrivano come un gruppo');
+    return gruppo(radice, 1);
   }
 
   async #clean(

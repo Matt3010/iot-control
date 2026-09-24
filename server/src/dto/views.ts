@@ -1,6 +1,7 @@
 import type { Capability, DeviceValue } from '../../../shared/protocol.js';
-import type { Agent, Category, Device, Group, MapEditor, Place, PlaceMap, Scene, SceneCondition, SceneStep, SceneTrigger, Timing } from '../types.js';
+import type { Agent, Category, Device, Group, MapEditor, Place, PlaceMap, Scene, SceneConditionGroup, SceneStep, SceneTrigger, Timing } from '../types.js';
 import type { OwnerState } from '../managers/StateManager.js';
+import { NESSUNA_CONDIZIONE } from '../types.js';
 
 /** The shapes that leave the API: entities never go out untouched. */
 export interface CategoryView {
@@ -71,7 +72,7 @@ export interface SceneView {
   /** L'ultima volta che è partita, per metterle in fila per uso. */
   ranAt?: string;
   triggers: SceneTrigger[];
-  only: SceneCondition[];
+  only: SceneConditionGroup;
 }
 
 export interface StateView {
@@ -97,7 +98,7 @@ export const toSceneView = ({ id, name, steps, when, ranAt, triggers, only }: Sc
   name,
   steps: steps ?? [],
   triggers: triggers ?? [],
-  only: only ?? [],
+  only: only ?? NESSUNA_CONDIZIONE,
   ...(ranAt ? { ranAt } : {}),
   // l'ultima partenza resta di qua: a chi guarda serve sapere quando parte,
   // non quando e' partita l'ultima volta — quello e' nel registro

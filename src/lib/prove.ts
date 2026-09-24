@@ -37,6 +37,27 @@ const valore = (capability: Capability, value: string | number): string =>
   capability.kind === 'switch' ? (String(value) === 'true' ? 'acceso' : 'spento') : String(value);
 
 /**
+ * Le cose che si comandano con un ordine e si leggono con uno stato.
+ *
+ * Una tenda si comanda con «Apri», «Ferma», «Chiudi», e lo stesso valore
+ * dice com'è rimasta: «Apri» vuol dire aperta. In un «solo se» l'ordine si
+ * leggeva come un'azione («Persiane · Movimento «Apri»»), e «Ferma», che
+ * non è mai uno stato, dava una condizione che non vale mai. Per le prove
+ * si offrono solo gli stati, a parole di stato. Il valore resta quello del
+ * dispositivo, perché è quello che arriva.
+ */
+const STATI: Record<string, Record<string, { se: string; quando: string }>> = {
+  move: {
+    Apri: { se: 'aperto', quando: 'si apre' },
+    Chiudi: { se: 'chiuso', quando: 'si chiude' },
+  },
+  lock: {
+    Apri: { se: 'aperto', quando: 'si apre' },
+    'Chiudi a chiave': { se: 'chiuso a chiave', quando: 'si chiude a chiave' },
+  },
+};
+
+/**
  * La prova su quella capacità, senza il nome del dispositivo davanti.
  *
  * Un interruttore non porta la sua etichetta: la chiama il dispositivo, e
@@ -55,6 +76,8 @@ export function fraseProva(capability: Capability, op: Op, value: string | numbe
     if (modo === 'quando') return acceso ? 'si accende' : 'si spegne';
     return valore(capability, value);
   }
+  const stato = STATI[capability.code]?.[String(value)];
+  if (stato) return stato[modo];
   if (modo === 'quando') return `${capability.label} diventa «${value}»`;
   return `${capability.label} «${valore(capability, value)}»`;
 }
@@ -95,7 +118,13 @@ export function scelteDi(device: Device, modo: Modo): { id: string; label: strin
             { id: `${capability.code}:<`, label: `${capability.label} sotto…` },
           ];
     }
-    const valori = capability.kind === 'switch' ? ['true', 'false'] : capability.kind === 'enum' ? capability.values : [];
+    const stati = STATI[capability.code];
+    const valori =
+      capability.kind === 'switch'
+        ? ['true', 'false']
+        : capability.kind === 'enum'
+          ? capability.values.filter((value) => !stati || value in stati)
+          : [];
     return valori.map((value) => ({
       id: `${capability.code}:=${value}`,
       label: grande(fraseProva(capability, 'is', value, modo)),
@@ -123,9 +152,18 @@ export function unitaDiScelta(device: Device, scelta: string): string | undefine
   return capability ? unitaDi(capability) : undefined;
 }
 
-/** Una condizione a parole. */
-export function fraseCondizione(devices: Device[], condizione: SceneCondition): string {
+/**
+ * Una condizione a parole. Un gruppo dentro un altro va fra parentesi, se
+ * no «A e B o C» non dice quale delle due letture è quella giusta.
+ */
+export function fraseCondizione(devices: Device[], condizione: SceneCondition, dentro = false): string {
   switch (condizione.kind) {
+    case 'group': {
+      // un gruppo appena aperto e ancora vuoto non dice niente, e non lascia un «e» a vuoto
+      const parti = condizione.items.map((one) => fraseCondizione(devices, one, true)).filter(Boolean);
+      const testo = parti.join(condizione.match === 'any' ? ' o ' : ' e ');
+      return dentro && parti.length > 1 ? `(${testo})` : testo;
+    }
     case 'device':
       return fraseDiProva(devices, condizione, 'se');
     case 'days':

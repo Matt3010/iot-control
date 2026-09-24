@@ -1,5 +1,5 @@
 import type { DeviceValue } from '../../../shared/protocol.js';
-import type { Op, SceneCondition } from '../types.js';
+import type { Op, SceneCondition, SceneConditionGroup } from '../types.js';
 
 /**
  * Le prove sui dispositivi, una volta sola per avvisi e scene.
@@ -79,7 +79,7 @@ export type StateOf = (deviceId: string) => Record<string, DeviceValue> | undefi
  * chiude alle tre di notte per un errore di lettura fa paura.
  */
 export function conditionsHold(
-  only: SceneCondition[] | undefined,
+  only: SceneConditionGroup | undefined,
   stateOf: StateOf,
   /** Il fuso di chi ha la scena: le ore sono le sue, ovunque giri il server. */
   tz: string,
@@ -99,9 +99,21 @@ export function conditionsHold(
     adesso = undefined;
   }
 
-  return (only ?? []).every((condizione) => {
+  /*
+   * Tre risposte e non due. Giorni e ore, per l'orario, non valgono né sì né
+   * no: non c'entrano. Contarli come sì andava bene quando tutto doveva
+   * valere insieme, ma in un «ne basta una» un sì regalato farebbe partire
+   * la scena sempre. Chi non c'entra si toglie dal conto, e un gruppo dove
+   * non c'entra nessuno non chiede niente.
+   */
+  const vale = (condizione: SceneCondition): boolean | null => {
+    if (condizione.kind === 'group') {
+      const risposte = condizione.items.map(vale).filter((one): one is boolean => one !== null);
+      if (!risposte.length) return null;
+      return condizione.match === 'any' ? risposte.some(Boolean) : risposte.every(Boolean);
+    }
     if (condizione.kind === 'device') return holds(condizione, stateOf(condizione.deviceId)?.[condizione.code]);
-    if (perOrario && (condizione.kind === 'days' || condizione.kind === 'hours')) return true;
+    if (perOrario && (condizione.kind === 'days' || condizione.kind === 'hours')) return null;
     if (!adesso) return false;
 
     if (condizione.kind === 'days') return !condizione.days.length || condizione.days.includes(adesso.day);
@@ -112,5 +124,7 @@ export function conditionsHold(
     return from <= to
       ? from <= adesso.clock && adesso.clock < to
       : adesso.clock >= from || adesso.clock < to;
-  });
+  };
+
+  return only ? vale(only) !== false : true;
 }
