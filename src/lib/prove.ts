@@ -106,7 +106,7 @@ export function fraseDiProva(devices: Device[], prova: DeviceTest, modo: Modo): 
  * a muro nessuno lo racconta. Il server lo rifiuta per la stessa ragione
  * (server/src/managers/check.ts).
  */
-const SOLO_ORDINI = new Set(['move']);
+const SOLO_ORDINI = new Set(['move', 'volume_step', 'playback']);
 
 /**
  * Le cose di un dispositivo su cui si può scrivere una prova. Un interruttore

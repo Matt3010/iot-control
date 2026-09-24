@@ -49,7 +49,7 @@ export function check(capability: Capability, value: DeviceValue): void {
  * riporta la posizione ha «Apertura», che è un dato vero, e si chiede
  * quella.
  */
-export const SOLO_ORDINI = new Set(['move']);
+export const SOLO_ORDINI = new Set(['move', 'volume_step', 'playback']);
 
 export function provabile(
   capability: Capability,

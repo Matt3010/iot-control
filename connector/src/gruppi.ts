@@ -20,7 +20,7 @@ import type { HaEntity, Voce } from './homeassistant.js';
  */
 
 /** Le entità che si comandano: una di queste è il dispositivo. */
-const PRINCIPALI = new Set(['light', 'switch', 'input_boolean', 'fan', 'cover', 'climate', 'lock', 'camera']);
+const PRINCIPALI = new Set(['light', 'switch', 'input_boolean', 'fan', 'cover', 'climate', 'lock', 'camera', 'media_player']);
 /** Le letture, che stanno con il dispositivo di cui misurano qualcosa. */
 const LETTURE = new Set(['sensor', 'binary_sensor', 'event']);
 /** Le impostazioni che sappiamo disegnare: una levetta, un numero, un elenco. */

@@ -20,6 +20,7 @@ const DOMAINS = new Set([
   'binary_sensor',
   'camera',
   'event',
+  'media_player',
 ]);
 
 /** I bit con cui HA dice cosa sa fare una tapparella o un ventilatore. */
@@ -27,6 +28,20 @@ const COVER_SET_POSITION = 4;
 const COVER_STOP = 8;
 const FAN_SET_SPEED = 1;
 const CLIMATE_TARGET_TEMPERATURE = 1;
+/** E quelli di una TV o di una cassa. */
+const MEDIA = {
+  PAUSE: 1,
+  VOLUME_SET: 4,
+  VOLUME_MUTE: 8,
+  PREVIOUS: 16,
+  NEXT: 32,
+  TURN_ON: 128,
+  TURN_OFF: 256,
+  VOLUME_STEP: 1024,
+  SELECT_SOURCE: 2048,
+  STOP: 4096,
+  PLAY: 16384,
+} as const;
 
 export const domainOf = (entityId: string): string => entityId.split('.')[0] ?? '';
 const features = (entity: HaEntity): number => Number(entity.attributes.supported_features ?? 0);
@@ -117,6 +132,35 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
         modi && modi.length > 1 ? { code: 'mode', kind: 'enum', label: 'Modo', values: modi } : null;
 
       return [acceso, ...(has(entity, CLIMATE_TARGET_TEMPERATURE) ? [temperatura] : []), ...(modo ? [modo] : [])];
+    }
+
+    case 'media_player': {
+      /*
+       * Una TV o una cassa, con i controlli che abbiamo già: una levetta per
+       * accenderla, un cursore per il volume, le sorgenti come scelte, e i
+       * tasti del lettore come ordini. Ognuno solo se quella TV dice di
+       * saperlo fare: un tasto che non fa niente è peggio di nessun tasto.
+       */
+      const out: Capability[] = [];
+      if (has(entity, MEDIA.TURN_OFF) || has(entity, MEDIA.TURN_ON)) out.push(acceso);
+      if (has(entity, MEDIA.VOLUME_SET)) out.push(percent('Volume', 'volume'));
+      else if (has(entity, MEDIA.VOLUME_STEP)) {
+        out.push({ code: 'volume_step', kind: 'enum', label: 'Volume', values: ['Abbassa', 'Alza'] });
+      }
+      if (has(entity, MEDIA.VOLUME_MUTE)) out.push({ code: 'mute', kind: 'switch', label: 'Muto' });
+      const sorgenti = entity.attributes.source_list as string[] | undefined;
+      if (has(entity, MEDIA.SELECT_SOURCE) && Array.isArray(sorgenti) && sorgenti.length) {
+        out.push({ code: 'source', kind: 'enum', label: 'Sorgente', values: sorgenti });
+      }
+      const tasti = [
+        ...(has(entity, MEDIA.PREVIOUS) ? ['Indietro'] : []),
+        ...(has(entity, MEDIA.PLAY) ? ['Play'] : []),
+        ...(has(entity, MEDIA.PAUSE) ? ['Pausa'] : []),
+        ...(has(entity, MEDIA.STOP) ? ['Stop'] : []),
+        ...(has(entity, MEDIA.NEXT) ? ['Avanti'] : []),
+      ];
+      if (tasti.length) out.push({ code: 'playback', kind: 'enum', label: 'Riproduzione', values: tasti });
+      return out;
     }
 
     case 'event': {
@@ -250,6 +294,18 @@ export function stateOf(entity: HaEntity): Record<string, DeviceValue> {
   // Una tapparella aperta non è «accesa»: non consuma e non si è dimenticata
   // niente. Se contasse, il pin sulla mappa si scalderebbe per una tenda
   // tirata su, che non è quello che vuoi sapere da lontano.
+  if (domain === 'media_player') {
+    // spenta o in attesa è spenta; accesa è tutto il resto, anche «ferma»
+    state.power = !['off', 'standby', 'unavailable', 'unknown'].includes(entity.state);
+    const volume = numeric(entity.attributes.volume_level);
+    if (volume !== undefined) state.volume = Math.round(Number(volume) * 100);
+    if (typeof entity.attributes.is_volume_muted === 'boolean') state.mute = entity.attributes.is_volume_muted;
+    if (typeof entity.attributes.source === 'string') state.source = entity.attributes.source;
+    if (entity.state === 'playing') state.playback = 'Play';
+    else if (entity.state === 'paused') state.playback = 'Pausa';
+    return state;
+  }
+
   if (domain === 'cover') {
     if (entity.state === 'open') state.move = 'Apri';
     else if (entity.state === 'closed') state.move = 'Chiudi';
@@ -349,6 +405,38 @@ export function toServiceCall(entityId: string, code: string, value: DeviceValue
       return domain === 'climate'
         ? { domain: 'climate', service: 'set_hvac_mode', data: { hvac_mode: String(value) } }
         : null;
+
+    case 'volume':
+      return domain === 'media_player'
+        ? { domain: 'media_player', service: 'volume_set', data: { volume_level: Number(value) / 100 } }
+        : null;
+
+    case 'volume_step':
+      return domain === 'media_player'
+        ? { domain: 'media_player', service: value === 'Alza' ? 'volume_up' : 'volume_down', data: {} }
+        : null;
+
+    case 'mute':
+      return domain === 'media_player'
+        ? { domain: 'media_player', service: 'volume_mute', data: { is_volume_muted: Boolean(value) } }
+        : null;
+
+    case 'source':
+      return domain === 'media_player'
+        ? { domain: 'media_player', service: 'select_source', data: { source: String(value) } }
+        : null;
+
+    case 'playback': {
+      const servizi: Record<string, string> = {
+        Play: 'media_play',
+        Pausa: 'media_pause',
+        Stop: 'media_stop',
+        Avanti: 'media_next_track',
+        Indietro: 'media_previous_track',
+      };
+      const service = servizi[String(value)];
+      return domain === 'media_player' && service ? { domain: 'media_player', service, data: {} } : null;
+    }
 
     case 'move': {
       const service = value === 'Apri' ? 'open_cover' : value === 'Chiudi' ? 'close_cover' : 'stop_cover';
