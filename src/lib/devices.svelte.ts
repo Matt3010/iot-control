@@ -673,6 +673,16 @@ class Devices {
     return api.post<PairingStep | null>(`/agents/${agent.id}/pair`, { action, ...options });
   }
 
+  /**
+   * Un numero per agente che cresce quando i suoi account cambiano: chi
+   * mostra i collegamenti di quell'agente lo legge, e rilegge l'elenco.
+   */
+  versioniAccount = $state<Record<string, number>>({});
+
+  accountsCambiati(agentId: string): void {
+    this.versioniAccount[agentId] = (this.versioniAccount[agentId] ?? 0) + 1;
+  }
+
   /** Cosa si può collegare a quell'agente: tutto il catalogo della sua centrale. */
   catalog(agent: Agent): Promise<CatalogEntry[]> {
     return api

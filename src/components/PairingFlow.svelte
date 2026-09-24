@@ -28,12 +28,19 @@
   let {
     agent,
     provider,
+    riprendi,
     onquit,
     ondone,
   }: {
     agent: Agent;
     /** Cosa si collega, e come si spiega (lib/providers.ts). */
     provider: Provider;
+    /**
+     * La conversazione già aperta dalla centrale per rientrare in un account
+     * scaduto. Si riprende quella invece di cominciarne una nuova, così i
+     * dispositivi restano gli stessi.
+     */
+    riprendi?: string;
     /** Se ne va senza aver collegato niente. */
     onquit: () => void;
     /** Ha collegato: chi tiene l'elenco lo rilegga. */
@@ -144,10 +151,22 @@
     // un «riprova» — deve ritrovarsi lì.
     if (action !== 'cancel') kept = { ...kept, ...answers };
 
+    /*
+     * Annullare un ricollegamento chiude la finestra e basta. La conversazione
+     * l'ha aperta la centrale e resta lì: chiudendola, «Ricollega» sparirebbe
+     * finché lei non ne apre un'altra.
+     */
+    if (action === 'cancel' && riprendi) {
+      busy = false;
+      onquit();
+      return;
+    }
+
+    const flowId = step?.flowId || riprendi;
     try {
       const next = await devices.pair(agent, action, {
         handler: provider.handler,
-        ...(step?.flowId ? { flowId: step.flowId } : {}),
+        ...(flowId ? { flowId } : {}),
         ...(action === 'submit' ? { input } : {}),
       });
 
@@ -179,7 +198,8 @@
    * preme deve saperlo prima, non dopo. Stava nella domanda del tasto
    * «Collega»; adesso che si parte dalla ricerca, è il primo passo.
    */
-  const avvisoPrima = $derived(nelRegistro(provider.handler) && !!provider.warns);
+  // chi ricollega sa già cosa sta facendo: l'avviso serviva alla prima volta
+  const avvisoPrima = $derived(!riprendi && nelRegistro(provider.handler) && !!provider.warns);
   let avvisato = $state(false);
 
   onMount(() => {
@@ -243,7 +263,7 @@
 </script>
 
 <div class="pair" class:is-busy={busy}>
-  <span class="eyebrow">{provider.label}</span>
+  <span class="eyebrow">{riprendi ? `Ricollega ${provider.label}` : provider.label}</span>
 
   {#if step?.error}
     <p class="wrong">{step.error}</p>

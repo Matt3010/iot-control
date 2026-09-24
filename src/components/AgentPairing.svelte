@@ -2,10 +2,10 @@
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
   import type { CatalogEntry } from '../../shared/protocol';
-  import type { Provider } from '../lib/providers';
+  import { providerDa, type Provider } from '../lib/providers';
   import { ui } from '../lib/ui.svelte';
   import CatalogPicker from './CatalogPicker.svelte';
-  import type { LinkedAccount } from '../lib/types';
+  import type { Health, LinkedAccount } from '../lib/types';
   import AccountList from './AccountList.svelte';
   import PairingFlow from './PairingFlow.svelte';
 
@@ -37,11 +37,13 @@
     busy: false,
   });
 
-  /** La conversazione aperta adesso, se ce n'è una. */
-  let open = $state<Provider | null>(null);
+  /** La conversazione aperta adesso, se ce n'è una, e se riprende quella di un account scaduto. */
+  let open = $state<{ provider: Provider; riprendi?: string } | null>(null);
 
   $effect(() => {
     if (!agent.online) return;
+    // e di nuovo ogni volta che il server dice che gli account sono cambiati
+    void devices.versioniAccount[agent.id];
     void devices
       .linked(agent)
       .then((list) => (stato.linked = list))
@@ -60,11 +62,39 @@
       props: {
         agent,
         stato,
-        onpick: (provider: Provider) => (open = provider),
+        onpick: (provider: Provider) => (open = { provider }),
         onoff: (joint: LinkedAccount, label: string) => void detach(joint, label),
+        onricollega: ricollega,
       },
     });
   }
+
+  /** Rientrare in un account scaduto: si riprende la conversazione che la centrale ha aperto. */
+  const ricollega = (joint: LinkedAccount, provider: Provider): void => {
+    ui.closeModal();
+    open = { provider, riprendi: joint.ricollega };
+  };
+
+  /*
+   * Gli account da ricollegare stanno anche nella scheda, sopra a «Collega
+   * qualcosa»: un account scaduto nascosto dentro una finestra è un account
+   * che nessuno ricollega. Gli altri guasti — una telecamera spenta — non
+   * hanno niente da premere: li dice il pallino, e il dettaglio è nella
+   * finestra.
+   */
+  const guasti = $derived(stato.linked.filter((one) => !!one.ricollega));
+
+  /** Il peggiore fra tutti, per il pallino della riga: rosso batte arancione, che batte verde. */
+  const riassunto = $derived.by((): Health | undefined => {
+    if (!stato.linked.length) return undefined;
+    const stati = stato.linked.map((one) => one.health ?? 'live');
+    return stati.includes('lost') ? 'lost' : stati.includes('degraded') ? 'degraded' : stati.includes('new') ? 'new' : 'live';
+  });
+  const loro = $derived(
+    [...new Set(guasti.map((one) => one.handler))].map((handler) =>
+      providerDa(handler, guasti.find((one) => one.handler === handler)?.name ?? stato.catalogo.find((voce) => voce.handler === handler)?.name),
+    ),
+  );
 
   const reread = async (): Promise<void> => {
     stato.linked = await devices.linked(agent).catch(() => stato.linked);
@@ -86,7 +116,8 @@
 {#if open}
   <PairingFlow
     {agent}
-    provider={open}
+    provider={open.provider}
+    riprendi={open.riprendi}
     onquit={() => (open = null)}
     ondone={() => {
       open = null;
@@ -95,5 +126,5 @@
   />
 {:else}
   <!-- nella scheda una riga sola: cosa è collegato e cosa si può collegare stanno nella finestra -->
-  <AccountList {agent} busy={stato.busy} altre={cerca} />
+  <AccountList {agent} accounts={loro} linked={guasti} busy={stato.busy} altre={cerca} onricollega={ricollega} {riassunto} />
 {/if}

@@ -167,6 +167,8 @@ export interface CatalogEntry {
 /** Un account già collegato a quell'agente, e come si fa a staccarlo. */
 export interface LinkedAccount {
   handler: string;
+  /** Come si chiama il servizio, da leggere: «eWeLink», non `sonoff`. Serve a chi scrive un avviso. */
+  name?: string;
   /** Come lo chiama lui: di solito l'utente con cui sei entrato. */
   title: string;
   /** Serve a scollegarlo. */
@@ -179,6 +181,13 @@ export interface LinkedAccount {
    * pallino verde direbbe una cosa falsa. Chi sta di la' lo sa, e lo dice.
    */
   health?: Health;
+  /**
+   * Scaduto, e la centrale ha già aperto la conversazione per rientrare:
+   * è il suo numero. Completandola si rientra sullo stesso collegamento,
+   * senza perdere i dispositivi, e quindi scene e avvisi scritti su di loro.
+   * Scollegare e ricollegare invece li perderebbe.
+   */
+  ricollega?: string;
 }
 
 /** Sale l'inventario intero: alla connessione, e ogni volta che cambia. */
@@ -281,7 +290,11 @@ export interface ResyncMessage {
 export interface PairMessage {
   type: 'pair';
   reqId: string;
-  /** `list` chiede cosa è già collegato, `unlink` stacca, `catalog` cosa si può collegare. */
+  /**
+   * `list` chiede cosa è già collegato, `unlink` stacca, `catalog` cosa si
+   * può collegare. `start` con un `flowId` riprende una conversazione già
+   * aperta, quella per rientrare in un account scaduto.
+   */
   action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink' | 'catalog';
   /** Quale account si sta collegando. */
   handler?: string;
@@ -291,7 +304,17 @@ export interface PairMessage {
   entryId?: string;
 }
 
-export type AgentMessage = HelloMessage | DevicesMessage | StateMessage | AckMessage;
+/**
+ * Come stanno gli account collegati, detto dall'agente senza che nessuno lo
+ * chieda: alla connessione e ogni pochi minuti. È così che si viene a sapere
+ * di un account scaduto anche quando nessuno ha la finestra aperta.
+ */
+export interface AccountsMessage {
+  type: 'accounts';
+  accounts: LinkedAccount[];
+}
+
+export type AgentMessage = HelloMessage | DevicesMessage | StateMessage | AckMessage | AccountsMessage;
 export type BackendMessage =
   | CommandMessage
   | ResyncMessage

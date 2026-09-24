@@ -23,11 +23,13 @@
     stato,
     onpick,
     onoff,
+    onricollega,
   }: {
     agent: Agent;
     stato: { linked: LinkedAccount[]; catalogo: CatalogEntry[]; busy: boolean };
     onpick: (provider: Provider) => void;
     onoff: (joint: LinkedAccount, label: string) => void;
+    onricollega: (joint: LinkedAccount, account: Provider) => void;
   } = $props();
 
   const nome = (handler: string) => stato.catalogo.find((voce) => voce.handler === handler)?.name;
@@ -55,7 +57,7 @@
 {#if collegati.length}
   <section class="collegati">
     <span class="eyebrow">Collegati</span>
-    <AccountList {agent} accounts={collegati} linked={stato.linked} busy={stato.busy} {onoff} />
+    <AccountList {agent} accounts={collegati} linked={stato.linked} busy={stato.busy} {onoff} {onricollega} />
   </section>
   <span class="eyebrow">Da collegare</span>
 {/if}

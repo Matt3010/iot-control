@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, isNull, sql, type AnyColumn } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, sql, type AnyColumn, inArray } from 'drizzle-orm';
 import { iso, when, type Transaction } from '../persistence/db.js';
 import type { Ask, Page } from '../persistence/page.js';
 import { notices } from '../persistence/schema.js';
@@ -94,7 +94,9 @@ export class NoticeRepository {
     const [row] = await this.tx.db
       .select()
       .from(notices)
-      .where(and(eq(notices.agentId, agentId), isNull(notices.deviceId)))
+      // solo silenzio e ripresa: un avviso su un account dello stesso agente
+      // in mezzo farebbe credere che non ci sia niente da dire sul silenzio
+      .where(and(eq(notices.agentId, agentId), isNull(notices.deviceId), inArray(notices.kind, ['silent', 'back'])))
       .orderBy(desc(notices.at))
       .limit(1);
     return row ? toNotice(row) : undefined;

@@ -23,6 +23,8 @@
     busy,
     onoff,
     altre,
+    onricollega,
+    riassunto,
   }: {
     agent: Agent;
     accounts?: readonly Provider[];
@@ -31,6 +33,13 @@
     onoff?: (joint: LinkedAccount, label: string) => void;
     /** Apre la finestra per collegare: senza, niente riga per farlo. */
     altre?: () => void;
+    /**
+     * Come stanno tutti i collegamenti insieme, per il pallino della riga
+     * «Collega qualcosa»: il peggiore, con gli stessi colori delle righe.
+     */
+    riassunto?: Health;
+    /** Riprende il rientro in un account scaduto. Senza, niente «Ricollega». */
+    onricollega?: (joint: LinkedAccount, account: Provider) => void;
   } = $props();
 
   const joined = (handler: string) => linked.filter((one) => one.handler === handler);
@@ -74,6 +83,20 @@
       <div class="account is-joined">
         {@render segno(account.label, joint.title, joint.health ?? 'live')}
 
+        <!-- scaduto: si rientra riprendendo la conversazione della centrale,
+             e i dispositivi restano gli stessi -->
+        {#if joint.ricollega && onricollega}
+          <Button
+            look="link"
+            disabled={!agent.online || busy}
+            title={`Rientra in ${account.label} senza perdere i dispositivi`}
+            onclick={() => onricollega(joint, account)}
+          >
+            Ricollega
+          </Button>
+        {/if}
+
+        {#if onoff}
         <Button
           look="link"
           tone="danger"
@@ -89,6 +112,7 @@
         >
           Scollega
         </Button>
+        {/if}
       </div>
     {/each}
 
@@ -98,7 +122,7 @@
        da collegare si vedono nella finestra che apre. -->
   {#if altre}
     <div class="account">
-      {@render segno('Collega qualcosa', '', undefined)}
+      {@render segno('Collega qualcosa', '', riassunto)}
       <Button
         look="link"
         disabled={!agent.online || busy}

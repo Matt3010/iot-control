@@ -401,8 +401,9 @@ export interface Notice {
   /**
    * `silent`: un agente ha smesso di rispondere. `back`: ha ripreso.
    * `scene`: l'ha detto una scena, perche' gliel'hai scritto tu.
+   * `account`: un account collegato a un agente non funziona più.
    */
-  kind: 'silent' | 'back' | 'scene';
+  kind: 'silent' | 'back' | 'scene' | 'account';
   /** Di chi si parla, se e' un agente. */
   agentId?: string;
   /** O quale dispositivo, quando l'avviso riguarda una cosa sola in casa. */

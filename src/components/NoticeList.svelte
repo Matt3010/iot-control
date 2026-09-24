@@ -55,9 +55,11 @@
   function chi(row: Notice): { tipo: string; nome: string }[] {
     const nome = row.who ?? '—';
     if (row.kind === 'scene') return [{ tipo: 'Scena', nome }];
+    const agente = devices.agents.find((agent) => agent.id === row.agentId)?.name;
+    // un account è di un agente, e senza l'agente non si sa quale casa ha perso l'accesso
+    if (row.kind === 'account') return [...(agente ? [{ tipo: 'Agente', nome: agente }] : []), { tipo: 'Account', nome }];
     if (!row.deviceId) return [{ tipo: 'Agente', nome }];
 
-    const agente = devices.agents.find((agent) => agent.id === row.agentId)?.name;
     return [
       ...(agente ? [{ tipo: 'Agente', nome: agente }] : []),
       { tipo: 'Dispositivo', nome },

@@ -650,17 +650,61 @@ export async function listLinked(config: ConnectorConfig, collegabili: Set<strin
     title: string;
     state?: string;
   }[];
+  const rientri = await ricollegamenti(config);
+
   // Solo quello che porta dispositivi, non il sole e i backup. Le telecamere
   // ci sono, una per canale: senza, una si poteva collegare e non scollegare più.
   return entries
     .filter((entry) => collegabili.has(entry.domain))
-    .map((entry) => ({
-      handler: entry.domain,
-      title: entry.title,
-      entryId: entry.entry_id,
-      health: howIs(entry.state),
-    }));
+    .map((entry) => {
+      const ricollega = rientri.get(entry.entry_id);
+      return {
+        handler: entry.domain,
+        title: entry.title,
+        entryId: entry.entry_id,
+        // un account da ricollegare non porta niente, qualunque cosa dica il suo stato
+        health: ricollega ? 'lost' : howIs(entry.state),
+        ...(ricollega ? { ricollega } : {}),
+      };
+    });
 }
+
+/**
+ * Gli account scaduti per cui la centrale ha già aperto la conversazione
+ * per rientrare: collegamento → conversazione.
+ *
+ * Quando un servizio rifiuta le credenziali — password cambiata, accesso
+ * revocato — Home Assistant non stacca niente: apre una conversazione di
+ * tipo `reauth` sullo stesso collegamento e aspetta qualcuno che la finisca.
+ * Finendola, i dispositivi restano quelli di prima.
+ */
+async function ricollegamenti(config: ConnectorConfig): Promise<Map<string, string>> {
+  const response = await fetch(`${config.haUrl}${FLOWS}`, {
+    headers: { authorization: `Bearer ${config.haToken}` },
+  }).catch(() => undefined);
+  if (!response?.ok) return new Map();
+  const flussi = (await response.json().catch(() => [])) as {
+    flow_id: string;
+    context?: { source?: string; entry_id?: string };
+  }[];
+  return new Map(
+    flussi
+      .filter((one) => one.context?.source === 'reauth' && one.context.entry_id)
+      .map((one) => [one.context?.entry_id as string, one.flow_id]),
+  );
+}
+
+/**
+ * Riprende una conversazione già aperta dalla centrale: quella per rientrare
+ * in un account scaduto. Si chiede a che passo è, e da lì si va avanti come
+ * per un collegamento nuovo.
+ */
+export async function resumePairing(config: ConnectorConfig, flowId: string): Promise<PairingStep> {
+  const flow = await ask(config, `${FLOWS}/${encodeURIComponent(flowId)}`);
+  if (flow.flow_id && flow.handler && flow.type === 'form') ricorda(config, flow.flow_id, flow.handler);
+  return translate(flow);
+}
+
 
 /**
  * Alle telecamere Home Assistant da' tutte lo stesso nome.

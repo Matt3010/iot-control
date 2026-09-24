@@ -4,7 +4,7 @@ import { Vista } from './vista.svelte';
 /** Un avviso avvenuto, come arriva dal server. */
 export interface Notice {
   id: string;
-  kind: 'silent' | 'back' | 'scene';
+  kind: 'silent' | 'back' | 'scene' | 'account';
   agentId?: string;
   /** Quando l'avviso riguarda una cosa sola in casa: quale. */
   deviceId?: string;

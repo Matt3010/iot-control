@@ -33,7 +33,9 @@ export type LiveEvent =
   /** Le regole degli avvisi sono cambiate da un'altra parte. */
   | { kind: 'rules' }
   /** L'account è cambiato da un'altra scheda: nome o fuso. */
-  | { kind: 'account' };
+  | { kind: 'account' }
+  /** Gli account di un agente sono cambiati: uno scaduto, uno ricollegato. */
+  | { kind: 'accounts'; agentId: string };
 
 class Live {
   #stream: EventSource | null = null;
@@ -120,6 +122,8 @@ class Live {
       void devices.loadRules().catch(() => undefined);
     } else if (event.kind === 'account') {
       void auth.refresh();
+    } else if (event.kind === 'accounts') {
+      devices.accountsCambiati(event.agentId);
     } else {
       store.apply(event);
       // una mappa che cambia può aver cambiato anche fin dove arrivo

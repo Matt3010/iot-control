@@ -4,6 +4,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import type { AgentMessage } from '../../../shared/protocol.js';
 import { agentManager } from '../managers/AgentManager.js';
 import { logManager } from '../managers/LogManager.js';
+import { accountsReported } from '../services/AccountWatch.js';
 import { deviceManager } from '../managers/DeviceManager.js';
 import type { Agent } from '../types.js';
 import { hub } from './hub.js';
@@ -103,6 +104,10 @@ function serve(socket: WebSocket, agent: Agent): void {
 
       case 'state':
         hub.publish(agent.ownerId, agent.id, message.externalId, { online: message.online, state: message.state });
+        return;
+
+      case 'accounts':
+        await accountsReported(agent, message.accounts);
         return;
 
       case 'ack':

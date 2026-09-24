@@ -61,7 +61,9 @@ export type LiveEvent =
    * stessa persona lo rileggono, se no la linea delle partenze resterebbe
    * sulle ore del fuso di prima.
    */
-  | { kind: 'account' };
+  | { kind: 'account' }
+  /** Gli account collegati a quell'agente sono cambiati: chi guarda la sua scheda li rilegga. */
+  | { kind: 'accounts'; agentId: string };
 
 /** Quel poco che il hub sa dire al registro: chi, cosa, e di chi è. */
 export interface LiveNote {

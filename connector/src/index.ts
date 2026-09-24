@@ -19,7 +19,7 @@ import { blind, look } from './live.js';
 import { leggiImpulsi } from './impulsi.js';
 import { lettoriImpulsi, PROVIDERS } from './providers.js';
 import { ensureToken } from './onboarding.js';
-import { cancelPairing, conNomi, listLinked, startPairing, submitPairing, titled, unlink } from './pairing.js';
+import { cancelPairing, conNomi, listLinked, resumePairing, startPairing, submitPairing, titled, unlink } from './pairing.js';
 
 /**
  * Chi e', per il server e per chi guarda i log.
@@ -151,6 +151,7 @@ async function main(): Promise<void> {
 
     console.log(`${devices.size} dispositivi da home assistant`);
     announceAll();
+    raccontaAccount();
   }
 
   /**
@@ -282,7 +283,13 @@ async function main(): Promise<void> {
   const collegati = async () => {
     const catalogo = await ha.catalogo().catch(() => []);
     const collegabili = new Set([...catalogo.map((voce) => voce.handler), ...Object.keys(PROVIDERS)]);
-    return titled(await listLinked(config, collegabili), await born());
+    const nomeDi = (handler: string): string | undefined =>
+      PROVIDERS[handler as keyof typeof PROVIDERS]?.label ?? catalogo.find((voce) => voce.handler === handler)?.name;
+    const elenco = await titled(await listLinked(config, collegabili), await born());
+    return elenco.map((one) => {
+      const name = nomeDi(one.handler);
+      return name ? { ...one, name } : one;
+    });
   };
 
   /**
@@ -316,7 +323,10 @@ async function main(): Promise<void> {
 
       const grezzo =
         message.action === 'start'
-          ? await startPairing(config, message.handler)
+          ? // con una conversazione già aperta si riprende quella: il rientro in un account scaduto
+            message.flowId
+            ? await resumePairing(config, message.flowId)
+            : await startPairing(config, message.handler)
           : await submitPairing(config, message.flowId ?? '', message.input ?? {});
       // i campi con il loro nome italiano, quando la centrale lo sa
       const step = await conNomi(grezzo, (integrazione) => ha.traduzioniCollegamento(integrazione));
@@ -416,6 +426,20 @@ async function main(): Promise<void> {
       fail((error as Error).message);
     }
   };
+
+  /*
+   * Come stanno gli account, detto al backend da sé: dopo ogni giro
+   * d'inventario e ogni cinque minuti. Un account scaduto si scopre così
+   * anche quando nessuno ha la finestra aperta, e arriva l'avviso.
+   */
+  const raccontaAccount = (): void => {
+    if (!ha.connected) return;
+    void collegati()
+      .then((accounts) => link.send({ type: 'accounts', accounts }))
+      .catch(() => undefined);
+  };
+  const giroAccount = setInterval(raccontaAccount, 5 * 60_000);
+  giroAccount.unref?.();
 
   /*
    * L'impulso si cambia dall'app del provider, e Home Assistant non se ne
