@@ -60,14 +60,18 @@
   .big {
     width: 100vw;
     max-width: 100vw;
-    /* sta nello strato più alto, fuori dal corpo: il pezzo che iOS lascia
-       fuori sotto va aggiunto qui a mano */
-    height: calc(100dvh + var(--sotto, 0px));
-    max-height: calc(100dvh + var(--sotto, 0px));
+    height: 100dvh;
+    max-height: 100dvh;
     padding: 0;
     border: 0;
     background: #000;
     overflow: hidden;
+  }
+
+  /* sta nello strato più alto, fuori dal corpo: da installata su iPhone
+     anche lei ha bisogno di `lvh` per arrivare in fondo (vedi base.css) */
+  @media (display-mode: standalone) {
+    .big { height: 100lvh; max-height: 100lvh; }
   }
 
   .big::backdrop { background: #000; }

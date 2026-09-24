@@ -10,21 +10,33 @@
 html, body { height: 100%; margin: 0; }
 
 /*
- * Il corpo è lo schermo, fino in fondo.
+ * Installata su iPhone, la pagina arriva in fondo allo schermo.
  *
- * Fermo e alto quanto lo spazio della pagina più quello che, installata su
- * iPhone, restava fuori sotto (`--sotto`, misurato in lib/schermo.ts; zero
- * altrove). La trasformazione lo rende il riferimento anche per chi è
- * `fixed` — le pagine, i foglietti, la fascia dell'ospite — così tutto
- * quello che si appoggia in fondo si appoggia al fondo vero, con una regola
- * sola invece che una per pezzo.
+ * Con la barra di stato trasparente iOS disegna la pagina da sotto
+ * l'orologio, ma le dà un'altezza di schermo meno barra: `100%`, `vh` e
+ * `dvh` si fermano tutti quarantasette pixel prima del fondo, e sotto resta
+ * una fascia che niente riesce a riempire. Allungare un pezzo dentro la
+ * pagina non basta, perché oltre quella riga non si disegna. Solo `lvh`
+ * vale lo schermo intero, e va dato alla radice.
+ *
+ * Solo da installata: in una scheda del browser `lvh` è l'altezza a barre
+ * nascoste, e la pagina finirebbe sotto la barra dell'indirizzo.
+ */
+@media (display-mode: standalone) {
+  html, body { height: 100lvh; }
+}
+
+/*
+ * Il corpo è il riferimento di tutto quello che si appoggia a un bordo.
+ *
+ * Posizionato, per chi è `absolute` — il pannello, le finestre, il tasto in
+ * fondo — e trasformato, per chi è `fixed`: le pagine, i foglietti, la
+ * fascia dell'ospite. Così tutti si misurano dalla stessa scatola, che è
+ * quella che la regola qui sopra porta fino al fondo vero dello schermo,
+ * invece che dallo spazio più corto che iOS dichiara.
  */
 body {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: calc(100% + var(--sotto, 0px));
+  position: relative;
   transform: translateZ(0);
   font-family: var(--font);
   font-size: 14px;
