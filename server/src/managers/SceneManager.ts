@@ -5,7 +5,7 @@ import { hub } from '../iot/hub.js';
 import { noticeManager } from './NoticeManager.js';
 import type { Transaction } from '../persistence/db.js';
 import { store } from '../persistence/db.js';
-import { check, provabile } from './check.js';
+import { check, paroleDi, provabile, siMisura } from './check.js';
 import { giroNuovo } from '../rules/giri.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
@@ -415,7 +415,7 @@ export class SceneManager {
     if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
     provabile(capability, device.name, modo, test.value);
 
-    const numerica = capability.kind === 'range' || capability.kind === 'sensor';
+    const numerica = siMisura(capability);
     const op = test.op ?? 'is';
     if (numerica) {
       if (op === 'is') throw badRequest(`per «${device.name}» si sceglie sopra o sotto un numero`);
@@ -429,7 +429,8 @@ export class SceneManager {
     if (capability.kind === 'switch' && scritto !== 'true' && scritto !== 'false') {
       throw badRequest('un interruttore è acceso o spento');
     }
-    if (capability.kind === 'enum' && !capability.values.includes(scritto)) {
+    const parole = paroleDi(capability);
+    if (parole && !parole.includes(scritto)) {
       throw badRequest(`«${device.name}» non ha il valore «${scritto}»`);
     }
     if (capability.kind === 'image') throw badRequest(`«${device.name}» si guarda e basta`);

@@ -19,6 +19,7 @@ const DOMAINS = new Set([
   'sensor',
   'binary_sensor',
   'camera',
+  'event',
 ]);
 
 /** I bit con cui HA dice cosa sa fare una tapparella o un ventilatore. */
@@ -55,6 +56,8 @@ export const MEASURES: Record<string, string> = {
   window: 'Finestra',
   smoke: 'Fumo',
   moisture: 'Acqua',
+  doorbell: 'Campanello',
+  button: 'Pulsante',
 };
 
 /** Una luce che sa solo accendersi non ha un cursore da mostrare. */
@@ -116,10 +119,41 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
       return [acceso, ...(has(entity, CLIMATE_TARGET_TEMPERATURE) ? [temperatura] : []), ...(modo ? [modo] : [])];
     }
 
-    case 'sensor':
+    case 'event': {
+      // un evento: il campanello, un tasto del telecomando. Le parole sono i suoi tipi
+      const tipi = (entity.attributes.event_types as string[] | undefined) ?? [];
+      if (!tipi.length) return [];
+      const measure = entity.attributes.device_class as string | undefined;
+      const labels = Object.fromEntries(tipi.flatMap((tipo) => (EVENTI[tipo] ? [[tipo, EVENTI[tipo] as string]] : [])));
+      return [
+        {
+          code: 'value',
+          kind: 'sensor',
+          label: (measure && MEASURES[measure]) || 'Evento',
+          values: tipi,
+          ...(Object.keys(labels).length ? { labels } : {}),
+          event: true,
+        },
+      ];
+    }
+
     case 'binary_sensor': {
+      // due parole e non un numero: «Aperta» o «Chiusa», e con quelle si chiede
+      const measure = entity.attributes.device_class as string | undefined;
+      if (!measure) return [];
+      const [si, no] = WORDS[measure] ?? ['Sì', 'No'];
+      return [{ code: 'value', kind: 'sensor', label: MEASURES[measure] ?? 'Valore', values: [si, no] }];
+    }
+
+    case 'sensor': {
       const unit = entity.attributes.unit_of_measurement as string | undefined;
       const measure = entity.attributes.device_class as string | undefined;
+      // un sensore che dice una voce da un elenco — il programma di una
+      // lavatrice, lo stato di una batteria — ha quelle voci come parole
+      const voci = entity.attributes.options as string[] | undefined;
+      if (measure === 'enum' && Array.isArray(voci) && voci.length) {
+        return [{ code: 'value', kind: 'sensor', label: 'Stato', values: voci }];
+      }
       // Un sensore senza unità e senza tipo non è una misura: è un dettaglio
       // interno dell'integrazione — «Mansarda Action», che vale 0 e non vuol
       // dire niente. Su una mappa è rumore.
@@ -154,6 +188,30 @@ const WORDS: Record<string, [string, string]> = {
   presence: ['In casa', 'Fuori'],
 };
 
+/** Per quanto un evento dice la sua parola prima di tornare muto. */
+export const EVENTO_MS = 3_000;
+
+/** I tipi di evento più comuni, detti in italiano. Sono nomi e non verbi: non si accordano con niente. */
+const EVENTI: Record<string, string> = {
+  pressed: 'una pressione',
+  press: 'una pressione',
+  single: 'una pressione',
+  single_press: 'una pressione',
+  initial_press: 'una pressione',
+  short_release: 'una pressione',
+  double: 'due pressioni',
+  double_press: 'due pressioni',
+  multi_press_2: 'due pressioni',
+  triple: 'tre pressioni',
+  triple_press: 'tre pressioni',
+  long: 'una pressione lunga',
+  long_press: 'una pressione lunga',
+  hold: 'una pressione lunga',
+  long_release: 'una pressione lunga',
+  ring: 'uno squillo',
+  motion: 'un movimento',
+};
+
 /** Un numero resta un numero; quello che non lo è resta la sua parola. */
 export const numeric = (value: unknown): DeviceValue | undefined => {
   if (value === null || value === undefined) return undefined;
@@ -164,6 +222,19 @@ export const numeric = (value: unknown): DeviceValue | undefined => {
 export function stateOf(entity: HaEntity): Record<string, DeviceValue> {
   const domain = domainOf(entity.entity_id);
   const state: Record<string, DeviceValue> = {};
+
+  /*
+   * Un evento dice il suo tipo per pochi secondi, e poi niente. Lo stato di
+   * un evento in Home Assistant è l'ora dell'ultima volta: così due squilli
+   * di fila sono due passaggi, e ognuno fa partire la sua scena. Chi lo
+   * rimette a zero è index.ts, che ricompone il dispositivo dopo quel poco.
+   */
+  if (domain === 'event') {
+    const quando = Date.parse(entity.state);
+    const recente = Number.isFinite(quando) && Date.now() - quando < EVENTO_MS;
+    state.value = recente ? String(entity.attributes.event_type ?? '') : '';
+    return state;
+  }
 
   if (domain === 'binary_sensor') {
     const words = WORDS[String(entity.attributes.device_class ?? '')] ?? ['Sì', 'No'];

@@ -51,7 +51,10 @@
     const value = device.state[code];
     if (typeof value === 'number') return `${Math.round(value * 10) / 10}`;
     if (typeof value === 'boolean') return value ? 'sì' : 'no';
-    return value === undefined || value === '' ? '—' : String(value);
+    if (value === undefined || value === '') return '—';
+    // una parola da macchina si legge con la sua etichetta: «in carica», non `charging`
+    const capability = (device.capabilities as Capability[]).find((one) => one.code === code);
+    return (capability?.kind === 'sensor' && capability.labels?.[String(value)]) || String(value);
   }
 
   /**

@@ -58,6 +58,11 @@ export function provabile(
   modo: 'quando' | 'se',
   value?: unknown,
 ): void {
+  // un evento succede e basta: non c'è un «com'è» da chiedere in un «solo se»
+  if (modo === 'se' && capability.kind === 'sensor' && capability.event) {
+    throw badRequest(`«${capability.label}» di «${deviceName}» è un evento, quindi si chiede quando succede e non com’è`);
+  }
+
   // un'impostazione si cambia, ma non è una cosa che succede in casa
   if (capability.setting) {
     throw badRequest(`«${capability.label}» di «${deviceName}» è un’impostazione, quindi non si può chiedere in una condizione`);
@@ -81,3 +86,15 @@ export function provabile(
     `di «${deviceName}» si sa solo l’ultimo ordine dato e non com’è adesso, quindi non si può chiedere in una condizione`,
   );
 }
+
+/**
+ * Se si chiede con un numero — «sopra 25», «sotto 18» — o con una parola.
+ * Un sensore che dichiara le sue parole (una porta, un movimento) è una
+ * parola, anche se è un sensore.
+ */
+export const siMisura = (capability: Capability): boolean =>
+  capability.kind === 'range' || (capability.kind === 'sensor' && !capability.values?.length);
+
+/** Le parole che si possono chiedere a una capacità che non si misura. */
+export const paroleDi = (capability: Capability): string[] | undefined =>
+  capability.kind === 'enum' ? capability.values : capability.kind === 'sensor' ? capability.values : undefined;

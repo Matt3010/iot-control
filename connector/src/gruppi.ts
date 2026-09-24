@@ -22,7 +22,7 @@ import type { HaEntity, Voce } from './homeassistant.js';
 /** Le entità che si comandano: una di queste è il dispositivo. */
 const PRINCIPALI = new Set(['light', 'switch', 'input_boolean', 'fan', 'cover', 'climate', 'lock', 'camera']);
 /** Le letture, che stanno con il dispositivo di cui misurano qualcosa. */
-const LETTURE = new Set(['sensor', 'binary_sensor']);
+const LETTURE = new Set(['sensor', 'binary_sensor', 'event']);
 /** Le impostazioni che sappiamo disegnare: una levetta, un numero, un elenco. */
 const IMPOSTAZIONI = new Set(['switch', 'number', 'select']);
 
@@ -180,9 +180,10 @@ const BLACKOUT = new Set(['on', 'off', 'stay', 'last', 'previous', 'memory', 'po
 /** Le voci di un elenco dette in italiano, dalla traduzione o dal dizionario. */
 function vociDi(voce: Voce, valori: string[], traduzioni: Record<string, string>): Record<string, string> | undefined {
   const dette: Record<string, string> = {};
+  const domain = domainOf(voce.entityId);
   for (const valore of valori) {
     const tradotta = voce.translationKey
-      ? traduzioni[`component.${voce.platform}.entity.select.${voce.translationKey}.state.${valore}`]
+      ? traduzioni[`component.${voce.platform}.entity.${domain}.${voce.translationKey}.state.${valore}`]
       : undefined;
     const detta = tradotta ?? VOCI[pulito(valore)];
     if (detta) dette[valore] = detta;
@@ -267,5 +268,18 @@ export function componi(
     if (!voce.category) dentro.push(id);
   }
 
-  return { ...base, capabilities, state, ...(dentro.length ? { absorbs: dentro } : {}) };
+  /*
+   * Le voci di un sensore a elenco — il programma, lo stato della batteria —
+   * dette in italiano, se la centrale o il dizionario le sanno. Vale anche
+   * per quello principale, che dal traduttore arriva senza.
+   */
+  const conVoci = capabilities.map((capability) => {
+    if (capability.kind !== 'sensor' || !capability.values?.length || capability.labels || capability.event) return capability;
+    const id = capability.code.includes('#') ? (capability.code.split('#')[0] as string) : gruppo.primaria;
+    const voce = voci.get(id);
+    const labels = voce ? vociDi(voce, capability.values, traduzioni) : undefined;
+    return labels ? { ...capability, labels } : capability;
+  });
+
+  return { ...base, capabilities: conVoci, state, ...(dentro.length ? { absorbs: dentro } : {}) };
 }

@@ -7,7 +7,7 @@ import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import { holds } from '../rules/prove.js';
 import type { Alert, Device, Op } from '../types.js';
 import { noticeManager } from './NoticeManager.js';
-import { provabile } from './check.js';
+import { paroleDi, provabile, siMisura } from './check.js';
 import { number, says, saysThreshold } from './says.js';
 
 /**
@@ -44,9 +44,12 @@ export class AlertManager {
       provabile(capability, device.name, 'quando', becomes);
 
       // una soglia vale per i numeri, un valore preciso per il resto
-      const numerica = capability.kind === 'range' || capability.kind === 'sensor';
+      const numerica = siMisura(capability);
       if (op !== 'is' && !numerica) throw badRequest('sopra e sotto valgono solo per i numeri');
       if (op !== 'is' && !Number.isFinite(Number(becomes))) throw badRequest('la soglia va scritta come numero');
+      // una parola vale se è una di quelle che quella cosa sa dire
+      const parole = paroleDi(capability);
+      if (op === 'is' && parole && !parole.includes(becomes)) throw badRequest(`«${device.name}» non dice «${becomes}»`);
 
       const alerts = new AlertRepository(tx);
       const gia = (await alerts.findAllOf(ownerId)).some(
@@ -154,6 +157,8 @@ export class AlertManager {
     if (op !== 'is') return saysThreshold(capability, op, value);
 
     if (capability.kind === 'switch' && capability.pulse) return 'scatta';
+    // un evento non «diventa»: succede, e si dice che cosa
+    if (capability.kind === 'sensor' && capability.event) return `«${says(capability, value)}»`;
     if (capability.kind === 'switch') return value === 'true' ? 'si accende' : 'si spegne';
     // una serratura si comanda con «Apri» e con lo stesso valore dice com'è
     // rimasta, e letto come un ordine l'avviso sembrava chiederle di aprirsi

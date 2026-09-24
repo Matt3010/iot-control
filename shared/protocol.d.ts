@@ -55,7 +55,28 @@ export type Capability = (
       /** Come si leggono le voci, quando il valore è una parola da macchina: `off` → «Spento». */
       labels?: Record<string, string>;
     }
-  | { code: string; kind: 'sensor'; label: string; unit?: string }
+  | {
+      code: string;
+      kind: 'sensor';
+      label: string;
+      unit?: string;
+      /**
+       * Le parole che può dire, quando non misura un numero: una porta
+       * «Aperta» o «Chiusa», un movimento «Rilevato» o «Niente», un
+       * programma «Lavaggio». Con le parole si può chiedere «quando la porta
+       * si apre», senza si chiede «sopra» o «sotto».
+       */
+      values?: string[];
+      /** Come si leggono, quando sono parole da macchina: `ring` → «suona». */
+      labels?: Record<string, string>;
+      /**
+       * Un evento e non uno stato: il campanello suonato, un tasto del
+       * telecomando premuto. Dice la parola per un momento e poi torna muto,
+       * così due squilli di fila sono due partenze. Si chiede quando
+       * succede, mai com'è.
+       */
+      event?: boolean;
+    }
 ) & {
   /**
    * Un'impostazione e non un comando di tutti i giorni: la luce spia, lo

@@ -19,8 +19,13 @@ import type { Capability } from './types';
 /** Quando: una cosa che succede. Se: una cosa che è vera. */
 export type Modo = 'quando' | 'se';
 
+/**
+ * Se si chiede con un numero — «sopra 25» — o con una parola. Un sensore
+ * che dichiara le sue parole (una porta, un movimento, un campanello) è una
+ * parola: la stessa regola la usa il server (managers/check.ts, `siMisura`).
+ */
 export const numerica = (capability: Capability): boolean =>
-  capability.kind === 'range' || capability.kind === 'sensor';
+  capability.kind === 'range' || (capability.kind === 'sensor' && !capability.values?.length);
 
 const unitaDi = (capability: Capability): string | undefined =>
   capability.kind === 'range' || capability.kind === 'sensor' ? capability.unit : undefined;
@@ -32,9 +37,12 @@ export function numero(value: string | number, unit?: string): string {
   return unit ? `${scritto} ${unit}` : scritto;
 }
 
-/** Come si legge un valore di stato: «acceso», o quello che dice il dispositivo. */
-const valore = (capability: Capability, value: string | number): string =>
-  capability.kind === 'switch' ? (String(value) === 'true' ? 'acceso' : 'spento') : String(value);
+/** Come si legge un valore di stato: «acceso», o la parola del dispositivo detta per bene. */
+const valore = (capability: Capability, value: string | number): string => {
+  if (capability.kind === 'switch') return String(value) === 'true' ? 'acceso' : 'spento';
+  if (capability.kind === 'sensor' || capability.kind === 'enum') return capability.labels?.[String(value)] ?? String(value);
+  return String(value);
+};
 
 /**
  * Le cose che si comandano con un ordine e si leggono con uno stato.
@@ -74,7 +82,9 @@ export function fraseProva(capability: Capability, op: Op, value: string | numbe
   }
   const stato = STATI[capability.code]?.[String(value)];
   if (stato) return stato[modo];
-  if (modo === 'quando') return `${capability.label} diventa «${value}»`;
+  // un evento non «diventa» niente: succede, e si dice che cosa
+  if (capability.kind === 'sensor' && capability.event) return `${capability.label} «${valore(capability, value)}»`;
+  if (modo === 'quando') return `${capability.label} diventa «${valore(capability, value)}»`;
   return `${capability.label} «${valore(capability, value)}»`;
 }
 
@@ -109,6 +119,8 @@ export const provabili = (device: Device, modo: Modo): Capability[] =>
       capability.kind !== 'image' &&
       // un'impostazione si cambia, ma non è una cosa che succede in casa
       !capability.setting &&
+      // un evento succede e basta: nel «solo se» non c'è un «com'è» da chiedere
+      !(modo === 'se' && capability.kind === 'sensor' && capability.event) &&
       !SOLO_ORDINI.has(capability.code) &&
       !(modo === 'se' && capability.kind === 'switch' && capability.pulse),
   );
@@ -141,7 +153,9 @@ export function scelteDi(device: Device, modo: Modo): { id: string; label: strin
           : ['true', 'false']
         : capability.kind === 'enum'
           ? capability.values.filter((value) => !stati || value in stati)
-          : [];
+          : capability.kind === 'sensor'
+            ? (capability.values ?? [])
+            : [];
     return valori.map((value) => ({
       id: `${capability.code}:=${value}`,
       label: grande(fraseProva(capability, 'is', value, modo)),

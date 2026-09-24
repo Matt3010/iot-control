@@ -16,6 +16,8 @@ import type { Op } from '../types.js';
 export function says(capability: Capability, value: DeviceValue): string {
   if (capability.kind === 'switch') return capability.pulse ? 'premi' : value ? 'accendi' : 'spegni';
   if (capability.kind === 'enum') return String(value);
+  // le parole di un sensore, come si leggono: «Aperta», «uno squillo»
+  if (capability.kind === 'sensor' && capability.labels) return capability.labels[String(value)] ?? String(value);
   if (capability.kind === 'range')
     return `${capability.label.toLocaleLowerCase('it')} ${value}${capability.unit ?? ''}`;
   return String(value);

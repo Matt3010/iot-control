@@ -9,7 +9,7 @@ import type {
   WatchMessage,
 } from '../../shared/protocol.js';
 import { ConfigError, loadConfig } from './config.js';
-import { targetOf, toServiceCall } from './entities.js';
+import { EVENTO_MS, targetOf, toServiceCall } from './entities.js';
 import { componi, raggruppa, type Gruppo } from './gruppi.js';
 import { forgetDoors, lastSeen, look as guardala, noticed, watchEyes } from './eyes.js';
 import { channelOf } from './go2rtc.js';
@@ -239,6 +239,25 @@ async function main(): Promise<void> {
     (entity) => {
       // una lettura o un'impostazione cambia il dispositivo che la tiene dentro
       const primaria = dentroA.get(entity.entity_id) ?? entity.entity_id;
+
+      /*
+       * Un evento dice la sua parola per poco, e poi deve tornare muto: se
+       * no il secondo squillo, uguale al primo, non sarebbe un passaggio.
+       * Si ricompone quel dispositivo appena passato quel poco.
+       */
+      if (entity.entity_id.startsWith('event.')) {
+        const zitto = setTimeout(() => {
+          const gruppo = gruppi.get(primaria);
+          const fresh = gruppo && componi(gruppo, stati, voci, traduzioni);
+          const known = devices.get(primaria);
+          if (!fresh || !known) return;
+          const device = { ...fresh, name: known.name };
+          devices.set(primaria, device);
+          const detto = fuori(device);
+          link.send({ type: 'state', externalId: detto.externalId, online: detto.online, state: detto.state, at: new Date().toISOString() });
+        }, EVENTO_MS + 200);
+        zitto.unref?.();
+      }
       const gruppo = gruppi.get(primaria);
       if (!gruppo) return;
       stati.set(entity.entity_id, entity);
