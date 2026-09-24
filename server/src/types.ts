@@ -24,14 +24,12 @@ export interface PlaceMap {
   ownerId: string;
   name: string;
   /**
-   * Chi può modificarla oltre a chi ce l'ha.
-   *
-   * Servono degli indirizzi e non un link: un link non dice chi sei, e questa
-   * è una chiave. Ognuno ha le sue regole, e stanno qui — sulla persona, non
-   * su ogni singolo luogo: «questi tre pin a lui, tutti a lei» si decide in
-   * un posto solo invece che entrando in venti schede.
+   * Chi può modificarla oltre a chi ce l'ha, e gli inviti ancora aperti.
+   * Ci sono solo quando la legge il padrone: a un ospite chi altri ci
+   * lavora non serve, e non è suo saperlo.
    */
   editors?: MapEditor[];
+  invites?: MapInvite[];
   createdAt: string;
 }
 
@@ -137,14 +135,34 @@ export interface Device {
 /**
  * Uno che può modificare una mappa, e fin dove.
  *
+ * È un account, entrato aprendo un link d'invito: non un indirizzo, che
+ * chiunque avrebbe potuto usare per iscriversi. Nome ed email sono quelli
+ * del suo account, perché il padrone sappia chi ha davvero aperto il link.
+ *
  * `only` assente vuol dire tutta la mappa: è il caso normale, e non si scrive.
  * Con un elenco dentro, solo quei luoghi — e nient'altro: chi è limitato a
  * dei pin non ne crea di nuovi, perché nascerebbero fuori dal suo elenco e
  * non potrebbe nemmeno correggerli.
  */
 export interface MapEditor {
+  userId: string;
+  handle: string;
   email: string;
   only?: string[];
+  createdAt: string;
+}
+
+/**
+ * Un link d'invito, ancora da aprire. Il codice non c'è: esiste solo nel
+ * link, e il link l'ha visto una volta chi l'ha creato.
+ */
+export interface MapInvite {
+  id: string;
+  mapId: string;
+  /** A chi l'ha mandato, per ricordarselo. Può essere vuoto. */
+  label: string;
+  createdAt: string;
+  expiresAt: string;
 }
 
 /** Una riga di una scena: a chi, cosa, e con che valore. */
@@ -412,8 +430,9 @@ export interface Notice {
    * `silent`: un agente ha smesso di rispondere. `back`: ha ripreso.
    * `scene`: l'ha detto una scena, perche' gliel'hai scritto tu.
    * `account`: un account collegato a un agente non funziona più.
+   * `map`: qualcosa è cambiato in chi può entrare in una mappa.
    */
-  kind: 'silent' | 'back' | 'scene' | 'account';
+  kind: 'silent' | 'back' | 'scene' | 'account' | 'map';
   /** Di chi si parla, se e' un agente. */
   agentId?: string;
   /** O quale dispositivo, quando l'avviso riguarda una cosa sola in casa. */

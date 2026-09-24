@@ -1,6 +1,6 @@
 import type { PairMessage } from '../../../shared/protocol.js';
 import { Transform } from 'class-transformer';
-import { Allow, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Allow, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
 const trim = () => Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
 
@@ -22,6 +22,8 @@ export class PairDto {
   @IsOptional()
   @IsString()
   @MaxLength(80)
+  // un id della centrale è fatto di lettere, cifre e trattini: finisce in un indirizzo, e «../» no
+  @Matches(/^[A-Za-z0-9_-]+$/, { message: 'questo collegamento non esiste' })
   flowId?: string;
 
   /** Quello che la persona ha scritto nei campi del passo prima. */
@@ -32,6 +34,8 @@ export class PairDto {
   @IsOptional()
   @IsString()
   @MaxLength(80)
+  // un id della centrale è fatto di lettere, cifre e trattini: finisce in un indirizzo, e «../» no
+  @Matches(/^[A-Za-z0-9_-]+$/, { message: 'questo collegamento non esiste' })
   entryId?: string;
 }
 

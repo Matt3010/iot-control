@@ -18,7 +18,7 @@ import { CommandDto, WatchDto } from '../dto/device.dto.js';
 import { SceneDto } from '../dto/scene.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
 import { CreateGroupDto, UpdateGroupDto } from '../dto/group.dto.js';
-import { MapDto } from '../dto/map.dto.js';
+import { EditorDto, InviteDto, MapDto } from '../dto/map.dto.js';
 import { CreatePlaceDto, UpdatePlaceDto } from '../dto/place.dto.js';
 import { pushController } from '../controllers/PushController.js';
 import { SubscribeDto, UnsubscribeDto } from '../dto/push.dto.js';
@@ -38,6 +38,9 @@ apiRouter.post('/auth/logout', authController.logout);
 apiRouter.get('/agents/:id/install', agentController.install);
 apiRouter.get('/agents/:id/compose.yml', agentController.compose);
 
+// cosa c'è dietro a un link d'invito: chi lo apre può non essere ancora entrato
+apiRouter.get('/invites/:code', mapController.look);
+
 // --- da qui in poi serve essere entrati ------------------------------------
 apiRouter.use(requireUser);
 /**
@@ -54,6 +57,8 @@ apiRouter.put('/auth/password', validateBody(PasswordDto), authController.passwo
 /** Entrare in casa di qualcuno, e tornarsene a casa propria. */
 apiRouter.post('/auth/act', validateBody(ActDto), authController.enter);
 apiRouter.delete('/auth/act', authController.leave);
+/** Aprire un link d'invito da entrati: si diventa editor di quella mappa e ci si entra. */
+apiRouter.post('/invites/:code', authController.accept);
 apiRouter.get('/state', stateController.snapshot);
 /**
  * Il filo aperto: da qui scende tutto quello che cambia mentre guardi — gli
@@ -67,6 +72,18 @@ apiRouter
   .route('/maps/:id')
   .put(validateBody(MapDto), mapController.update)
   .delete(mapController.remove);
+
+/**
+ * Chi può modificare una mappa: si entra con un link d'invito, che vale una
+ * volta, e il padrone può revocarlo, restringere un editor a certi luoghi o
+ * toglierlo.
+ */
+apiRouter.post('/maps/:id/invites', validateBody(InviteDto), mapController.invite);
+apiRouter.delete('/maps/:id/invites/:inviteId', mapController.revoke);
+apiRouter
+  .route('/maps/:id/editors/:userId')
+  .put(validateBody(EditorDto), mapController.restrict)
+  .delete(mapController.dropEditor);
 
 apiRouter
   .route('/categories')

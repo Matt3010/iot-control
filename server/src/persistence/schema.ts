@@ -12,13 +12,13 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import type { Capability } from '../../../shared/protocol.js';
-import { NESSUNA_CONDIZIONE, type LogEntry, type MapEditor, type Notice, type Op, type SceneConditionGroup, type SceneStep, type SceneTrigger, type Timing } from '../types.js';
+import { NESSUNA_CONDIZIONE, type LogEntry, type Notice, type Op, type SceneConditionGroup, type SceneStep, type SceneTrigger, type Timing } from '../types.js';
 
 /**
  * Le tabelle, e perché sono fatte così.
  *
  * Quello che ha una forma sua — le righe di una scena, quello che un
- * dispositivo sa fare, chi può modificare una mappa — sta in `jsonb`: sono
+ * dispositivo sa fare — sta in `jsonb`: sono
  * documenti, si leggono sempre interi, e spezzarli in tabelle vorrebbe dire
  * cinque join per disegnare una scheda. Quello che invece è un legame fra due
  * cose — un luogo e i suoi gruppi, un luogo e i suoi agenti — ha la sua
@@ -58,11 +58,67 @@ export const maps = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    /** Chi può modificarla oltre a chi ce l'ha, e fin dove. */
-    editors: jsonb('editors').$type<MapEditor[]>().notNull().default([]),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('maps_owner').on(table.ownerId)],
+);
+
+/**
+ * Chi può modificare una mappa oltre a chi ce l'ha, e fin dove.
+ *
+ * Era un elenco di email dentro alla mappa, e chiunque si iscrivesse con una
+ * di quelle email ci entrava, senza che nessuno avesse controllato che
+ * fosse davvero sua. Adesso è un legame con un account, e nasce solo quando
+ * qualcuno apre un link d'invito: chi c'è entrato è chi l'ha aperto, e il
+ * legame se ne va da solo con l'account o con la mappa.
+ */
+export const mapEditors = pgTable(
+  'map_editors',
+  {
+    mapId: text('map_id')
+      .notNull()
+      .references(() => maps.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * Solo questi luoghi, se c'è; vuoto vuol dire tutta la mappa. La colonna
+     * non si chiama «only», che è una parola di SQL.
+     */
+    only: jsonb('places').$type<string[]>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.mapId, table.userId] }), index('map_editors_user').on(table.userId)],
+);
+
+/**
+ * Un link d'invito a una mappa, che vale una volta sola.
+ *
+ * Del codice si tiene solo l'impronta: il link lo vede una volta chi lo
+ * crea, e chi leggesse l'archivio non potrebbe usarne nessuno. L'impronta è
+ * uno SHA-256 e non una derivata lenta come per le password, perché il
+ * codice è lungo e casuale e non c'è niente da indovinare a forza di
+ * tentativi; così lo si trova con una domanda sola. Le righe restano anche
+ * dopo, usate o revocate, per poter dire a chi riapre il link perché non
+ * vale più.
+ */
+export const mapInvites = pgTable(
+  'map_invites',
+  {
+    id: text('id').primaryKey(),
+    mapId: text('map_id')
+      .notNull()
+      .references(() => maps.id, { onDelete: 'cascade' }),
+    /** A chi l'ha mandato, per ricordarselo: lo scrive chi lo crea, se vuole. */
+    label: text('label').notNull().default(''),
+    hash: text('hash').notNull().unique(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    usedBy: text('used_by').references(() => users.id, { onDelete: 'set null' }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [index('map_invites_map').on(table.mapId)],
 );
 
 export const categories = pgTable(

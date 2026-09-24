@@ -2,17 +2,23 @@ import { hub } from '../iot/hub.js';
 import { store } from '../persistence/db.js';
 import { AgentRepository } from '../repositories/AgentRepository.js';
 import { LogRepository } from '../repositories/LogRepository.js';
-import type { LogEntry } from '../types.js';
+import { notFound } from '../errors/HttpError.js';
+import type { LogEntry, Scope } from '../types.js';
+import { raggioDi } from './raggio.js';
 
 /** Quello che si scrive nel registro, senza l'ora e senza l'id. */
 type Note = Omit<LogEntry, 'id' | 'at'>;
 
 export class LogManager {
-  /** Le ultime ventiquattr'ore di un agente. Di un agente d'altri: niente. */
-  ofAgent(ownerId: string, agentId: string): Promise<LogEntry[]> {
+  /**
+   * Le ultime ventiquattr'ore di un agente che questa richiesta vede. Di uno
+   * che non vede non c'è registro, come non c'è l'agente.
+   */
+  ofAgent(scope: Scope, agentId: string): Promise<LogEntry[]> {
     return store.transaction(async (tx) => {
-      if (!(await new AgentRepository(tx).owns(ownerId, agentId))) return [];
-      return new LogRepository(tx).findAgent(ownerId, agentId);
+      const suo = await new AgentRepository(tx).owns(scope.ownerId, agentId);
+      if (!suo || !(await raggioDi(tx, scope)).vedeAgente(agentId)) throw notFound('agente inesistente');
+      return new LogRepository(tx).findAgent(scope.ownerId, agentId);
     });
   }
 

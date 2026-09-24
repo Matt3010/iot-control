@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { noteOrigin } from '../push/keys.js';
 import { whoIs } from '../auth/owner.js';
 import type { SubscribeDto, UnsubscribeDto } from '../dto/push.dto.js';
 import { pushManager } from '../managers/PushManager.js';
@@ -35,6 +36,8 @@ export class PushController {
   subscribe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const dto = dtoOf<SubscribeDto>(req);
+      // chi si iscrive sta usando il sito da questo indirizzo: è quello con cui firmare
+      noteOrigin(req.get('host'));
       await pushManager.subscribe(whoIs(req).id, {
         endpoint: dto.endpoint,
         p256dh: dto.p256dh,

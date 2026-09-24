@@ -3,7 +3,9 @@ import { CategoryRepository } from '../repositories/CategoryRepository.js';
 import { GroupRepository } from '../repositories/GroupRepository.js';
 import { MapRepository } from '../repositories/MapRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
+import { withSharing } from '../repositories/ShareRepository.js';
 import type { Category, Group, Place, PlaceMap, Scope } from '../types.js';
+import { aCasa } from './raggio.js';
 
 export interface OwnerState {
   maps: PlaceMap[];
@@ -16,7 +18,9 @@ export interface OwnerState {
 export class StateManager {
   snapshot(scope: Scope): Promise<OwnerState> {
     return store.transaction(async (tx) => {
-      const maps = await new MapRepository(tx).findAllIn(scope);
+      const lette = await new MapRepository(tx).findAllIn(scope);
+      // chi ci lavora e gli inviti aperti solo al padrone: a un ospite non servono
+      const maps = aCasa(scope) ? await withSharing(tx, lette) : lette;
       const ids = maps.map((map) => map.id);
 
       // categorie e gruppi restano interi anche per un ospite: un luogo ci

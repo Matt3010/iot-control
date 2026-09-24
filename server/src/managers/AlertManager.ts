@@ -7,7 +7,9 @@ import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import { holds } from '../rules/prove.js';
 import { statoDi } from '../../../shared/regole.js';
-import type { Alert, Device, Notice, Op } from '../types.js';
+import type { Transaction } from '../persistence/db.js';
+import type { Alert, Device, Notice, Op, Scope } from '../types.js';
+import { raggioDi } from './raggio.js';
 import { noticeManager, scrivi } from './NoticeManager.js';
 import { provaDi } from './check.js';
 import { guardati } from './guardati.js';
@@ -23,8 +25,21 @@ import { number, says, saysThreshold } from './says.js';
  * quella cosa smette di essere così.
  */
 export class AlertManager {
-  mine(ownerId: string): Promise<Alert[]> {
-    return store.transaction((tx) => new AlertRepository(tx).findAllOf(ownerId));
+  /** Le regole scritte sui dispositivi che questa richiesta vede. */
+  mine(scope: Scope): Promise<Alert[]> {
+    return store.transaction(async (tx) => {
+      const raggio = await raggioDi(tx, scope);
+      return (await new AlertRepository(tx).findAllOf(scope.ownerId)).filter((alert) => raggio.vedeDispositivo(alert.deviceId));
+    });
+  }
+
+  /** Una regola che si vede: sta su un dispositivo che si vede. Le altre non ci sono. */
+  async #vista(tx: Transaction, scope: Scope, id: string): Promise<Alert> {
+    const alert = await new AlertRepository(tx).findById(id);
+    if (!alert || alert.ownerId !== scope.ownerId || !(await raggioDi(tx, scope)).vedeDispositivo(alert.deviceId)) {
+      throw notFound('regola inesistente');
+    }
+    return alert;
   }
 
   /**
@@ -32,10 +47,13 @@ export class AlertManager {
    * controllo è lo stesso delle partenze e delle condizioni delle scene
    * (`check.ts`, `provaDi`).
    */
-  async add(ownerId: string, deviceId: string, code: string, becomes: string, op: Op = 'is'): Promise<Alert> {
+  async add(scope: Scope, deviceId: string, code: string, becomes: string, op: Op = 'is'): Promise<Alert> {
+    const ownerId = scope.ownerId;
     const nuova = await store.transaction(async (tx) => {
       const device = await new DeviceRepository(tx).findById(deviceId);
-      if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
+      if (!device || device.ownerId !== ownerId || !(await raggioDi(tx, scope)).vedeDispositivo(deviceId)) {
+        throw notFound('dispositivo inesistente');
+      }
 
       const capability = device.capabilities.find((one) => one.code === code);
       if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
@@ -66,24 +84,20 @@ export class AlertManager {
    * niente, quindi non vede nemmeno la porta che si chiude: se restava
    * segnata come scattata, alla prossima apertura taceva.
    */
-  async flip(ownerId: string, id: string, off: boolean): Promise<Alert> {
+  async flip(scope: Scope, id: string, off: boolean): Promise<Alert> {
     const fatta = await store.transaction(async (tx) => {
       const alerts = new AlertRepository(tx);
-      const alert = await alerts.findById(id);
-      if (!alert || alert.ownerId !== ownerId) throw notFound('regola inesistente');
-
+      await this.#vista(tx, scope, id);
       return (await alerts.update(id, off ? { off } : { off, firedAt: undefined })) as Alert;
     });
     guardati.cambiate();
     return fatta;
   }
 
-  async remove(ownerId: string, id: string): Promise<void> {
+  async remove(scope: Scope, id: string): Promise<void> {
     await store.transaction(async (tx) => {
-      const alerts = new AlertRepository(tx);
-      const alert = await alerts.findById(id);
-      if (!alert || alert.ownerId !== ownerId) throw notFound('regola inesistente');
-      await alerts.delete(id);
+      await this.#vista(tx, scope, id);
+      await new AlertRepository(tx).delete(id);
     });
     guardati.cambiate();
   }

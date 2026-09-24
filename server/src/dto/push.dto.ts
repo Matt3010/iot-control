@@ -1,6 +1,14 @@
 import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 
+/** I servizi che consegnano gli avvisi: Google, Mozilla, Apple, Microsoft. */
+const CONSEGNA = [
+  /^(fcm|android)\.googleapis\.com$/,
+  /^([a-z0-9-]+\.)*push\.services\.mozilla\.com$/,
+  /^([a-z0-9-]+\.)*push\.apple\.com$/,
+  /^([a-z0-9-]+\.)*notify\.windows\.com$/,
+];
+
 const trim = () => Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
 
 /**
@@ -16,7 +24,16 @@ export class SubscribeDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(1024)
-  @IsUrl({ protocols: ['https'], require_protocol: true }, { message: 'indirizzo di consegna non valido' })
+  /*
+   * Solo i servizi di consegna dei browser. L'indirizzo lo scrive il browser,
+   * ma arriva dalla rete, e il server poi ci fa una richiesta: un indirizzo
+   * qualunque lo farebbe bussare dove vuole chi l'ha scritto, anche dentro
+   * la rete di casa.
+   */
+  @IsUrl(
+    { protocols: ['https'], require_protocol: true, host_whitelist: CONSEGNA },
+    { message: 'questo indirizzo non è di un servizio di consegna degli avvisi' },
+  )
   endpoint!: string;
 
   @IsString()

@@ -85,6 +85,13 @@
       "when": 1790283095384,
       "tag": "0011_parole-di-stato-e-accende",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790288171395,
+      "tag": "0012_inviti-con-un-link",
+      "breakpoints": true
     }
   ]
 }

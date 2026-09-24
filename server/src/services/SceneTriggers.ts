@@ -1,6 +1,7 @@
 import { hub, type Cambio } from '../iot/hub.js';
 import { guardati } from '../managers/guardati.js';
 import { sceneManager } from '../managers/SceneManager.js';
+import { casaDi } from '../managers/raggio.js';
 import { store } from '../persistence/db.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { UserRepository } from '../repositories/UserRepository.js';
@@ -102,7 +103,7 @@ export async function happened(deviceId: string, cambi: Cambio[], adesso = Date.
     if (!(await fusibile(scene, adesso))) continue;
 
     void sceneManager
-      .run(scene.ownerId, scene.id)
+      .run(casaDi(scene.ownerId), scene.id)
       .catch((error: Error) => console.warn(`la scena «${scene.name}» non è andata fino in fondo, ${error.message}`));
   }
 }

@@ -385,6 +385,16 @@ export class Hub {
     this.#agents.get(agentId)?.send({ type: 'resync' });
   }
 
+  /**
+   * Chiude la connessione di un agente adesso: il suo token non vale più,
+   * perché è stato rigenerato o l'agente è stato tolto. Aspettare che la
+   * connessione cada da sola lascerebbe a chi ha il token vecchio tutto il
+   * tempo che vuole; al prossimo tentativo il token vecchio prende un no.
+   */
+  caccia(agentId: string): void {
+    this.#agents.get(agentId)?.close();
+  }
+
   /* ------------------------------------------------------- chi sta a guardare */
 
   /**

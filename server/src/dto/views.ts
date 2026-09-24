@@ -1,5 +1,5 @@
 import type { Capability, DeviceValue } from '../../../shared/protocol.js';
-import type { Agent, Category, Device, Group, MapEditor, Place, PlaceMap, Scene, SceneConditionGroup, SceneStep, SceneTrigger, Timing } from '../types.js';
+import type { Agent, Category, Device, Group, MapEditor, MapInvite, Place, PlaceMap, Scene, SceneConditionGroup, SceneStep, SceneTrigger, Timing } from '../types.js';
 import type { OwnerState } from '../managers/StateManager.js';
 import { NESSUNA_CONDIZIONE } from '../types.js';
 
@@ -14,8 +14,12 @@ export interface CategoryView {
 export interface MapView {
   id: string;
   name: string;
-  /** Chi la può modificare oltre a chi ce l'ha, e con quali regole. */
-  editors: MapEditor[];
+  /**
+   * Chi la può modificare oltre a chi ce l'ha, e i link d'invito ancora da
+   * aprire. Solo per il padrone: a un ospite non arrivano mai.
+   */
+  editors?: MapEditor[];
+  invites?: MapInvite[];
   createdAt: string;
 }
 
@@ -97,9 +101,17 @@ export const toCategoryView = ({ id, name, emoji, color }: Category): CategoryVi
 export const toMapView = (map: PlaceMap): MapView => ({
   id: map.id,
   name: map.name,
-  editors: map.editors ?? [],
+  ...(map.editors ? { editors: map.editors } : {}),
+  ...(map.invites ? { invites: map.invites } : {}),
   createdAt: map.createdAt,
 });
+
+/**
+ * Una mappa come la vede un ospite: senza chi altri ci lavora e senza i
+ * link aperti. La usano sia la lettura intera sia il filo, così quello che
+ * arriva a caldo non è mai più di quello che si leggerebbe ricaricando.
+ */
+export const mapForGuest = ({ editors: _editors, invites: _invites, ...map }: MapView): MapView => map;
 
 export const toGroupView = ({ id, name }: Group): GroupView => ({ id, name });
 

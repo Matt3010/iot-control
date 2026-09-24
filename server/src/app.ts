@@ -5,7 +5,6 @@ import path from 'node:path';
 import { configurePassport } from './auth/strategy.js';
 import { config } from './config.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import { noteOrigin } from './push/keys.js';
 import { apiRouter } from './routes/index.js';
 
 export function createApp(): express.Express {
@@ -14,12 +13,6 @@ export function createApp(): express.Express {
   configurePassport();
 
   app.set('trust proxy', true);
-  // con che nome ci raggiungono: serve a firmare le notifiche, e lo sa solo
-  // chi bussa
-  app.use((req, _res, next) => {
-    noteOrigin(req.get('host'));
-    next();
-  });
   app.use(express.json({ limit: config.bodyLimit }));
   app.use(cookieParser());
   app.use(passport.initialize());

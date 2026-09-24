@@ -11,6 +11,7 @@ import { agentManager } from '../managers/AgentManager.js';
 import { logManager } from '../managers/LogManager.js';
 import { deviceManager } from '../managers/DeviceManager.js';
 import { dimentica } from './AccountWatch.js';
+import type { Scope } from '../types.js';
 
 export interface NewAgentView {
   agent: AgentView;
@@ -44,16 +45,16 @@ async function render(file: string, values: Record<string, string>): Promise<str
 }
 
 export class AgentService {
-  async list(ownerId: string): Promise<AgentView[]> {
-    const [agents, devices] = await Promise.all([agentManager.list(ownerId), deviceManager.list(ownerId)]);
+  async list(scope: Scope): Promise<AgentView[]> {
+    const [agents, devices] = await Promise.all([agentManager.list(scope), deviceManager.list(scope)]);
     return agents.map((agent) =>
       toAgentView(agent, hub.isOnline(agent.id), devices.filter((device) => device.agentId === agent.id).length),
     );
   }
 
-  async create(ownerId: string, name: string, origin: string): Promise<NewAgentView> {
-    const { agent, token } = await agentManager.create(ownerId, name);
-    hub.changed(ownerId, { kind: 'agents' });
+  async create(scope: Scope, name: string, origin: string): Promise<NewAgentView> {
+    const { agent, token } = await agentManager.create(scope, name);
+    hub.changed(scope.ownerId, { kind: 'agents' });
     return {
       agent: toAgentView(agent, false, 0),
       token,
@@ -61,16 +62,16 @@ export class AgentService {
     };
   }
 
-  async rename(ownerId: string, id: string, name: string): Promise<AgentView> {
-    const agent = await agentManager.rename(ownerId, id, name);
-    const devices = await deviceManager.list(ownerId);
-    hub.changed(ownerId, { kind: 'agents' });
+  async rename(scope: Scope, id: string, name: string): Promise<AgentView> {
+    const agent = await agentManager.rename(scope, id, name);
+    const devices = await deviceManager.list(scope);
+    hub.changed(scope.ownerId, { kind: 'agents' });
     return toAgentView(agent, hub.isOnline(agent.id), devices.filter((device) => device.agentId === agent.id).length);
   }
 
-  async rotate(ownerId: string, id: string, origin: string): Promise<NewAgentView> {
-    const { agent, token } = await agentManager.rotate(ownerId, id);
-    hub.changed(ownerId, { kind: 'agents' });
+  async rotate(scope: Scope, id: string, origin: string): Promise<NewAgentView> {
+    const { agent, token } = await agentManager.rotate(scope, id);
+    hub.changed(scope.ownerId, { kind: 'agents' });
     return {
       agent: toAgentView(agent, hub.isOnline(agent.id), 0),
       token,
@@ -84,8 +85,9 @@ export class AgentService {
    * un'altra scheda deve vederle tutte e tre — se no gli resta sulla mappa un
    * pin con un pallino che non risponderà mai più.
    */
-  async remove(ownerId: string, id: string): Promise<void> {
-    const { places, regole } = await agentManager.remove(ownerId, id);
+  async remove(scope: Scope, id: string): Promise<void> {
+    const ownerId = scope.ownerId;
+    const { places, regole } = await agentManager.remove(scope, id);
     dimentica(id);
     /*
      * Un evento solo per agenti, dispositivi e scene: il sito li rilegge
@@ -107,14 +109,20 @@ export class AgentService {
    * passo successivo, QR compreso.
    */
   async pair(
-    ownerId: string,
+    scope: Scope,
     id: string,
     action: PairMessage['action'],
     options: { handler?: string; flowId?: string; input?: Record<string, string | boolean>; entryId?: string },
     who?: string,
   ): Promise<PairingStep | LinkedAccount[] | CatalogEntry[] | null> {
-    // che sia tuo lo si controlla prima di bussare a casa sua
-    await agentManager.find(ownerId, id);
+    /*
+     * Che sia tuo lo si controlla prima di bussare a casa sua. Anche solo
+     * guardare gli account collegati: sono di chi possiede l'indice, con i
+     * loro nomi e le loro email, e un ospite non ne ha bisogno per accendere
+     * una luce.
+     */
+    await agentManager.guard(scope, id);
+    const ownerId = scope.ownerId;
 
     try {
       const step = (await hub.pair(id, action, options)) as PairingStep | LinkedAccount[] | CatalogEntry[] | undefined;

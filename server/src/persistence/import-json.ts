@@ -8,6 +8,7 @@ import {
   devices,
   groups,
   logEntries,
+  mapEditors,
   maps,
   notices,
   placeAgents,
@@ -17,7 +18,10 @@ import {
   scenes,
   users,
 } from './schema.js';
-import type { Database } from '../types.js';
+import type { Database, PlaceMap } from '../types.js';
+
+/** Una mappa com'era scritta nel file: chi la poteva modificare era un'email. */
+type VecchiaMappa = PlaceMap & { editors?: { email: string; only?: string[] }[] };
 
 /**
  * Il trasloco dal file all'archivio.
@@ -46,6 +50,7 @@ async function main(): Promise<void> {
 
   await db.transaction(async (tx) => {
     const quanti: Record<string, number> = {};
+    const fuori: string[] = [];
     const conta = (cosa: string, righe: unknown[]) => {
       quanti[cosa] = righe.length;
     };
@@ -78,11 +83,30 @@ async function main(): Promise<void> {
             id: one.id,
             ownerId: one.ownerId,
             name: one.name,
-            editors: one.editors ?? [],
             createdAt: when(one.createdAt) ?? new Date(),
           })),
         )
         .onConflictDoNothing();
+
+      /*
+       * Nel file chi poteva modificare una mappa era un'email. Diventa un
+       * editor solo se quell'email è di un account che c'è: un indirizzo
+       * senza account non è nessuno, e il posto per farlo entrare adesso è
+       * un link d'invito. Quelli che restano fuori si dicono qui.
+       */
+      const perEmail = new Map(utenti.map((one) => [one.email, one.id]));
+      const legami = mappe.flatMap((one) =>
+        ((one as VecchiaMappa).editors ?? []).flatMap((editor) => {
+          const userId = perEmail.get(editor.email);
+          if (!userId || userId === one.ownerId) {
+            if (!userId) fuori.push(`${editor.email} su «${one.name}»`);
+            return [];
+          }
+          return [{ mapId: one.id, userId, only: editor.only ?? null }];
+        }),
+      );
+      if (legami.length) await tx.insert(mapEditors).values(legami).onConflictDoNothing();
+      conta('editor', legami);
     }
 
     const cate = lista(data.categories);
@@ -277,6 +301,7 @@ async function main(): Promise<void> {
     }
 
     for (const [cosa, numero] of Object.entries(quanti)) console.log(`${numero} ${cosa}`);
+    for (const via of fuori) console.log(`resta fuori ${via}, perché nessun account usa quella email. Se serve ancora, mandagli un link d’invito.`);
   });
 
   console.log('trasloco finito. Il file di prima è rimasto dov’era.');

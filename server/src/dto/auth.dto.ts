@@ -72,7 +72,7 @@ class FusoVero implements ValidatorConstraintInterface {
  * Il fuso deve essere uno che esiste, se no ogni orario delle scene si
  * fermerebbe senza dire perché: il controllo lo fa `Intl`, che li conosce
  * tutti, invece di un elenco nostro che invecchierebbe. L'email non si
- * cambia da qui: è la chiave con cui altri ti hanno aperto le loro mappe.
+ * cambia da qui: è quella con cui si entra.
  */
 export class AccountDto {
   @IsOptional()

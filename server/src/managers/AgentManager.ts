@@ -7,8 +7,10 @@ import { AgentRepository } from '../repositories/AgentRepository.js';
 import { AlertRepository } from '../repositories/AlertRepository.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
-import type { Agent, Place } from '../types.js';
+import type { Transaction } from '../persistence/db.js';
+import type { Agent, Place, Scope } from '../types.js';
 import { guardati } from './guardati.js';
+import { raggioDi, soloPadrone } from './raggio.js';
 
 /**
  * Il token di un agente: `pia_<id>.<segreto>`. L'id sta dentro perché così, a
@@ -27,45 +29,69 @@ export interface MintedAgent {
 }
 
 export class AgentManager {
-  list(ownerId: string): Promise<Agent[]> {
-    return store.transaction((tx) => new AgentRepository(tx).findAllOf(ownerId));
-  }
-
-  find(ownerId: string, id: string): Promise<Agent> {
+  /** Quelli che questa richiesta vede: tutti a casa propria, quelli dei suoi luoghi da ospite. */
+  list(scope: Scope): Promise<Agent[]> {
     return store.transaction(async (tx) => {
-      const agent = await new AgentRepository(tx).findById(id);
-      if (!agent || agent.ownerId !== ownerId) throw notFound('agente inesistente');
-      return agent;
+      const raggio = await raggioDi(tx, scope);
+      return (await new AgentRepository(tx).findAllOf(scope.ownerId)).filter((agent) => raggio.vedeAgente(agent.id));
     });
   }
 
-  async create(ownerId: string, name: string): Promise<MintedAgent> {
+  /** Uno solo, se si vede. Uno che non si vede, per chi chiede, non esiste. */
+  find(scope: Scope, id: string): Promise<Agent> {
+    return store.transaction((tx) => this.#visto(tx, scope, id));
+  }
+
+  async #visto(tx: Transaction, scope: Scope, id: string): Promise<Agent> {
+    const agent = await new AgentRepository(tx).findById(id);
+    if (!agent || agent.ownerId !== scope.ownerId || !(await raggioDi(tx, scope)).vedeAgente(id)) {
+      throw notFound('agente inesistente');
+    }
+    return agent;
+  }
+
+  /**
+   * Quello che si fa solo a casa propria, su un agente che si vede: prima se
+   * esiste, poi se tocca a te. Un ospite che chiede di un agente non suo
+   * riceve il 404 di un id sbagliato, non un «c'è, ma non è tuo».
+   */
+  async #delPadrone(tx: Transaction, scope: Scope, id: string): Promise<Agent> {
+    const agent = await this.#visto(tx, scope, id);
+    soloPadrone(scope);
+    return agent;
+  }
+
+  /** Controlla soltanto: chi collega un account deve essere il padrone di quell'agente. */
+  guard(scope: Scope, id: string): Promise<Agent> {
+    return store.transaction((tx) => this.#delPadrone(tx, scope, id));
+  }
+
+  async create(scope: Scope, name: string): Promise<MintedAgent> {
+    soloPadrone(scope);
     const secret = randomBytes(32).toString('hex');
     const { salt, hash } = await hashPassword(secret);
-    const agent = await store.transaction((tx) => new AgentRepository(tx).insert(ownerId, name, salt, hash));
+    const agent = await store.transaction((tx) => new AgentRepository(tx).insert(scope.ownerId, name, salt, hash));
     return { agent, token: mint(agent.id, secret) };
   }
 
-  rename(ownerId: string, id: string, name: string): Promise<Agent> {
+  rename(scope: Scope, id: string, name: string): Promise<Agent> {
     return store.transaction(async (tx) => {
-      const agents = new AgentRepository(tx);
-      if (!(await agents.owns(ownerId, id))) throw notFound('agente inesistente');
-      return (await agents.update(id, { name })) as Agent;
+      await this.#delPadrone(tx, scope, id);
+      return (await new AgentRepository(tx).update(id, { name })) as Agent;
     });
   }
 
   /** Il token vecchio smette di funzionare subito, e chi lo usava viene sbattuto fuori. */
-  async rotate(ownerId: string, id: string): Promise<MintedAgent> {
+  async rotate(scope: Scope, id: string): Promise<MintedAgent> {
     const secret = randomBytes(32).toString('hex');
     const { salt, hash } = await hashPassword(secret);
 
     const agent = await store.transaction(async (tx) => {
-      const agents = new AgentRepository(tx);
-      if (!(await agents.owns(ownerId, id))) throw notFound('agente inesistente');
-      return (await agents.update(id, { salt, hash })) as Agent;
+      await this.#delPadrone(tx, scope, id);
+      return (await new AgentRepository(tx).update(id, { salt, hash })) as Agent;
     });
 
-    hub.resync(id);
+    hub.caccia(id);
     return { agent, token: mint(agent.id, secret) };
   }
 
@@ -73,10 +99,11 @@ export class AgentManager {
    * Un agente che se ne va porta via i suoi dispositivi. I luoghi che lo
    * tenevano restano dove sono: erano luoghi prima di essere interruttori.
    */
-  async remove(ownerId: string, id: string): Promise<{ places: Place[]; scenes: number; regole: number }> {
+  async remove(scope: Scope, id: string): Promise<{ places: Place[]; scenes: number; regole: number }> {
+    const ownerId = scope.ownerId;
     const fatto = await store.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
-      if (!(await agents.owns(ownerId, id))) throw notFound('agente inesistente');
+      await this.#delPadrone(tx, scope, id);
 
       const devices = new DeviceRepository(tx);
       // le regole se ne vanno con i dispositivi, per il vincolo: si contano prima
@@ -94,6 +121,7 @@ export class AgentManager {
       await agents.delete(id);
       return { places: gone.places, scenes, regole };
     });
+    hub.caccia(id);
     hub.forget(id);
     // i suoi dispositivi non ci sono più, e con loro quello che li guardava
     guardati.cambiate();

@@ -1,51 +1,49 @@
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
-  IsEmail,
+  IsEmpty,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
-  ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 
 const trim = () =>
   Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
 
-/** Uno che può modificare una mappa, e fin dove. */
-export class MapEditorDto {
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().toLowerCase() : value,
-  )
-  @IsEmail({}, { message: "serve un'email valida" })
-  @MaxLength(120)
-  email!: string;
-
-  /** Assente: tutta la mappa. Con un elenco: solo quei luoghi. */
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(200)
-  @IsString({ each: true })
-  @MaxLength(80, { each: true })
-  only?: string[];
-}
-
 export class MapDto {
-  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @trim()
   @IsString()
   @IsNotEmpty({ message: 'il nome è obbligatorio' })
   @MaxLength(40)
   name!: string;
 
   /**
-   * Chi può modificarla oltre a chi ce l'ha, e con quali regole. Sono email
-   * perché questa è una chiave: un link non dice chi sei.
+   * Prima qui dentro c'erano le email di chi poteva modificarla. Non vale
+   * più, e lo si dice invece di ignorarlo in silenzio: chi manda ancora
+   * quella forma crederebbe di aver dato una chiave che non esiste.
    */
+  @IsEmpty({ message: 'chi può modificare la mappa non si scrive più qui, si crea un link d’invito' })
+  editors?: unknown;
+}
+
+/** Un link d'invito nuovo: basta, se si vuole, un promemoria di a chi lo si manda. */
+export class InviteDto {
   @IsOptional()
+  @trim()
+  @IsString()
+  @MaxLength(60, { message: 'il promemoria sta in 60 caratteri' })
+  label?: string;
+}
+
+/** Fin dove arriva un editor: `null` vuol dire tutta la mappa, un elenco solo quei luoghi. */
+export class EditorDto {
+  @ValidateIf((_dto, value) => value !== null)
   @IsArray()
-  @ArrayMaxSize(24)
-  @ValidateNested({ each: true })
-  @Type(() => MapEditorDto)
-  editors?: MapEditorDto[];
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  only!: string[] | null;
 }

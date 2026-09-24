@@ -7,9 +7,11 @@
  * o il numero la metà delle volte, perché di quella parola non sappiamo
  * niente.
  *
- * Si legge solo quello che finisce sotto gli occhi di chi usa l'app: i
- * commenti no, i nomi delle cose nel codice nemmeno, e nemmeno quello che
- * va solo nel terminale del server (`console.*`).
+ * Si legge solo quello che finisce sotto gli occhi di chi usa l'app, cioè
+ * le stringhe nel codice, il testo delle pagine e quello che il telefono
+ * mostra installando l'app (il manifest). I commenti no, i nomi delle cose
+ * nel codice nemmeno, e nemmeno quello che va solo nel terminale del
+ * server (`console.*`).
  */
 import { readFileSync } from 'node:fs';
 import { globSync } from 'node:fs';
@@ -20,7 +22,12 @@ const DOVE = [
   'server/src/**/*.ts',
   'connector/src/**/*.ts',
   'shared/**/*.js',
+  'public/**/*.js',
+  'index.html',
 ];
+
+/** Quello che il telefono legge quando l'app si installa: il nome e la descrizione. */
+const MANIFESTI = ['public/**/*.webmanifest'];
 
 /** Via i commenti e i fogli di stile: lì i due punti non li legge nessuno. */
 function spoglia(testo) {
@@ -40,7 +47,26 @@ function spoglia(testo) {
 const SEGNAPOSTO = 'qualcosa';
 
 /** Due punti dopo una parola, una chiusa di virgolette o di parentesi, e prima di un'altra parola. */
-const DUE_PUNTI = /[a-zà-ù»)\]}\d]: [A-Za-zà-ù«]/;
+const DUE_PUNTI = /[a-zà-ù»)\]}\d]: [A-Za-zà-ù«]/g;
+
+/**
+ * Se ci sono due punti che incollano due frasi.
+ *
+ * Quelli che aprono un elenco restano leciti, come «ci lavorano come te:
+ * luoghi, categorie, gruppi». Un elenco sono almeno due voci corte,
+ * separate da virgole o da una «e», fino alla fine della frase. Leggendo il
+ * testo delle pagine, e non solo le stringhe, quella frase passava per
+ * sbagliata.
+ */
+function duePuntiInMezzo(frase) {
+  for (const trovati of frase.matchAll(DUE_PUNTI)) {
+    const dopo = frase.slice(trovati.index + 3).split(/[.;!?](?:\s|$)/)[0];
+    const voci = dopo.split(/,\s*|\s+[eo]\s+/).filter((voce) => voce.trim());
+    const elenco = voci.length >= 2 && voci.every((voce) => voce.trim().split(/\s+/).length <= 3);
+    if (!elenco) return true;
+  }
+  return false;
+}
 
 /** Le parole che in italiano si accordano con chi le precede. */
 const ACCORDO =
@@ -134,12 +160,77 @@ function stringhe(testo) {
   return out;
 }
 
+/** Se una frase è abbastanza lunga e abbastanza parlata da valere la pena di leggerla. */
+const parlata = (frase) => frase.length >= 18 && frase.split(' ').length >= 4 && !frase.includes('http');
+
+/**
+ * I tag che stanno dentro a una frase senza interromperla. «Di <b>Anna</b>:
+ * quello che cambi» è una frase sola con i due punti in mezzo, mentre tutti
+ * gli altri tag — un paragrafo, un tasto, un componente — la chiudono.
+ */
+const IN_RIGA = /^(?:a|abbr|b|br|code|em|i|kbd|mark|q|s|small|span|strong|sub|sup|time|u)$/i;
+
+/** Dove una frase finisce, perché lì comincia un'altra cosa. */
+const FINE = '\u0000';
+
+/**
+ * Il testo di una pagina, frase per frase, cioè quello che sta fra i tag di
+ * un componente o di un file HTML, fuori da script e stili.
+ *
+ * Le stringhe le legge già `stringhe`, ma una frase scritta nella pagina non
+ * è una stringa, e passava intera, a maggior ragione con un tag in mezzo.
+ * Un `{…}` si legge come una parola qualunque (`SEGNAPOSTO`), mentre
+ * `{#if}`, `{:else}` e i loro fratelli dividono la frase, perché di là c'è
+ * un'altra cosa.
+ */
+function testiDiPagina(testo) {
+  const pagina = testo.replace(/<script[\s\S]*?<\/script>/g, '');
+
+  let piano = '';
+  let i = 0;
+  while (i < pagina.length) {
+    if (pagina[i] !== '{') {
+      piano += pagina[i];
+      i += 1;
+      continue;
+    }
+    let profondita = 1;
+    let j = i + 1;
+    while (j < pagina.length && profondita > 0) {
+      if (pagina[j] === '{') profondita += 1;
+      else if (pagina[j] === '}') profondita -= 1;
+      j += 1;
+    }
+    piano += /^\s*[#:/@]/.test(pagina.slice(i + 1, j - 1)) ? FINE : SEGNAPOSTO;
+    i = j;
+  }
+
+  return piano
+    .replace(/<\/?([A-Za-z][\w:.-]*)(?:[^>"']|"[^"]*"|'[^']*')*>/g, (_tag, nome) => (IN_RIGA.test(nome) ? '' : FINE))
+    .split(FINE)
+    .map((pezzo) => pezzo.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(parlata);
+}
+
+/** Le stringhe di un manifest, ovunque stiano. */
+function testiDiManifesto(valore) {
+  if (typeof valore === 'string') return parlata(valore) ? [valore] : [];
+  if (Array.isArray(valore)) return valore.flatMap(testiDiManifesto);
+  if (valore && typeof valore === 'object') return Object.values(valore).flatMap(testiDiManifesto);
+  return [];
+}
+
 const lamentele = [];
+const duePunti = (file, frase) => lamentele.push(`${file}\n   due punti in mezzo a una frase — ${frase.slice(0, 90)}`);
 
 for (const dove of DOVE) {
   for (const file of globSync(dove)) {
     const intero = readFileSync(file, 'utf8');
     const testo = spoglia(intero);
+
+    if (/\.(?:svelte|html)$/.test(file)) {
+      for (const frase of testiDiPagina(testo)) if (duePuntiInMezzo(frase)) duePunti(file, frase);
+    }
 
     for (const { frase, dove: at } of stringhe(testo)) {
       if (frase.length < 18 || frase.includes('\n')) continue;
@@ -149,7 +240,7 @@ for (const dove of DOVE) {
       // meta', un ternario, una chiave di configurazione
       if (frase.split(' ').length < 4 || frase.includes('http') || frase.includes('--')) continue;
       if (/[{}]|=>|\?\?| \? |^\s*[,;]|const|value/.test(frase)) continue;
-      if (DUE_PUNTI.test(frase)) {
+      if (duePuntiInMezzo(frase)) {
         lamentele.push(`${file}\n   due punti in mezzo a una frase — ${frase.slice(0, 90)}`);
       }
     }
@@ -173,6 +264,14 @@ for (const dove of DOVE) {
       const prima = testo.slice(Math.max(0, trovata.index - 40), trovata.index);
       if (NOSTRO.test(prima)) continue;
       lamentele.push(`${file}\n   si accorda con un nome fra virgolette — ${trovata[0].slice(0, 90)}`);
+    }
+  }
+}
+
+for (const dove of MANIFESTI) {
+  for (const file of globSync(dove)) {
+    for (const frase of testiDiManifesto(JSON.parse(readFileSync(file, 'utf8')))) {
+      if (duePuntiInMezzo(frase)) duePunti(file, frase);
     }
   }
 }

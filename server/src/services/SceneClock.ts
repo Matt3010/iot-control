@@ -1,6 +1,7 @@
 import { toSceneView } from '../dto/views.js';
 import { hub } from '../iot/hub.js';
 import { sceneManager } from '../managers/SceneManager.js';
+import { casaDi } from '../managers/raggio.js';
 import { store } from '../persistence/db.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { DEFAULT_TZ, type Scene } from '../types.js';
@@ -103,7 +104,7 @@ export async function tick(at = new Date()): Promise<void> {
     // servito, anche se la scena e' partita a meta'.
     if (scene.when?.on) await scorda(scene);
 
-    await sceneManager.run(scene.ownerId, scene.id);
+    await sceneManager.run(casaDi(scene.ownerId), scene.id);
   };
 
   const esiti = await Promise.allSettled(scenes.map(parti));

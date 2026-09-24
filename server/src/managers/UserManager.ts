@@ -2,8 +2,8 @@ import { hashPassword, verifyPassword } from '../auth/password.js';
 import type { AccountDto, CredentialsDto, PasswordDto, RegisterDto } from '../dto/auth.dto.js';
 import { badRequest } from '../errors/HttpError.js';
 import { store } from '../persistence/db.js';
-import { MapRepository } from '../repositories/MapRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
+import { EditorRepository } from '../repositories/ShareRepository.js';
 import { UserRepository } from '../repositories/UserRepository.js';
 import type { PlaceMap, Scope, User } from '../types.js';
 
@@ -17,16 +17,16 @@ export class UserManager {
   }
 
   /**
-   * Le mappe aperte a questo indirizzo, con il nome di chi le tiene. È
+   * Le mappe aperte a questo account, con il nome di chi le tiene. È
    * l'elenco delle porte che qualcuno mi ha lasciato aperte.
    */
-  keysOf(email: string): Promise<{ owner: User; map: PlaceMap }[]> {
+  keysOf(userId: string): Promise<{ owner: User; map: PlaceMap }[]> {
     return store.transaction(async (tx) => {
-      const maps = await new MapRepository(tx).findEditableBy(email);
+      const maps = await new EditorRepository(tx).mapsOf(userId);
       // i padroni tutti insieme: erano una domanda per mappa aperta
-      const chi = await new UserRepository(tx).findMany(maps.map((map) => map.ownerId));
+      const chi = await new UserRepository(tx).findMany(maps.map(({ map }) => map.ownerId));
 
-      return maps.flatMap((map) => {
+      return maps.flatMap(({ map }) => {
         const owner = chi.get(map.ownerId);
         return owner ? [{ owner, map }] : [];
       });
@@ -42,27 +42,23 @@ export class UserManager {
    * aggiunti un minuto fa. Se anche una sola delle mie mappe è aperta tutta,
    * l'elenco non serve: `null` vuol dire «tutti quelli che posso vedere».
    */
-  reachOf(who: string, email: string): Promise<Scope | undefined> {
+  reachOf(who: string, userId: string): Promise<Scope | undefined> {
     return store.transaction(async (tx) => {
       const owner = await new UserRepository(tx).findByIdOrHandle(who);
-      if (!owner || owner.email === email) return undefined;
+      if (!owner || owner.id === userId) return undefined;
 
-      const maps = new MapRepository(tx);
-      const mie = await maps.findEditableOf(owner.id, email);
+      const mie = await new EditorRepository(tx).mapsOf(userId, owner.id);
       if (!mie.length) return undefined;
 
-      const regole = mie.map((map) => ({ map, rule: maps.ruleFor(map, email) }));
-      const aperte = regole.some(({ rule }) => !rule?.only);
-      if (aperte) return { ownerId: owner.id, maps: mie.map((map) => map.id), places: null };
+      const ids = mie.map(({ map }) => map.id);
+      if (mie.some(({ only }) => !only)) return { ownerId: owner.id, maps: ids, places: null };
 
       // i luoghi di tutte le mappe in una domanda, e poi si smistano
-      const tutti = await new PlaceRepository(tx).findAllOfMaps(mie.map((map) => map.id));
-      const regoleDi = new Map(regole.map(({ map, rule }) => [map.id, rule]));
+      const tutti = await new PlaceRepository(tx).findAllOfMaps(ids);
+      const regoleDi = new Map(mie.map(({ map, only }) => [map.id, only]));
 
-      const dentro = tutti
-        .filter((place) => regoleDi.get(place.mapId)?.only?.includes(place.id))
-        .map((place) => place.id);
-      return { ownerId: owner.id, maps: mie.map((map) => map.id), places: [...new Set(dentro)] };
+      const dentro = tutti.filter((place) => regoleDi.get(place.mapId)?.includes(place.id)).map((place) => place.id);
+      return { ownerId: owner.id, maps: ids, places: [...new Set(dentro)] };
     });
   }
 

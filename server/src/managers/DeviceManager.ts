@@ -9,30 +9,38 @@ import { check } from './check.js';
 import { logManager } from './LogManager.js';
 import { guardati } from './guardati.js';
 import { dispositivi, says } from './says.js';
-import type { Device } from '../types.js';
+import type { Transaction } from '../persistence/db.js';
+import type { Device, Scope } from '../types.js';
+import { raggioDi, soloPadrone } from './raggio.js';
 
 export class DeviceManager {
-  list(ownerId: string): Promise<Device[]> {
-    return store.transaction((tx) => new DeviceRepository(tx).findAllOf(ownerId));
+  /** Quelli che questa richiesta vede: da ospite, quelli degli agenti dei suoi luoghi e niente telecamere. */
+  list(scope: Scope): Promise<Device[]> {
+    return store.transaction(async (tx) => {
+      const raggio = await raggioDi(tx, scope);
+      return (await new DeviceRepository(tx).findAllOf(scope.ownerId)).filter((device) => raggio.vedeDispositivo(device.id));
+    });
   }
 
   /** Accende o spegne l'avviso su un dispositivo. */
-  watch(ownerId: string, id: string, wanted: boolean): Promise<Device> {
+  watch(scope: Scope, id: string, wanted: boolean): Promise<Device> {
     return store.transaction(async (tx) => {
-      const devices = new DeviceRepository(tx);
-      const device = await devices.findById(id);
-      if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
-
-      return (await devices.watch(id, wanted)) as Device;
+      await this.#visto(tx, scope, id);
+      return (await new DeviceRepository(tx).watch(id, wanted)) as Device;
     });
   }
 
-  find(ownerId: string, id: string): Promise<Device> {
-    return store.transaction(async (tx) => {
-      const device = await new DeviceRepository(tx).findById(id);
-      if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
-      return device;
-    });
+  find(scope: Scope, id: string): Promise<Device> {
+    return store.transaction((tx) => this.#visto(tx, scope, id));
+  }
+
+  /** Uno che questa richiesta non vede, per lei, non esiste. */
+  async #visto(tx: Transaction, scope: Scope, id: string): Promise<Device> {
+    const device = await new DeviceRepository(tx).findById(id);
+    if (!device || device.ownerId !== scope.ownerId || !(await raggioDi(tx, scope)).vedeDispositivo(id)) {
+      throw notFound('dispositivo inesistente');
+    }
+    return device;
   }
 
   /**
@@ -161,11 +169,12 @@ export class DeviceManager {
    * avvisi scritti su di lui. Uno che c'è ancora non si toglie da qui, perché
    * al prossimo inventario tornerebbe, nuovo e senza niente.
    */
-  async remove(ownerId: string, id: string): Promise<void> {
+  async remove(scope: Scope, id: string): Promise<void> {
+    const ownerId = scope.ownerId;
     const regole = await store.transaction(async (tx) => {
       const devices = new DeviceRepository(tx);
-      const device = await devices.findById(id);
-      if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
+      const device = await this.#visto(tx, scope, id);
+      soloPadrone(scope);
       if (!device.goneAt) throw badRequest('c’è ancora, per toglierlo si scollega il servizio da cui viene');
       await new SceneRepository(tx).pruneDevices(ownerId, new Set([id]));
       const cadute = await new AlertRepository(tx).pruneDevices(new Set([id]));
@@ -184,14 +193,14 @@ export class DeviceManager {
    * Non finisce nel registro: guardare non è successo niente, e una riga a
    * ogni aggiornamento coprirebbe in un'ora tutto il resto della giornata.
    */
-  async frame(ownerId: string, id: string): Promise<Buffer> {
-    const device = await this.camera(ownerId, id);
+  async frame(scope: Scope, id: string): Promise<Buffer> {
+    const device = await this.camera(scope, id);
     return hub.snapshot(device.agentId, device.externalId);
   }
 
   /** Una telecamera, e non un'altra cosa: la domanda si fa in un posto solo. */
-  async camera(ownerId: string, id: string): Promise<Device> {
-    const device = await this.find(ownerId, id);
+  async camera(scope: Scope, id: string): Promise<Device> {
+    const device = await this.find(scope, id);
     const guarda = device.capabilities.find((entry) => entry.kind === 'image');
     if (!guarda) throw badRequest('questo dispositivo non è una telecamera');
     return device;
@@ -199,13 +208,14 @@ export class DeviceManager {
 
   /** Premere un interruttore: si aspetta che l'agente dica di sì. */
   async command(
-    ownerId: string,
+    scope: Scope,
     id: string,
     code: string,
     value: string | number | boolean,
     who?: string,
   ): Promise<void> {
-    const device = await this.find(ownerId, id);
+    const ownerId = scope.ownerId;
+    const device = await this.find(scope, id);
     const capability = device.capabilities.find((entry) => entry.code === code);
     if (!capability) throw badRequest('questo dispositivo non sa fare questa cosa');
     // lo stesso controllo che passano le righe di una scena: un comando che

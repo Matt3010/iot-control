@@ -11,7 +11,8 @@ import { SceneRepository, SceneRunRepository } from '../repositories/SceneReposi
 import { stendi, type Foglia } from '../rules/chiamate.js';
 import { giroNuovo } from '../rules/giri.js';
 import { diversi, ordiniDi, partonoInsieme } from '../rules/scontri.js';
-import type { Device, DeviceTest, Op, Scene, SceneCondition, SceneConditionGroup, SceneStep, SceneTrigger } from '../types.js';
+import type { Device, DeviceTest, Op, Scene, SceneCondition, SceneConditionGroup, SceneStep, SceneTrigger, Scope } from '../types.js';
+import { raggioDi, sceneVisibili, type Raggio } from './raggio.js';
 import { check, provaDi } from './check.js';
 import { guardati } from './guardati.js';
 import { logManager } from './LogManager.js';
@@ -60,28 +61,42 @@ function aspetta(secondi: number, segnale: AbortSignal): Promise<void> {
 class Fermata extends Error {}
 
 export class SceneManager {
-  list(ownerId: string): Promise<Scene[]> {
-    return store.transaction((tx) => new SceneRepository(tx).findAllOf(ownerId));
+  /** Quelle che questa richiesta vede: da ospite, quelle che nominano solo dispositivi dei suoi luoghi. */
+  list(scope: Scope): Promise<Scene[]> {
+    return store.transaction(async (tx) => {
+      const tutte = await new SceneRepository(tx).findAllOf(scope.ownerId);
+      const raggio = await raggioDi(tx, scope, tutte);
+      return tutte.filter((scene) => raggio.vedeScena(scene.id));
+    });
   }
 
-  create(ownerId: string, dto: SceneDto): Promise<Scene> {
+  create(scope: Scope, dto: SceneDto): Promise<Scene> {
+    const ownerId = scope.ownerId;
     return store.transaction(async (tx) => {
       const [scene, devices] = await this.#leggi(tx, ownerId);
-      const steps = this.#clean(scene, devices, ownerId, dto.steps ?? []);
+      const raggio = await raggioDi(tx, scope, scene);
+      const steps = this.#clean(this.#viste(scene, raggio), this.#visti(devices, raggio), ownerId, dto.steps ?? []);
+      this.#restaVista(raggio, scene, { id: `nuova-${randomUUID()}`, ownerId, name: dto.name, steps }, devices);
       return new SceneRepository(tx).insert(ownerId, dto.name, steps);
     });
   }
 
-  async update(ownerId: string, id: string, dto: SceneDto): Promise<Scene> {
+  async update(scope: Scope, id: string, dto: SceneDto): Promise<Scene> {
+    const ownerId = scope.ownerId;
     const fatta = await store.transaction(async (tx) => {
       const scenes = new SceneRepository(tx);
       const [tutte, devices] = await this.#leggi(tx, ownerId);
-      if (!tutte.some((one) => one.id === id)) throw notFound('scena inesistente');
+      const raggio = await raggioDi(tx, scope, tutte);
+      const prima = tutte.find((one) => one.id === id);
+      if (!prima || !raggio.vedeScena(id)) throw notFound('scena inesistente');
 
+      // da ospite si nomina solo quello che si vede: il resto, per lui, non c'è
+      const viste = this.#viste(tutte, raggio);
+      const visti = this.#visti(devices, raggio);
       const patch: Partial<Scene> = { name: dto.name };
-      if (dto.steps) patch.steps = this.#clean(tutte, devices, ownerId, dto.steps, id);
-      if (dto.triggers) patch.triggers = this.#cleanTriggers(devices, dto.triggers);
-      if (dto.only) patch.only = this.#cleanConditions(devices, dto.only);
+      if (dto.steps) patch.steps = this.#clean(viste, visti, ownerId, dto.steps, id);
+      if (dto.triggers) patch.triggers = this.#cleanTriggers(visti, dto.triggers);
+      if (dto.only) patch.only = this.#cleanConditions(visti, dto.only);
 
       /*
        * `null` vuol dire «non parte piu' da sola», che e' diverso da «non ne
@@ -98,8 +113,10 @@ export class SceneManager {
             }
           : undefined;
       }
-      this.#scontri(tutte, devices, id, patch);
-      this.#giri(tutte, devices, id, patch);
+      const dopo: Scene = { ...prima, ...patch, ...('when' in patch ? { when: patch.when } : {}) };
+      this.#restaVista(raggio, tutte.filter((one) => one.id !== id), dopo, devices);
+      this.#scontri(tutte, devices, id, patch, raggio);
+      this.#giri(tutte, devices, id, patch, raggio);
       return (await scenes.update(id, patch)) as Scene;
     });
     // le sue partenze possono essere cambiate: chi ascolta i passaggi rilegge cosa guardare
@@ -108,10 +125,36 @@ export class SceneManager {
     return fatta;
   }
 
-  async remove(ownerId: string, id: string): Promise<void> {
+  /** Da ospite le scene che si vedono; a casa propria tutte. */
+  #viste(tutte: Scene[], raggio: Raggio): Scene[] {
+    return raggio.padrone ? tutte : tutte.filter((one) => raggio.vedeScena(one.id));
+  }
+
+  #visti(devices: Device[], raggio: Raggio): Device[] {
+    return raggio.padrone ? devices : devices.filter((one) => raggio.vedeDispositivo(one.id));
+  }
+
+  /**
+   * Chi scrive una scena in casa d'altri deve poterla vedere anche dopo: se
+   * dopo la modifica non la vedesse più, l'avrebbe fatta sparire a sé stesso
+   * lasciandola viva per il padrone. Succede solo con una scena che non
+   * comanda più nessun dispositivo, perché gli altri non li può nominare.
+   */
+  #restaVista(raggio: Raggio, altre: Scene[], dopo: Scene, devices: Device[]): void {
+    if (raggio.padrone) return;
+    const visti = new Set(this.#visti(devices, raggio).map((one) => one.id));
+    if (sceneVisibili([...altre, dopo], visti).has(dopo.id)) return;
+    throw badRequest(
+      'In una mappa d’altri una scena deve comandare o guardare almeno un dispositivo dei luoghi aperti a te. Aggiungi prima quello.',
+    );
+  }
+
+  async remove(scope: Scope, id: string): Promise<void> {
     await store.transaction(async (tx) => {
       const scenes = new SceneRepository(tx);
-      if (!(await scenes.owns(ownerId, id))) throw notFound('scena inesistente');
+      if (!(await scenes.owns(scope.ownerId, id)) || !(await raggioDi(tx, scope)).vedeScena(id)) {
+        throw notFound('scena inesistente');
+      }
       await scenes.delete(id);
     });
     guardati.cambiate();
@@ -195,8 +238,11 @@ export class SceneManager {
    * aspettare si lascia scritta la partenza, così un riavvio a metà si può
    * raccontare.
    */
-  #prepara(ownerId: string, id: string, run: string, who?: string) {
+  #prepara(scope: Scope, id: string, run: string, who?: string) {
+    const ownerId = scope.ownerId;
     return store.transaction(async (tx) => {
+      // da ospite prima di tutto se la vede: una che non vede non parte, e non esiste
+      if (!(await raggioDi(tx, scope)).vedeScena(id)) throw notFound('scena inesistente');
       /*
        * Solo quello che serve: lei, le scene che chiama (e quelle che
        * chiamano loro), e i dispositivi che nominano. Leggere tutte le scene
@@ -318,9 +364,10 @@ export class SceneManager {
    * risposto nessuno è un guasto; se è partita a metà, la scena non si
    * riavvolge — quello che si è mosso resta mosso, e si dice cosa manca.
    */
-  async run(ownerId: string, id: string, who?: string): Promise<void> {
+  async run(scope: Scope, id: string, who?: string): Promise<void> {
+    const ownerId = scope.ownerId;
     const run = `run-${randomUUID()}`;
-    const { scene, momenti, pronte, saltati, segnate, toccate, case_ } = await this.#prepara(ownerId, id, run, who);
+    const { scene, momenti, pronte, saltati, segnate, toccate, case_ } = await this.#prepara(scope, id, run, who);
     for (const one of segnate) hub.changed(ownerId, { kind: 'scene', id: one.id, value: toSceneView(one) });
 
     const stop = new AbortController();
@@ -514,14 +561,21 @@ export class SceneManager {
    * Rifiuta una modifica che farebbe ripartire una scena da sola, e dice il
    * giro con i nomi, perché «c'è un giro» non dice cosa togliere.
    */
-  #giri(prima: Scene[], devices: Device[], id: string, patch: Partial<Scene>): void {
+  #giri(prima: Scene[], devices: Device[], id: string, patch: Partial<Scene>, raggio: Raggio): void {
     const dopo = prima.map((one) => (one.id === id ? { ...one, ...patch } : one));
 
     const giro = giroNuovo(prima, dopo, devices, id);
     if (!giro) return;
 
-    const scena = (sceneId: string) => `«${dopo.find((one) => one.id === sceneId)?.name ?? 'una scena'}»`;
-    const dispositivo = (deviceId: string) => `il dispositivo «${devices.find((one) => one.id === deviceId)?.name ?? '?'}»`;
+    // a un ospite i nomi di quello che non vede non si dicono nemmeno qui
+    const scena = (sceneId: string) =>
+      sceneId === id || raggio.vedeScena(sceneId)
+        ? `«${dopo.find((one) => one.id === sceneId)?.name ?? 'una scena'}»`
+        : 'un’altra scena';
+    const dispositivo = (deviceId: string) =>
+      raggio.vedeDispositivo(deviceId)
+        ? `il dispositivo «${devices.find((one) => one.id === deviceId)?.name ?? '?'}»`
+        : 'un dispositivo che non vedi';
 
     if (giro.length === 1) {
       const [passo] = giro as [(typeof giro)[number]];
@@ -543,7 +597,7 @@ export class SceneManager {
    * deciderebbe l'ordine in cui arrivano, cioè nessuno. Si dice con quale
    * scena e su quale dispositivo, così si sa cosa cambiare.
    */
-  #scontri(tutte: Scene[], devices: Device[], id: string, patch: Partial<Scene>): void {
+  #scontri(tutte: Scene[], devices: Device[], id: string, patch: Partial<Scene>, raggio: Raggio): void {
     const prima = tutte.find((one) => one.id === id);
     if (!prima) return;
     const dopo: Scene = { ...prima, ...patch, ...('when' in patch ? { when: patch.when } : {}) };
@@ -599,9 +653,13 @@ export class SceneManager {
         if (!scontro) continue;
 
         const device = devices.find((one) => one.id === scontro.deviceId);
-        const chi = questa.id === id ? 'Può partire' : `Chiamata dalla scena «${questa.name}», può partire`;
+        // a un ospite i nomi di quello che non vede non si dicono nemmeno qui
+        const nomeDi = (scene: Scene) =>
+          scene.id === id || raggio.vedeScena(scene.id) ? `la scena «${scene.name}»` : 'un’altra scena';
+        const chi = questa.id === id ? 'Può partire' : `Chiamata da ${nomeDi(questa)}, può partire`;
+        const cosa = device && raggio.vedeDispositivo(device.id) ? `«${device.name}»` : 'un dispositivo';
         throw badRequest(
-          `${chi} insieme alla scena «${altra.name}», che dà a «${device?.name ?? 'un dispositivo'}» un ordine diverso. ` +
+          `${chi} insieme a ${nomeDi(altra)}, che dà a ${cosa} un ordine diverso. ` +
             'Cambia l’orario o quello che la fa partire, oppure togli una delle due righe.',
         );
       }

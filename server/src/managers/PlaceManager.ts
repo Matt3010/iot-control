@@ -8,6 +8,7 @@ import { GroupRepository } from '../repositories/GroupRepository.js';
 import { MapRepository } from '../repositories/MapRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import type { Place, Scope } from '../types.js';
+import { raggioDi } from './raggio.js';
 
 const unique = (ids: string[]): string[] => [...new Set(ids.filter(Boolean))];
 
@@ -29,7 +30,7 @@ export class PlaceManager {
     return store.transaction(async (tx) => {
       const groupIds = unique(dto.groupIds ?? []);
       const agentIds = unique(dto.agentIds ?? []);
-      await this.#assertRefs(tx, scope, dto.mapId, dto.categoryId, groupIds, agentIds);
+      await this.#assertRefs(tx, scope, dto.mapId, dto.categoryId, groupIds, agentIds, []);
 
       return new PlaceRepository(tx).insert({
         mapId: dto.mapId,
@@ -52,7 +53,7 @@ export class PlaceManager {
 
       const groupIds = dto.groupIds ? unique(dto.groupIds) : current.groupIds;
       const agentIds = dto.agentIds ? unique(dto.agentIds) : (current.agentIds ?? []);
-      await this.#assertRefs(tx, scope, current.mapId, dto.categoryId ?? current.categoryId, groupIds, agentIds);
+      await this.#assertRefs(tx, scope, current.mapId, dto.categoryId ?? current.categoryId, groupIds, agentIds, current.agentIds ?? []);
 
       return (await places.update(id, { ...dto, groupIds, agentIds })) as Place;
     });
@@ -92,6 +93,8 @@ export class PlaceManager {
     categoryId: string,
     groupIds: string[],
     agentIds: string[],
+    /** Quelli che il luogo aveva già: restano anche se chi salva non li vede. */
+    cerano: string[],
   ): Promise<void> {
     const ownerId = scope.ownerId;
     if (!(await new MapRepository(tx).within(scope, mapId))) throw notFound('mappa inesistente');
@@ -113,6 +116,16 @@ export class PlaceManager {
     const chi = [...new Set(agentIds)];
     if ((await new AgentRepository(tx).countOwned(ownerId, chi)) !== chi.length) {
       throw badRequest('agente inesistente');
+    }
+
+    /*
+     * Da ospite si appende a un luogo solo un agente che si vede già: se no
+     * basterebbe conoscerne l'id per portarselo nel proprio raggio.
+     */
+    const nuovi = chi.filter((one) => !cerano.includes(one));
+    if (nuovi.length) {
+      const raggio = await raggioDi(tx, scope);
+      if (!nuovi.every((one) => raggio.vedeAgente(one))) throw badRequest('agente inesistente');
     }
   }
 }

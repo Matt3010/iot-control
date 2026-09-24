@@ -43,7 +43,7 @@ export const resolveActing: RequestHandler = (
   }
 
   void userManager
-    .reachOf(wanted, me.email)
+    .reachOf(wanted, me.id)
     .then((reach) => {
       if (reach) req.acting = reach;
     })

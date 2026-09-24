@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { isGuest, ownerOf, whoIs } from '../auth/owner.js';
+import { scopeOf, whoIs } from '../auth/owner.js';
 import type { CommandDto, WatchDto } from '../dto/device.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import { liveHub } from '../iot/live.js';
@@ -8,7 +8,7 @@ import { deviceService } from '../services/DeviceService.js';
 export class DeviceController {
   list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await deviceService.list(ownerOf(req), isGuest(req)));
+      res.json(await deviceService.list(scopeOf(req)));
     } catch (error) {
       next(error);
     }
@@ -23,7 +23,7 @@ export class DeviceController {
   watch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const dto = dtoOf<WatchDto>(req);
-      res.json(await deviceService.watch(ownerOf(req), req.params.id as string, dto.watch));
+      res.json(await deviceService.watch(scopeOf(req), req.params.id as string, dto.watch));
     } catch (error) {
       next(error);
     }
@@ -32,7 +32,7 @@ export class DeviceController {
   /** «Rimuovi», per un dispositivo sparito: se ne va con quello che lo nominava. */
   remove = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await deviceService.remove(ownerOf(req), req.params.id as string);
+      await deviceService.remove(scopeOf(req), req.params.id as string);
       res.status(204).end();
     } catch (error) {
       next(error);
@@ -46,7 +46,7 @@ export class DeviceController {
    */
   frame = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const jpeg = await deviceService.frame(ownerOf(req), req.params.id as string, isGuest(req));
+      const jpeg = await deviceService.frame(scopeOf(req), req.params.id as string);
       res.set('content-type', 'image/jpeg');
       res.set('cache-control', 'no-store, max-age=0');
       res.send(jpeg);
@@ -62,7 +62,7 @@ export class DeviceController {
    */
   live = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const device = await deviceService.watchable(ownerOf(req), req.params.id as string, isGuest(req));
+      const device = await deviceService.watchable(scopeOf(req), req.params.id as string);
       liveHub.join(device.ownerId, device.agentId, device.externalId, res);
     } catch (error) {
       next(error);
@@ -74,7 +74,7 @@ export class DeviceController {
       const { code, value } = dtoOf<CommandDto>(req);
       // chi ha premuto finisce nel registro: su una mappa tenuta in due è
       // la differenza fra «si è aperta da sola» e «l'ha aperta lui»
-      await deviceService.command(ownerOf(req), req.params.id as string, code, value, whoIs(req).email);
+      await deviceService.command(scopeOf(req), req.params.id as string, code, value, whoIs(req).email);
       res.status(204).end();
     } catch (error) {
       next(error);

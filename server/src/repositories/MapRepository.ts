@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { iso, type Transaction } from '../persistence/db.js';
 import { maps } from '../persistence/schema.js';
-import type { MapEditor, PlaceMap, Scope } from '../types.js';
+import type { PlaceMap, Scope } from '../types.js';
 
 type Row = typeof maps.$inferSelect;
 
@@ -10,7 +10,6 @@ const toMap = (row: Row): PlaceMap => ({
   id: row.id,
   ownerId: row.ownerId,
   name: row.name,
-  editors: row.editors ?? [],
   createdAt: iso(row.createdAt) as string,
 });
 
@@ -47,35 +46,6 @@ export class MapRepository {
     return scope.maps === null || scope.maps.includes(id);
   }
 
-  /**
-   * Le mappe che qualcuno ha aperto a questo indirizzo.
-   *
-   * La domanda la fa il database, dentro al documento degli editori: chiedere
-   * tutte le mappe di tutti per poi guardarle una a una qui sarebbe leggere
-   * l'archivio intero per rispondere di una persona sola.
-   */
-  async findEditableBy(email: string): Promise<PlaceMap[]> {
-    const rows = await this.tx.db
-      .select()
-      .from(maps)
-      .where(sql`${maps.editors} @> ${JSON.stringify([{ email }])}::jsonb`);
-    return rows.map(toMap);
-  }
-
-  /** Le regole che una mappa dà a quell'indirizzo, se gliene dà. */
-  ruleFor(map: PlaceMap, email: string): MapEditor | undefined {
-    return (map.editors ?? []).find((editor) => editor.email === email);
-  }
-
-  /** Di quel padrone, quelle aperte a me: è il raggio di chi entra da ospite. */
-  async findEditableOf(ownerId: string, email: string): Promise<PlaceMap[]> {
-    const rows = await this.tx.db
-      .select()
-      .from(maps)
-      .where(and(eq(maps.ownerId, ownerId), sql`${maps.editors} @> ${JSON.stringify([{ email }])}::jsonb`));
-    return rows.map(toMap);
-  }
-
   async insert(ownerId: string, name: string): Promise<PlaceMap> {
     const [row] = await this.tx.db
       .insert(maps)
@@ -83,7 +53,6 @@ export class MapRepository {
         id: `map-${randomUUID()}`,
         ownerId,
         name,
-        editors: [],
       })
       .returning();
     return toMap(row as Row);
@@ -91,7 +60,7 @@ export class MapRepository {
 
   async update(
     id: string,
-    patch: Partial<Pick<PlaceMap, 'name' | 'editors'>>,
+    patch: Partial<Pick<PlaceMap, 'name'>>,
   ): Promise<PlaceMap | undefined> {
     if (!Object.keys(patch).length) return this.findById(id);
     const [row] = await this.tx.db.update(maps).set(patch).where(eq(maps.id, id)).returning();

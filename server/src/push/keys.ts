@@ -30,12 +30,17 @@ export interface PushKeys {
 }
 
 /**
- * L'indirizzo del sito, imparato dalla prima richiesta che arriva.
+ * L'indirizzo del sito, imparato da chi si iscrive agli avvisi.
  *
  * Serve a firmare le notifiche, e non si può sapere da qui: questo
  * programma gira dietro un tunnel, dentro un container, e il nome con cui lo
  * si raggiunge lo conosce solo chi bussa. Chiederlo a chi installa sarebbe
  * una domanda in più a cui si può rispondere da soli.
+ *
+ * Lo dice solo una persona entrata, nel momento in cui si iscrive: è lei che
+ * sta usando il sito da quell'indirizzo. Prima lo diceva la prima richiesta
+ * qualunque, e un robot che bussava con un nome inventato lo fissava fino al
+ * riavvio, con Apple che poi rifiutava ogni consegna.
  */
 let bussato = '';
 
@@ -49,9 +54,10 @@ export function noteOrigin(host: string | undefined): void {
    * richiesta era una prova fatta dalla macchina stessa, su localhost, e il
    * server si presentava ad Apple e Google con quello: rifiutavano ogni
    * consegna finché non ripartiva. Un indirizzo locale vale solo finché non
-   * ne arriva uno vero, che lo sostituisce, e uno vero non si cambia più.
+   * ne arriva uno vero, che lo sostituisce; uno vero lo sostituisce solo un
+   * altro vero, di chi si è iscritto dopo.
    */
-  if (bussato && (locale || !LOCALE.test(new URL(bussato).host))) return;
+  if (bussato && locale && !LOCALE.test(new URL(bussato).host)) return;
   // da fuori si arriva sempre in https, in casa sviluppando no
   bussato = `${locale ? 'http' : 'https'}://${host}`;
 }

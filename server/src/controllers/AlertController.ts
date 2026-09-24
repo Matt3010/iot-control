@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ownerOf, whoIs } from '../auth/owner.js';
+import { ownerOf, scopeOf, whoIs } from '../auth/owner.js';
 import type { AlertDto, AlertOffDto } from '../dto/alert.dto.js';
 import { hub } from '../iot/hub.js';
 import { alertManager } from '../managers/AlertManager.js';
@@ -27,7 +27,7 @@ export class AlertController {
 
   rules = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await alertManager.mine(ownerOf(req)));
+      res.json(await alertManager.mine(scopeOf(req)));
     } catch (error) {
       next(error);
     }
@@ -36,7 +36,7 @@ export class AlertController {
   add = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const dto = dtoOf<AlertDto>(req);
-      res.status(201).json(await alertManager.add(ownerOf(req), dto.deviceId, dto.code, dto.becomes, dto.op ?? 'is'));
+      res.status(201).json(await alertManager.add(scopeOf(req), dto.deviceId, dto.code, dto.becomes, dto.op ?? 'is'));
       hub.changed(ownerOf(req), { kind: 'rules' });
     } catch (error) {
       next(error);
@@ -46,7 +46,7 @@ export class AlertController {
   flip = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const dto = dtoOf<AlertOffDto>(req);
-      res.json(await alertManager.flip(ownerOf(req), req.params.id as string, dto.off));
+      res.json(await alertManager.flip(scopeOf(req), req.params.id as string, dto.off));
       hub.changed(ownerOf(req), { kind: 'rules' });
     } catch (error) {
       next(error);
@@ -55,7 +55,7 @@ export class AlertController {
 
   remove = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await alertManager.remove(ownerOf(req), req.params.id as string);
+      await alertManager.remove(scopeOf(req), req.params.id as string);
       hub.changed(ownerOf(req), { kind: 'rules' });
       res.status(204).end();
     } catch (error) {

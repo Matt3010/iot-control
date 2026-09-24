@@ -14,3 +14,9 @@ export const badRequest = (message: string, details?: unknown) => new HttpError(
 export const notFound = (message: string) => new HttpError(404, message);
 /** Non è colpa nostra e non è colpa di chi chiede: è l'agente che non risponde. */
 export const badGateway = (message: string) => new HttpError(502, message);
+/**
+ * Si sa che esiste e non la si può fare da qui: la fa solo chi possiede
+ * l'indice. Diverso da un 404, che per un ospite vuol dire che quella cosa
+ * per lui non c'è.
+ */
+export const forbidden = (message: string) => new HttpError(403, message);

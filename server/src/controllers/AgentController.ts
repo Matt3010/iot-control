@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ownerOf, whoIs } from '../auth/owner.js';
+import { scopeOf, whoIs } from '../auth/owner.js';
 import { logManager } from '../managers/LogManager.js';
 import type { AgentDto } from '../dto/agent.dto.js';
 import type { PairDto } from '../dto/agent.dto.js';
@@ -17,7 +17,7 @@ export class AgentController {
   /** Le ultime ventiquattr'ore di quell'agente, dalla più recente. */
   log = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await logManager.ofAgent(ownerOf(req), req.params.id as string));
+      res.json(await logManager.ofAgent(scopeOf(req), req.params.id as string));
     } catch (error) {
       next(error);
     }
@@ -25,7 +25,7 @@ export class AgentController {
 
   list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await agentService.list(ownerOf(req)));
+      res.json(await agentService.list(scopeOf(req)));
     } catch (error) {
       next(error);
     }
@@ -33,7 +33,7 @@ export class AgentController {
 
   create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.status(201).json(await agentService.create(ownerOf(req), dtoOf<AgentDto>(req).name, originOf(req)));
+      res.status(201).json(await agentService.create(scopeOf(req), dtoOf<AgentDto>(req).name, originOf(req)));
     } catch (error) {
       next(error);
     }
@@ -41,7 +41,7 @@ export class AgentController {
 
   rename = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await agentService.rename(ownerOf(req), req.params.id as string, dtoOf<AgentDto>(req).name));
+      res.json(await agentService.rename(scopeOf(req), req.params.id as string, dtoOf<AgentDto>(req).name));
     } catch (error) {
       next(error);
     }
@@ -50,7 +50,7 @@ export class AgentController {
   /** Il token vecchio muore qui: chi lo usava va reinstallato. */
   rotate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await agentService.rotate(ownerOf(req), req.params.id as string, originOf(req)));
+      res.json(await agentService.rotate(scopeOf(req), req.params.id as string, originOf(req)));
     } catch (error) {
       next(error);
     }
@@ -58,7 +58,7 @@ export class AgentController {
 
   remove = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await agentService.remove(ownerOf(req), req.params.id as string);
+      await agentService.remove(scopeOf(req), req.params.id as string);
       res.status(204).end();
     } catch (error) {
       next(error);
@@ -72,7 +72,7 @@ export class AgentController {
   pair = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const dto = dtoOf<PairDto>(req);
-      const step = await agentService.pair(ownerOf(req), req.params.id as string, dto.action, {
+      const step = await agentService.pair(scopeOf(req), req.params.id as string, dto.action, {
         handler: dto.handler,
         flowId: dto.flowId,
         input: dto.input,

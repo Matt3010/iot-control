@@ -164,8 +164,15 @@ export class PlaceRepository {
    * cancella quello che c'era e si scrive quello che deve esserci, che è
    * corto e non lascia margine a un legame dimenticato. Se l'elenco non
    * arriva, quel legame non si tocca.
+   *
+   * Due salvataggi dello stesso luogo nello stesso istante si mettono in fila
+   * sulla riga del luogo: se no ognuno cancella senza vedere quello che
+   * l'altro ha appena scritto, e il secondo inserimento trova la riga già lì.
+   * Vince l'ultimo, come per il resto del luogo.
    */
   async #relink(id: string, groupIds?: string[], agentIds?: string[]): Promise<void> {
+    if (!groupIds && !agentIds) return;
+    await this.tx.db.select({ id: places.id }).from(places).where(eq(places.id, id)).for('update');
     if (groupIds) {
       await this.tx.db.delete(placeGroups).where(eq(placeGroups.placeId, id));
       const righe = [...new Set(groupIds)].map((groupId) => ({ placeId: id, groupId }));

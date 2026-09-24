@@ -79,7 +79,7 @@ export class AuthService {
    * vecchio non racconta un permesso che non c'è più.
    */
   async me(user: User, acting?: Scope): Promise<UserView> {
-    const keys: KeyRef[] = (await userManager.keysOf(user.email)).map(({ owner, map }) => ({
+    const keys: KeyRef[] = (await userManager.keysOf(user.id)).map(({ owner, map }) => ({
       ownerId: owner.id,
       handle: owner.handle,
       mapId: map.id,

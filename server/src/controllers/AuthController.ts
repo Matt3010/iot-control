@@ -8,6 +8,7 @@ import { dtoOf } from '../middleware/validateBody.js';
 import type { Session } from '../services/AuthService.js';
 import { authService } from '../services/AuthService.js';
 import { hub } from '../iot/hub.js';
+import { mapService } from '../services/MapService.js';
 
 /**
  * Il token vive in un cookie httpOnly: nessuno script della pagina può
@@ -89,8 +90,25 @@ export class AuthController {
   enter = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const me = whoIs(req);
-      const reach = await userManager.reachOf(dtoOf<ActDto>(req).handle, me.email);
+      const reach = await userManager.reachOf(dtoOf<ActDto>(req).handle, me.id);
       if (!reach) throw badRequest('quelle mappe non sono aperte a te');
+      res.cookie(config.auth.actCookie, reach.ownerId, cookieOptions(req));
+      res.json(await authService.me(me, reach));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Aprire un link d'invito da entrati. Si diventa editor di quella mappa, e
+   * ci si entra subito: è quello che chi ha aperto il link voleva fare.
+   */
+  accept = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const me = whoIs(req);
+      const { ownerId } = await mapService.accept(req.params.code as string, me);
+      const reach = await userManager.reachOf(ownerId, me.id);
+      if (!reach) throw badRequest('La mappa di questo invito non è più aperta a te.');
       res.cookie(config.auth.actCookie, reach.ownerId, cookieOptions(req));
       res.json(await authService.me(me, reach));
     } catch (error) {
