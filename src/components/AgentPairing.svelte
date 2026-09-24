@@ -2,7 +2,7 @@
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
   import type { CatalogEntry } from '../../shared/protocol';
-  import { nelRegistro, providerDa, PROVIDERS, type Provider } from '../lib/providers';
+  import type { Provider } from '../lib/providers';
   import { ui } from '../lib/ui.svelte';
   import CatalogPicker from './CatalogPicker.svelte';
   import type { LinkedAccount } from '../lib/types';
@@ -25,74 +25,60 @@
   let { agent }: { agent: Agent } = $props();
 
 
-  /** Cosa è già collegato: si chiede una volta, e si rilegge quando cambia. */
-  let linked = $state<LinkedAccount[]>([]);
+  /**
+   * Quello che la finestra mostra: cosa è collegato, cosa si può collegare,
+   * e se c'è un comando in corso. Un oggetto solo e vivo, perché la finestra
+   * lo riceve una volta sola quando si apre, e dopo uno «Scollega» deve
+   * vedere l'elenco nuovo senza riaprirsi.
+   */
+  const stato = $state<{ linked: LinkedAccount[]; catalogo: CatalogEntry[]; busy: boolean }>({
+    linked: [],
+    catalogo: [],
+    busy: false,
+  });
+
   /** La conversazione aperta adesso, se ce n'è una. */
   let open = $state<Provider | null>(null);
-  let busy = $state(false);
-
-  /** Tutto quello che la centrale di quell'agente sa collegare. Si chiede una volta. */
-  let catalogo = $state<CatalogEntry[]>([]);
 
   $effect(() => {
     if (!agent.online) return;
     void devices
       .linked(agent)
-      .then((list) => (linked = list))
+      .then((list) => (stato.linked = list))
       .catch(() => undefined);
     void devices
       .catalog(agent)
-      .then((list) => (catalogo = list))
+      .then((list) => (stato.catalogo = list))
       .catch(() => undefined);
   });
 
-  /*
-   * Una riga per ogni marca già collegata, con il nome nostro se è del
-   * registro, se no con quello del catalogo. Quelle da collegare stanno
-   * tutte nella ricerca.
-   */
-  const accounts = $derived(
-    [...new Set(linked.map((one) => one.handler))].map((handler) =>
-      providerDa(handler, catalogo.find((voce) => voce.handler === handler)?.name),
-    ),
-  );
-
-  /*
-   * Quello che si può cercare: il catalogo della centrale, con le voci del
-   * registro sopra alle sue (i nostri nomi — «Telecamera» e non «Generic
-   * Camera») e in più quelle che la centrale ancora non ha, come eWeLink
-   * prima di installarlo.
-   */
-  const cercabili = $derived([
-    ...PROVIDERS.map((one) => ({ handler: one.handler, name: one.label })),
-    ...catalogo.filter((voce) => !nelRegistro(voce.handler)),
-  ]);
-
-  /** Le altre marche, cercando nel catalogo. La conversazione è la stessa di quelle del registro. */
-  function altre(): void {
+  /** Collegati e da collegare, nella stessa finestra. */
+  function cerca(): void {
     ui.openModal({
-      title: 'Collega una marca',
+      title: 'Collega qualcosa',
       view: CatalogPicker,
       props: {
-        voci: cercabili,
-        onpick: (voce: CatalogEntry) => (open = providerDa(voce.handler, voce.name)),
+        agent,
+        stato,
+        onpick: (provider: Provider) => (open = provider),
+        onoff: (joint: LinkedAccount, label: string) => void detach(joint, label),
       },
     });
   }
 
   const reread = async (): Promise<void> => {
-    linked = await devices.linked(agent).catch(() => linked);
+    stato.linked = await devices.linked(agent).catch(() => stato.linked);
   };
 
   async function detach(joint: LinkedAccount, label: string): Promise<void> {
-    busy = true;
+    stato.busy = true;
     try {
-      linked = await devices.unlink(agent, joint.entryId);
+      stato.linked = await devices.unlink(agent, joint.entryId);
       toast.show(`${label} si scollega, e i suoi dispositivi se ne vanno`);
     } catch (error) {
       toast.show((error as Error).message);
     } finally {
-      busy = false;
+      stato.busy = false;
     }
   }
 </script>
@@ -108,12 +94,6 @@
     }}
   />
 {:else}
-  <AccountList
-    {agent}
-    {accounts}
-    {altre}
-    {linked}
-    {busy}
-    onoff={(joint, label) => void detach(joint, label)}
-  />
+  <!-- nella scheda una riga sola: cosa è collegato e cosa si può collegare stanno nella finestra -->
+  <AccountList {agent} busy={stato.busy} altre={cerca} />
 {/if}

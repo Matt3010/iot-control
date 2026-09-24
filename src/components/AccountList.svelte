@@ -18,19 +18,19 @@
 
   let {
     agent,
-    accounts,
-    linked,
+    accounts = [],
+    linked = [],
     busy,
     onoff,
     altre,
   }: {
     agent: Agent;
-    accounts: readonly Provider[];
-    linked: LinkedAccount[];
+    accounts?: readonly Provider[];
+    linked?: LinkedAccount[];
     busy: boolean;
-    onoff: (joint: LinkedAccount, label: string) => void;
-    /** Apre la ricerca fra tutte le marche che si possono collegare. */
-    altre: () => void;
+    onoff?: (joint: LinkedAccount, label: string) => void;
+    /** Apre la finestra per collegare: senza, niente riga per farlo. */
+    altre?: () => void;
   } = $props();
 
   const joined = (handler: string) => linked.filter((one) => one.handler === handler);
@@ -84,7 +84,7 @@
               title: account.many ? `Scollegare «${joint.title}»?` : `Scollegare ${account.label}?`,
               detail: "L'agente si porta via i suoi dispositivi. Il collegamento si rifà quando vuoi.",
               verb: 'Scollega',
-              onYes: () => onoff(joint, account.many ? joint.title : account.label),
+              onYes: () => onoff?.(joint, account.many ? joint.title : account.label),
             })}
         >
           Scollega
@@ -94,20 +94,21 @@
 
   {/each}
 
-  <!-- Collegare qualcosa di nuovo è una riga sola: Tuya, eWeLink, una
-       telecamera e tutte le altre marche si cercano per nome, nello stesso
-       elenco. Una riga fissa per ognuna diventava una colonna di «Collega». -->
-  <div class="account">
-    {@render segno(linked.length ? 'Collega qualcos’altro' : 'Collega una marca o una telecamera', '', undefined)}
-    <Button
-      look="link"
-      disabled={!agent.online || busy}
-      title={agent.online ? 'Cerca fra tutte le marche che si possono collegare' : "L'agente non è collegato"}
-      onclick={altre}
-    >
-      Cerca
-    </Button>
-  </div>
+  <!-- Collegare è una riga sola: cosa è già collegato e tutte le marche
+       da collegare si vedono nella finestra che apre. -->
+  {#if altre}
+    <div class="account">
+      {@render segno('Collega qualcosa', '', undefined)}
+      <Button
+        look="link"
+        disabled={!agent.online || busy}
+        title={agent.online ? 'Vedi cosa è collegato e cerca fra tutte le marche' : "L'agente non è collegato"}
+        onclick={altre}
+      >
+        Cerca
+      </Button>
+    </div>
+  {/if}
 </div>
 
 <style>

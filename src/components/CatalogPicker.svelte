@@ -1,33 +1,73 @@
 <script lang="ts">
-  import type { CatalogEntry } from '../../shared/protocol';
+  import type { Agent } from '../lib/devices.svelte';
+  import { nelRegistro, providerDa, PROVIDERS, type Provider } from '../lib/providers';
+  import type { CatalogEntry, LinkedAccount } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
+  import AccountList from './AccountList.svelte';
   import SearchPicker from './SearchPicker.svelte';
 
   /**
-   * Tutte le marche che si possono collegare, da cercare per nome.
+   * Cosa è collegato a un agente, e tutto quello che gli si può collegare.
    *
-   * Il catalogo lo dà la centrale dell'agente, e sono quasi mille: Shelly,
-   * Philips Hue, IKEA, Xiaomi e quello che viene. Qui si sceglie e basta; la
-   * conversazione per collegare la fa chi ha aperto la finestra.
+   * In alto i collegamenti fatti, ognuno con il suo stato e «Scollega». Sotto
+   * il catalogo intero, da cercare per nome: le marche del registro con i
+   * nostri nomi — «Telecamera», non «Generic Camera» — e quelle che la
+   * centrale ancora non ha, come eWeLink prima di installarlo. Una marca già
+   * collegata non si ripropone, tranne quelle di cui se ne può avere più di
+   * una, come le telecamere.
+   *
+   * `stato` è vivo: dopo uno «Scollega» la finestra si aggiorna da sola.
    */
-  let { voci, onpick }: { voci: CatalogEntry[]; onpick: (voce: CatalogEntry) => void } = $props();
+  let {
+    agent,
+    stato,
+    onpick,
+    onoff,
+  }: {
+    agent: Agent;
+    stato: { linked: LinkedAccount[]; catalogo: CatalogEntry[]; busy: boolean };
+    onpick: (provider: Provider) => void;
+    onoff: (joint: LinkedAccount, label: string) => void;
+  } = $props();
 
-  // svelte-ignore state_referenced_locally
-  const elenco = voci.map((voce) => ({ id: voce.handler, name: voce.name }));
+  const nome = (handler: string) => stato.catalogo.find((voce) => voce.handler === handler)?.name;
+
+  const collegati = $derived(
+    [...new Set(stato.linked.map((one) => one.handler))].map((handler) => providerDa(handler, nome(handler))),
+  );
+
+  const voci = $derived(
+    [
+      ...PROVIDERS.map((one) => ({ handler: one.handler, name: one.label })),
+      ...stato.catalogo.filter((voce) => !nelRegistro(voce.handler)),
+    ]
+      .filter((voce) => providerDa(voce.handler).many || !stato.linked.some((one) => one.handler === voce.handler))
+      .map((voce) => ({ id: voce.handler, name: voce.name })),
+  );
 
   function scegli(handler: string): void {
-    const voce = voci.find((one) => one.handler === handler);
-    if (!voce) return;
     // prima la scelta, poi la finestra: chiusa per prima, si portava via chi doveva riceverla
-    onpick(voce);
+    onpick(providerDa(handler, voci.find((voce) => voce.id === handler)?.name));
     ui.closeModal();
   }
 </script>
 
+{#if collegati.length}
+  <section class="collegati">
+    <span class="eyebrow">Collegati</span>
+    <AccountList {agent} accounts={collegati} linked={stato.linked} busy={stato.busy} {onoff} />
+  </section>
+  <span class="eyebrow">Da collegare</span>
+{/if}
+
 <SearchPicker
-  voci={elenco}
+  {voci}
   chiave="catalogo"
   placeholder="Cerca una marca o un protocollo"
   vuoto="Nessuna marca con questo nome."
   onpick={scegli}
 />
+
+<style>
+  .collegati { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--hairline-soft); }
+</style>
