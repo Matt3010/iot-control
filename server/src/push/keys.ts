@@ -39,10 +39,20 @@ export interface PushKeys {
  */
 let bussato = '';
 
+const LOCALE = /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/;
+
 export function noteOrigin(host: string | undefined): void {
-  if (bussato || !host) return;
-  // da fuori si arriva sempre in https; in casa, sviluppando, no
-  const locale = /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(host);
+  if (!host) return;
+  const locale = LOCALE.test(host);
+  /*
+   * Un indirizzo di casa non è il nome del sito. Dopo un rilascio la prima
+   * richiesta era una prova fatta dalla macchina stessa, su localhost, e il
+   * server si presentava ad Apple e Google con quello: rifiutavano ogni
+   * consegna finché non ripartiva. Un indirizzo locale vale solo finché non
+   * ne arriva uno vero, che lo sostituisce, e uno vero non si cambia più.
+   */
+  if (bussato && (locale || !LOCALE.test(new URL(bussato).host))) return;
+  // da fuori si arriva sempre in https, in casa sviluppando no
   bussato = `${locale ? 'http' : 'https'}://${host}`;
 }
 
