@@ -394,9 +394,26 @@ export class Hub {
    */
   #corse = new Map<string, { at: number; of: number; fino?: number }>();
 
+  /** Quando è finita ogni scena, per chi deve sapere se lo è da poco. */
+  #finite = new Map<string, number>();
+
   #corsa(event: Extract<LiveEvent, { kind: 'running' }>): void {
-    if (event.done) this.#corse.delete(event.sceneId);
+    if (event.done) {
+      this.#corse.delete(event.sceneId);
+      this.#finite.set(event.sceneId, Date.now());
+    }
     else this.#corse.set(event.sceneId, { at: event.at, of: event.of, ...(event.resta ? { fino: Date.now() + event.resta } : {}) });
+  }
+
+  /**
+   * Se sta andando, o se ha finito negli ultimi `ms`. L'ultima riga di una
+   * scena può essere proprio il comando che la farebbe ripartire, e la sua
+   * risposta arriva dopo che la scena si è già detta finita.
+   */
+  inCorsaODaPoco(sceneId: string, ms: number): boolean {
+    if (this.#corse.has(sceneId)) return true;
+    const finita = this.#finite.get(sceneId);
+    return finita !== undefined && Date.now() - finita < ms;
   }
 
   /** A che punto è quella scena, se sta andando. `resta` sono millisecondi da adesso. */

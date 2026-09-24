@@ -50,9 +50,17 @@ async function happened(deviceId: string, code: string, value: DeviceValue, befo
     const tz = fusi.get(scene.ownerId) ?? DEFAULT_TZ;
     if (!conditionsHold(scene.only, (id) => hub.stateOf(id), tz)) continue;
 
+    /*
+     * Il minuto si conta dall'inizio, e una scena con dentro un'attesa più
+     * lunga premeva il suo stesso pulsante quando il minuto era già passato,
+     * ripartendo per sempre. Finché sta andando, e per qualche secondo dopo
+     * — il suo ultimo comando può essere proprio quello — i nostri comandi
+     * non la fanno ripartire.
+     */
     const nostro = hub.comandatoDaPoco(deviceId, ECO_MS);
-    if (nostro && scene.ranAt && Date.now() - Date.parse(scene.ranAt) < PAUSA_MS) {
-      console.warn(`la scena «${scene.name}» è appena partita, non riparte da sola per un minuto`);
+    const recente = !!scene.ranAt && Date.now() - Date.parse(scene.ranAt) < PAUSA_MS;
+    if (nostro && (recente || hub.inCorsaODaPoco(scene.id, ECO_MS))) {
+      console.warn(`la scena «${scene.name}» non riparte, il cambiamento l’ha provocato un nostro comando mentre andava o da poco`);
       continue;
     }
 
