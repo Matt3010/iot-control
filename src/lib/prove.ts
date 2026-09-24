@@ -39,18 +39,12 @@ const valore = (capability: Capability, value: string | number): string =>
 /**
  * Le cose che si comandano con un ordine e si leggono con uno stato.
  *
- * Una tenda si comanda con «Apri», «Ferma», «Chiudi», e lo stesso valore
- * dice com'è rimasta: «Apri» vuol dire aperta. In un «solo se» l'ordine si
- * leggeva come un'azione («Persiane · Movimento «Apri»»), e «Ferma», che
- * non è mai uno stato, dava una condizione che non vale mai. Per le prove
- * si offrono solo gli stati, a parole di stato. Il valore resta quello del
- * dispositivo, perché è quello che arriva.
+ * Una serratura si comanda con «Apri» e «Chiudi a chiave», e lo stesso
+ * valore dice com'è rimasta. In un «solo se» l'ordine si leggeva come
+ * un'azione, quindi per le prove si scrive a parole di stato. Il valore
+ * resta quello del dispositivo, perché è quello che arriva.
  */
 const STATI: Record<string, Record<string, { se: string; quando: string }>> = {
-  move: {
-    Apri: { se: 'aperto', quando: 'si apre' },
-    Chiudi: { se: 'chiuso', quando: 'si chiude' },
-  },
   lock: {
     Apri: { se: 'aperto', quando: 'si apre' },
     'Chiudi a chiave': { se: 'chiuso a chiave', quando: 'si chiude a chiave' },
@@ -94,9 +88,19 @@ export function fraseDiProva(devices: Device[], prova: DeviceTest, modo: Modo): 
   return `${device.name} · ${fraseProva(capability, prova.op, prova.value, modo)}`;
 }
 
+/**
+ * Quello che si comanda e basta, senza sapere com'è rimasto. Il movimento
+ * di una tenda è l'ultimo ordine dato da qui, e se la si apre dal pulsante
+ * a muro nessuno lo racconta. Il server lo rifiuta per la stessa ragione
+ * (server/src/managers/check.ts).
+ */
+const SOLO_ORDINI = new Set(['move']);
+
 /** Le cose di un dispositivo su cui si può scrivere una prova. */
 export const provabili = (device: Device): Capability[] =>
-  (device.capabilities as Capability[]).filter((capability) => capability.kind !== 'image');
+  (device.capabilities as Capability[]).filter(
+    (capability) => capability.kind !== 'image' && !SOLO_ORDINI.has(capability.code),
+  );
 
 /**
  * Le prove che si possono scegliere su quel dispositivo.

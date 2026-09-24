@@ -36,3 +36,22 @@ export function check(capability: Capability, value: DeviceValue): void {
     throw badRequest(`«${capability.label}» sta fra ${capability.min} e ${capability.max}`);
   }
 }
+
+/**
+ * Questa cosa dice com'è davvero, o solo cosa le è stato ordinato?
+ *
+ * Il movimento di una tenda è un ordine. Il valore che torna è l'ultimo
+ * dato da qui, e se la tenda si apre dal pulsante a muro nessuno lo viene
+ * a sapere, perché i motori non lo raccontano. Una condizione o un avviso
+ * scritti su quello direbbero «chiuso» a finestre aperte. Una tenda che
+ * riporta la posizione ha «Apertura», che è un dato vero, e si chiede
+ * quella.
+ */
+export const SOLO_ORDINI = new Set(['move']);
+
+export function provabile(capability: Capability, deviceName: string): void {
+  if (!SOLO_ORDINI.has(capability.code)) return;
+  throw badRequest(
+    `di «${deviceName}» si sa solo l’ultimo ordine dato e non com’è adesso, quindi non si può chiedere in una condizione`,
+  );
+}

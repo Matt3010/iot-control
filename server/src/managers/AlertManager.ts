@@ -7,6 +7,7 @@ import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import { holds } from '../rules/prove.js';
 import type { Alert, Device, Op } from '../types.js';
 import { noticeManager } from './NoticeManager.js';
+import { provabile } from './check.js';
 import { number, says, saysThreshold } from './says.js';
 
 /**
@@ -15,7 +16,6 @@ import { number, says, saysThreshold } from './says.js';
  * qui serve solo il «quando», perché un avviso arriva quando succede.
  */
 const STATI: Record<string, Record<string, string>> = {
-  move: { Apri: 'si apre', Chiudi: 'si chiude' },
   lock: { Apri: 'si apre', 'Chiudi a chiave': 'si chiude a chiave' },
 };
 
@@ -41,6 +41,7 @@ export class AlertManager {
 
       const capability = device.capabilities.find((one) => one.code === code);
       if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
+      provabile(capability, device.name);
 
       // una soglia vale per i numeri, un valore preciso per il resto
       const numerica = capability.kind === 'range' || capability.kind === 'sensor';
@@ -153,8 +154,8 @@ export class AlertManager {
     if (op !== 'is') return saysThreshold(capability, op, value);
 
     if (capability.kind === 'switch') return value === 'true' ? 'si accende' : 'si spegne';
-    // una tenda si comanda con «Apri» e con lo stesso valore dice com'è
-    // rimasta: letto come un ordine, l'avviso sembrava chiederle di aprirsi
+    // una serratura si comanda con «Apri» e con lo stesso valore dice com'è
+    // rimasta, e letto come un ordine l'avviso sembrava chiederle di aprirsi
     const stato = STATI[code]?.[value];
     if (stato) return stato;
     /*

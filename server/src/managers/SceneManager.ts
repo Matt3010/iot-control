@@ -5,7 +5,7 @@ import { hub } from '../iot/hub.js';
 import { noticeManager } from './NoticeManager.js';
 import type { Transaction } from '../persistence/db.js';
 import { store } from '../persistence/db.js';
-import { check } from './check.js';
+import { check, provabile } from './check.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { logManager } from './LogManager.js';
@@ -374,6 +374,7 @@ export class SceneManager {
     if (!device) throw badRequest('uno dei dispositivi non c’è più');
     const capability = (device.capabilities as Capability[]).find((one) => one.code === test.code);
     if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
+    provabile(capability, device.name);
 
     const numerica = capability.kind === 'range' || capability.kind === 'sensor';
     const op = test.op ?? 'is';
