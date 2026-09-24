@@ -1,5 +1,4 @@
 <script lang="ts">
-  import type { Capability } from '../lib/types';
   import { chiediProva } from '../lib/chiedi';
   import { diTempo, gruppoDi, senza } from '../lib/condizioni';
   import { devices, type Scene, type SceneTrigger, type Timing } from '../lib/devices.svelte';
@@ -48,26 +47,6 @@
   }
 
   const triggers = $derived(scene.triggers ?? []);
-
-  /*
-   * I dispositivi che la fanno partire e che lei stessa comanda. Non si
-   * rincorre — i suoi comandi non la fanno ripartire — ma annulla o ripete
-   * quello che l'ha appena fatta partire, e chi la scrive di solito non se
-   * ne accorge. Detto con l'effetto, non col meccanismo.
-   */
-  const sestessa = $derived.by(() => {
-    const comandati = new Set(scene.steps.map((step) => step.deviceId).filter((id): id is string => !!id));
-    const visti = new Set<string>();
-    return triggers
-      .filter((trigger) => comandati.has(trigger.deviceId) && !visti.has(trigger.deviceId) && visti.add(trigger.deviceId))
-      .map((trigger) => {
-        const device = devices.list.find((one) => one.id === trigger.deviceId);
-        const impulso = (device?.capabilities as Capability[] | undefined)?.some(
-          (one) => one.code === trigger.code && one.kind === 'switch' && one.pulse,
-        );
-        return { id: trigger.deviceId, nome: device?.name ?? 'un dispositivo', impulso: !!impulso };
-      });
-  });
   /*
    * Tolto l'ultimo dispositivo, giorni e ore del «solo se» non varrebbero più
    * per niente, perché l'orario ha già i suoi. Se ne vanno con lui, invece di
@@ -166,17 +145,6 @@
   </div>
 {/each}
 
-{#each sestessa as uno (uno.id)}
-  <p class="nota">
-    {#if uno.impulso}
-      Questa scena parte quando {uno.nome} scatta, e poi fa scattare di nuovo {uno.nome}. Con un relè passo-passo,
-      quello che hai appena acceso si rispegne.
-    {:else}
-      Questa scena parte quando {uno.nome} cambia, e poi comanda di nuovo {uno.nome}.
-    {/if}
-  </p>
-{/each}
-
 {#if devices.list.length}
   <div class="aggiungi">
     <Chip label="Quando un dispositivo cambia" size="sm" look="off" extra="pick-btn" onclick={aggiungiTrigger} />
@@ -203,15 +171,4 @@
   .testo { flex: 1; min-width: 0; font-size: 12.5px; color: var(--ink-2); }
 
   .aggiungi { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px; }
-
-  /* un'avvertenza, non un errore: la scena funziona, ma forse non come si pensa */
-  .nota {
-    margin: 0;
-    padding: 7px 10px;
-    border-radius: var(--r-sm);
-    background: var(--sunken);
-    font-size: 11.5px;
-    line-height: 1.45;
-    color: var(--ink-2);
-  }
 </style>
