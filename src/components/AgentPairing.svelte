@@ -47,24 +47,34 @@
   });
 
   /*
-   * Le righe: quelle del registro sempre, e in più ogni altra marca già
-   * collegata, con il nome che le dà il catalogo. Una marca collegata dal
-   * catalogo deve potersi vedere e staccare come le altre.
+   * Una riga per ogni marca già collegata, con il nome nostro se è del
+   * registro, se no con quello del catalogo. Quelle da collegare stanno
+   * tutte nella ricerca.
    */
-  const accounts = $derived([
-    ...PROVIDERS,
-    ...[...new Set(linked.map((one) => one.handler))]
-      .filter((handler) => !nelRegistro(handler))
-      .map((handler) => providerDa(handler, catalogo.find((voce) => voce.handler === handler)?.name)),
+  const accounts = $derived(
+    [...new Set(linked.map((one) => one.handler))].map((handler) =>
+      providerDa(handler, catalogo.find((voce) => voce.handler === handler)?.name),
+    ),
+  );
+
+  /*
+   * Quello che si può cercare: il catalogo della centrale, con le voci del
+   * registro sopra alle sue (i nostri nomi — «Telecamera» e non «Generic
+   * Camera») e in più quelle che la centrale ancora non ha, come eWeLink
+   * prima di installarlo.
+   */
+  const cercabili = $derived([
+    ...PROVIDERS.map((one) => ({ handler: one.handler, name: one.label })),
+    ...catalogo.filter((voce) => !nelRegistro(voce.handler)),
   ]);
 
   /** Le altre marche, cercando nel catalogo. La conversazione è la stessa di quelle del registro. */
   function altre(): void {
     ui.openModal({
-      title: 'Collega un’altra marca',
+      title: 'Collega una marca',
       view: CatalogPicker,
       props: {
-        voci: catalogo.filter((voce) => !nelRegistro(voce.handler)),
+        voci: cercabili,
         onpick: (voce: CatalogEntry) => (open = providerDa(voce.handler, voce.name)),
       },
     });
@@ -101,10 +111,9 @@
   <AccountList
     {agent}
     {accounts}
-    altre={catalogo.length ? altre : undefined}
+    {altre}
     {linked}
     {busy}
-    onbegin={(account) => (open = account)}
     onoff={(joint, label) => void detach(joint, label)}
   />
 {/if}

@@ -12,10 +12,8 @@
    * — quello con cui sei entrato — ma di telecamere ce n'è una per canale, e
    * staccarne una non deve staccare le altre.
    *
-   * Qui non si collega niente: si chiede il permesso e si passa la parola.
-   * Cosa comporta collegare una marca lo dice l'avviso prima del sì, che non
-   * è un dettaglio — certe cose scaricano roba su quella macchina e la fanno
-   * riavviare, e chi preme deve saperlo prima, non dopo.
+   * Qui non si collega niente: si apre la ricerca e si passa la parola. Cosa
+   * comporta collegare una marca lo dice il primo passo della conversazione.
    */
 
   let {
@@ -23,7 +21,6 @@
     accounts,
     linked,
     busy,
-    onbegin,
     onoff,
     altre,
   }: {
@@ -31,10 +28,9 @@
     accounts: readonly Provider[];
     linked: LinkedAccount[];
     busy: boolean;
-    onbegin: (account: Provider) => void;
     onoff: (joint: LinkedAccount, label: string) => void;
-    /** Apre la ricerca fra tutte le altre marche, se l'agente ne ha un catalogo. */
-    altre?: () => void;
+    /** Apre la ricerca fra tutte le marche che si possono collegare. */
+    altre: () => void;
   } = $props();
 
   const joined = (handler: string) => linked.filter((one) => one.handler === handler);
@@ -51,17 +47,6 @@
             ? 'Spento'
             : 'Non collegato';
 
-  /** Niente parte prima di un sì: collegare un account non è un clic qualunque. */
-  function ask(event: MouseEvent, account: Provider) {
-    ui.askSure(event.currentTarget as HTMLElement, {
-      title: `Collegare ${account.label}?`,
-      detail: account.warns,
-      verb: 'Collega',
-      tone: 'plain',
-      no: 'Non ora',
-      onYes: () => onbegin(account),
-    });
-  }
 </script>
 
 <!--
@@ -107,35 +92,22 @@
       </div>
     {/each}
 
-    <!-- E la riga per aggiungerne: sempre, dove se ne può avere più d'una. -->
-    {#if !mine.length || account.many}
-      <div class="account">
-        {@render segno(mine.length ? account.more : account.label, '', undefined)}
-
-        <!-- stessa misura di «Scollega»: in questo elenco ogni azione è un
-             comando scritto piccolo, e due misure diverse sulla stessa
-             colonna si vedono -->
-        <Button
-          look="link"
-          disabled={!agent.online || busy}
-          title={agent.online ? `Collega ${account.label}` : "L'agente non è collegato"}
-          onclick={(event: MouseEvent) => ask(event, account)}
-        >
-          Collega
-        </Button>
-      </div>
-    {/if}
   {/each}
 
-  <!-- tutte le altre marche: quasi mille, e si cercano per nome -->
-  {#if altre}
-    <div class="account">
-      {@render segno('Altre marche', 'Shelly, Philips Hue, IKEA…', undefined)}
-      <Button look="link" disabled={!agent.online || busy} title="Cerca fra tutte le marche che si possono collegare" onclick={altre}>
-        Cerca
-      </Button>
-    </div>
-  {/if}
+  <!-- Collegare qualcosa di nuovo è una riga sola: Tuya, eWeLink, una
+       telecamera e tutte le altre marche si cercano per nome, nello stesso
+       elenco. Una riga fissa per ognuna diventava una colonna di «Collega». -->
+  <div class="account">
+    {@render segno(linked.length ? 'Collega qualcos’altro' : 'Collega una marca o una telecamera', '', undefined)}
+    <Button
+      look="link"
+      disabled={!agent.online || busy}
+      title={agent.online ? 'Cerca fra tutte le marche che si possono collegare' : "L'agente non è collegato"}
+      onclick={altre}
+    >
+      Cerca
+    </Button>
+  </div>
 </div>
 
 <style>

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
-  import type { Provider } from '../lib/providers';
+  import { nelRegistro, type Provider } from '../lib/providers';
   import type { PairingStep } from '../lib/types';
   import Button from './Button.svelte';
   import TextField from './TextField.svelte';
@@ -173,7 +173,23 @@
   }
 
   /** Si comincia appena si compare: chi ha premuto ha già detto di sì. */
-  onMount(() => void go('start'));
+  /*
+   * Prima di cominciare, se questa marca ha qualcosa da dire prima: eWeLink
+   * la prima volta installa un pezzo e fa riavviare la macchina, e chi
+   * preme deve saperlo prima, non dopo. Stava nella domanda del tasto
+   * «Collega»; adesso che si parte dalla ricerca, è il primo passo.
+   */
+  const avvisoPrima = $derived(nelRegistro(provider.handler) && !!provider.warns);
+  let avvisato = $state(false);
+
+  onMount(() => {
+    if (!avvisoPrima) void go('start');
+  });
+
+  function comincia(): void {
+    avvisato = true;
+    void go('start');
+  }
 
   /** Da capo, con quello che avevi scritto ancora in mano. */
   function restart(): void {
@@ -233,7 +249,13 @@
     <p class="wrong">{step.error}</p>
   {/if}
 
-  {#if !step}
+  {#if avvisoPrima && !avvisato}
+    <p class="say">{provider.warns}</p>
+    <div class="acts">
+      <Button look="primary" size="sm" onclick={comincia}>Comincia</Button>
+      <Button look="link" onclick={onquit}>Annulla</Button>
+    </div>
+  {:else if !step}
     <p class="say">Un momento…</p>
   {:else if step.kind === 'failed'}
     <div class="acts">
