@@ -34,6 +34,11 @@ export function check(capability: Capability, value: DeviceValue): void {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     throw badRequest(`«${capability.label}» vuole un numero`);
   }
+  // un colore è una tinta sul cerchio, da 0 a 360
+  if (capability.kind === 'color') {
+    if (value < 0 || value > 360) throw badRequest(`«${capability.label}» va da 0 a 360`);
+    return;
+  }
   if (value < capability.min || value > capability.max) {
     throw badRequest(`«${capability.label}» sta fra ${capability.min} e ${capability.max}`);
   }
@@ -49,7 +54,7 @@ export function check(capability: Capability, value: DeviceValue): void {
  * riporta la posizione ha «Apertura», che è un dato vero, e si chiede
  * quella.
  */
-export const SOLO_ORDINI = new Set(['move', 'volume_step', 'playback']);
+export const SOLO_ORDINI = new Set(['move', 'volume_step', 'playback', 'press', 'activate', 'vacuum', 'mower']);
 
 export function provabile(
   capability: Capability,
@@ -61,6 +66,11 @@ export function provabile(
   // un evento succede e basta: non c'è un «com'è» da chiedere in un «solo se»
   if (modo === 'se' && capability.kind === 'sensor' && capability.event) {
     throw badRequest(`«${capability.label}» di «${deviceName}» è un evento, quindi si chiede quando succede e non com’è`);
+  }
+
+  // un colore non si chiede: rosso e viola stanno ai due capi del cerchio e sono quasi lo stesso
+  if (capability.kind === 'color') {
+    throw badRequest(`«${capability.label}» di «${deviceName}» è un colore, quindi non si può chiedere in una condizione`);
   }
 
   // un'impostazione si cambia, ma non è una cosa che succede in casa

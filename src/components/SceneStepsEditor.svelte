@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { COLORI } from '../lib/colori';
   import { devices, type Device, type Scene, type SceneStep } from '../lib/devices.svelte';
   import { ATTESE, saysWait } from '../lib/timing';
   import type { Capability } from '../lib/types';
@@ -43,10 +44,20 @@
             step: { deviceId: device.id, code: capability.code, value },
           });
         }
+      } else if (capability.kind === 'color') {
+        // un colore si sceglie per nome: «imposta a 230» non lo legge nessuno
+        for (const colore of COLORI) {
+          out.push({
+            what: `Colore ${colore.nome.toLocaleLowerCase('it')}`,
+            step: { deviceId: device.id, code: capability.code, value: colore.tinta },
+          });
+        }
       } else if (capability.kind === 'range') {
         // i valori tondi, perche' una scena non si scrive al pixel
         for (const quota of [0, 25, 50, 75, 100]) {
-          const value = Math.round(capability.min + ((capability.max - capability.min) * quota) / 100);
+          // arrotondato al passo del cursore: 3300 K e non 3275 K
+          const passo = capability.step > 0 ? capability.step : 1;
+          const value = Math.round((capability.min + ((capability.max - capability.min) * quota) / 100) / passo) * passo;
           out.push({
             what: `${capability.label} ${value}${capability.unit ?? ''}`,
             step: { deviceId: device.id, code: capability.code, value },

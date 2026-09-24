@@ -13,7 +13,20 @@ import type { Op } from '../types.js';
  * «acceso» di una cosa che non si è accesa sarebbe falso; e un participio in
  * italiano ha un genere, mentre i dispositivi si chiamano come capita.
  */
+/**
+ * Il nome di una tinta, per il registro. È la stessa tavola che il sito usa
+ * per scegliere un colore in una scena (src/lib/colori.ts): il colore più
+ * vicino a quello chiesto.
+ */
+const COLORI: [number, string][] = [
+  [0, 'rosso'], [30, 'arancione'], [55, 'giallo'], [120, 'verde'],
+  [190, 'azzurro'], [230, 'blu'], [280, 'viola'], [320, 'rosa'], [360, 'rosso'],
+];
+const nomeColore = (tinta: number): string =>
+  COLORI.reduce((meglio, uno) => (Math.abs(uno[0] - tinta) < Math.abs(meglio[0] - tinta) ? uno : meglio))[1];
+
 export function says(capability: Capability, value: DeviceValue): string {
+  if (capability.kind === 'color') return `colore ${nomeColore(Number(value))}`;
   if (capability.kind === 'switch') return capability.pulse ? 'premi' : value ? 'accendi' : 'spegni';
   if (capability.kind === 'enum') return String(value);
   // le parole di un sensore, come si leggono: «Aperta», «uno squillo»

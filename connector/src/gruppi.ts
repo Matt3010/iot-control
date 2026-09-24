@@ -20,11 +20,33 @@ import type { HaEntity, Voce } from './homeassistant.js';
  */
 
 /** Le entità che si comandano: una di queste è il dispositivo. */
-const PRINCIPALI = new Set(['light', 'switch', 'input_boolean', 'fan', 'cover', 'climate', 'lock', 'camera', 'media_player']);
+const PRINCIPALI = new Set([
+  'light',
+  'switch',
+  'input_boolean',
+  'fan',
+  'cover',
+  'climate',
+  'lock',
+  'camera',
+  'media_player',
+  'valve',
+  'vacuum',
+  'lawn_mower',
+  'humidifier',
+  'water_heater',
+  'siren',
+]);
+/**
+ * Cose che si comandano ma non sono il dispositivo: un pulsante, una scena
+ * della marca, un numero o un elenco. Stanno dentro al dispositivo a cui
+ * appartengono; da sole, fanno da dispositivo.
+ */
+const COMANDI = new Set(['button', 'scene', 'number', 'select']);
 /** Le letture, che stanno con il dispositivo di cui misurano qualcosa. */
 const LETTURE = new Set(['sensor', 'binary_sensor', 'event']);
 /** Le impostazioni che sappiamo disegnare: una levetta, un numero, un elenco. */
-const IMPOSTAZIONI = new Set(['switch', 'number', 'select']);
+const IMPOSTAZIONI = new Set(['switch', 'number', 'select', 'button']);
 
 /** Quale misura dà il nome a un dispositivo fatto solo di letture. */
 const PRIMA = ['temperature', 'humidity', 'power', 'motion', 'door', 'window', 'moisture', 'smoke'];
@@ -41,6 +63,7 @@ export interface Gruppo {
 const impostazione = (voce: Voce): boolean => voce.category === 'config' && IMPOSTAZIONI.has(domainOf(voce.entityId));
 const lettura = (voce: Voce): boolean => !voce.category && LETTURE.has(domainOf(voce.entityId));
 const principale = (voce: Voce): boolean => !voce.category && PRINCIPALI.has(domainOf(voce.entityId));
+const comando = (voce: Voce): boolean => !voce.category && COMANDI.has(domainOf(voce.entityId));
 
 /**
  * Chi sta con chi.
@@ -67,17 +90,22 @@ export function raggruppa(voci: Voce[], stati: Map<string, HaEntity>): Gruppo[] 
 
     const principali = ordinati.filter((voce) => principale(voce) && vale(voce));
     const letture = ordinati.filter((voce) => lettura(voce) && vale(voce));
+    const comandi = ordinati.filter((voce) => comando(voce) && vale(voce));
     const impostazioni = ordinati.filter(impostazione);
 
     if (principali.length === 1) {
       const [sola] = principali as [Voce];
       gruppi.push({
         primaria: sola.entityId,
-        accessori: [...letture, ...impostazioni].map((voce) => voce.entityId),
+        accessori: [...letture, ...comandi, ...impostazioni].map((voce) => voce.entityId),
         nome,
       });
     } else if (principali.length > 1) {
-      for (const voce of [...principali, ...letture]) gruppi.push({ primaria: voce.entityId, accessori: [], nome });
+      for (const voce of [...principali, ...letture, ...comandi]) gruppi.push({ primaria: voce.entityId, accessori: [], nome });
+    } else if (comandi.length && !letture.length) {
+      // solo comandi — un cancello con il suo pulsante, le scene della marca — e il primo fa da dispositivo
+      const [primo, ...altri] = comandi as [Voce, ...Voce[]];
+      gruppi.push({ primaria: primo.entityId, accessori: [...altri, ...impostazioni].map((voce) => voce.entityId), nome });
     } else if (letture.length) {
       // la scheda prende il nome della misura che conta di più, non della prima in ordine alfabetico
       const peso = (voce: Voce): number => {
@@ -88,7 +116,7 @@ export function raggruppa(voci: Voce[], stati: Map<string, HaEntity>): Gruppo[] 
       const [prima, ...altre] = [...letture].sort((a, b) => peso(a) - peso(b)) as [Voce, ...Voce[]];
       gruppi.push({
         primaria: prima.entityId,
-        accessori: [...altre, ...impostazioni].map((voce) => voce.entityId),
+        accessori: [...altre, ...comandi, ...impostazioni].map((voce) => voce.entityId),
         nome,
       });
     }
@@ -213,13 +241,23 @@ function capacitaAccessorio(voce: Voce, entity: HaEntity, traduzioni: Record<str
         const labels = vociDi(voce, values, traduzioni);
         return [{ code: code('value'), kind: 'enum', label, values, ...(labels ? { labels } : {}), setting: true }];
       }
+      // riavvia, identifica: un tasto solo, fra le impostazioni
+      case 'button':
+        return [{ code: code('press'), kind: 'enum', label, values: ['Premi'], setting: true }];
       default:
         return [];
     }
   }
 
-  // una lettura: la stessa del sensore da solo, con il codice suo e il nome giusto
-  return capabilitiesOf(entity).map((capability) => ({ ...capability, code: code(capability.code), label }));
+  // una lettura o un comando: lo stesso che da solo, con il codice suo e il nome giusto
+  return capabilitiesOf(entity).map((capability) => {
+    const dentro = { ...capability, code: code(capability.code), label };
+    if (dentro.kind === 'enum' && domainOf(voce.entityId) === 'select') {
+      const labels = vociDi(voce, dentro.values, traduzioni);
+      return labels ? { ...dentro, labels } : dentro;
+    }
+    return dentro;
+  });
 }
 
 /** Lo stato di un'entità che sta dentro un altro dispositivo, con i codici suoi. */

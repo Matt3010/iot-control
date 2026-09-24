@@ -47,6 +47,13 @@ export type Capability = (
    */
   | { code: string; kind: 'image'; label: string }
   | { code: string; kind: 'range'; label: string; min: number; max: number; step: number; unit?: string }
+  /**
+   * Un colore, come tinta sul cerchio da 0 a 360. È un numero, ma non si
+   * chiede «sopra» o «sotto»: rosso e viola stanno ai due capi e sono quasi
+   * lo stesso colore. Si sceglie con il suo controllo, o per nome in una
+   * scena.
+   */
+  | { code: string; kind: 'color'; label: string }
   | {
       code: string;
       kind: 'enum';

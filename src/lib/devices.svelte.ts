@@ -1,4 +1,5 @@
 import { rimpiazza } from './rimpiazza';
+import { nomeColore } from './colori';
 import { daQuando, healthOf, salute, type Salute } from './health';
 import { api } from './api';
 import { toast } from './toast.svelte';
@@ -392,6 +393,7 @@ class Devices {
       const detta = capability.labels?.[String(step.value)] ?? String(step.value);
       return { who, what: capability.setting ? `${capability.label} ${detta}` : detta };
     }
+    if (capability.kind === 'color') return { who, what: `Colore ${nomeColore(Number(step.value)).toLocaleLowerCase('it')}` };
     if (capability.kind !== 'range') return { who, what: String(step.value) };
     return { who, what: `${capability.label} ${step.value}${capability.unit ?? ''}` };
   }

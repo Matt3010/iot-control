@@ -17,6 +17,7 @@ import { number, says, saysThreshold } from './says.js';
  */
 const STATI: Record<string, Record<string, string>> = {
   lock: { Apri: 'si apre', 'Chiudi a chiave': 'si chiude a chiave' },
+  valve: { Apri: 'si apre', Chiudi: 'si chiude' },
 };
 
 /**

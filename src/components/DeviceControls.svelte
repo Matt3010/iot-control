@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { nomeColore } from '../lib/colori';
   import { numero } from '../lib/prove';
   import HealthDot from './HealthDot.svelte';
   import { devices, type Device } from '../lib/devices.svelte';
@@ -180,6 +181,28 @@
             style:--fill="{((numberOf(device.state[capability.code]) - capability.min) /
               Math.max(capability.max - capability.min, 1)) *
               100}%"
+            oninput={(event) => preview(capability.code, Number(event.currentTarget.value))}
+            onchange={(event) => devices.command(device, capability.code, Number(event.currentTarget.value))}
+          />
+        </div>
+      {:else if capability.kind === 'color'}
+        <!-- Il colore: lo stesso cursore, ma la striscia è l'arcobaleno e il
+             pallino ha il colore scelto. Accanto il suo nome, perché «230°»
+             non lo legge nessuno. -->
+        {@const tinta = numberOf(device.state[capability.code])}
+        <div class="line range is-color" class:is-busy={devices.isBusy(device.id, capability.code)} style:--tinta={tinta}>
+          <span class="line-head">
+            <span class="line-name">{capability.label}</span>
+            <span class="line-value">{nomeColore(tinta)}</span>
+          </span>
+          <input
+            type="range"
+            aria-label={capability.label}
+            min="0"
+            max="360"
+            step="1"
+            disabled={!device.online}
+            value={tinta}
             oninput={(event) => preview(capability.code, Number(event.currentTarget.value))}
             onchange={(event) => devices.command(device, capability.code, Number(event.currentTarget.value))}
           />
@@ -452,6 +475,28 @@
   .range input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.12); }
 
   .range input[type="range"]:focus-visible { outline: 0; }
+
+  /* il colore: la striscia è tutto il cerchio delle tinte, e il pallino è
+     quella scelta, così si vede prima ancora di leggerne il nome */
+  .range.is-color input[type="range"]::-webkit-slider-runnable-track {
+    background: linear-gradient(
+      to right,
+      hsl(0 90% 55%), hsl(60 90% 55%), hsl(120 90% 45%), hsl(180 90% 45%),
+      hsl(240 90% 60%), hsl(300 90% 55%), hsl(360 90% 55%)
+    );
+  }
+
+  .range.is-color input[type="range"]::-moz-range-track {
+    background: linear-gradient(
+      to right,
+      hsl(0 90% 55%), hsl(60 90% 55%), hsl(120 90% 45%), hsl(180 90% 45%),
+      hsl(240 90% 60%), hsl(300 90% 55%), hsl(360 90% 55%)
+    );
+  }
+
+  .range.is-color input[type="range"]::-webkit-slider-thumb { background: hsl(calc(var(--tinta) * 1deg) 90% 55%); }
+
+  .range.is-color input[type="range"]::-moz-range-thumb { background: hsl(calc(var(--tinta) * 1deg) 90% 55%); }
 
   .range input[type="range"]:focus-visible::-webkit-slider-thumb {
     box-shadow: var(--shadow-1), 0 0 0 1px var(--hairline), 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);

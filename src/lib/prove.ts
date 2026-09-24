@@ -53,6 +53,10 @@ const valore = (capability: Capability, value: string | number): string => {
  * resta quello del dispositivo, perché è quello che arriva.
  */
 const STATI: Record<string, Record<string, { se: string; quando: string }>> = {
+  valve: {
+    Apri: { se: 'aperto', quando: 'si apre' },
+    Chiudi: { se: 'chiuso', quando: 'si chiude' },
+  },
   lock: {
     Apri: { se: 'aperto', quando: 'si apre' },
     'Chiudi a chiave': { se: 'chiuso a chiave', quando: 'si chiude a chiave' },
@@ -106,7 +110,7 @@ export function fraseDiProva(devices: Device[], prova: DeviceTest, modo: Modo): 
  * a muro nessuno lo racconta. Il server lo rifiuta per la stessa ragione
  * (server/src/managers/check.ts).
  */
-const SOLO_ORDINI = new Set(['move', 'volume_step', 'playback']);
+const SOLO_ORDINI = new Set(['move', 'volume_step', 'playback', 'press', 'activate', 'vacuum', 'mower']);
 
 /**
  * Le cose di un dispositivo su cui si può scrivere una prova. Un interruttore
@@ -117,6 +121,8 @@ export const provabili = (device: Device, modo: Modo): Capability[] =>
   (device.capabilities as Capability[]).filter(
     (capability) =>
       capability.kind !== 'image' &&
+      // un colore non si chiede: rosso e viola sono ai due capi del cerchio e quasi uguali
+      capability.kind !== 'color' &&
       // un'impostazione si cambia, ma non è una cosa che succede in casa
       !capability.setting &&
       // un evento succede e basta: nel «solo se» non c'è un «com'è» da chiedere

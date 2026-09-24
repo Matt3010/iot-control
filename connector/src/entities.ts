@@ -21,6 +21,16 @@ const DOMAINS = new Set([
   'camera',
   'event',
   'media_player',
+  'button',
+  'scene',
+  'number',
+  'select',
+  'valve',
+  'vacuum',
+  'lawn_mower',
+  'humidifier',
+  'water_heater',
+  'siren',
 ]);
 
 /** I bit con cui HA dice cosa sa fare una tapparella o un ventilatore. */
@@ -28,6 +38,75 @@ const COVER_SET_POSITION = 4;
 const COVER_STOP = 8;
 const FAN_SET_SPEED = 1;
 const CLIMATE_TARGET_TEMPERATURE = 1;
+const CLIMATE_FAN_MODE = 8;
+const CLIMATE_PRESET_MODE = 16;
+const COVER_SET_TILT = 128;
+const VALVE = { STOP: 8, SET_POSITION: 4 } as const;
+const VACUUM = { PAUSE: 4, STOP: 8, RETURN_HOME: 16, START: 8192 } as const;
+const MOWER = { START: 1, PAUSE: 2, DOCK: 4 } as const;
+const HUMIDIFIER_MODES = 1;
+const WATER_HEATER = { TARGET_TEMPERATURE: 1, OPERATION_MODE: 2, ON_OFF: 8 } as const;
+
+/** Le parole per come sta un aspirapolvere o un tosaerba, dette in italiano. */
+const LAVORI: Record<string, string> = {
+  cleaning: 'pulisce',
+  mowing: 'taglia',
+  docked: 'alla base',
+  returning: 'torna alla base',
+  paused: 'in pausa',
+  idle: 'fermo',
+  error: 'in errore',
+};
+
+/**
+ * Le voci più comuni dei modi di clima, ventilatori, umidificatori e
+ * scaldabagni, dette in italiano. Il valore resta quello del dispositivo,
+ * che è quello che si manda indietro; cambia solo come si legge.
+ */
+const MODI: Record<string, string> = {
+  heat: 'Caldo',
+  cool: 'Freddo',
+  heat_cool: 'Automatico',
+  auto: 'Automatico',
+  dry: 'Deumidifica',
+  fan_only: 'Solo ventola',
+  low: 'Bassa',
+  medium: 'Media',
+  middle: 'Media',
+  high: 'Alta',
+  quiet: 'Silenziosa',
+  eco: 'Eco',
+  comfort: 'Comfort',
+  away: 'Fuori casa',
+  home: 'In casa',
+  sleep: 'Notte',
+  boost: 'Massima',
+  normal: 'Normale',
+  performance: 'Prestazioni',
+  electric: 'Elettrico',
+  gas: 'Gas',
+  heat_pump: 'Pompa di calore',
+  high_demand: 'Molta richiesta',
+  baby: 'Bambini',
+};
+
+/** Le etichette italiane delle voci che il dizionario conosce, se ce n'è almeno una. */
+const detteIn = (voci: string[]): Record<string, string> | undefined => {
+  const dette = Object.fromEntries(voci.flatMap((voce) => (MODI[voce] ? [[voce, MODI[voce] as string]] : [])));
+  return Object.keys(dette).length ? dette : undefined;
+};
+
+/** Un elenco di modi, con le voci dette in italiano. */
+const modi = (code: string, label: string, values: string[]): Capability => {
+  const labels = detteIn(values);
+  return { code, kind: 'enum', label, values, ...(labels ? { labels } : {}) };
+};
+
+/** Un numero da un attributo, con il suo ripiego. */
+const attr = (entity: HaEntity, nome: string, ripiego: number): number => {
+  const valore = Number(entity.attributes[nome]);
+  return Number.isFinite(valore) ? valore : ripiego;
+};
 /** E quelli di una TV o di una cassa. */
 const MEDIA = {
   PAUSE: 1,
@@ -97,8 +176,28 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
     case 'input_boolean':
       return [acceso];
 
-    case 'light':
-      return dimmable(entity) ? [acceso, percent('Luminosità', 'brightness')] : [acceso];
+    case 'light': {
+      const modi = (entity.attributes.supported_color_modes as string[] | undefined) ?? [];
+      const out: Capability[] = [acceso];
+      if (dimmable(entity)) out.push(percent('Luminosità', 'brightness'));
+      // il bianco, da caldo a freddo, in kelvin: un cursore come un altro
+      if (modi.includes('color_temp')) {
+        out.push({
+          code: 'color_temp',
+          kind: 'range',
+          label: 'Bianco',
+          min: attr(entity, 'min_color_temp_kelvin', 2000),
+          max: attr(entity, 'max_color_temp_kelvin', 6500),
+          step: 100,
+          unit: 'K',
+        });
+      }
+      // il colore: una tinta sul cerchio, con il suo controllo
+      if (modi.some((modo) => ['hs', 'rgb', 'rgbw', 'rgbww', 'xy'].includes(modo))) {
+        out.push({ code: 'color', kind: 'color', label: 'Colore' });
+      }
+      return out;
+    }
 
     case 'fan':
       return has(entity, FAN_SET_SPEED) ? [acceso, percent('Velocità', 'speed')] : [acceso];
@@ -111,7 +210,11 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
         label: 'Movimento',
         values: has(entity, COVER_STOP) ? ['Apri', 'Ferma', 'Chiudi'] : ['Apri', 'Chiudi'],
       };
-      return has(entity, COVER_SET_POSITION) ? [move, percent('Apertura', 'position')] : [move];
+      return [
+        move,
+        ...(has(entity, COVER_SET_POSITION) ? [percent('Apertura', 'position')] : []),
+        ...(has(entity, COVER_SET_TILT) ? [percent('Lamelle', 'tilt')] : []),
+      ];
     }
 
     case 'lock':
@@ -127,11 +230,26 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
 
       // i modi che quel condizionatore sa fare davvero, senza «off» che è già
       // l'interruttore qui sopra
-      const modi = (entity.attributes.hvac_modes as string[] | undefined)?.filter((mode) => mode !== 'off');
-      const modo: Capability | null =
-        modi && modi.length > 1 ? { code: 'mode', kind: 'enum', label: 'Modo', values: modi } : null;
+      const elenco = (entity.attributes.hvac_modes as string[] | undefined)?.filter((mode) => mode !== 'off');
+      const modo: Capability | null = elenco && elenco.length > 1 ? modi('mode', 'Modo', elenco) : null;
 
-      return [acceso, ...(has(entity, CLIMATE_TARGET_TEMPERATURE) ? [temperatura] : []), ...(modo ? [modo] : [])];
+      const ventole = entity.attributes.fan_modes as string[] | undefined;
+      const profili = entity.attributes.preset_modes as string[] | undefined;
+      return [
+        acceso,
+        ...(has(entity, CLIMATE_TARGET_TEMPERATURE) ? [temperatura] : []),
+        ...(modo ? [modo] : []),
+        ...(has(entity, CLIMATE_FAN_MODE) && ventole?.length
+          ? [modi('fan_mode', 'Ventilatore', ventole)]
+          : []),
+        ...(has(entity, CLIMATE_PRESET_MODE) && profili?.length
+          ? [modi('preset', 'Profilo', profili)]
+          : []),
+        // quanti gradi ci sono davvero, accanto a quanti se ne chiedono
+        ...(entity.attributes.current_temperature !== undefined
+          ? [{ code: 'current', kind: 'sensor', label: 'In stanza', unit: '°C' } as Capability]
+          : []),
+      ];
     }
 
     case 'media_player': {
@@ -162,6 +280,115 @@ export function capabilitiesOf(entity: HaEntity): Capability[] {
       if (tasti.length) out.push({ code: 'playback', kind: 'enum', label: 'Riproduzione', values: tasti });
       return out;
     }
+
+    // Un pulsante e una scena della marca si premono e basta: un tasto solo.
+    case 'button':
+      return [{ code: 'press', kind: 'enum', label: 'Pulsante', values: ['Premi'] }];
+    case 'scene':
+      return [{ code: 'activate', kind: 'enum', label: 'Scena', values: ['Attiva'] }];
+
+    // Un numero o un elenco che si comandano, e non come impostazione
+    case 'number':
+      return [
+        {
+          code: 'value',
+          kind: 'range',
+          label: 'Valore',
+          min: attr(entity, 'min', 0),
+          max: attr(entity, 'max', 100),
+          step: attr(entity, 'step', 1),
+          ...(entity.attributes.unit_of_measurement ? { unit: String(entity.attributes.unit_of_measurement) } : {}),
+        },
+      ];
+    case 'select': {
+      const voci = (entity.attributes.options as string[] | undefined) ?? [];
+      return voci.length ? [{ code: 'value', kind: 'enum', label: 'Valore', values: voci }] : [];
+    }
+
+    // Una valvola dell'acqua: si apre e si chiude, e com'è lo dice davvero
+    case 'valve': {
+      const valvola: Capability = {
+        code: 'valve',
+        kind: 'enum',
+        label: 'Valvola',
+        values: has(entity, VALVE.STOP) ? ['Apri', 'Ferma', 'Chiudi'] : ['Apri', 'Chiudi'],
+      };
+      return has(entity, VALVE.SET_POSITION) ? [valvola, percent('Apertura', 'position')] : [valvola];
+    }
+
+    // Aspirapolvere e tosaerba: gli ordini, e come sta adesso
+    case 'vacuum': {
+      const ordini = [
+        ...(has(entity, VACUUM.START) ? ['Avvia'] : []),
+        ...(has(entity, VACUUM.PAUSE) ? ['Pausa'] : []),
+        ...(has(entity, VACUUM.STOP) ? ['Fermati'] : []),
+        ...(has(entity, VACUUM.RETURN_HOME) ? ['Torna alla base'] : []),
+      ];
+      return [
+        ...(ordini.length ? [{ code: 'vacuum', kind: 'enum', label: 'Pulizia', values: ordini } as Capability] : []),
+        { code: 'status', kind: 'sensor', label: 'Adesso', values: Object.keys(LAVORI), labels: LAVORI },
+        ...(entity.attributes.battery_level !== undefined
+          ? [{ code: 'battery', kind: 'sensor', label: 'Batteria', unit: '%' } as Capability]
+          : []),
+      ];
+    }
+    case 'lawn_mower': {
+      const ordini = [
+        ...(has(entity, MOWER.START) ? ['Avvia'] : []),
+        ...(has(entity, MOWER.PAUSE) ? ['Pausa'] : []),
+        ...(has(entity, MOWER.DOCK) ? ['Torna alla base'] : []),
+      ];
+      return [
+        ...(ordini.length ? [{ code: 'mower', kind: 'enum', label: 'Taglio', values: ordini } as Capability] : []),
+        { code: 'status', kind: 'sensor', label: 'Adesso', values: Object.keys(LAVORI), labels: LAVORI },
+      ];
+    }
+
+    // Umidificatore e scaldabagno: acceso, quanto, e in che modo
+    case 'humidifier': {
+      const disponibili = entity.attributes.available_modes as string[] | undefined;
+      return [
+        acceso,
+        {
+          code: 'humidity',
+          kind: 'range',
+          label: 'Umidità',
+          min: attr(entity, 'min_humidity', 30),
+          max: attr(entity, 'max_humidity', 80),
+          step: 1,
+          unit: '%',
+        },
+        ...(has(entity, HUMIDIFIER_MODES) && disponibili?.length ? [modi('mode', 'Modo', disponibili)] : []),
+        ...(entity.attributes.current_humidity !== undefined
+          ? [{ code: 'current', kind: 'sensor', label: 'In stanza', unit: '%' } as Capability]
+          : []),
+      ];
+    }
+    case 'water_heater': {
+      const disponibili = entity.attributes.operation_list as string[] | undefined;
+      return [
+        ...(has(entity, WATER_HEATER.ON_OFF) ? [acceso] : []),
+        ...(has(entity, WATER_HEATER.TARGET_TEMPERATURE)
+          ? [
+              {
+                code: 'temperature',
+                kind: 'range',
+                label: 'Temperatura',
+                min: attr(entity, 'min_temp', 30),
+                max: attr(entity, 'max_temp', 70),
+                step: 1,
+                unit: '°C',
+              } as Capability,
+            ]
+          : []),
+        ...(has(entity, WATER_HEATER.OPERATION_MODE) && disponibili?.length ? [modi('mode', 'Modo', disponibili)] : []),
+        ...(entity.attributes.current_temperature !== undefined
+          ? [{ code: 'current', kind: 'sensor', label: 'Adesso', unit: '°C' } as Capability]
+          : []),
+      ];
+    }
+    case 'siren':
+      return [acceso];
 
     case 'event': {
       // un evento: il campanello, un tasto del telecomando. Le parole sono i suoi tipi
@@ -306,9 +533,53 @@ export function stateOf(entity: HaEntity): Record<string, DeviceValue> {
     return state;
   }
 
+  if (domain === 'button' || domain === 'scene') return state;
+  if (domain === 'number') {
+    const valore = numeric(entity.state);
+    if (valore !== undefined) state.value = valore;
+    return state;
+  }
+  if (domain === 'select') {
+    state.value = entity.state;
+    return state;
+  }
+  if (domain === 'valve') {
+    if (entity.state === 'open') state.valve = 'Apri';
+    else if (entity.state === 'closed') state.valve = 'Chiudi';
+    const posizione = numeric(entity.attributes.current_position);
+    if (posizione !== undefined) state.position = posizione;
+    return state;
+  }
+  if (domain === 'vacuum' || domain === 'lawn_mower') {
+    state.status = String(entity.attributes.activity ?? entity.state);
+    const batteria = numeric(entity.attributes.battery_level);
+    if (batteria !== undefined) state.battery = batteria;
+    return state;
+  }
+  if (domain === 'humidifier') {
+    state.power = entity.state === 'on';
+    const voluta = numeric(entity.attributes.humidity);
+    if (voluta !== undefined) state.humidity = voluta;
+    if (typeof entity.attributes.mode === 'string') state.mode = entity.attributes.mode;
+    const adesso = numeric(entity.attributes.current_humidity);
+    if (adesso !== undefined) state.current = adesso;
+    return state;
+  }
+  if (domain === 'water_heater') {
+    state.power = entity.state !== 'off';
+    const voluta = numeric(entity.attributes.temperature);
+    if (voluta !== undefined) state.temperature = voluta;
+    if (typeof entity.attributes.operation_mode === 'string') state.mode = entity.attributes.operation_mode;
+    const adesso = numeric(entity.attributes.current_temperature);
+    if (adesso !== undefined) state.current = adesso;
+    return state;
+  }
+
   if (domain === 'cover') {
     if (entity.state === 'open') state.move = 'Apri';
     else if (entity.state === 'closed') state.move = 'Chiudi';
+    const lamelle = numeric(entity.attributes.current_tilt_position);
+    if (lamelle !== undefined) state.tilt = lamelle;
   } else if (domain === 'lock') {
     state.lock = entity.state === 'locked' ? 'Chiudi a chiave' : 'Apri';
   } else if (domain === 'climate') {
@@ -316,9 +587,19 @@ export function stateOf(entity: HaEntity): Record<string, DeviceValue> {
     // «diverso da spento» è l'unica regola che non lascia fuori nessuno
     state.power = entity.state !== 'off' && entity.state !== 'unavailable';
     state.mode = entity.state;
+    const stanza = numeric(entity.attributes.current_temperature);
+    if (stanza !== undefined) state.current = stanza;
+    if (typeof entity.attributes.fan_mode === 'string') state.fan_mode = entity.attributes.fan_mode;
+    if (typeof entity.attributes.preset_mode === 'string') state.preset = entity.attributes.preset_mode;
   } else {
     state.power = entity.state === 'on';
   }
+
+  // il bianco in kelvin, e il colore come tinta sul cerchio
+  const kelvin = numeric(entity.attributes.color_temp_kelvin);
+  if (kelvin !== undefined) state.color_temp = kelvin;
+  const hs = entity.attributes.hs_color as [number, number] | undefined;
+  if (Array.isArray(hs) && Number.isFinite(Number(hs[0]))) state.color = Math.round(Number(hs[0]));
 
   // HA tiene la luminosità su 255; fuori di qui si ragiona in percentuale.
   const brightness = numeric(entity.attributes.brightness);
@@ -391,10 +672,49 @@ export function toServiceCall(entityId: string, code: string, value: DeviceValue
       return { domain: 'fan', service: 'set_percentage', data: { percentage: Number(value) } };
 
     case 'position':
-      return { domain: 'cover', service: 'set_cover_position', data: { position: Number(value) } };
+      return domain === 'valve'
+        ? { domain: 'valve', service: 'set_valve_position', data: { position: Number(value) } }
+        : { domain: 'cover', service: 'set_cover_position', data: { position: Number(value) } };
 
     case 'temperature':
-      return { domain: 'climate', service: 'set_temperature', data: { temperature: Number(value) } };
+      return domain === 'water_heater'
+        ? { domain: 'water_heater', service: 'set_temperature', data: { temperature: Number(value) } }
+        : { domain: 'climate', service: 'set_temperature', data: { temperature: Number(value) } };
+
+    case 'color_temp':
+      return { domain: 'light', service: 'turn_on', data: { color_temp_kelvin: Number(value) } };
+    case 'color':
+      return { domain: 'light', service: 'turn_on', data: { hs_color: [Number(value), 100] } };
+    case 'tilt':
+      return { domain: 'cover', service: 'set_cover_tilt_position', data: { tilt_position: Number(value) } };
+    case 'fan_mode':
+      return { domain: 'climate', service: 'set_fan_mode', data: { fan_mode: String(value) } };
+    case 'preset':
+      return { domain: 'climate', service: 'set_preset_mode', data: { preset_mode: String(value) } };
+    case 'humidity':
+      return { domain: 'humidifier', service: 'set_humidity', data: { humidity: Number(value) } };
+    case 'press':
+      return { domain: 'button', service: 'press', data: {} };
+    case 'activate':
+      return { domain: 'scene', service: 'turn_on', data: {} };
+    case 'value':
+      if (domain === 'number') return { domain: 'number', service: 'set_value', data: { value: Number(value) } };
+      if (domain === 'select') return { domain: 'select', service: 'select_option', data: { option: String(value) } };
+      return null;
+    case 'valve': {
+      const service = value === 'Apri' ? 'open_valve' : value === 'Chiudi' ? 'close_valve' : 'stop_valve';
+      return { domain: 'valve', service, data: {} };
+    }
+    case 'vacuum': {
+      const servizi: Record<string, string> = { Avvia: 'start', Pausa: 'pause', Fermati: 'stop', 'Torna alla base': 'return_to_base' };
+      const service = servizi[String(value)];
+      return service ? { domain: 'vacuum', service, data: {} } : null;
+    }
+    case 'mower': {
+      const servizi: Record<string, string> = { Avvia: 'start_mowing', Pausa: 'pause', 'Torna alla base': 'dock' };
+      const service = servizi[String(value)];
+      return service ? { domain: 'lawn_mower', service, data: {} } : null;
+    }
 
     case 'lock':
       return domain === 'lock'
@@ -402,9 +722,12 @@ export function toServiceCall(entityId: string, code: string, value: DeviceValue
         : null;
 
     case 'mode':
-      return domain === 'climate'
-        ? { domain: 'climate', service: 'set_hvac_mode', data: { hvac_mode: String(value) } }
-        : null;
+      if (domain === 'climate') return { domain: 'climate', service: 'set_hvac_mode', data: { hvac_mode: String(value) } };
+      if (domain === 'humidifier') return { domain: 'humidifier', service: 'set_mode', data: { mode: String(value) } };
+      if (domain === 'water_heater') {
+        return { domain: 'water_heater', service: 'set_operation_mode', data: { operation_mode: String(value) } };
+      }
+      return null;
 
     case 'volume':
       return domain === 'media_player'
@@ -462,6 +785,8 @@ function toAccessoryCall(entityId: string, value: DeviceValue): ServiceCall | nu
       return { domain: 'homeassistant', service: value ? 'turn_on' : 'turn_off', data: {} };
     case 'number':
       return { domain: 'number', service: 'set_value', data: { value: Number(value) } };
+    case 'button':
+      return { domain: 'button', service: 'press', data: {} };
     case 'select':
       return { domain: 'select', service: 'select_option', data: { option: String(value) } };
     default:
