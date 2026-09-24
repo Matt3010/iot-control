@@ -86,7 +86,15 @@ function serve(socket: WebSocket, agent: Agent): void {
           socket.close(4400, `serve il protocollo ${PROTOCOL}`);
           return;
         }
-        await deviceManager.sync(agent.ownerId, agent.id, message.devices);
+        /*
+         * La presentazione non è l'inventario. Un agente appena ripartito si
+         * presenta prima di aver letto la centrale, cioè con un elenco vuoto,
+         * e preso per completo faceva cancellare tutti i suoi dispositivi, e
+         * con loro le righe delle scene e gli avvisi. Qui si aggiunge e si
+         * aggiorna soltanto. Chi non c'è più lo dice l'inventario completo,
+         * che arriva dopo.
+         */
+        await deviceManager.sync(agent.ownerId, agent.id, message.devices, false);
         return;
 
       case 'devices':

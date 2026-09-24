@@ -50,8 +50,14 @@ export class DeviceManager {
    * resta nell'elenco — è l'agente a dire che non lo raggiunge — e quindi non
    * viene toccato.
    */
-  async sync(ownerId: string, agentId: string, snapshots: DeviceSnapshot[]): Promise<Device[]> {
-    const { devices, gone, scenes, before } = await store.transaction(async (tx) => {
+  async sync(
+    ownerId: string,
+    agentId: string,
+    snapshots: DeviceSnapshot[],
+    /** Se l'elenco è completo, e quindi chi non c'è dentro va tolto. */
+    completo = true,
+  ): Promise<Device[]> {
+    const { devices, gone, scenes, before, tutti } = await store.transaction(async (tx) => {
       const repository = new DeviceRepository(tx);
       const was = (await repository.findAllOfAgent(agentId)).length;
 
@@ -69,10 +75,9 @@ export class DeviceManager {
        * scritte su di lui — lo dice lo schema — e contarle dopo vorrebbe dire
        * contarne sempre zero, cioè dire a chi guarda che non è caduto niente.
        */
-      const lost = await repository.lostOfAgent(
-        agentId,
-        new Set(snapshots.map((snapshot) => snapshot.externalId)),
-      );
+      const lost = completo
+        ? await repository.lostOfAgent(agentId, new Set(snapshots.map((snapshot) => snapshot.externalId)))
+        : [];
 
       // chi sparisce esce anche dagli insiemi che lo tenevano: un insieme
       // che prova a comandare un fantasma non si capisce perché non va
@@ -82,10 +87,11 @@ export class DeviceManager {
       await new AlertRepository(tx).pruneDevices(new Set(lost));
       await repository.deleteMany(lost);
 
-      return { devices: kept, gone: lost, scenes: scene, before: was };
+      return { devices: kept, gone: lost, scenes: scene, before: was, tutti: await repository.findAllOfAgent(agentId) };
     });
 
-    hub.index(agentId, devices);
+    // l'indice li tiene tutti, anche quelli che una presentazione non ha nominato
+    hub.index(agentId, tutti);
     for (const snapshot of snapshots) {
       hub.publish(ownerId, agentId, snapshot.externalId, { online: snapshot.online, state: snapshot.state });
     }
@@ -94,7 +100,7 @@ export class DeviceManager {
     // fantasmi di quelli spariti o non vede quelli nuovi.
     // Nel registro ci finisce solo se è cambiato qualcosa: un agente che si
     // ricollega e racconta le stesse cose non è una notizia.
-    if (gone.length || devices.length !== before) {
+    if (gone.length || tutti.length !== before) {
       logManager.note({
         ownerId,
         agentId,
@@ -103,7 +109,7 @@ export class DeviceManager {
         // dice se sono spariti dalla rete o se li hai tolti tu, e la riga si
         // legge di sfuggita la mattina dopo.
         detail: [
-          devices.length > before ? `ha trovato ${conta(devices.length - before)} in più` : '',
+          tutti.length > before ? `ha trovato ${conta(tutti.length - before)} in più` : '',
           gone.length ? `non trova più ${conta(gone.length)}` : '',
         ]
           .filter(Boolean)
