@@ -1,5 +1,6 @@
 import type { Agent, Device, Scene } from './devices.svelte';
 import { store } from './store.svelte';
+import { nextRun } from './timing';
 import type { Category, Group, PlaceMap } from './types';
 import { perNome, poiPerNome, Vista } from './vista.svelte';
 
@@ -44,15 +45,29 @@ export const vistaAgenti = new Vista<Agent>({
   ],
 });
 
+/*
+ * Le scene per nome, per quando sono partite l'ultima volta — quali si usano
+ * e quali no — e per quando partiranno. Chi non è mai partita, o non ha un
+ * orario, sta in fondo in tutti e due i versi.
+ */
+const quandoPartita = (scena: Scene): number => (scena.ranAt ? new Date(scena.ranAt).getTime() : 0);
+
 export const vistaScene = new Vista<Scene>({
   chiave: 'scene',
   criteri: [
     { id: 'nome', label: 'Nome', per: perNome },
     {
-      id: 'passi',
-      label: 'Cose che muove',
-      per: poiPerNome((a, b) => a.steps.length - b.steps.length),
+      id: 'ultima',
+      label: 'Ultima esecuzione',
+      per: poiPerNome((a, b) => quandoPartita(a) - quandoPartita(b)),
       verso: 'desc',
+      inFondo: (scena) => !scena.ranAt,
+    },
+    {
+      id: 'prossima',
+      label: 'Prossima esecuzione',
+      per: poiPerNome((a, b) => (nextRun(a.when) ?? 0) - (nextRun(b.when) ?? 0)),
+      inFondo: (scena) => nextRun(scena.when) === undefined,
     },
   ],
 });

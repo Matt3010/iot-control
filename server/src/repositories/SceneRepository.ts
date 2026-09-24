@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, isNull, ne, or } from 'drizzle-orm';
-import type { Transaction } from '../persistence/db.js';
+import { iso, type Transaction } from '../persistence/db.js';
 import { scenes } from '../persistence/schema.js';
 import type { Scene, SceneStep } from '../types.js';
 
@@ -13,10 +13,17 @@ const toScene = (row: Row): Scene => ({
   steps: row.steps,
   ...(row.timing ? { when: row.timing } : {}),
   ...(row.lastRunAt ? { lastRunAt: row.lastRunAt } : {}),
+  ...(row.ranAt ? { ranAt: iso(row.ranAt) as string } : {}),
 });
 
 export class SceneRepository {
   constructor(private readonly tx: Transaction) {}
+
+  /** È partita adesso. Torna la scena com'è dopo, per dirlo a chi guarda. */
+  async markRan(id: string): Promise<Scene | undefined> {
+    const [row] = await this.tx.db.update(scenes).set({ ranAt: new Date() }).where(eq(scenes.id, id)).returning();
+    return row ? toScene(row) : undefined;
+  }
 
   /** Le scene sono di chi le ha fatte, come gli agenti. */
   async findAllOf(ownerId: string): Promise<Scene[]> {

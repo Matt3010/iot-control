@@ -27,6 +27,7 @@
     back = { href: '/', label: 'Torna alla mappa' },
     layout = 'columns',
     tools,
+    strip,
     children,
   }: {
     title: string;
@@ -71,6 +72,12 @@
      * quello che c'è sotto tutto intero, non una scheda.
      */
     tools?: Snippet;
+    /**
+     * Una riga a tutta larghezza sotto le linguette, prima delle schede: per
+     * quello che riassume la pagina intera, come le prossime partenze delle
+     * scene. In mezzo alle schede starebbe in una colonna sola.
+     */
+    strip?: Snippet;
     children: Snippet;
   } = $props();
 
@@ -107,6 +114,7 @@
         {#if tools}<span class="strumenti">{@render tools()}</span>{/if}
       </div>
     {/if}
+    {@render strip?.()}
   </header>
 
   <!-- A colonne, non a griglia: una scheda collegata e' alta, una appena

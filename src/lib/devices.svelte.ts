@@ -82,6 +82,8 @@ export interface Scene {
   name: string;
   steps: SceneStep[];
   when?: Timing;
+  /** L'ultima volta che è partita, a mano o da sola. Mai, se manca. */
+  ranAt?: string;
 }
 
 /**

@@ -227,6 +227,8 @@ export interface Scene {
    * era occupata.
    */
   lastRunAt?: string;
+  /** L'ultima volta che è partita, in qualunque modo. */
+  ranAt?: string;
 }
 
 /**

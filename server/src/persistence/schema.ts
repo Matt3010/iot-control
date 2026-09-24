@@ -201,6 +201,15 @@ export const scenes = pgTable(
      * scena, e chi arriva dopo trova quel minuto già preso.
      */
     lastRunAt: text('last_run_at'),
+    /**
+     * L'ultima volta che è partita davvero, comunque: a mano, da sola o
+     * chiamata da un'altra scena.
+     *
+     * Non è `lastRunAt`, che è il turno dell'orologio e vale solo per le
+     * partenze automatiche. Questa è un istante, e serve a chi guarda: a
+     * sapere quali scene si usano e quali no.
+     */
+    ranAt: timestamp('ran_at', { withTimezone: true }),
   },
   (table) => [index('scenes_owner').on(table.ownerId)],
 );

@@ -41,6 +41,13 @@ export interface Criterio<T> {
   per?: (a: T, b: T) => number;
   /** Il verso della prima volta: una data si legge dalla più recente. */
   verso?: Verso;
+  /**
+   * Le voci che per questo criterio non hanno niente da dire — una scena mai
+   * partita, messa in fila per ultima esecuzione. Stanno in fondo in tutti e
+   * due i versi: girare l'ordine le porterebbe in cima, davanti a quelle di
+   * cui si voleva sapere.
+   */
+  inFondo?: (voce: T) => boolean;
 }
 
 interface Scelta {
@@ -137,7 +144,16 @@ export class Vista<T> {
     const per = this.criterio?.per;
     if (per) {
       const segno = this.#scelta.verso === 'asc' ? 1 : -1;
-      dopo.sort((a, b) => segno * per(a, b));
+      const inFondo = this.criterio?.inFondo;
+      dopo.sort((a, b) => {
+        if (inFondo) {
+          const giuA = inFondo(a);
+          const giuB = inFondo(b);
+          if (giuA !== giuB) return giuA ? 1 : -1;
+          if (giuA) return 0;
+        }
+        return segno * per(a, b);
+      });
     }
     return dopo;
   }

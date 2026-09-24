@@ -10,6 +10,7 @@ import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { logManager } from './LogManager.js';
 import type { Device, Scene, SceneStep } from '../types.js';
+import { toSceneView } from '../dto/views.js';
 
 /**
  * Se partendo da una scena si arriva a un'altra, anche passando per altre.
@@ -132,6 +133,15 @@ export class SceneManager {
       console.warn(`la scena «${scene.name}» si richiama da sola, giro fermato`);
       return;
     }
+
+    /*
+     * Parte: lo si scrive prima di cominciare, e lo si dice a chi sta
+     * guardando l'elenco delle scene, che le mette in fila anche per ultima
+     * esecuzione. Scriverlo alla fine vorrebbe dire aspettare i dieci minuti
+     * di una scena che dentro ha un'attesa.
+     */
+    const segnata = await store.transaction((tx) => new SceneRepository(tx).markRan(id));
+    if (segnata) hub.changed(ownerId, { kind: 'scene', id, value: toSceneView(segnata) });
 
     /*
      * A momenti, non tutto in una volta.

@@ -79,6 +79,8 @@ export interface SceneView {
   name: string;
   steps: SceneStep[];
   when?: Timing;
+  /** L'ultima volta che è partita, per metterle in fila per uso. */
+  ranAt?: string;
 }
 
 export interface StateView {
@@ -99,10 +101,11 @@ export const toMapView = (map: PlaceMap): MapView => ({
 
 export const toGroupView = ({ id, name }: Group): GroupView => ({ id, name });
 
-export const toSceneView = ({ id, name, steps, when }: Scene): SceneView => ({
+export const toSceneView = ({ id, name, steps, when, ranAt }: Scene): SceneView => ({
   id,
   name,
   steps: steps ?? [],
+  ...(ranAt ? { ranAt } : {}),
   // l'ultima partenza resta di qua: a chi guarda serve sapere quando parte,
   // non quando e' partita l'ultima volta — quello e' nel registro
   ...(when ? { when } : {}),
