@@ -162,27 +162,31 @@ h2 {
   }
 
   /*
-   * Su un telefono una finestra non è un foglietto appoggiato in fondo, è la
-   * schermata, dai quattro lati del corpo. Appoggiata in fondo era alta
-   * quanto quello che aveva dentro, e sopra lasciava mezzo schermo di nero.
+   * Su un telefono una finestra è un foglio che sale dal fondo e si ferma
+   * appena sotto l'orologio, come quelli del sistema.
+   *
+   * Arriva in fondo e prende quasi tutto lo schermo, perché appoggiata in
+   * basso e alta quanto il contenuto lasciava sopra mezzo schermo di nero.
+   * Ma non passa sotto la barra di stato: così sopra il titolo non serve lo
+   * spazio per l'orologio, che dentro al foglio si leggeva come un vuoto, e
+   * gli angoli tondi in alto dicono che è un foglio appoggiato sopra alla
+   * pagina, che si spinge via col dito. In basso restano dritti, perché lì
+   * finisce lo schermo, non il foglio.
    *
    * `.surface.modal` e non `.modal`: il vestito — bordo, angoli, ombra — lo
-   * mette `.surface`, e per vincere su di lei ci vogliono due classi. Con una
-   * sola gli angoli restavano tondi in basso, a disegnare una cornice intorno
-   * a un bordo che non c'è.
+   * mette `.surface`, e per vincere su di lei ci vogliono due classi.
    */
   .surface.modal {
-    inset: 0;
+    top: calc(env(safe-area-inset-top) + 10px);
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: auto;
     height: auto;
     max-height: none;
     border: 0;
-    border-radius: 0;
-    padding-top: calc(22px + env(safe-area-inset-top));
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
     padding-bottom: calc(var(--card-pad) + env(safe-area-inset-bottom));
     animation-name: sheet-in-mobile;
   }
-
-  /* la maniglia scende sotto l'orologio insieme al resto */
-  .modal::before { top: calc(9px + env(safe-area-inset-top)); }
 }

@@ -19,7 +19,12 @@ export function swipeToClose(node: HTMLElement, onClose: () => void) {
 
   const down = (event: PointerEvent) => {
     if (!window.matchMedia(NARROW).matches || event.button !== 0) return;
-    if (node.scrollTop > 0) return;
+    // si trascina solo da in cima: se quello che sta sotto al dito è già
+    // sceso, il dito vuole risalirlo, non chiudere. Lo scorrimento sta in un
+    // pezzo interno (il corpo della finestra), non nel foglio stesso.
+    for (let el = event.target as HTMLElement | null; el && el !== node.parentElement; el = el.parentElement) {
+      if (el.scrollTop > 0) return;
+    }
     if ((event.target as HTMLElement).closest('input, textarea, select, button, a, emoji-picker')) return;
     dragging = true;
     travelled = 0;
