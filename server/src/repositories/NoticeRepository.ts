@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, isNull, sql, type AnyColumn, inArray } from 'drizzle-orm';
+import { asc, desc, eq, sql, type AnyColumn } from 'drizzle-orm';
 import { iso, when, type Transaction } from '../persistence/db.js';
 import type { Ask, Page } from '../persistence/page.js';
 import { notices } from '../persistence/schema.js';
@@ -80,37 +80,6 @@ export class NoticeRepository {
       offset: ask.offset,
       limit: ask.limit,
     };
-  }
-
-  /**
-   * L'ultimo detto su un agente, e solo su di lui.
-   *
-   * Anche gli avvisi di un dispositivo portano il nome del suo agente — serve
-   * a sapere di quale casa si parla — ma non sono avvisi *sull'agente*:
-   * contarli faceva credere di aver già detto che era tornato, e l'avviso
-   * vero partiva due volte.
-   */
-  async lastAbout(agentId: string): Promise<Notice | undefined> {
-    const [row] = await this.tx.db
-      .select()
-      .from(notices)
-      // solo silenzio e ripresa: un avviso su un account dello stesso agente
-      // in mezzo farebbe credere che non ci sia niente da dire sul silenzio
-      .where(and(eq(notices.agentId, agentId), isNull(notices.deviceId), inArray(notices.kind, ['silent', 'back'])))
-      .orderBy(desc(notices.at))
-      .limit(1);
-    return row ? toNotice(row) : undefined;
-  }
-
-  /** E l'ultimo detto su un dispositivo, per la stessa ragione. */
-  async lastAboutDevice(deviceId: string): Promise<Notice | undefined> {
-    const [row] = await this.tx.db
-      .select()
-      .from(notices)
-      .where(eq(notices.deviceId, deviceId))
-      .orderBy(desc(notices.at))
-      .limit(1);
-    return row ? toNotice(row) : undefined;
   }
 
   async add(notice: Omit<Notice, 'id' | 'at'>): Promise<Notice> {

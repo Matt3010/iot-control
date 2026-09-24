@@ -1,4 +1,5 @@
 import type { Capability, DeviceValue } from '../../../shared/protocol.js';
+import { nomeColore, numero } from '../../../shared/regole.js';
 import type { Op } from '../types.js';
 
 /**
@@ -13,20 +14,9 @@ import type { Op } from '../types.js';
  * «acceso» di una cosa che non si è accesa sarebbe falso; e un participio in
  * italiano ha un genere, mentre i dispositivi si chiamano come capita.
  */
-/**
- * Il nome di una tinta, per il registro. È la stessa tavola che il sito usa
- * per scegliere un colore in una scena (src/lib/colori.ts): il colore più
- * vicino a quello chiesto.
- */
-const COLORI: [number, string][] = [
-  [0, 'rosso'], [30, 'arancione'], [55, 'giallo'], [120, 'verde'],
-  [190, 'azzurro'], [230, 'blu'], [280, 'viola'], [320, 'rosa'], [360, 'rosso'],
-];
-const nomeColore = (tinta: number): string =>
-  COLORI.reduce((meglio, uno) => (Math.abs(uno[0] - tinta) < Math.abs(meglio[0] - tinta) ? uno : meglio))[1];
-
 export function says(capability: Capability, value: DeviceValue): string {
-  if (capability.kind === 'color') return `colore ${nomeColore(Number(value))}`;
+  // il nome più vicino, con la stessa tavola del sito (`shared/regole.js`)
+  if (capability.kind === 'color') return `colore ${nomeColore(Number(value)).toLocaleLowerCase('it')}`;
   if (capability.kind === 'switch') return capability.pulse ? 'premi' : value ? 'accendi' : 'spegni';
   if (capability.kind === 'enum') return String(value);
   // le parole di un sensore, come si leggono: «Aperta», «uno squillo»
@@ -36,12 +26,16 @@ export function says(capability: Capability, value: DeviceValue): string {
   return String(value);
 }
 
-/** Un numero come si legge in Italia: la virgola, e l'unità dopo uno spazio. */
-export function number(value: DeviceValue | string, unit?: string): string {
-  const numero = Number(value);
-  const scritto = Number.isFinite(numero) ? numero.toLocaleString('it', { maximumFractionDigits: 1 }) : String(value);
-  return unit ? `${scritto} ${unit}` : scritto;
-}
+/**
+ * «1 dispositivo», «3 dispositivi». Il singolare conta anche dentro a una
+ * frase più lunga: «1 dispositivi su 2» fa sembrare scritto male tutto il
+ * resto. Lo dicono il registro dell'inventario e quello delle scene, con la
+ * stessa funzione.
+ */
+export const dispositivi = (quanti: number): string => `${quanti} ${quanti === 1 ? 'dispositivo' : 'dispositivi'}`;
+
+/** Un numero come si legge in Italia, lo stesso che scrive il sito. */
+export const number = numero;
 
 /**
  * Una soglia detta come la si direbbe: «sale sopra 25 °C», «scende sotto

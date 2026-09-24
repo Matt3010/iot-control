@@ -23,6 +23,10 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server/dist ./server/dist
+# Le regole che server e sito dicono allo stesso modo (shared/regole.js): il
+# server compilato le importa da qui, alla stessa distanza da cui le importa
+# il sorgente, quindi non passano dal compilatore.
+COPY shared ./shared
 # Le migrazioni: file SQL, non codice compilato, e senza di loro il server
 # parte e non trova le tabelle. Le legge lui stesso all'avvio.
 COPY server/drizzle ./server/drizzle

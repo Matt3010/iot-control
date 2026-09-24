@@ -178,7 +178,8 @@ async function main(): Promise<void> {
             ownerId: one.ownerId,
             name: one.name,
             steps: one.steps ?? [],
-            timing: one.when ?? null,
+            // il fuso che i vecchi orari si portavano dietro non vale più: vale quello dell'account
+            timing: one.when ? { ...one.when, tz: undefined } : null,
             lastRunAt: one.lastRunAt ?? null,
           })),
         )

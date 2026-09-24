@@ -1,4 +1,4 @@
-import { plainToInstance, Transform, Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -7,6 +7,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -69,8 +70,8 @@ export class SceneStepDto {
  * Quando una scena parte da sola.
  *
  * L'orario si scrive come si legge — `07:30` — e i giorni sono numeri, da
- * domenica a sabato. Il fuso arriva dal browser di chi la scrive: «le sette»
- * vuol dire le sette dove sta lui, e fra sei mesi vuol dire ancora le sette.
+ * domenica a sabato. Il fuso non si manda: è quello dell'account, e «le
+ * sette» vuol dire le sette di chi ha la scena, anche fra sei mesi.
  */
 export class TimingDto {
   @IsString()
@@ -90,11 +91,6 @@ export class TimingDto {
   @Min(0, { each: true })
   @Max(6, { each: true })
   days?: number[];
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  tz?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -230,17 +226,9 @@ export class SceneDto {
   @Type(() => SceneTriggerDto)
   triggers?: SceneTriggerDto[];
 
-  /**
-   * Tutte le condizioni, come un gruppo solo. Un elenco semplice è come le
-   * mandava la pagina prima dei gruppi, e un telefono con quella ancora in
-   * memoria le manda così: vuol dire «tutte», e diventa quel gruppo.
-   */
+  /** Tutte le condizioni, come un gruppo solo che può contenerne altri. */
   @IsOptional()
-  @Transform(({ obj, value }) =>
-    Array.isArray(obj.only)
-      ? plainToInstance(SceneConditionDto, { kind: 'group', match: 'all', items: obj.only })
-      : value,
-  )
+  @IsObject({ message: 'le condizioni arrivano come un gruppo' })
   @ValidateNested()
   @Type(() => SceneConditionDto)
   only?: SceneConditionDto;

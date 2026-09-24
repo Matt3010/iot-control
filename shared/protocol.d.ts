@@ -46,14 +46,35 @@ export type Capability = (
    * a ogni cambiamento e un JPEG no. Si chiede quando serve.
    */
   | { code: string; kind: 'image'; label: string }
-  | { code: string; kind: 'range'; label: string; min: number; max: number; step: number; unit?: string }
+  | {
+      code: string;
+      kind: 'range';
+      label: string;
+      min: number;
+      max: number;
+      step: number;
+      unit?: string;
+      /**
+       * L'interruttore che si accende quando questo valore va sopra zero: la
+       * luminosità di una luce, la velocità di un ventilatore. Lo dice
+       * l'agente, che sa come si comanda la cosa, e serve a capire che una
+       * scena che alza la luminosità fa scattare anche «quando si accende».
+       */
+      accende?: string;
+    }
   /**
    * Un colore, come tinta sul cerchio da 0 a 360. È un numero, ma non si
    * chiede «sopra» o «sotto»: rosso e viola stanno ai due capi e sono quasi
    * lo stesso colore. Si sceglie con il suo controllo, o per nome in una
    * scena.
    */
-  | { code: string; kind: 'color'; label: string }
+  | {
+      code: string;
+      kind: 'color';
+      label: string;
+      /** L'interruttore che si accende quando si sceglie un colore, come `accende` di un cursore. */
+      accende?: string;
+    }
   | {
       code: string;
       kind: 'enum';
@@ -61,6 +82,19 @@ export type Capability = (
       values: string[];
       /** Come si leggono le voci, quando il valore è una parola da macchina: `off` → «Spento». */
       labels?: Record<string, string>;
+      /**
+       * Un ordine e non uno stato: «apri», «ferma», «arma fuori casa». Si
+       * manda e basta, e il dispositivo non dice mai quale è stato l'ultimo,
+       * quindi non si chiede in un avviso o in una condizione. Lo dice chi lo
+       * conosce, l'agente, invece di un elenco di nomi da tenere qui.
+       */
+      order?: true;
+      /**
+       * Come si legge ogni voce in una prova, quando la voce è un verbo: la
+       * serratura «Apri» è aperta («è aperta», «si apre»), «Chiudi a chiave»
+       * è chiusa a chiave. Senza, la voce si legge com'è scritta.
+       */
+      detti?: Record<string, { se: string; quando: string }>;
     }
   | {
       code: string;

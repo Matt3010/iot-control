@@ -4,9 +4,11 @@ import { notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
 import { store } from '../persistence/db.js';
 import { AgentRepository } from '../repositories/AgentRepository.js';
+import { AlertRepository } from '../repositories/AlertRepository.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import type { Agent, Place } from '../types.js';
+import { guardati } from './guardati.js';
 
 /**
  * Il token di un agente: `pia_<id>.<segreto>`. L'id sta dentro perché così, a
@@ -71,12 +73,15 @@ export class AgentManager {
    * Un agente che se ne va porta via i suoi dispositivi. I luoghi che lo
    * tenevano restano dove sono: erano luoghi prima di essere interruttori.
    */
-  async remove(ownerId: string, id: string): Promise<{ places: Place[]; scenes: number }> {
+  async remove(ownerId: string, id: string): Promise<{ places: Place[]; scenes: number; regole: number }> {
     const fatto = await store.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
       if (!(await agents.owns(ownerId, id))) throw notFound('agente inesistente');
 
-      const gone = await new DeviceRepository(tx).deleteByAgent(id);
+      const devices = new DeviceRepository(tx);
+      // le regole se ne vanno con i dispositivi, per il vincolo: si contano prima
+      const regole = await new AlertRepository(tx).countOfDevices((await devices.findAllOfAgent(id)).map((one) => one.id));
+      const gone = await devices.deleteByAgent(id);
       /*
        * E le righe delle scene che comandavano quei dispositivi.
        *
@@ -87,10 +92,12 @@ export class AgentManager {
        */
       const scenes = await new SceneRepository(tx).pruneDevices(ownerId, new Set(gone.devices));
       await agents.delete(id);
-      return { ...gone, scenes };
+      return { places: gone.places, scenes, regole };
     });
     hub.forget(id);
-    return { places: fatto.places, scenes: fatto.scenes };
+    // i suoi dispositivi non ci sono più, e con loro quello che li guardava
+    guardati.cambiate();
+    return fatto;
   }
 
   /** Alla stretta di mano: chi è questo, e ha davvero questo token? */

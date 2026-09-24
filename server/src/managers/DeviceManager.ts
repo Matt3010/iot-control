@@ -7,18 +7,9 @@ import { AlertRepository } from '../repositories/AlertRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { check } from './check.js';
 import { logManager } from './LogManager.js';
-import { says } from './says.js';
+import { guardati } from './guardati.js';
+import { dispositivi, says } from './says.js';
 import type { Device } from '../types.js';
-
-/**
- * «1 dispositivo in più», «2 dispositivi in meno».
- *
- * Nel registro ci finiva «1 in più», e uno in più di cosa lo doveva indovinare
- * chi leggeva. Una riga di registro si legge di sfuggita, magari la mattina
- * dopo: deve dire per intero di cosa parla.
- */
-const conta = (quanti: number): string =>
-  `${quanti} ${quanti === 1 ? 'dispositivo' : 'dispositivi'}`;
 
 export class DeviceManager {
   list(ownerId: string): Promise<Device[]> {
@@ -54,19 +45,33 @@ export class DeviceManager {
     ownerId: string,
     agentId: string,
     snapshots: DeviceSnapshot[],
-    /** Se l'elenco è completo, e quindi chi non c'è dentro va tolto. */
+    /** Se l'elenco è completo, e quindi chi non c'è dentro va segnato come sparito. */
     completo = true,
   ): Promise<Device[]> {
-    const { devices, gone, scenes, before, tutti } = await store.transaction(async (tx) => {
+    const { devices, tutti, nuovi, cambiati, gone, spostati } = await store.transaction(async (tx) => {
       const repository = new DeviceRepository(tx);
-      const was = (await repository.findAllOfAgent(agentId)).length;
+      // letti una volta: tutto quello che serve dopo si sa da qui e da quello che torna dalle scritture
+      const prima = await repository.findAllOfAgent(agentId);
+      const perEsterno = new Map(prima.map((one) => [one.externalId, one]));
 
-      const kept: Device[] = [];
-      for (const snapshot of snapshots) {
-        kept.push(
-          await repository.upsert(ownerId, agentId, snapshot.externalId, snapshot.name, snapshot.capabilities),
+      const kept = await repository.upsertMany(ownerId, agentId, snapshots);
+      /*
+       * Cambiato vuol dire qualcosa che chi guarda vede: uno nuovo, un nome,
+       * quello che sa fare, uno sparito che torna. L'ora in cui si è fatto
+       * sentire l'ultima volta non conta, se no ogni ricollegamento
+       * rileggerebbe l'elenco di tutte le schede aperte.
+       */
+      const nuovi = kept.filter((one) => !perEsterno.has(one.externalId)).length;
+      const cambiati = kept.filter((one) => {
+        const era = perEsterno.get(one.externalId);
+        return (
+          !!era &&
+          (era.name !== one.name ||
+            !!era.goneAt ||
+            JSON.stringify(era.capabilities) !== JSON.stringify(one.capabilities))
         );
-      }
+      }).length;
+      for (const one of kept) perEsterno.set(one.externalId, one);
 
       /*
        * Un'entità che adesso sta dentro a un dispositivo — il sensore dei
@@ -75,20 +80,21 @@ export class DeviceManager {
        * dispositivo che lo tiene dentro, con il codice che dice da dove
        * viene. Tolto dopo, se li porterebbe via.
        */
-      const perEsterno = new Map((await repository.findAllOfAgent(agentId)).map((one) => [one.externalId, one]));
-      /** Quelli entrati dentro a un altro: scene e avvisi sono già passati a lui, e loro se ne vanno subito. */
-      const assorbiti: string[] = [];
+      const moves: { from: string; to: string; prefisso: string }[] = [];
       for (const snapshot of snapshots) {
         const casa = perEsterno.get(snapshot.externalId);
         for (const assorbito of snapshot.absorbs ?? []) {
           const vecchio = perEsterno.get(assorbito);
           if (!casa || !vecchio || vecchio.id === casa.id) continue;
-          await new SceneRepository(tx).moveDevice(ownerId, vecchio.id, casa.id, assorbito);
-          await new AlertRepository(tx).moveDevice(vecchio.id, casa.id, assorbito);
-          assorbiti.push(vecchio.id);
+          moves.push({ from: vecchio.id, to: casa.id, prefisso: assorbito });
+          perEsterno.delete(assorbito);
         }
       }
-      await repository.deleteMany(assorbiti);
+      const scene = await new SceneRepository(tx).moveDevices(ownerId, moves);
+      const alerts = new AlertRepository(tx);
+      let regole = 0;
+      for (const move of moves) regole += await alerts.moveDevice(move.from, move.to, move.prefisso);
+      await repository.deleteMany(moves.map((move) => move.from));
 
       /*
        * Chi non c'è più non si cancella: si segna da quando manca, e resta
@@ -96,12 +102,21 @@ export class DeviceManager {
        * ricollegato riporta gli stessi dispositivi, e ritrovano tutto com'era.
        * Se ne vanno davvero solo con «Rimuovi», dalla loro scheda.
        */
+      const raccontati = new Set(snapshots.map((snapshot) => snapshot.externalId));
       const lost = completo
-        ? await repository.lostOfAgent(agentId, new Set(snapshots.map((snapshot) => snapshot.externalId)))
+        ? [...perEsterno.values()].filter((one) => !raccontati.has(one.externalId)).map((one) => one.id)
         : [];
       const appena = await repository.markGone(lost);
+      for (const one of appena) perEsterno.set(one.externalId, one);
 
-      return { devices: kept, gone: appena, scenes: 0, before: was, tutti: await repository.findAllOfAgent(agentId) };
+      return {
+        devices: kept,
+        tutti: [...perEsterno.values()],
+        nuovi,
+        cambiati,
+        gone: appena.length,
+        spostati: { scene, regole, dispositivi: moves.length },
+      };
     });
 
     // l'indice li tiene tutti, anche quelli che una presentazione non ha nominato
@@ -110,11 +125,9 @@ export class DeviceManager {
       hub.publish(ownerId, agentId, snapshot.externalId, { online: snapshot.online, state: snapshot.state });
     }
 
-    // L'inventario è cambiato: chi guarda deve rileggerlo, se no si tiene i
-    // fantasmi di quelli spariti o non vede quelli nuovi.
     // Nel registro ci finisce solo se è cambiato qualcosa: un agente che si
     // ricollega e racconta le stesse cose non è una notizia.
-    if (gone || tutti.length !== before) {
+    if (gone || nuovi) {
       logManager.note({
         ownerId,
         agentId,
@@ -122,18 +135,23 @@ export class DeviceManager {
         // Una frase intera e non un conteggio: «2 dispositivi in meno» non
         // dice se sono spariti dalla rete o se li hai tolti tu, e la riga si
         // legge di sfuggita la mattina dopo.
-        detail: [
-          tutti.length > before ? `ha trovato ${conta(tutti.length - before)} in più` : '',
-          gone ? `non trova più ${conta(gone)}` : '',
-        ]
+        detail: [nuovi ? `ha trovato ${dispositivi(nuovi)} in più` : '', gone ? `non trova più ${dispositivi(gone)}` : '']
           .filter(Boolean)
           .join(', e '),
       });
     }
 
-    if (gone || devices.length) hub.changed(ownerId, { kind: 'devices' });
-    // gli insiemi cambiati si rileggono insieme ai dispositivi: è la stessa lista
-    if (scenes) hub.changed(ownerId, { kind: 'devices' });
+    /*
+     * L'inventario è cambiato: chi guarda deve rileggerlo, se no si tiene i
+     * fantasmi di quelli spariti o non vede quelli nuovi. Le scene che
+     * nominavano un dispositivo assorbito si rileggono con lui, perché il
+     * sito rilegge dispositivi e scene insieme. Le regole degli avvisi hanno
+     * il loro evento.
+     */
+    if (gone || nuovi || cambiati || spostati.dispositivi) hub.changed(ownerId, { kind: 'devices' });
+    if (spostati.regole) hub.changed(ownerId, { kind: 'rules' });
+    // scene e avvisi scritti su un dispositivo assorbito adesso guardano l'altro
+    if (spostati.dispositivi) guardati.cambiate();
     return devices;
   }
 
@@ -144,16 +162,20 @@ export class DeviceManager {
    * al prossimo inventario tornerebbe, nuovo e senza niente.
    */
   async remove(ownerId: string, id: string): Promise<void> {
-    await store.transaction(async (tx) => {
+    const regole = await store.transaction(async (tx) => {
       const devices = new DeviceRepository(tx);
       const device = await devices.findById(id);
       if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
       if (!device.goneAt) throw badRequest('c’è ancora, per toglierlo si scollega il servizio da cui viene');
       await new SceneRepository(tx).pruneDevices(ownerId, new Set([id]));
-      await new AlertRepository(tx).pruneDevices(new Set([id]));
+      const cadute = await new AlertRepository(tx).pruneDevices(new Set([id]));
       await devices.deleteMany([id]);
+      return cadute;
     });
+    // dispositivi e scene si rileggono insieme; gli avvisi scritti su di lui se ne sono andati con lui
+    guardati.cambiate();
     hub.changed(ownerId, { kind: 'devices' });
+    if (regole) hub.changed(ownerId, { kind: 'rules' });
   }
 
   /**

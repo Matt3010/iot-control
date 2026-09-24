@@ -50,6 +50,41 @@
       "when": 1790266377394,
       "tag": "0006_dispositivi-spariti",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790270544366,
+      "tag": "0007_fusibile-silenzi-e-partenze",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790273129742,
+      "tag": "0008_ordini-senza-stato",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790281077203,
+      "tag": "0009_battito-delle-partenze",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790282180705,
+      "tag": "0010_silenzi-e-indici-parziali",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790283095384,
+      "tag": "0011_parole-di-stato-e-accende",
+      "breakpoints": true
     }
   ]
 }

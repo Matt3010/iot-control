@@ -1,5 +1,7 @@
 import type { Capability, DeviceValue } from '../../../shared/protocol.js';
+import { nonProvabile, siMisura, type NonProvabile } from '../../../shared/regole.js';
 import { badRequest } from '../errors/HttpError.js';
+import type { Op } from '../types.js';
 
 /**
  * Questo valore, a questa cosa, si può dire?
@@ -44,67 +46,67 @@ export function check(capability: Capability, value: DeviceValue): void {
   }
 }
 
-/**
- * Questa cosa dice com'è davvero, o solo cosa le è stato ordinato?
- *
- * Il movimento di una tenda è un ordine. Il valore che torna è l'ultimo
- * dato da qui, e se la tenda si apre dal pulsante a muro nessuno lo viene
- * a sapere, perché i motori non lo raccontano. Una condizione o un avviso
- * scritti su quello direbbero «chiuso» a finestre aperte. Una tenda che
- * riporta la posizione ha «Apertura», che è un dato vero, e si chiede
- * quella.
- */
-export const SOLO_ORDINI = new Set(['move', 'volume_step', 'playback', 'press', 'activate', 'vacuum', 'mower']);
+/** Come si dice a chi scrive la prova perché su quella cosa non si può. */
+const PERCHE: Record<NonProvabile, (label: string, deviceName: string) => string> = {
+  immagine: (_label, deviceName) => `«${deviceName}» si guarda e basta`,
+  colore: (label, deviceName) => `«${label}» di «${deviceName}» è un colore, quindi non si può chiedere in una condizione`,
+  impostazione: (label, deviceName) =>
+    `«${label}» di «${deviceName}» è un’impostazione, quindi non si può chiedere in una condizione`,
+  evento: (label, deviceName) =>
+    `«${label}» di «${deviceName}» è un evento, quindi si chiede quando succede e non com’è`,
+  impulso: (_label, deviceName) =>
+    `«${deviceName}» è a impulso e non si sa com’è rimasto, quindi non si può chiedere in una condizione`,
+  ordine: (_label, deviceName) =>
+    `di «${deviceName}» si sa solo l’ultimo ordine dato e non com’è adesso, quindi non si può chiedere in una condizione`,
+};
 
-export function provabile(
+/**
+ * Una prova su un dispositivo — «quando la porta si apre», «se sopra 25
+ * gradi» — controllata e scritta nella sua forma: la soglia come numero, un
+ * valore preciso come testo.
+ *
+ * Una funzione sola per gli avvisi, le partenze e le condizioni delle scene
+ * (CLAUDE.md, «Le prove sui dispositivi»). Erano due controlli, e quello
+ * degli avvisi lasciava scrivere «uguale a» su un numero, un interruttore
+ * «acceso» con una parola qualunque e una telecamera.
+ *
+ * Se si può chiedere lo decide `nonProvabile` in `shared/regole.js`, lo
+ * stesso che usa il sito per non mostrare quello che qui si rifiuta.
+ */
+export function provaDi(
   capability: Capability,
   deviceName: string,
   /** `quando` è una cosa che succede, `se` una cosa che è vera adesso. */
   modo: 'quando' | 'se',
-  value?: unknown,
-): void {
-  // un evento succede e basta: non c'è un «com'è» da chiedere in un «solo se»
-  if (modo === 'se' && capability.kind === 'sensor' && capability.event) {
-    throw badRequest(`«${capability.label}» di «${deviceName}» è un evento, quindi si chiede quando succede e non com’è`);
+  op: Op,
+  value: unknown,
+): { op: Op; value: string | number } {
+  const perche = nonProvabile(capability, modo);
+  if (perche) throw badRequest(PERCHE[perche](capability.label, deviceName));
+
+  if (siMisura(capability)) {
+    if (op === 'is') throw badRequest(`per «${deviceName}» si sceglie sopra o sotto un numero`);
+    const soglia = Number(value);
+    if (value === '' || value === null || !Number.isFinite(soglia)) throw badRequest('la soglia va scritta come numero');
+    return { op, value: soglia };
   }
 
-  // un colore non si chiede: rosso e viola stanno ai due capi del cerchio e sono quasi lo stesso
-  if (capability.kind === 'color') {
-    throw badRequest(`«${capability.label}» di «${deviceName}» è un colore, quindi non si può chiedere in una condizione`);
+  if (op !== 'is') throw badRequest('sopra e sotto valgono solo per i numeri');
+  const scritto = String(value);
+  if (capability.kind === 'switch') {
+    /*
+     * A impulso torna spento dopo mezzo secondo: che scatti si vede, perché
+     * l'impulso comincia con un'accensione, ed è l'unica cosa che se ne
+     * può chiedere.
+     */
+    if (capability.pulse && scritto !== 'true') throw badRequest(`di «${deviceName}» si può chiedere solo quando scatta`);
+    if (scritto !== 'true' && scritto !== 'false') throw badRequest('un interruttore è acceso o spento');
   }
-
-  // un'impostazione si cambia, ma non è una cosa che succede in casa
-  if (capability.setting) {
-    throw badRequest(`«${capability.label}» di «${deviceName}» è un’impostazione, quindi non si può chiedere in una condizione`);
-  }
-
-  /*
-   * A impulso torna spento dopo mezzo secondo, e com'è rimasto quello che
-   * comanda non si sa: non si chiede in un «solo se». Che scatti invece si
-   * vede, perché l'impulso comincia con un'accensione, ed è l'unica cosa
-   * che se ne può chiedere.
-   */
-  if (capability.kind === 'switch' && capability.pulse) {
-    if (modo === 'se') {
-      throw badRequest(`«${deviceName}» è a impulso e non si sa com’è rimasto, quindi non si può chiedere in una condizione`);
-    }
-    if (String(value) !== 'true') throw badRequest(`di «${deviceName}» si può chiedere solo quando scatta`);
-    return;
-  }
-  if (!SOLO_ORDINI.has(capability.code)) return;
-  throw badRequest(
-    `di «${deviceName}» si sa solo l’ultimo ordine dato e non com’è adesso, quindi non si può chiedere in una condizione`,
-  );
+  const parole = paroleDi(capability);
+  if (parole && !parole.includes(scritto)) throw badRequest(`«${deviceName}» non ha il valore «${scritto}»`);
+  return { op, value: scritto };
 }
 
-/**
- * Se si chiede con un numero — «sopra 25», «sotto 18» — o con una parola.
- * Un sensore che dichiara le sue parole (una porta, un movimento) è una
- * parola, anche se è un sensore.
- */
-export const siMisura = (capability: Capability): boolean =>
-  capability.kind === 'range' || (capability.kind === 'sensor' && !capability.values?.length);
-
 /** Le parole che si possono chiedere a una capacità che non si misura. */
-export const paroleDi = (capability: Capability): string[] | undefined =>
+const paroleDi = (capability: Capability): string[] | undefined =>
   capability.kind === 'enum' ? capability.values : capability.kind === 'sensor' ? capability.values : undefined;

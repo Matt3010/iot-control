@@ -18,6 +18,11 @@ import type { Agent } from '../types.js';
  */
 const visti = new Map<string, Map<string, LinkedAccount>>();
 
+/** Un agente che se ne va non ha più account da ricordare. */
+export function dimentica(agentId: string): void {
+  visti.delete(agentId);
+}
+
 const giu = (account: LinkedAccount | undefined): boolean => account?.health === 'lost' || !!account?.ricollega;
 
 export async function accountsReported(agent: Agent, accounts: LinkedAccount[]): Promise<void> {

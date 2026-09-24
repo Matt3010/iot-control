@@ -1,24 +1,17 @@
 import { badRequest, notFound } from '../errors/HttpError.js';
+import { Fila } from '../iot/fila.js';
 import { hub } from '../iot/hub.js';
 import { store } from '../persistence/db.js';
 import { AlertRepository } from '../repositories/AlertRepository.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
 import { holds } from '../rules/prove.js';
-import type { Alert, Device, Op } from '../types.js';
-import { noticeManager } from './NoticeManager.js';
-import { paroleDi, provabile, siMisura } from './check.js';
+import { statoDi } from '../../../shared/regole.js';
+import type { Alert, Device, Notice, Op } from '../types.js';
+import { noticeManager, scrivi } from './NoticeManager.js';
+import { provaDi } from './check.js';
+import { guardati } from './guardati.js';
 import { number, says, saysThreshold } from './says.js';
-
-/**
- * Come si dice che una cosa comandata a ordini è cambiata. È la stessa
- * tabella che la pagina usa per scrivere le prove (src/lib/prove.ts), ma
- * qui serve solo il «quando», perché un avviso arriva quando succede.
- */
-const STATI: Record<string, Record<string, string>> = {
-  lock: { Apri: 'si apre', 'Chiudi a chiave': 'si chiude a chiave' },
-  valve: { Apri: 'si apre', Chiudi: 'si chiude' },
-};
 
 /**
  * Le regole scritte sui dispositivi, e chi le fa scattare.
@@ -34,60 +27,65 @@ export class AlertManager {
     return store.transaction((tx) => new AlertRepository(tx).findAllOf(ownerId));
   }
 
-  /** Scrive una regola nuova, dopo aver controllato che abbia senso. */
-  add(ownerId: string, deviceId: string, code: string, becomes: string, op: Op = 'is'): Promise<Alert> {
-    return store.transaction(async (tx) => {
+  /**
+   * Scrive una regola nuova, dopo aver controllato che abbia senso. Il
+   * controllo è lo stesso delle partenze e delle condizioni delle scene
+   * (`check.ts`, `provaDi`).
+   */
+  async add(ownerId: string, deviceId: string, code: string, becomes: string, op: Op = 'is'): Promise<Alert> {
+    const nuova = await store.transaction(async (tx) => {
       const device = await new DeviceRepository(tx).findById(deviceId);
       if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
 
       const capability = device.capabilities.find((one) => one.code === code);
       if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
-      provabile(capability, device.name, 'quando', becomes);
+      const prova = provaDi(capability, device.name, 'quando', op, becomes);
+      const valore = String(prova.value);
 
-      // una soglia vale per i numeri, un valore preciso per il resto
-      const numerica = siMisura(capability);
-      if (op !== 'is' && !numerica) throw badRequest('sopra e sotto valgono solo per i numeri');
-      if (op !== 'is' && !Number.isFinite(Number(becomes))) throw badRequest('la soglia va scritta come numero');
-      // una parola vale se è una di quelle che quella cosa sa dire
-      const parole = paroleDi(capability);
-      if (op === 'is' && parole && !parole.includes(becomes)) throw badRequest(`«${device.name}» non dice «${becomes}»`);
-
-      const alerts = new AlertRepository(tx);
-      const gia = (await alerts.findAllOf(ownerId)).some(
-        (one) => one.deviceId === deviceId && one.code === code && one.op === op && one.becomes === becomes,
-      );
-      if (gia) throw badRequest('questa regola c’è già');
-
-      return alerts.add({
+      // la stessa regola due volte la rifiuta l'archivio, anche da due schede insieme
+      const scritta = await new AlertRepository(tx).add({
         ownerId,
         deviceId,
         code,
-        op,
-        becomes,
-        says: `${device.name} ${this.#reads(device, code, becomes, op)}`,
+        op: prova.op,
+        becomes: valore,
+        says: `${device.name} ${this.#reads(device, code, valore, prova.op)}`,
         also: [],
       });
+      if (!scritta) throw badRequest('questa regola c’è già');
+      return scritta;
     });
+    guardati.cambiate();
+    return nuova;
   }
 
-  /** Spegne o riaccende una regola senza cancellarla. */
-  flip(ownerId: string, id: string, off: boolean): Promise<Alert> {
-    return store.transaction(async (tx) => {
+  /**
+   * Spegne o riaccende una regola senza cancellarla.
+   *
+   * Riaccesa riparte da capo, come appena scritta. Spenta non guarda più
+   * niente, quindi non vede nemmeno la porta che si chiude: se restava
+   * segnata come scattata, alla prossima apertura taceva.
+   */
+  async flip(ownerId: string, id: string, off: boolean): Promise<Alert> {
+    const fatta = await store.transaction(async (tx) => {
       const alerts = new AlertRepository(tx);
       const alert = await alerts.findById(id);
       if (!alert || alert.ownerId !== ownerId) throw notFound('regola inesistente');
 
-      return (await alerts.update(id, { off })) as Alert;
+      return (await alerts.update(id, off ? { off } : { off, firedAt: undefined })) as Alert;
     });
+    guardati.cambiate();
+    return fatta;
   }
 
-  remove(ownerId: string, id: string): Promise<void> {
-    return store.transaction(async (tx) => {
+  async remove(ownerId: string, id: string): Promise<void> {
+    await store.transaction(async (tx) => {
       const alerts = new AlertRepository(tx);
       const alert = await alerts.findById(id);
       if (!alert || alert.ownerId !== ownerId) throw notFound('regola inesistente');
       await alerts.delete(id);
     });
+    guardati.cambiate();
   }
 
   /**
@@ -99,44 +97,80 @@ export class AlertManager {
    * aspetta da «quando la porta si apre».
    */
   async happened(deviceId: string, code: string, value: unknown): Promise<void> {
+    // quasi tutti i passaggi non li guarda nessuno, e lo si sa senza chiederlo al database
+    if (!(await guardati.daAvvisi(deviceId, code))) return;
     const adesso = String(value);
 
     const scattate = await store.transaction(async (tx) => {
       const alerts = new AlertRepository(tx);
-      const device = await new DeviceRepository(tx).findById(deviceId);
-      const out: { alert: Alert; device: Device; luogo?: string }[] = [];
-      if (!device) return out;
+      // prima le regole: quasi tutti i passaggi non ne hanno, e lì ci si ferma
+      const guardano = await alerts.findWatching(deviceId, code);
+      if (!guardano.length) return [];
 
+      const rientrate = guardano.filter((alert) => !holds({ op: alert.op, value: alert.becomes }, value));
+      /*
+       * È rientrata, e da qui in poi può scattare di nuovo. Tutte e non solo
+       * quelle lette come scattate: un'apertura arrivata un istante prima
+       * può averla appena presa, e la condizione sta nella scrittura.
+       */
+      await alerts.rearm(rientrate.map((alert) => alert.id));
+
+      /*
+       * Scatta chi vince il turno: la condizione sta dentro alla scrittura,
+       * e due passaggi arrivati insieme non mandano due avvisi.
+       */
+      const vinte: Alert[] = [];
+      for (const alert of guardano) {
+        if (rientrate.includes(alert) || alert.firedAt) continue;
+        if (await alerts.fire(alert.id)) vinte.push(alert);
+      }
+      if (!vinte.length) return [];
+
+      const device = await new DeviceRepository(tx).findById(deviceId);
+      if (!device) return [];
       const luogo = (await new PlaceRepository(tx).findByAgent(device.agentId))?.name;
 
-      for (const alert of await alerts.findWatching(deviceId, code)) {
-        const centrata = holds({ op: alert.op, value: alert.becomes }, value);
-        if (!centrata) {
-          // è rientrata: da qui in poi può scattare di nuovo
-          if (alert.firedAt) await alerts.update(alert.id, { firedAt: undefined });
-          continue;
-        }
-
-        if (alert.firedAt) continue;
-        await alerts.update(alert.id, { firedAt: new Date().toISOString() });
-        out.push({ alert, device, ...(luogo ? { luogo } : {}) });
+      // la riga dell'avviso nella stessa transazione del turno: preso l'uno, c'è anche l'altra
+      const righe: Notice[] = [];
+      for (const alert of vinte) {
+        righe.push(
+          await scrivi(tx, alert.ownerId, {
+            kind: 'scene',
+            deviceId: device.id,
+            agentId: device.agentId,
+            who: device.name,
+            ...(luogo ? { where: luogo } : {}),
+            short: this.#fired(device, alert, adesso),
+            title: alert.says,
+            // sul telefono il titolo dice gia' tutto: sotto ci sta solo dove
+            body: luogo ? `Su «${luogo}».` : '',
+          }),
+        );
       }
-      return out;
+      return righe;
     });
 
-    for (const { alert, device, luogo } of scattate) {
-      await noticeManager.tell(alert.ownerId, {
-        kind: 'scene',
-        deviceId: device.id,
-        agentId: device.agentId,
-        who: device.name,
-        ...(luogo ? { where: luogo } : {}),
-        short: this.#fired(device, alert, adesso),
-        title: alert.says,
-        // sul telefono il titolo dice gia' tutto: sotto ci sta solo dove
-        body: luogo ? `Su «${luogo}».` : '',
-      });
-    }
+    for (const riga of scattate) await noticeManager.manda(riga);
+  }
+
+  /**
+   * Com'è un dispositivo quando non c'è un passaggio da raccontare: il primo
+   * stato dopo un riavvio, o dopo che è tornato in rete.
+   *
+   * Non fa scattare niente, perché non si sa quando è successo. Ma una regola
+   * già scattata che adesso non vale più rientra: se la porta si è chiusa
+   * mentre non la vedevamo, la prossima volta che si apre lo si deve dire.
+   */
+  async settled(deviceId: string, state: Record<string, unknown>): Promise<void> {
+    if (!(await guardati.conAvvisi(deviceId))) return;
+    await store.transaction(async (tx) => {
+      const alerts = new AlertRepository(tx);
+      const scattate = await alerts.findFiredOf(deviceId);
+      const rientrate = scattate.filter(
+        (alert) => alert.code in state && !holds({ op: alert.op, value: alert.becomes }, state[alert.code]),
+      );
+      await alerts.rearm(rientrate.map((alert) => alert.id));
+    });
   }
 
   /**
@@ -163,8 +197,8 @@ export class AlertManager {
     if (capability.kind === 'switch') return value === 'true' ? 'si accende' : 'si spegne';
     // una serratura si comanda con «Apri» e con lo stesso valore dice com'è
     // rimasta, e letto come un ordine l'avviso sembrava chiederle di aprirsi
-    const stato = STATI[code]?.[value];
-    if (stato) return stato;
+    const stato = statoDi(capability, value);
+    if (stato) return stato.quando;
     /*
      * Il valore fra virgolette e com'e' scritto. Smontato in minuscolo
      * diventava «diventa apri», che non e' italiano: quelle parole le
@@ -180,9 +214,17 @@ export const alertManager = new AlertManager();
 /*
  * Il hub racconta i passaggi, le regole li ascoltano. Il legame si fa qui e
  * non dentro al hub: lui sa cosa succede in casa, non cosa farne.
+ *
+ * In fila per dispositivo (`iot/fila.ts`). «Si apre» e «si chiude» un
+ * istante dopo sono due transazioni: in parallelo la chiusura può finire
+ * prima dell'apertura, e la regola resterebbe scattata con la porta chiusa,
+ * muta alla volta dopo. Dispositivi diversi invece non si aspettano.
  */
-hub.watchesChanges((deviceId, code, value) => {
-  void alertManager
-    .happened(deviceId, code, value)
-    .catch((error: Error) => console.warn(`regole di ${deviceId}, ${error.message}`));
+const regole = new Fila((deviceId, error) => console.warn(`regole di ${deviceId}, ${error.message}`));
+
+hub.watchesChanges((deviceId, cambi) => {
+  void regole.metti(deviceId, async () => {
+    for (const cambio of cambi) await alertManager.happened(deviceId, cambio.code, cambio.value);
+  });
 });
+hub.watchesSnapshots((deviceId, state) => void regole.metti(deviceId, () => alertManager.settled(deviceId, state)));

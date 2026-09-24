@@ -99,6 +99,8 @@ export interface Agent {
   /** L'ultima volta che si è fatto vivo. Nullo se non si è mai collegato. */
   lastSeenAt: string | null;
   createdAt: string;
+  /** Da quando tace, se l'avviso è già partito. */
+  quietSince: string | null;
 }
 
 /**
@@ -128,6 +130,8 @@ export interface Device {
   name: string;
   capabilities: Capability[];
   lastSeenAt: string;
+  /** Da quando tace, se l'avviso è già partito. */
+  quietSince?: string;
 }
 
 /**
@@ -191,10 +195,10 @@ export interface SceneStep {
 /**
  * Quando una scena parte da sola.
  *
- * Un orario a muro e i giorni in cui vale, con il fuso in cui quell'orario e'
- * scritto: «le sette di sera» vuol dire sette di sera lì, non sette al
- * meridiano di Greenwich, e a ottobre le lancette si spostano senza chiedere
- * il permesso a nessuno.
+ * Un orario a muro e i giorni in cui vale. Il fuso non sta qui: è quello
+ * dell'account (`User.tz`), così «le sette di sera» sono le sette di chi le
+ * ha scritte anche se chi guarda è altrove, e a ottobre le lancette si
+ * spostano senza chiedere il permesso a nessuno.
  */
 export interface Timing {
   /** L'ora del giorno, come la si legge su un orologio: `07:30`. */
@@ -210,8 +214,6 @@ export interface Timing {
   on?: string;
   /** I giorni in cui vale, da domenica (0) a sabato (6). Vuoto vuol dire tutti. */
   days: number[];
-  /** Dove sono quelle lancette: `Europe/Rome`. */
-  tz: string;
   /** Sospesa senza cancellarla, per l'estate o per una settimana fuori. */
   off?: boolean;
 }
@@ -297,6 +299,12 @@ export interface Scene {
   lastRunAt?: string;
   /** L'ultima volta che è partita, in qualunque modo. */
   ranAt?: string;
+  /**
+   * Da quando il fusibile l'ha fermata, perché ripartiva da sola di
+   * continuo. Finché c'è non parte da sola; la riaccende chi la cambia o la
+   * fa partire a mano.
+   */
+  blownAt?: string;
 }
 
 /**

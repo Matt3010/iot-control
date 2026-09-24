@@ -1,4 +1,5 @@
-import type { Capability, DeviceValue } from '../../../shared/protocol.js';
+import type { Capability } from '../../../shared/protocol.js';
+import { comandi, stendi } from './chiamate.js';
 import type { Device, Scene, SceneTrigger } from '../types.js';
 
 /**
@@ -13,14 +14,10 @@ import type { Device, Scene, SceneTrigger } from '../types.js';
  * tocca lo stesso dispositivo. «Quando la luce si accende, dopo dieci minuti
  * spegnila» non è un giro, perché spegnere non fa scattare «si accende».
  * Quello che dai dati non si vede — una presa che accende un sensore di
- * movimento — lo ferma a parte la pausa in `services/SceneTriggers.ts`.
+ * movimento — lo ferma a parte il fusibile in `services/SceneTriggers.ts`.
  */
 
-interface Comando {
-  deviceId: string;
-  code: string;
-  value: DeviceValue;
-}
+type Comando = ReturnType<typeof comandi>[number];
 
 /** Un passo del giro: da quale scena, attraverso quale dispositivo, a quale. */
 export interface Passo {
@@ -29,27 +26,20 @@ export interface Passo {
   a: string;
 }
 
-/** Quello che una scena comanda, anche attraverso le scene che chiama. */
-function comandiDi(scene: Scene, perId: Map<string, Scene>, visti = new Set<string>()): Comando[] {
-  if (visti.has(scene.id)) return [];
-  visti.add(scene.id);
-  return scene.steps.flatMap((step): Comando[] => {
-    if (step.scene) {
-      const chiamata = perId.get(step.scene);
-      return chiamata ? comandiDi(chiamata, perId, visti) : [];
-    }
-    if (!step.deviceId || !step.code || step.value === undefined) return [];
-    return [{ deviceId: step.deviceId, code: step.code, value: step.value }];
-  });
-}
-
 /** Se quel comando può far scattare quella partenza. */
-function faScattare(comando: Comando, trigger: SceneTrigger, capability: Capability | undefined): boolean {
+function faScattare(comando: Comando, trigger: SceneTrigger, capability: Capability | undefined, delComando: Capability | undefined): boolean {
   if (comando.deviceId !== trigger.deviceId) return false;
 
   if (comando.code !== trigger.code) {
-    // una luminosità o una velocità sopra zero accendono anche l'interruttore
-    return trigger.code === 'power' && String(trigger.value) === 'true' && Number(comando.value) > 0;
+    /*
+     * Una luminosità o un colore accendono anche l'interruttore: lo dice
+     * l'agente con `accende`, che nomina proprio quell'interruttore (per un
+     * accessorio, quello della sua entità). Un cursore accende sopra zero,
+     * un colore sempre.
+     */
+    if (!delComando || !('accende' in delComando) || delComando.accende !== trigger.code) return false;
+    if (String(trigger.value) !== 'true') return false;
+    return delComando.kind === 'color' || Number(comando.value) > 0;
   }
 
   // a impulso ogni pressione scatta, qualunque cosa si scriva
@@ -63,15 +53,19 @@ function faScattare(comando: Comando, trigger: SceneTrigger, capability: Capabil
 /** Chi fa partire chi, e attraverso quale dispositivo. */
 function archi(scenes: Scene[], devices: Device[]): Passo[] {
   const perId = new Map(scenes.map((one) => [one.id, one]));
+  const trova = (id: string) => perId.get(id);
+  const perDispositivo = new Map(devices.map((one) => [one.id, one]));
   const capacita = (deviceId: string, code: string): Capability | undefined =>
-    devices.find((one) => one.id === deviceId)?.capabilities.find((one) => one.code === code);
+    perDispositivo.get(deviceId)?.capabilities.find((one) => one.code === code);
 
   const out: Passo[] = [];
   for (const da of scenes) {
-    const comandi = comandiDi(da, perId);
+    const suoi = comandi(stendi(da, trova));
     for (const a of scenes) {
       for (const trigger of a.triggers ?? []) {
-        const colpo = comandi.find((comando) => faScattare(comando, trigger, capacita(trigger.deviceId, trigger.code)));
+        const colpo = suoi.find((comando) =>
+          faScattare(comando, trigger, capacita(trigger.deviceId, trigger.code), capacita(comando.deviceId, comando.code)),
+        );
         if (colpo) {
           out.push({ da: da.id, deviceId: colpo.deviceId, a: a.id });
           break;
@@ -107,15 +101,22 @@ function giroDa(inizio: string, passi: Passo[]): Passo[] | null {
  * scrivendo un'altra cosa.
  */
 export function giroNuovo(prima: Scene[], dopo: Scene[], devices: Device[], id: string): Passo[] | null {
-  const passiPrima = archi(prima, devices);
   const passiDopo = archi(dopo, devices);
 
   const suo = giroDa(id, passiDopo);
   if (suo) return suo;
 
+  /*
+   * Gli archi di prima servono solo se dopo c'è un giro che non passa da
+   * lei, per sapere se c'era già: quasi mai. Si calcolano allora, e una
+   * volta sola, invece che a ogni modifica.
+   */
+  let passiPrima: Passo[] | undefined;
   for (const scene of dopo) {
     const adesso = giroDa(scene.id, passiDopo);
-    if (adesso && !giroDa(scene.id, passiPrima)) return adesso;
+    if (!adesso) continue;
+    passiPrima ??= archi(prima, devices);
+    if (!giroDa(scene.id, passiPrima)) return adesso;
   }
   return null;
 }

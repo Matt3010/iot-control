@@ -3,8 +3,10 @@ import http from 'node:http';
 import { createApp } from './app.js';
 import { config } from './config.js';
 import { attachAgentLink } from './iot/link.js';
+import { guardati } from './managers/guardati.js';
 import { watchLog } from './managers/LogManager.js';
 import { closeDb, migrateUp } from './persistence/db.js';
+import { watchRuns } from './services/RunWatch.js';
 import { watchClock } from './services/SceneClock.js';
 import { watchTriggers } from './services/SceneTriggers.js';
 import { watchSilence } from './services/SilenceWatch.js';
@@ -31,6 +33,10 @@ watchSilence();
 // e qualcuno guarda l'orologio, per le scene che partono da sole
 watchClock();
 watchTriggers();
+// le cose guardate da avvisi e scene, lette prima che gli agenti comincino a raccontare
+await guardati.prepara();
+// e qualcuno scrive nel registro le scene rimaste a metà perché il servizio si è fermato
+watchRuns();
 // e qualcuno porta fuori le righe di registro scadute
 watchLog();
 

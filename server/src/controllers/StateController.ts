@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ownerOf, scopeOf } from '../auth/owner.js';
+import { isGuest, ownerOf, scopeOf } from '../auth/owner.js';
 import { hub } from '../iot/hub.js';
 import { stateService } from '../services/StateService.js';
 
@@ -34,7 +34,15 @@ export class StateController {
     });
     res.write(': ci sono\n\n');
 
-    const stop = hub.watch(ownerOf(req), (event) => res.write(`data: ${JSON.stringify(event)}\n\n`));
+    const ownerId = ownerOf(req);
+    const manda = (event: unknown): void => void res.write(`data: ${JSON.stringify(event)}\n\n`);
+
+    // a un ospite non arriva quello che succede alle telecamere, come l'elenco non gliele mostra
+    const ospite = isGuest(req);
+    const stop = hub.watch(ownerId, (event) => {
+      if (ospite && event.kind === 'device' && hub.isCamera(event.deviceId)) return;
+      manda(event);
+    });
     const beat = setInterval(() => res.write(': .\n\n'), KEEPALIVE_MS);
     beat.unref?.();
 

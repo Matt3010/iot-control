@@ -76,7 +76,13 @@ export interface SceneView {
   triggers: SceneTrigger[];
   only: SceneConditionGroup;
   /** Se sta andando adesso: a che momento, e quanto manca all'attesa di adesso. */
-  corre?: { at: number; of: number; resta?: number };
+  corre?: { run: string; at: number; of: number; resta?: number };
+  /**
+   * Da quando il fusibile l'ha fermata, perché ripartiva da sola di
+   * continuo. Finché c'è non parte da sola; si riaccende cambiandola o
+   * facendola partire a mano.
+   */
+  blownAt?: string;
 }
 
 export interface StateView {
@@ -97,13 +103,14 @@ export const toMapView = (map: PlaceMap): MapView => ({
 
 export const toGroupView = ({ id, name }: Group): GroupView => ({ id, name });
 
-export const toSceneView = ({ id, name, steps, when, ranAt, triggers, only }: Scene): SceneView => ({
+export const toSceneView = ({ id, name, steps, when, ranAt, triggers, only, blownAt }: Scene): SceneView => ({
   id,
   name,
   steps: steps ?? [],
   triggers: triggers ?? [],
   only: only ?? NESSUNA_CONDIZIONE,
   ...(ranAt ? { ranAt } : {}),
+  ...(blownAt ? { blownAt } : {}),
   // l'ultima partenza resta di qua: a chi guarda serve sapere quando parte,
   // non quando e' partita l'ultima volta — quello e' nel registro
   ...(when ? { when } : {}),

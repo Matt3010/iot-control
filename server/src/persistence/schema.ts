@@ -10,6 +10,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import type { Capability } from '../../../shared/protocol.js';
 import { NESSUNA_CONDIZIONE, type LogEntry, type MapEditor, type Notice, type Op, type SceneConditionGroup, type SceneStep, type SceneTrigger, type Timing } from '../types.js';
 
@@ -103,6 +104,13 @@ export const agents = pgTable(
     hash: text('hash').notNull(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Da quando tace, se l'avviso che tace è già partito. È il turno di chi
+     * lo dice: lo prende chi riesce a scriverlo, e chi arriva secondo trova
+     * il posto già preso e non ripete l'avviso. Si toglie quando ritorna,
+     * con la stessa gara.
+     */
+    quietSince: timestamp('quiet_since', { withTimezone: true }),
   },
   (table) => [index('agents_owner').on(table.ownerId)],
 );
@@ -188,12 +196,16 @@ export const devices = pgTable(
      * davvero solo quando qualcuno preme «Rimuovi».
      */
     goneAt: timestamp('gone_at', { withTimezone: true }),
+    /** Da quando tace, se l'avviso è già partito: lo stesso turno degli agenti. */
+    quietSince: timestamp('quiet_since', { withTimezone: true }),
   },
   (table) => [
     // lo stesso agente non racconta due volte la stessa cosa: prima era una
     // ricerca nell'elenco, adesso è una regola che non si può violare
     uniqueIndex('devices_agent_external').on(table.agentId, table.externalId),
     index('devices_owner').on(table.ownerId),
+    // chi si accorge dei silenzi chiede ogni minuto i pochi sorvegliati fra tutti
+    index('devices_watched').on(table.id).where(sql`watch`),
   ],
 );
 
@@ -233,8 +245,57 @@ export const scenes = pgTable(
      * una parola di SQL come «when».
      */
     only: jsonb('conditions').$type<SceneConditionGroup>().notNull().default(NESSUNA_CONDIZIONE),
+    /**
+     * Da quando il fusibile l'ha fermata: ripartiva da sola di continuo.
+     *
+     * Sta scritto e non in memoria perché una scena in un giro, se il
+     * fusibile si riarmasse da solo dopo un minuto, ripartirebbe e
+     * rimanderebbe l'avviso ogni minuto per sempre, anche dopo un riavvio.
+     * Resta ferma finché qualcuno non la tocca: la cambia, o la fa partire
+     * a mano.
+     */
+    blownAt: timestamp('blown_at', { withTimezone: true }),
   },
-  (table) => [index('scenes_owner').on(table.ownerId)],
+  (table) => [
+    index('scenes_owner').on(table.ownerId),
+    // le partenze si cercano con «contiene» a ogni cambiamento di ogni
+    // dispositivo, e senza indice vorrebbe dire leggerle tutte ogni volta
+    index('scenes_triggers').using('gin', table.triggers),
+    // l'orologio chiede ogni minuto le poche scene con un orario fra tutte
+    index('scenes_timed').on(table.id).where(sql`timing is not null`),
+  ],
+);
+
+/**
+ * Le scene che stanno aspettando fra un momento e l'altro.
+ *
+ * Un'attesa vive nella memoria del server: se il server riparte a metà, i
+ * momenti che mancavano non partono più. Questa riga è quello che resta per
+ * poterlo dire nel registro delle case che la scena toccava, invece di
+ * lasciare una tenda aperta senza un perché. Nasce quando comincia la prima
+ * attesa e se ne va quando la scena finisce.
+ *
+ * Chi la sta eseguendo batte ogni minuto su `aliveAt`. Una riga che non batte
+ * più è di un server che si è fermato, questo o un altro: la si guarda dal
+ * battito e non dall'ora di avvio, così un server che riparte non scambia
+ * per interrotte le scene che un altro sta ancora eseguendo.
+ */
+export const sceneRuns = pgTable(
+  'scene_runs',
+  {
+    id: text('id').primaryKey(),
+    sceneId: text('scene_id')
+      .notNull()
+      .references(() => scenes.id, { onDelete: 'cascade' }),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Le case dove scrivere che non è finita: il registro è di un agente. */
+    agentIds: jsonb('agent_ids').$type<string[]>().notNull().default([]),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    aliveAt: timestamp('alive_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('scene_runs_scene').on(table.sceneId)],
 );
 
 export const logEntries = pgTable(
@@ -298,7 +359,9 @@ export const alerts = pgTable(
   },
   (table) => [
     index('alerts_owner').on(table.ownerId),
-    index('alerts_device_code').on(table.deviceId, table.code),
+    // la stessa regola due volte manderebbe due avvisi per la stessa porta:
+    // lo impedisce il database, anche a due schede che la aggiungono insieme
+    uniqueIndex('alerts_same_rule').on(table.deviceId, table.code, table.op, table.becomes),
   ],
 );
 

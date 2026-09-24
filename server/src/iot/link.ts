@@ -7,6 +7,7 @@ import { logManager } from '../managers/LogManager.js';
 import { accountsReported } from '../services/AccountWatch.js';
 import { deviceManager } from '../managers/DeviceManager.js';
 import type { Agent } from '../types.js';
+import { Fila } from './fila.js';
 import { hub } from './hub.js';
 import { liveHub } from './live.js';
 
@@ -47,6 +48,20 @@ function refuse(socket: Duplex, status: number, reason: string): void {
 const bearer = (header: string | undefined): string | undefined =>
   header?.startsWith('Bearer ') ? header.slice(7) : undefined;
 
+/**
+ * I messaggi di un agente, uno alla volta e nell'ordine in cui li ha
+ * mandati; agenti diversi non si aspettano.
+ *
+ * Gestiti appena arrivati, la presentazione e l'inventario mandati a ridosso
+ * si sincronizzavano insieme: quello che finiva per ultimo rifaceva l'indice
+ * del hub con un elenco letto prima dell'altro, e i dispositivi appena
+ * creati sparivano dall'indice. E uno stato arrivato durante l'inventario
+ * veniva poi coperto da quello, più vecchio, che l'inventario si portava
+ * dietro. Un messaggio storto non ferma quelli dopo, e non butta giù il
+ * processo: l'agente è là fuori.
+ */
+const messaggi = new Fila((agentId, error) => console.warn(`messaggio dell'agente ${agentId}, ${error.message}`));
+
 function serve(socket: WebSocket, agent: Agent): void {
   const connection = {
     ownerId: agent.ownerId,
@@ -72,14 +87,7 @@ function serve(socket: WebSocket, agent: Agent): void {
   }, HEARTBEAT_MS);
   beat.unref?.();
 
-  const handle = async (raw: string): Promise<void> => {
-    let message: AgentMessage;
-    try {
-      message = JSON.parse(raw) as AgentMessage;
-    } catch {
-      return;
-    }
-
+  const handle = async (message: AgentMessage): Promise<void> => {
     switch (message.type) {
       case 'hello':
         if (message.protocol !== PROTOCOL) {
@@ -110,18 +118,28 @@ function serve(socket: WebSocket, agent: Agent): void {
         await accountsReported(agent, message.accounts);
         return;
 
-      case 'ack':
-        hub.settle(message.reqId, message.ok, message.error, message.data);
-        return;
-
       default:
         return;
     }
   };
 
   socket.on('message', (raw) => {
-    // Un messaggio storto non deve buttare giù il processo: l'agente è là fuori.
-    handle(raw.toString()).catch((error: unknown) => console.warn(`${agent.name}: ${(error as Error).message}`));
+    let message: AgentMessage;
+    try {
+      message = JSON.parse(raw.toString()) as AgentMessage;
+    } catch {
+      return;
+    }
+    /*
+     * La risposta a un comando non aspetta: chi l'ha chiesto è fermo lì, e
+     * non dipende da niente di quello che c'è in fila. Tutto il resto sì,
+     * nell'ordine in cui l'agente l'ha mandato.
+     */
+    if (message.type === 'ack') {
+      hub.settle(message.reqId, message.ok, message.error, message.data);
+      return;
+    }
+    void messaggi.metti(agent.id, () => handle(message));
   });
 
   socket.on('close', () => {

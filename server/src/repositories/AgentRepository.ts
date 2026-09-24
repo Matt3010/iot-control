@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { iso, when, type Transaction } from '../persistence/db.js';
 import { agents, placeAgents, places } from '../persistence/schema.js';
 import type { Agent } from '../types.js';
+import { prendiRitorno, prendiSilenzio } from './silenzi.js';
 
 type Row = typeof agents.$inferSelect;
 
@@ -14,6 +15,7 @@ const toAgent = (row: Row): Agent => ({
   hash: row.hash,
   lastSeenAt: iso(row.lastSeenAt),
   createdAt: iso(row.createdAt) as string,
+  quietSince: iso(row.quietSince),
 });
 
 export class AgentRepository {
@@ -93,6 +95,16 @@ export class AgentRepository {
 
     const [row] = await this.tx.db.update(agents).set(set).where(eq(agents.id, id)).returning();
     return row ? toAgent(row) : undefined;
+  }
+
+  /** Il turno di dire che tace, da quando (`silenzi.ts`). */
+  claimQuiet(id: string, since: string): Promise<string | null> {
+    return prendiSilenzio(this.tx, agents, id, since);
+  }
+
+  /** E quello di dire che risponde di nuovo: torna da quando taceva. */
+  claimBack(id: string): Promise<string | null> {
+    return prendiRitorno(this.tx, agents, id);
   }
 
   /**

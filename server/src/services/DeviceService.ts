@@ -5,10 +5,9 @@ import { badGateway, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
 import { deviceManager } from '../managers/DeviceManager.js';
 import type { Device } from '../types.js';
+import { siGuarda } from '../../../shared/regole.js';
 
-/** Una telecamera si riconosce da questo: non si comanda, si guarda. */
-const isCamera = (device: { capabilities: { kind: string }[] }): boolean =>
-  device.capabilities.some((entry) => entry.kind === 'image');
+const isCamera = (device: { capabilities: { kind: string }[] }): boolean => siGuarda(device.capabilities);
 
 export class DeviceService {
   /**

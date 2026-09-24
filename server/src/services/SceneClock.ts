@@ -22,26 +22,20 @@ import { UserRepository } from '../repositories/UserRepository.js';
  */
 const EVERY_MS = 20_000;
 
+/** Che ore sono nel fuso di qualcuno: la risposta di `localNow`. */
+type Ora = ReturnType<typeof localNow>;
+
 /**
  * Se è il suo momento, adesso. E se quel momento è già passato per sempre.
  *
- * Le ore sono quelle di chi ha la scena (`tz`), non quelle scritte dentro
+ * Le ore sono quelle di chi ha la scena, non quelle scritte dentro
  * l'orario: prima ogni orario si portava il fuso del browser in cui era nato,
  * e uno scritto in viaggio restava in un altro fuso per sempre.
  */
-function due(scene: Scene, tz: string): { yes: boolean; minute: string; over: boolean } {
+function due(scene: Scene, now: Ora | undefined): { yes: boolean; over: boolean } {
   const when = scene.when;
-  const niente = { yes: false, minute: '', over: false };
-  if (!when || when.off || !scene.steps.length) return niente;
-
-  let now: ReturnType<typeof localNow>;
-  try {
-    now = localNow(tz);
-  } catch {
-    // Un fuso che non esiste — scritto a mano, o sparito da una versione di
-    // node all'altra — non deve fermare l'orologio di tutti gli altri.
-    return niente;
-  }
+  const niente = { yes: false, over: false };
+  if (!now || !when || when.off || !scene.steps.length) return niente;
 
   /*
    * Una volta sola: conta la data, non il giorno della settimana. E se quel
@@ -49,55 +43,78 @@ function due(scene: Scene, tz: string): { yes: boolean; minute: string; over: bo
    * — l'orario si toglie invece di restare li' a indicare l'anno scorso.
    */
   if (when.on) {
-    const oggi = now.minute.slice(0, 10);
-    if (when.on < oggi) return { ...niente, over: true };
-    return { yes: when.on === oggi && now.clock === when.at, minute: now.minute, over: false };
+    if (when.on < now.date) return { ...niente, over: true };
+    return { yes: when.on === now.date && now.clock === when.at, over: false };
   }
 
   const oggi = !when.days.length || when.days.includes(now.day);
-  return { yes: oggi && now.clock === when.at, minute: now.minute, over: false };
+  return { yes: oggi && now.clock === when.at, over: false };
 }
 
-/** Un giro solo. Esportato perché si possa provare senza aspettare un minuto. */
-export async function tick(): Promise<void> {
+/**
+ * Un giro solo. Esportato perché si possa provare senza aspettare un minuto.
+ *
+ * L'ora si chiede una volta per fuso e per giro, non una per scena: cento
+ * scene nello stesso fuso sono nello stesso minuto. E le scene partono
+ * insieme, senza aspettarsi: una che dura venti secondi perché una tenda
+ * non risponde non deve far arrivare in ritardo quella dopo.
+ */
+export async function tick(at = new Date()): Promise<void> {
   const { scenes, fusi } = await store.transaction(async (tx) => {
-    const tutte = await new SceneRepository(tx).findAll();
-    const chi = [...new Set(tutte.filter((scene) => scene.when).map((scene) => scene.ownerId))];
-    return { scenes: tutte, fusi: await new UserRepository(tx).tzOf(chi) };
+    const tutte = await new SceneRepository(tx).findTimed();
+    return { scenes: tutte, fusi: await new UserRepository(tx).tzOf([...new Set(tutte.map((scene) => scene.ownerId))]) };
   });
 
-  for (const scene of scenes) {
-    const tz = fusi.get(scene.ownerId) ?? DEFAULT_TZ;
-    const { yes, minute, over } = due(scene, tz);
-
-    if (over) {
-      await scorda(scene);
-      continue;
+  const ore = new Map<string, Ora | undefined>();
+  const oraIn = (tz: string): Ora | undefined => {
+    if (!ore.has(tz)) {
+      try {
+        ore.set(tz, localNow(tz, at));
+      } catch {
+        // Un fuso che non esiste — scritto a mano, o sparito da una versione
+        // di node all'altra — non deve fermare l'orologio di tutti gli altri.
+        ore.set(tz, undefined);
+      }
     }
-    if (!yes) continue;
+    return ore.get(tz);
+  };
+
+  const parti = async (scene: Scene): Promise<void> => {
+    const tz = fusi.get(scene.ownerId) ?? DEFAULT_TZ;
+    const now = oraIn(tz);
+    const { yes, over } = due(scene, now);
+
+    if (over) return scorda(scene);
+    // una scena fermata dal fusibile non parte da sola, finché qualcuno non la tocca
+    if (!yes || !now || scene.blownAt) return;
 
     // l'ora è quella, ma deve valere anche il resto di quello che hai scritto
-    if (!conditionsHold(scene.only, (id) => hub.stateOf(id), tz, new Date(), true)) continue;
+    if (!conditionsHold(scene.only, (id) => hub.stateOf(id), tz, at, true)) return;
 
     /*
      * Prima il turno, poi il lavoro. Se la scrittura non vince vuol dire che
      * quel minuto l'ha già preso qualcuno — un altro battito, un altro
      * server — e qui non si fa niente.
      */
-    const mio = await store.transaction((tx) => new SceneRepository(tx).claim(scene.id, minute));
-    if (!mio) continue;
+    const mio = await store.transaction((tx) => new SceneRepository(tx).claim(scene.id, now.minute));
+    if (!mio) return;
 
     // Una volta sola vuol dire una volta sola: l'orario se ne va appena
     // servito, anche se la scena e' partita a meta'.
     if (scene.when?.on) await scorda(scene);
 
-    await sceneManager
-      .run(scene.ownerId, scene.id)
-      // Una scena che parte da sola e trova una tenda muta non è un guasto
-      // del server: nel registro della casa c'è già scritto cosa non ha
-      // risposto, e qui si tira avanti con le altre.
-      .catch((error: Error) => console.warn(`la scena «${scene.name}» non è andata fino in fondo: ${error.message}`));
-  }
+    await sceneManager.run(scene.ownerId, scene.id);
+  };
+
+  const esiti = await Promise.allSettled(scenes.map(parti));
+  esiti.forEach((esito, at) => {
+    // Una scena che parte da sola e trova una tenda muta non è un guasto
+    // del server: nel registro della casa c'è già scritto cosa non ha
+    // risposto, e qui si tira avanti con le altre.
+    if (esito.status === 'rejected') {
+      console.warn(`la scena «${scenes[at]?.name}» non è andata fino in fondo, ${(esito.reason as Error).message}`);
+    }
+  });
 }
 
 /**
@@ -108,11 +125,9 @@ export async function tick(): Promise<void> {
  * passato, la prossima volta non ci si fida piu' di quello che c'e' scritto.
  */
 async function scorda(scene: Scene): Promise<void> {
-  const dopo = await store.transaction(async (tx) => {
-    const scenes = new SceneRepository(tx);
-    await scenes.forgetWhen(scene.id);
-    return scenes.findById(scene.id);
-  });
+  if (!scene.when) return;
+  const letto = scene.when;
+  const dopo = await store.transaction((tx) => new SceneRepository(tx).forgetWhen(scene.id, letto));
   if (dopo) hub.changed(scene.ownerId, { kind: 'scene', id: dopo.id, value: toSceneView(dopo) });
 }
 

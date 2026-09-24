@@ -1,0 +1,1 @@
+ALTER TABLE "scene_runs" ADD COLUMN "alive_at" timestamp with time zone DEFAULT now() NOT NULL;

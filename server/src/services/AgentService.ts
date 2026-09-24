@@ -10,6 +10,7 @@ import { toPlaceView } from '../dto/views.js';
 import { agentManager } from '../managers/AgentManager.js';
 import { logManager } from '../managers/LogManager.js';
 import { deviceManager } from '../managers/DeviceManager.js';
+import { dimentica } from './AccountWatch.js';
 
 export interface NewAgentView {
   agent: AgentView;
@@ -84,12 +85,16 @@ export class AgentService {
    * pin con un pallino che non risponderà mai più.
    */
   async remove(ownerId: string, id: string): Promise<void> {
-    // Le scene che hanno perso delle righe si rileggono insieme ai
-    // dispositivi: di la' e' una lista sola, e chi la sta guardando da
-    // un'altra scheda deve vederla accorciarsi senza ricaricare.
-    const { places } = await agentManager.remove(ownerId, id);
-    hub.changed(ownerId, { kind: 'agents' });
+    const { places, regole } = await agentManager.remove(ownerId, id);
+    dimentica(id);
+    /*
+     * Un evento solo per agenti, dispositivi e scene: il sito li rilegge
+     * sempre tutti e tre insieme, e due eventi volevano dire due volte la
+     * stessa lettura. Le regole degli avvisi cadute con i dispositivi hanno
+     * il loro, e ogni luogo che lo teneva il suo.
+     */
     hub.changed(ownerId, { kind: 'devices' });
+    if (regole) hub.changed(ownerId, { kind: 'rules' });
     for (const place of places) {
       const view = toPlaceView(place);
       hub.changed(ownerId, { kind: 'place', id: view.id, value: view });

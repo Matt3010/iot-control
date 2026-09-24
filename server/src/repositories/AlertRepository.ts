@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { iso, when, type Transaction } from '../persistence/db.js';
 import { alerts } from '../persistence/schema.js';
+import { conEntita } from '../../../shared/regole.js';
 import type { Alert } from '../types.js';
 
 /**
@@ -48,7 +49,24 @@ export class AlertRepository {
     return rows.map(toAlert);
   }
 
-  async add(alert: Omit<Alert, 'id' | 'createdAt'>): Promise<Alert> {
+  /**
+   * Le cose guardate da almeno una regola accesa, dispositivo e codice. Le
+   * tiene in memoria chi ascolta i passaggi (`managers/guardati.ts`), per
+   * non chiedere al database di ogni grado di ogni sonda.
+   */
+  async watchedPairs(): Promise<{ deviceId: string; code: string }[]> {
+    return this.tx.db
+      .selectDistinct({ deviceId: alerts.deviceId, code: alerts.code })
+      .from(alerts)
+      .where(eq(alerts.off, false));
+  }
+
+  /**
+   * Una regola nuova, se non c'è già. La stessa regola due volte la rifiuta
+   * l'indice unico, anche a due schede che la aggiungono nello stesso
+   * istante, e allora torna niente.
+   */
+  async add(alert: Omit<Alert, 'id' | 'createdAt'>): Promise<Alert | undefined> {
     const [row] = await this.tx.db
       .insert(alerts)
       .values({
@@ -63,8 +81,53 @@ export class AlertRepository {
         off: alert.off ?? false,
         firedAt: when(alert.firedAt),
       })
+      .onConflictDoNothing({ target: [alerts.deviceId, alerts.code, alerts.op, alerts.becomes] })
       .returning();
-    return toAlert(row as Row);
+    return row ? toAlert(row) : undefined;
+  }
+
+  /**
+   * Il turno di scattare. La condizione sta dentro alla scrittura: due
+   * passaggi che arrivano insieme la vedono scattare una volta sola, perché
+   * solo uno dei due trova `fired_at` ancora vuoto.
+   */
+  async fire(id: string): Promise<boolean> {
+    const rows = await this.tx.db
+      .update(alerts)
+      .set({ firedAt: new Date() })
+      .where(and(eq(alerts.id, id), isNull(alerts.firedAt)))
+      .returning({ id: alerts.id });
+    return rows.length > 0;
+  }
+
+  /** È rientrata: da qui in poi può scattare di nuovo. */
+  async rearm(ids: string[]): Promise<number> {
+    if (!ids.length) return 0;
+    const rows = await this.tx.db
+      .update(alerts)
+      .set({ firedAt: null })
+      .where(and(inArray(alerts.id, ids), isNotNull(alerts.firedAt)))
+      .returning({ id: alerts.id });
+    return rows.length;
+  }
+
+  /** Quelle già scattate su quel dispositivo: sono le sole che possono dover rientrare. */
+  async findFiredOf(deviceId: string): Promise<Alert[]> {
+    const rows = await this.tx.db
+      .select()
+      .from(alerts)
+      .where(and(eq(alerts.deviceId, deviceId), isNotNull(alerts.firedAt)));
+    return rows.map(toAlert);
+  }
+
+  /** Quante ne stanno su questi dispositivi: si contano prima che se ne vadano con loro. */
+  async countOfDevices(ids: string[]): Promise<number> {
+    if (!ids.length) return 0;
+    const [row] = await this.tx.db
+      .select({ quante: sql<number>`count(*)::int` })
+      .from(alerts)
+      .where(inArray(alerts.deviceId, ids));
+    return row?.quante ?? 0;
   }
 
   /**
@@ -103,13 +166,36 @@ export class AlertRepository {
     return rows.length;
   }
 
-  /** Le regole di un dispositivo che adesso sta dentro a un altro passano all'altro. */
+  /**
+   * Le regole di un dispositivo che adesso sta dentro a un altro passano
+   * all'altro, con il codice che dice da quale entità vengono. Un codice che
+   * ha già la sua entità davanti resta com'è: raddoppiarla darebbe
+   * `a#b#power`, che nessuno sa più a chi mandare.
+   *
+   * Una regola che sull'altro c'è già non si sposta: sarebbe la stessa due
+   * volte, e se ne va con il dispositivo assorbito.
+   */
   async moveDevice(from: string, to: string, prefisso: string): Promise<number> {
-    const rows = await this.tx.db
-      .update(alerts)
-      .set({ deviceId: to, code: sql`${prefisso} || '#' || ${alerts.code}` })
-      .where(eq(alerts.deviceId, from))
-      .returning({ id: alerts.id });
-    return rows.length;
+    const [sue, altre] = await Promise.all([
+      this.tx.db.select().from(alerts).where(eq(alerts.deviceId, from)),
+      this.tx.db.select().from(alerts).where(eq(alerts.deviceId, to)),
+    ]);
+    // il codice nuovo lo decide la regola di `shared/regole.js`, la stessa delle scene
+    const chiave = (code: string, op: string, becomes: string): string => JSON.stringify([code, op, becomes]);
+    const prese = new Set(altre.map((one) => chiave(one.code, one.op, one.becomes)));
+    const doppie: string[] = [];
+    for (const one of sue) {
+      const code = conEntita(one.code, prefisso);
+      const sua = chiave(code, one.op, one.becomes);
+      if (prese.has(sua)) {
+        doppie.push(one.id);
+        continue;
+      }
+      prese.add(sua);
+      await this.tx.db.update(alerts).set({ deviceId: to, code }).where(eq(alerts.id, one.id));
+    }
+    if (doppie.length) await this.tx.db.delete(alerts).where(inArray(alerts.id, doppie));
+    // contano anche quelle tolte: chi ha la pagina degli avvisi aperta deve rileggerle
+    return sue.length;
   }
 }

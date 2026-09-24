@@ -1,6 +1,6 @@
 import { hub } from '../iot/hub.js';
-import { noticeManager } from '../managers/NoticeManager.js';
-import { store } from '../persistence/db.js';
+import { noticeManager, scrivi, type Detto } from '../managers/NoticeManager.js';
+import { store, type Transaction } from '../persistence/db.js';
 import { AgentRepository } from '../repositories/AgentRepository.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import type { Agent } from '../types.js';
@@ -41,6 +41,27 @@ const THING_QUIET_MS = Number(process.env.DEVICE_QUIET_MINUTES ?? 10) * 60_000;
  */
 const mute = new Map<string, number>();
 
+/**
+ * Un avviso di silenzio o di ripresa, detto una volta sola.
+ *
+ * Prima si prende il turno (`prendi`, che torna da quando o niente se l'ha
+ * preso un altro), poi nella stessa transazione si scrive la riga
+ * dell'avviso, così preso l'uno c'è anche l'altra; e solo dopo si consegna.
+ * Era scritto quattro volte, per agenti e dispositivi che tacciono o
+ * riprendono.
+ */
+async function diUnaVolta(
+  ownerId: string,
+  prendi: (tx: Transaction) => Promise<string | null>,
+  avviso: (da: string) => Detto,
+): Promise<void> {
+  const riga = await store.transaction(async (tx) => {
+    const da = await prendi(tx);
+    return da ? scrivi(tx, ownerId, avviso(da)) : undefined;
+  });
+  if (riga) await noticeManager.manda(riga);
+}
+
 function quiet(agent: Agent): boolean {
   if (hub.isOnline(agent.id)) return false;
   if (!agent.lastSeenAt) return false;
@@ -72,9 +93,13 @@ function howLong(from: string): string {
  * E solo mentre il loro agente risponde: se manca lui, di una tenda a trenta
  * chilometri non si sa niente, e lo dice gia' il suo avviso.
  */
-async function sweepThings(): Promise<void> {
+export async function sweepThings(): Promise<void> {
   // le cose guardate e il luogo dove stanno, in una domanda sola
   const cose = await store.transaction((tx) => new DeviceRepository(tx).findWatchedWithPlace());
+
+  // chi non è più guardato, o non c'è più, non ha un silenzio da contare
+  const guardate = new Set(cose.map(({ device }) => device.id));
+  for (const id of mute.keys()) if (!guardate.has(id)) mute.delete(id);
 
   for (const { device, luogo } of cose) {
     if (!hub.isOnline(device.agentId)) {
@@ -83,35 +108,40 @@ async function sweepThings(): Promise<void> {
     }
 
     const risponde = hub.liveOf(device.agentId, device.externalId)?.online !== false;
-    const detto = await noticeManager.lastAboutDevice(device.id);
 
     if (risponde) {
       mute.delete(device.id);
-      if (detto?.kind !== 'silent') continue;
+      // Si sa già dalla riga letta se c'era un silenzio detto: chi non l'aveva, non ha niente da dire.
+      if (!device.quietSince) continue;
 
       /*
-       * Quanto è durato, come per un agente.
+       * Il turno di dirlo: lo prende chi riesce a togliere il silenzio, e
+       * torna da quando era cominciato. Due giri accavallati non lo dicono
+       * due volte.
        *
-       * «Ha ripreso a rispondere» da solo non dice niente di utile: una cosa
-       * tornata dopo due minuti e una tornata dopo due giorni sono due
-       * notizie diverse, e di solito quella lunga vuol dire che qualcuno è
-       * andato lì a rimetterla a posto. Il conto parte da dove il silenzio
-       * era cominciato — per questo l'avviso di prima si porta dietro
-       * `since` — e non da quando ce ne siamo accorti: in mezzo ci sono i
-       * minuti che si aspettano apposta.
+       * Quanto è durato, come per un agente. «Ha ripreso a rispondere» da
+       * solo non dice niente di utile: una cosa tornata dopo due minuti e
+       * una tornata dopo due giorni sono due notizie diverse. Il conto parte
+       * da dove il silenzio era cominciato e non da quando ce ne siamo
+       * accorti: in mezzo ci sono i minuti che si aspettano apposta.
        */
-      const muto = howLong(detto.since ?? detto.at);
-
-      await noticeManager.tell(device.ownerId, {
-        kind: 'back',
-        deviceId: device.id,
-        agentId: device.agentId,
-        who: device.name,
-        ...(luogo ? { where: luogo } : {}),
-        short: `ha ripreso a rispondere dopo ${muto}`,
-        title: `${device.name} risponde di nuovo`,
-        body: `Il dispositivo${luogo ? ` su «${luogo}»` : ''} ha ripreso a rispondere dopo ${muto} di silenzio.`,
-      });
+      await diUnaVolta(
+        device.ownerId,
+        (tx) => new DeviceRepository(tx).claimBack(device.id),
+        (da) => {
+          const muto = howLong(da);
+          return {
+            kind: 'back',
+            deviceId: device.id,
+            agentId: device.agentId,
+            who: device.name,
+            ...(luogo ? { where: luogo } : {}),
+            short: `ha ripreso a rispondere dopo ${muto}`,
+            title: `${device.name} risponde di nuovo`,
+            body: `Il dispositivo${luogo ? ` su «${luogo}»` : ''} ha ripreso a rispondere dopo ${muto} di silenzio.`,
+          };
+        },
+      );
       continue;
     }
 
@@ -120,20 +150,27 @@ async function sweepThings(): Promise<void> {
     mute.set(device.id, da);
 
     if (Date.now() - da < THING_QUIET_MS) continue;
-    if (detto?.kind === 'silent') continue;
+    if (device.quietSince) continue;
 
-    const quanto = howLong(new Date(da).toISOString());
-    await noticeManager.tell(device.ownerId, {
-      kind: 'silent',
-      deviceId: device.id,
-      agentId: device.agentId,
-      who: device.name,
-      ...(luogo ? { where: luogo } : {}),
-      since: new Date(da).toISOString(),
-      short: `non risponde da ${quanto}`,
-      title: `${device.name} non risponde`,
-      body: `Il dispositivo${luogo ? ` su «${luogo}»` : ''} non risponde da ${quanto}, anche se il resto della casa risponde.`,
-    });
+    const since = new Date(da).toISOString();
+    await diUnaVolta(
+      device.ownerId,
+      (tx) => new DeviceRepository(tx).claimQuiet(device.id, since),
+      (dal) => {
+        const quanto = howLong(dal);
+        return {
+          kind: 'silent',
+          deviceId: device.id,
+          agentId: device.agentId,
+          who: device.name,
+          ...(luogo ? { where: luogo } : {}),
+          since: dal,
+          short: `non risponde da ${quanto}`,
+          title: `${device.name} non risponde`,
+          body: `Il dispositivo${luogo ? ` su «${luogo}»` : ''} non risponde da ${quanto}, anche se il resto della casa risponde.`,
+        };
+      },
+    );
   }
 }
 
@@ -144,50 +181,62 @@ export async function sweep(): Promise<void> {
    * quello che tace e' l'agente — e' lui che ha il filo — ma sapere che e'
    * quello di Via Panigale e' l'unica informazione che serve davvero per
    * decidere se alzarsi. Un agente puo' anche non stare su nessun luogo.
+   *
+   * Se il silenzio è già stato detto lo sa la riga dell'agente
+   * (`quietSince`), letta qui con tutto il resto: niente domande in più per
+   * ogni casa, ogni minuto.
    */
   const agents = await store.transaction((tx) => new AgentRepository(tx).findAllWithPlace());
 
   for (const { agent, luogo } of agents) {
     const tace = quiet(agent);
-    const detto = await noticeManager.lastAbout(agent.id);
 
     // Già detto e ancora vero: non si ripete. Un avviso ripetuto ogni minuto
     // è il modo più rapido per far spegnere le notifiche a qualcuno.
-    if (tace === (detto?.kind === 'silent')) continue;
+    if (tace === !!agent.quietSince) continue;
 
     if (tace) {
-      const muto = howLong(agent.lastSeenAt as string);
-      await noticeManager.tell(agent.ownerId, {
-        kind: 'silent',
-        agentId: agent.id,
-        who: agent.name,
-        ...(luogo ? { where: luogo } : {}),
-        since: agent.lastSeenAt as string,
-        short: `ha smesso di rispondere da ${muto}`,
-        title: `${agent.name} non risponde`,
-        body: `L'agente ${luogo ? `su «${luogo}» ` : ''}non si fa vivo da ${muto}. Se è saltata la corrente o la linea, di là non c'è più nessuno a dirlo.`,
-      });
+      const since = agent.lastSeenAt as string;
+      // il turno di dirlo: chi arriva secondo trova il posto già preso
+      await diUnaVolta(
+        agent.ownerId,
+        (tx) => new AgentRepository(tx).claimQuiet(agent.id, since),
+        (dal) => {
+          const muto = howLong(dal);
+          return {
+            kind: 'silent',
+            agentId: agent.id,
+            who: agent.name,
+            ...(luogo ? { where: luogo } : {}),
+            since: dal,
+            short: `ha smesso di rispondere da ${muto}`,
+            title: `${agent.name} non risponde`,
+            body: `L'agente ${luogo ? `su «${luogo}» ` : ''}non si fa vivo da ${muto}. Se è saltata la corrente o la linea, di là non c'è più nessuno a dirlo.`,
+          };
+        },
+      );
       continue;
     }
-
-    // Non si dice che un posto risponde di nuovo a chi non ha mai saputo
-    // che aveva smesso.
-    if (!detto) continue;
 
     // Quanto e' durato il silenzio si conta da dove era cominciato, non da
     // quando ce ne siamo accorti: in mezzo c'e' il quarto d'ora che si
     // aspetta apposta, e dirlo in meno sarebbe dire una cosa falsa.
-    const muto = howLong(detto.since ?? detto.at);
-
-    await noticeManager.tell(agent.ownerId, {
-      kind: 'back',
-      agentId: agent.id,
-      who: agent.name,
-      ...(luogo ? { where: luogo } : {}),
-      short: `ha ripreso a rispondere dopo ${muto}`,
-      title: `${agent.name} risponde di nuovo`,
-      body: `L'agente ${luogo ? `su «${luogo}» ` : ''}ha ripreso a farsi vivo dopo ${muto} di silenzio.`,
-    });
+    await diUnaVolta(
+      agent.ownerId,
+      (tx) => new AgentRepository(tx).claimBack(agent.id),
+      (da) => {
+        const muto = howLong(da);
+        return {
+          kind: 'back',
+          agentId: agent.id,
+          who: agent.name,
+          ...(luogo ? { where: luogo } : {}),
+          short: `ha ripreso a rispondere dopo ${muto}`,
+          title: `${agent.name} risponde di nuovo`,
+          body: `L'agente ${luogo ? `su «${luogo}» ` : ''}ha ripreso a farsi vivo dopo ${muto} di silenzio.`,
+        };
+      },
+    );
   }
 }
 

@@ -1,11 +1,10 @@
-import type { DeviceValue } from '../../../shared/protocol.js';
-import { hub } from '../iot/hub.js';
+import { hub, type Cambio } from '../iot/hub.js';
+import { guardati } from '../managers/guardati.js';
 import { sceneManager } from '../managers/SceneManager.js';
 import { store } from '../persistence/db.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { UserRepository } from '../repositories/UserRepository.js';
 import { conditionsHold, crosses } from '../rules/prove.js';
-import { noticeManager } from '../managers/NoticeManager.js';
 import { DEFAULT_TZ, type Scene } from '../types.js';
 
 /**
@@ -27,68 +26,90 @@ import { DEFAULT_TZ, type Scene } from '../types.js';
  * persona fa partire una scena dieci volte in un minuto, quindi oltre
  * quella soglia si ferma e si avvisa. Sotto, ogni cambiamento la fa partire,
  * da qualunque parte arrivi.
+ *
+ * Fermata vuol dire fermata: resta scritto sulla scena (`blownAt`) e non si
+ * riarma da solo, se no un giro vero ripartirebbe dopo un minuto e
+ * rimanderebbe l'avviso ogni minuto per sempre. La riaccende chi la cambia
+ * o la fa partire a mano.
  */
-const SOGLIA = 10;
+export const SOGLIA = 10;
 const FINESTRA_MS = 60_000;
 
-/** Quando è partita da sola, di recente, ogni scena. */
+/** Quando è partita da sola, nell'ultimo minuto, ogni scena. */
 const partenze = new Map<string, number[]>();
 
-/** Se può ripartire, e se no avvisa, una volta sola per ogni fermata. */
-function fusibile(scene: Scene): boolean {
-  const adesso = Date.now();
-  const recenti = (partenze.get(scene.id) ?? []).filter((quando) => adesso - quando < FINESTRA_MS);
-  if (recenti.length >= SOGLIA) {
-    // si avvisa quando scatta, non a ogni tentativo dopo
-    if (recenti.length === SOGLIA) {
-      recenti.push(adesso);
-      partenze.set(scene.id, recenti);
-      void noticeManager.tell(scene.ownerId, {
-        kind: 'scene',
-        who: scene.name,
-        short: 'fermata, ripartiva da sola di continuo',
-        title: `La scena «${scene.name}» è stata fermata`,
-        body: 'È partita da sola più di dieci volte in un minuto, come se fosse in un giro. Guarda cosa la fa partire e cosa comanda.',
-      });
-      console.warn(`la scena «${scene.name}» è partita da sola ${SOGLIA} volte in un minuto, fermata`);
-    }
-    return false;
+/**
+ * Via quello che è più vecchio della finestra, e le scene che non partono
+ * da un minuto: una scena cancellata non lascia niente qui dentro.
+ */
+function ripulisci(adesso: number): void {
+  for (const [id, quando] of partenze) {
+    const recenti = quando.filter((one) => adesso - one < FINESTRA_MS);
+    if (recenti.length) partenze.set(id, recenti);
+    else partenze.delete(id);
   }
-  recenti.push(adesso);
-  partenze.set(scene.id, recenti);
-  return true;
 }
 
-async function happened(deviceId: string, code: string, value: DeviceValue, before: DeviceValue | undefined): Promise<void> {
+/** Se può ripartire. Se no fa saltare il fusibile, e avvisa chi lo fa saltare davvero. */
+async function fusibile(scene: Scene, adesso = Date.now()): Promise<boolean> {
+  ripulisci(adesso);
+  const recenti = partenze.get(scene.id) ?? [];
+  if (recenti.length < SOGLIA) {
+    partenze.set(scene.id, [...recenti, adesso]);
+    return true;
+  }
+
+  partenze.delete(scene.id);
+  const fermata = await sceneManager.blow(scene.id);
+  if (fermata) console.warn(`la scena «${scene.name}» è partita da sola ${SOGLIA} volte in un minuto, fermata`);
+  return false;
+}
+
+/**
+ * I cambiamenti di un messaggio di stato, tutti insieme. Una scena parte al
+ * massimo una volta per messaggio, anche se più d'una delle sue partenze
+ * scatta nello stesso istante: l'interruttore e la luce che ci sta dentro
+ * che si accendono insieme sono una cosa sola che succede, e contarla due
+ * volte faceva partire la scena due volte e la avvicinava al fusibile.
+ *
+ * Esportato perché si possa provare senza un dispositivo vero.
+ */
+export async function happened(deviceId: string, cambi: Cambio[], adesso = Date.now()): Promise<void> {
+  // quasi tutti i cambiamenti non fanno partire niente, e lo si sa senza chiederlo al database
+  const utili: Cambio[] = [];
+  for (const cambio of cambi) if (await guardati.daPartenze(deviceId, cambio.code)) utili.push(cambio);
+  if (!utili.length) return;
+
   const { scenes, fusi } = await store.transaction(async (tx) => {
-    const trovate = await new SceneRepository(tx).findTriggeredBy(deviceId, code);
+    const trovate = await new SceneRepository(tx).findTriggeredBy(deviceId, [...new Set(utili.map((one) => one.code))]);
     return { scenes: trovate, fusi: await new UserRepository(tx).tzOf([...new Set(trovate.map((one) => one.ownerId))]) };
   });
 
   for (const scene of scenes) {
-    if (!scene.steps.length) continue;
+    // una scena fermata dal fusibile resta ferma finché qualcuno non la tocca
+    if (!scene.steps.length || scene.blownAt) continue;
 
     const scatta = (scene.triggers ?? []).some(
-      (trigger) => trigger.deviceId === deviceId && trigger.code === code && crosses(trigger, before, value),
+      (trigger) =>
+        trigger.deviceId === deviceId &&
+        utili.some((cambio) => cambio.code === trigger.code && crosses(trigger, cambio.before, cambio.value)),
     );
     if (!scatta) continue;
 
     const tz = fusi.get(scene.ownerId) ?? DEFAULT_TZ;
     if (!conditionsHold(scene.only, (id) => hub.stateOf(id), tz)) continue;
 
-    if (!fusibile(scene)) continue;
+    if (!(await fusibile(scene, adesso))) continue;
 
-    await sceneManager
+    void sceneManager
       .run(scene.ownerId, scene.id)
-      .catch((error: Error) => console.warn(`la scena «${scene.name}» non è andata fino in fondo: ${error.message}`));
+      .catch((error: Error) => console.warn(`la scena «${scene.name}» non è andata fino in fondo, ${error.message}`));
   }
 }
 
 /** Parte con il server: da qui ascolta ogni passaggio di stato in ogni casa. */
 export function watchTriggers(): void {
-  hub.watchesChanges((deviceId, code, value, before) => {
-    void happened(deviceId, code, value, before).catch((error: Error) =>
-      console.warn(`scene su ${deviceId}, ${error.message}`),
-    );
+  hub.watchesChanges((deviceId, cambi) => {
+    void happened(deviceId, cambi).catch((error: Error) => console.warn(`scene su ${deviceId}, ${error.message}`));
   });
 }
