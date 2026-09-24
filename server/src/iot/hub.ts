@@ -264,26 +264,6 @@ export class Hub {
     return undefined;
   }
 
-  /**
-   * Quando abbiamo mandato l'ultimo comando a ogni dispositivo.
-   *
-   * Serve a distinguere un cambiamento che abbiamo provocato noi — una scena
-   * che accende una presa — da uno fatto da una persona, col pulsante a muro
-   * o dall'app del provider. Il primo può far rincorrere due scene, il
-   * secondo no.
-   */
-  #comandati = new Map<string, number>();
-
-  /** Se a quel dispositivo abbiamo mandato un comando negli ultimi `ms`. */
-  comandatoDaPoco(deviceId: string, ms: number): boolean {
-    for (const [key, id] of this.#ids) {
-      if (id !== deviceId) continue;
-      const quando = this.#comandati.get(key);
-      return quando !== undefined && Date.now() - quando < ms;
-    }
-    return false;
-  }
-
   liveOf(agentId: string, externalId: string): Live | undefined {
     return this.#live.get(this.#key(agentId, externalId));
   }
@@ -313,7 +293,6 @@ export class Hub {
 
   /** Premere un interruttore: non torna niente, o torna un errore. */
   async command(agentId: string, externalId: string, code: string, value: DeviceValue): Promise<void> {
-    this.#comandati.set(this.#key(agentId, externalId), Date.now());
     await this.#ask(agentId, (reqId) => ({ type: 'command', reqId, externalId, code, value }));
   }
 
@@ -394,26 +373,9 @@ export class Hub {
    */
   #corse = new Map<string, { at: number; of: number; fino?: number }>();
 
-  /** Quando è finita ogni scena, per chi deve sapere se lo è da poco. */
-  #finite = new Map<string, number>();
-
   #corsa(event: Extract<LiveEvent, { kind: 'running' }>): void {
-    if (event.done) {
-      this.#corse.delete(event.sceneId);
-      this.#finite.set(event.sceneId, Date.now());
-    }
+    if (event.done) this.#corse.delete(event.sceneId);
     else this.#corse.set(event.sceneId, { at: event.at, of: event.of, ...(event.resta ? { fino: Date.now() + event.resta } : {}) });
-  }
-
-  /**
-   * Se sta andando, o se ha finito negli ultimi `ms`. L'ultima riga di una
-   * scena può essere proprio il comando che la farebbe ripartire, e la sua
-   * risposta arriva dopo che la scena si è già detta finita.
-   */
-  inCorsaODaPoco(sceneId: string, ms: number): boolean {
-    if (this.#corse.has(sceneId)) return true;
-    const finita = this.#finite.get(sceneId);
-    return finita !== undefined && Date.now() - finita < ms;
   }
 
   /** A che punto è quella scena, se sta andando. `resta` sono millisecondi da adesso. */

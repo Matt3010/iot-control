@@ -5,7 +5,8 @@ import { store } from '../persistence/db.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { UserRepository } from '../repositories/UserRepository.js';
 import { conditionsHold, crosses } from '../rules/prove.js';
-import { DEFAULT_TZ } from '../types.js';
+import { noticeManager } from '../managers/NoticeManager.js';
+import { DEFAULT_TZ, type Scene } from '../types.js';
 
 /**
  * Le scene che partono quando in casa cambia qualcosa.
@@ -17,21 +18,46 @@ import { DEFAULT_TZ } from '../types.js';
  */
 
 /**
- * Quanto aspetta una scena prima di poter ripartire da sola.
+ * Il fusibile.
  *
- * Due scene possono rincorrersi: «quando la luce si accende, spegni la
- * presa» e «quando la presa si spegne, accendi la luce» farebbero lampeggiare
- * la casa per sempre. Una scena appena partita non riparte per un minuto,
- * che basta a spezzare il giro.
- *
- * Ma un giro passa solo dai nostri comandi. Se il cambiamento l'ha fatto una
- * persona — il pulsante a muro, l'app del provider — la pausa non serve, e
- * toglieva la seconda pressione a chi preme due volte per accendere e poi
- * spegnere. Nostro vuol dire un comando mandato a quel dispositivo da poco:
- * un agente risponde in pochi secondi, e dieci bastano anche a uno lento.
+ * I giri che si vedono dai dati — una scena che comanda quello che la fa
+ * partire, direttamente o passando per altre — non si possono salvare
+ * (`rules/giri.ts`). Restano quelli che dai dati non si vedono: una presa
+ * che accende un sensore di movimento che fa ripartire la scena. Nessuna
+ * persona fa partire una scena dieci volte in un minuto, quindi oltre
+ * quella soglia si ferma e si avvisa. Sotto, ogni cambiamento la fa partire,
+ * da qualunque parte arrivi.
  */
-const PAUSA_MS = 60_000;
-const ECO_MS = 10_000;
+const SOGLIA = 10;
+const FINESTRA_MS = 60_000;
+
+/** Quando è partita da sola, di recente, ogni scena. */
+const partenze = new Map<string, number[]>();
+
+/** Se può ripartire, e se no avvisa, una volta sola per ogni fermata. */
+function fusibile(scene: Scene): boolean {
+  const adesso = Date.now();
+  const recenti = (partenze.get(scene.id) ?? []).filter((quando) => adesso - quando < FINESTRA_MS);
+  if (recenti.length >= SOGLIA) {
+    // si avvisa quando scatta, non a ogni tentativo dopo
+    if (recenti.length === SOGLIA) {
+      recenti.push(adesso);
+      partenze.set(scene.id, recenti);
+      void noticeManager.tell(scene.ownerId, {
+        kind: 'scene',
+        who: scene.name,
+        short: 'fermata, ripartiva da sola di continuo',
+        title: `La scena «${scene.name}» è stata fermata`,
+        body: 'È partita da sola più di dieci volte in un minuto, come se fosse in un giro. Guarda cosa la fa partire e cosa comanda.',
+      });
+      console.warn(`la scena «${scene.name}» è partita da sola ${SOGLIA} volte in un minuto, fermata`);
+    }
+    return false;
+  }
+  recenti.push(adesso);
+  partenze.set(scene.id, recenti);
+  return true;
+}
 
 async function happened(deviceId: string, code: string, value: DeviceValue, before: DeviceValue | undefined): Promise<void> {
   const { scenes, fusi } = await store.transaction(async (tx) => {
@@ -50,19 +76,7 @@ async function happened(deviceId: string, code: string, value: DeviceValue, befo
     const tz = fusi.get(scene.ownerId) ?? DEFAULT_TZ;
     if (!conditionsHold(scene.only, (id) => hub.stateOf(id), tz)) continue;
 
-    /*
-     * Il minuto si conta dall'inizio, e una scena con dentro un'attesa più
-     * lunga premeva il suo stesso pulsante quando il minuto era già passato,
-     * ripartendo per sempre. Finché sta andando, e per qualche secondo dopo
-     * — il suo ultimo comando può essere proprio quello — i nostri comandi
-     * non la fanno ripartire.
-     */
-    const nostro = hub.comandatoDaPoco(deviceId, ECO_MS);
-    const recente = !!scene.ranAt && Date.now() - Date.parse(scene.ranAt) < PAUSA_MS;
-    if (nostro && (recente || hub.inCorsaODaPoco(scene.id, ECO_MS))) {
-      console.warn(`la scena «${scene.name}» non riparte, il cambiamento l’ha provocato un nostro comando mentre andava o da poco`);
-      continue;
-    }
+    if (!fusibile(scene)) continue;
 
     await sceneManager
       .run(scene.ownerId, scene.id)

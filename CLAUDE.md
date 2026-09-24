@@ -118,10 +118,10 @@ e cosa si può scegliere. Scattano sul passaggio, non sullo stato.
 Una scena non può far ripartire sé stessa, né da sola né passando per altre
 scene: il server rifiuta di salvarla così (`rules/giri.ts`) e dice il giro.
 Conta se un comando può davvero far scattare la partenza, e «quando si
-accende, spegni» non è un giro. Quello che dai dati non si vede lo ferma una
-pausa: una scena non riparte per un minuto se il cambiamento l'ha provocato
-un nostro comando. Se l'ha fatto una persona, dal muro o dall'app del
-provider, riparte subito.
+accende, spegni» non è un giro. Quello che dai dati non si vede — una presa
+che accende un sensore — lo ferma un fusibile: più di dieci partenze da sola
+in un minuto e la scena si ferma, con un avviso. Sotto la soglia ogni
+cambiamento la fa partire, da qualunque parte arrivi.
 
 Due scene che possono partire nello stesso momento non danno ordini diversi
 alla stessa cosa: il server rifiuta di salvarle così (`rules/scontri.ts`) e
