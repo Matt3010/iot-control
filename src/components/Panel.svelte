@@ -126,6 +126,10 @@
 
   {#if !collapsed}
     {#if store.categories.length && !store.loading}
+      <!-- Etichetta, pastiglie e matita stanno insieme: su un telefono
+           diventano una riga sola, e le due righe risparmiate vanno
+           all'elenco, che e' quello per cui la pagina si apre. -->
+      <div class="filtro">
       <div class="panel-row" id="group-head">
         <span class="eyebrow">Gruppi</span>
         <!-- apre la scheda dei gruppi: lì dentro se ne creano, si rinominano
@@ -139,7 +143,7 @@
           <Icon name="edit" />
         </Button>
       </div>
-      <div id="group-filters">
+      <div id="group-filters" class="strisce">
         {#if store.currentGroups.length}
           <Chip
             label="Tutti i luoghi"
@@ -169,13 +173,15 @@
           <Chip label="Mostra meno" look="off" onclick={() => (allGroups = false)} />
         {/if}
       </div>
+      </div>
     {/if}
 
     {#if store.loading}
       <PanelSkeleton />
     {:else}
       {#if store.categories.length}
-        <div class="panel-row is-cut">
+        <div class="filtro is-cut">
+        <div class="panel-row">
           <span class="eyebrow">Categorie</span>
           <span class="row-actions">
             {#if store.categories.length > 1}
@@ -202,7 +208,7 @@
           </span>
         </div>
 
-        <div id="filters">
+        <div id="filters" class="strisce">
           {#each shownCategories as category (category.id)}
             <Chip
               color={category.color}
@@ -223,6 +229,7 @@
           {:else if allCategories && store.categories.length > CAP.categories}
             <Chip label="Mostra meno" look="off" onclick={() => (allCategories = false)} />
           {/if}
+        </div>
         </div>
       {/if}
 
@@ -435,18 +442,87 @@
 }
 
 @media (max-width: 600px) {
+  /*
+   * Su un telefono la mappa non c'è, quindi il pannello è l'applicazione e
+   * l'elenco è quello per cui si apre. Prima del primo luogo c'erano
+   * trecentottantasei pixel di filtri — metà schermo — e i luoghi visibili
+   * erano sei su dodici.
+   *
+   * Le pastiglie non vanno più a capo: stanno in fila e si scorrono col
+   * dito, come le linguette di qualunque altra app. Quattro categorie
+   * occupavano due righe, e le righe le paga l'elenco.
+   */
+  /*
+   * Etichetta, pastiglie e matita su una riga sola.
+   *
+   * Erano due righe per sezione, quattro in tutto, e le pagava l'elenco: il
+   * primo luogo cominciava a metà schermo. La striscia delle pastiglie
+   * prende quello che avanza e scorre col dito.
+   */
+  .filtro {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+  }
+
+  .filtro .panel-row { padding-left: 6px; padding-right: 0; gap: 6px; }
+
+  .filtro.is-cut {
+    padding-top: 9px;
+    border-top: 1px solid var(--hairline-soft);
+  }
+
+  .filtro.is-cut .panel-row { padding-top: 0; border-top: 0; }
+
+  #filters,
+  #group-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* il filo che scorre arriva fino al bordo del pannello, se no sembra
+       che finisca lì */
+    margin: 0 -14px 0 0;
+    padding: 2px 14px 2px 0;
+    scroll-padding: 0 14px;
+  }
+
+  #filters::-webkit-scrollbar,
+  #group-filters::-webkit-scrollbar { display: none; }
+
+  :global(#filters .chip),
+  :global(#group-filters .chip) { flex: none; }
+
+  /* gli stacchi fra una cosa e l'altra: quello che avanza va all'elenco */
+  #panel { gap: 9px; }
+
+  .panel-row.is-cut { padding-top: 9px; }
+
+  #list-head { margin-top: 4px; }
+
   /* Senza la mappa dietro non c'è niente da lasciar vedere: l'elenco prende
      tutto lo schermo, meno il posto del tasto in fondo. Un pannello alto
      mezzo schermo davanti a uno sfondo vuoto era metà spazio buttato. */
+  /*
+   * Il pannello arriva ai bordi, perché qui il pannello è la pagina.
+   *
+   * Sul grande galleggia sopra la mappa, e la cornice serve a far vedere
+   * cosa c'è sotto. Su un telefono sotto non c'è niente: dieci pixel per
+   * parte erano venti di larghezza dati al nero, e sopra la cornice faceva
+   * sembrare la pagina una finestra aperta su una stanza vuota.
+   *
+   * L'incavo in alto lo tiene il riempimento, non il margine: così lo sfondo
+   * arriva fin sotto l'orologio invece di lasciargli una striscia nera.
+   */
   #panel {
-    left: 10px;
-    right: 10px;
-    /* Installata nella schermata home non c'è la barra del browser a fare da
-       cuscinetto: l'orologio e la batteria stanno sopra la pagina, e dieci
-       pixel dall'alto mandavano il nome della mappa a finirci sotto. */
-    top: calc(10px + env(safe-area-inset-top));
+    left: 0;
+    right: 0;
+    top: 0;
     width: auto;
-    max-height: calc(100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding-top: calc(var(--card-pad) + env(safe-area-inset-top));
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
+    border-top: 0;
+    max-height: calc(100dvh - 86px - env(safe-area-inset-bottom));
   }
 
   /* Su uno schermo stretto in testa non ci stanno tutti: il conteggio se ne

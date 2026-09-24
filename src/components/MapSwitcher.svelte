@@ -152,6 +152,12 @@
 </div>
 
 <style>
+  /* il nome della mappa si preme per cambiarla: dove si tocca, è alto
+     quanto un dito */
+  @media (hover: none) {
+    .current { min-height: 36px; }
+  }
+
   /* il nome della mappa si prende tutto lo spazio che avanza in testata */
   .switcher { position: relative; flex: 1 1 auto; min-width: 0; }
 

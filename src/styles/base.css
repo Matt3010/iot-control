@@ -130,13 +130,40 @@ aside header {
     background: var(--hairline);
   }
 
+  /*
+   * Su un telefono la scheda è alta sempre uguale, non quanto quello che ha
+   * dentro.
+   *
+   * Dietro non c'è nessuna mappa da lasciar vedere: una scheda con due righe
+   * dentro lasciava sopra di sé mezzo schermo di nero, con il pannello
+   * ridotto a galleggiare in cima. Quel vuoto non mostrava niente e non si
+   * poteva toccare — era solo spazio perso fra le due cose che servivano.
+   *
+   * `dvh` e non `vh`: su iPhone la barra dell'indirizzo si ritira mentre
+   * scorri, e con `vh` la scheda cambiava altezza sotto il dito.
+   */
   aside {
     top: auto;
-    left: 12px;
-    right: 12px;
-    bottom: calc(12px + env(safe-area-inset-bottom));
+    /*
+     * Ai bordi dello schermo, non dentro a una cornice.
+     *
+     * Dodici pixel per parte sono ventiquattro di larghezza regalati al
+     * nero, e su uno schermo da trecentonovanta sono il sette per cento
+     * della riga: un nome di categoria in meno per riga, una colonna in
+     * meno ovunque. La cornice ha senso dove sotto c'è una mappa da
+     * lasciar vedere; qui sotto non c'è niente.
+     */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding-bottom: calc(var(--card-pad) + env(safe-area-inset-bottom));
+    /* si arrotonda solo dove si stacca da qualcosa: in alto */
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    border-bottom: 0;
     width: auto;
-    max-height: 74vh;
+    height: 74dvh;
+    /* ma mai fin sotto al pannello: quello resta la testa della pagina */
+    max-height: calc(100dvh - 138px - env(safe-area-inset-top));
     animation-name: sheet-in-mobile;
   }
 }

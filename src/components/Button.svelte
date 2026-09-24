@@ -149,6 +149,15 @@
   }
 
   .icon:hover { background: var(--sunken-hover); color: var(--ink); }
+
+
+  /* Dove si tocca, un tasto è largo quanto un dito: trenta pixel sono la
+     misura di un puntatore, non di un polpastrello. Il disegno dentro resta
+     quello — a crescere è quello che si può prendere. */
+  @media (hover: none) {
+    .icon { width: 40px; height: 40px; }
+    .icon.is-sm { width: 34px; height: 34px; }
+  }
   .icon:disabled, .icon[aria-disabled='true'] { opacity: 0.3; }
 
   /* il vetro sopra un'immagine ------------------------------------------- */
@@ -231,6 +240,13 @@
   }
 
   .link:hover { background: var(--sunken-hover); color: var(--ink); }
+
+  /* Dove si tocca, anche un comando scritto piccolo vuole un dito: lo spazio
+     si aggiunge dentro e si toglie fuori, così la riga resta dov'era e a
+     crescere è solo quello che si può prendere. */
+  @media (hover: none) {
+    .link { padding: 10px 8px; margin: -10px 0; }
+  }
 
   /* -------------------------------------------------------------- danger -- */
   .danger {

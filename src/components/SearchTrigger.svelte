@@ -33,6 +33,13 @@
 
 #search-trigger span { flex: 1; min-width: 0; }
 
+/* Dove si tocca non c'è nessun Ctrl da premere: la scorciatoia è una
+   promessa che quel telefono non può mantenere, e intanto si prende
+   quaranta pixel di riga. */
+@media (hover: none) {
+  #search-trigger kbd { display: none; }
+}
+
 #search-trigger kbd {
   flex: none;
   font: inherit;

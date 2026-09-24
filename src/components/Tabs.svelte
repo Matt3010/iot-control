@@ -140,6 +140,18 @@
 
   .tabs.text .tab:hover { opacity: 1; }
 
+  /*
+   * Dove si tocca, una linguetta è alta quanto un dito.
+   * Scritta così com'è misurava quindici pixel: si legge benissimo e si
+   * prende per sbaglio, perché il polpastrello ne copre quaranta. Lo spazio
+   * si aggiunge sotto e sopra al testo, non intorno alla fila, così la riga
+   * resta dov'era e a crescere è solo il bersaglio.
+   */
+  @media (hover: none) {
+    .tabs.text { gap: 4px; margin: -11px 0; }
+    .tabs.text .tab { padding: 11px 5px; }
+  }
+
   .tabs.text .tab.is-on { color: var(--ink); opacity: 1; }
 
   .tabs.text .split {
