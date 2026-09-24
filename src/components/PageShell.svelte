@@ -130,6 +130,16 @@
     background: rgb(var(--base));
   }
 
+  /* Sul telefono le schede hanno già il loro margine dentro, e venti pixel
+     fuori ne facevano più di trenta prima della prima parola: su uno schermo
+     stretto è una colonna in meno per tutto il resto. */
+  @media (max-width: 600px) {
+    .page {
+      padding-right: max(12px, env(safe-area-inset-right));
+      padding-left: max(12px, env(safe-area-inset-left));
+    }
+  }
+
   header {
     max-width: 960px;
     margin: 0 auto 22px;
