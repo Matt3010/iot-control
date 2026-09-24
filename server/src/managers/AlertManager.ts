@@ -4,9 +4,10 @@ import { store } from '../persistence/db.js';
 import { AlertRepository } from '../repositories/AlertRepository.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
-import type { Alert, Device } from '../types.js';
+import { holds } from '../rules/prove.js';
+import type { Alert, Device, Op } from '../types.js';
 import { noticeManager } from './NoticeManager.js';
-import { says } from './says.js';
+import { number, says, saysThreshold } from './says.js';
 
 /**
  * Le regole scritte sui dispositivi, e chi le fa scattare.
@@ -23,7 +24,7 @@ export class AlertManager {
   }
 
   /** Scrive una regola nuova, dopo aver controllato che abbia senso. */
-  add(ownerId: string, deviceId: string, code: string, becomes: string): Promise<Alert> {
+  add(ownerId: string, deviceId: string, code: string, becomes: string, op: Op = 'is'): Promise<Alert> {
     return store.transaction(async (tx) => {
       const device = await new DeviceRepository(tx).findById(deviceId);
       if (!device || device.ownerId !== ownerId) throw notFound('dispositivo inesistente');
@@ -31,9 +32,14 @@ export class AlertManager {
       const capability = device.capabilities.find((one) => one.code === code);
       if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
 
+      // una soglia vale per i numeri, un valore preciso per il resto
+      const numerica = capability.kind === 'range' || capability.kind === 'sensor';
+      if (op !== 'is' && !numerica) throw badRequest('sopra e sotto valgono solo per i numeri');
+      if (op !== 'is' && !Number.isFinite(Number(becomes))) throw badRequest('la soglia va scritta come numero');
+
       const alerts = new AlertRepository(tx);
       const gia = (await alerts.findAllOf(ownerId)).some(
-        (one) => one.deviceId === deviceId && one.code === code && one.becomes === becomes,
+        (one) => one.deviceId === deviceId && one.code === code && one.op === op && one.becomes === becomes,
       );
       if (gia) throw badRequest('questa regola c’è già');
 
@@ -41,8 +47,9 @@ export class AlertManager {
         ownerId,
         deviceId,
         code,
+        op,
         becomes,
-        says: `${device.name} ${this.#reads(device, code, becomes)}`,
+        says: `${device.name} ${this.#reads(device, code, becomes, op)}`,
         also: [],
       });
     });
@@ -88,7 +95,7 @@ export class AlertManager {
       const luogo = (await new PlaceRepository(tx).findByAgent(device.agentId))?.name;
 
       for (const alert of await alerts.findWatching(deviceId, code)) {
-        const centrata = alert.becomes === adesso;
+        const centrata = holds({ op: alert.op, value: alert.becomes }, value);
         if (!centrata) {
           // è rientrata: da qui in poi può scattare di nuovo
           if (alert.firedAt) await alerts.update(alert.id, { firedAt: undefined });
@@ -109,7 +116,7 @@ export class AlertManager {
         agentId: device.agentId,
         who: device.name,
         ...(luogo ? { where: luogo } : {}),
-        short: this.#reads(device, code, adesso),
+        short: this.#fired(device, alert, adesso),
         title: alert.says,
         // sul telefono il titolo dice gia' tutto: sotto ci sta solo dove
         body: luogo ? `Su «${luogo}».` : '',
@@ -117,10 +124,23 @@ export class AlertManager {
     }
   }
 
+  /**
+   * Cosa è successo, per la riga dell'avviso. Per una soglia si dice anche
+   * quanto segna adesso: «sale sopra 25 °C» da solo non dice se sono 25,1 o
+   * 40, e sono due sere diverse.
+   */
+  #fired(device: Device, alert: Alert, adesso: string): string {
+    const capability = device.capabilities.find((one) => one.code === alert.code);
+    if (alert.op === 'is' || !capability) return this.#reads(device, alert.code, adesso);
+    const unit = capability.kind === 'range' || capability.kind === 'sensor' ? capability.unit : undefined;
+    return `${saysThreshold(capability, alert.op, alert.becomes)}, adesso segna ${number(adesso, unit)}`;
+  }
+
   /** Come si legge un valore, con le parole del dispositivo. */
-  #reads(device: Device, code: string, value: string): string {
+  #reads(device: Device, code: string, value: string, op: Op = 'is'): string {
     const capability = device.capabilities.find((one) => one.code === code);
     if (!capability) return `è ${value}`;
+    if (op !== 'is') return saysThreshold(capability, op, value);
 
     if (capability.kind === 'switch') return value === 'true' ? 'si accende' : 'si spegne';
     /*

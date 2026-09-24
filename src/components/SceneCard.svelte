@@ -7,6 +7,7 @@
   import Chip from './Chip.svelte';
   import Icon from './Icon.svelte';
   import PickField from './PickField.svelte';
+  import SceneAutomations from './SceneAutomations.svelte';
   import SceneControls from './SceneControls.svelte';
   import DateField from './DateField.svelte';
   import Switch from './Switch.svelte';
@@ -327,14 +328,15 @@
          «chiudi le tende alle 19» e' una cosa sola, e tenerla in due posti
          vorrebbe dire aprirne due per cambiare un numero. -->
     <div class="quando">
+      <span class="eyebrow">Quando parte da sola</span>
       <Switch
         checked={!!scene.when && !scene.when.off}
-        label="Parte da sola"
+        label="A un orario"
         note={scene.when
           ? scene.when.on
             ? 'Parte una volta sola, e poi l’orario se ne va.'
             : 'Se l’ora è quella, parte anche se non sei in casa.'
-          : 'Adesso parte solo quando la premi.'}
+          : 'Oppure quando un dispositivo cambia, qui sotto.'}
         onchange={(acceso: boolean) =>
           setWhen(acceso ? (scene.when ? { ...scene.when, off: false } : defaultWhen()) : scene.when ? { ...scene.when, off: true } : null)}
       />
@@ -386,6 +388,8 @@
           {/if}
         </div>
       {/if}
+
+      <SceneAutomations {scene} />
     </div>
 
     {#if all.length}

@@ -1,4 +1,5 @@
 import { api, onUnauthorized } from './api';
+import { fusoDelBrowser } from './fuso';
 
 /** Una mappa di qualcun altro che posso modificare, e chi la tiene. */
 export interface KeyRef {
@@ -22,6 +23,10 @@ export interface Account {
    * elenco vuol dire soltanto quelli.
    */
   actingAs: { ownerId: string; handle: string; places: string[] | null } | null;
+  /** Il fuso delle sue ore: le scene partono in questo, ovunque tu sia. */
+  tz: string;
+  /** Se l'ha già detto: finché no, lo dice il primo browser che entra. */
+  tzSet: boolean;
 }
 
 interface Gate {
@@ -85,9 +90,36 @@ class Auth {
     return acting.places === null || acting.places.includes(placeId);
   }
 
+  /** Il fuso in cui leggere le ore: quello dell'account, o del browser se non c'è. */
+  get tz(): string {
+    return this.account?.tz ?? fusoDelBrowser();
+  }
+
+  /**
+   * La prima volta, il fuso lo dice il browser.
+   *
+   * Uno solo e poi basta: chi apre l'app in viaggio non deve spostare
+   * l'orario delle scene di casa. Da lì in poi si cambia dalla pagina
+   * dell'account.
+   */
+  async #fuso(): Promise<void> {
+    if (!this.account || this.account.tzSet) return;
+    await this.update({ tz: fusoDelBrowser() }).catch(() => undefined);
+  }
+
+  /** Cambia nome utente o fuso. Torna l'account com'è dopo. */
+  async update(patch: { handle?: string; tz?: string }): Promise<void> {
+    this.account = await api.patch<Account>('/auth/me', patch);
+  }
+
+  async changePassword(current: string, next: string): Promise<void> {
+    await api.put('/auth/password', { current, next });
+  }
+
   async load(): Promise<void> {
     try {
       this.account = await api.get<Account>('/auth/me');
+      void this.#fuso();
     } catch {
       this.account = null;
       const gate = await api.get<Gate>('/auth/state').catch(() => null);
@@ -110,6 +142,7 @@ class Auth {
     const body = mode === 'register' ? { email, password, handle } : { email, password };
     this.account = await api.post<Account>(path, body);
     this.needsSetup = false;
+    void this.#fuso();
   }
 
   /**

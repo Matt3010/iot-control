@@ -1,5 +1,6 @@
 <script lang="ts">
   import { devices, type Device, type Rule } from '../lib/devices.svelte';
+  import { completa } from '../lib/chiedi';
   import { fraseDi, restaDa, SILENZIO, TACE } from '../lib/rules';
   import { store } from '../lib/store.svelte';
   import type { Column } from '../lib/table';
@@ -73,7 +74,7 @@
           .map((rule) => ({
             id: rule.id,
             device,
-            quando: fraseDi(device, rule.code, rule.becomes) ?? rule.says,
+            quando: fraseDi(device, rule.code, rule.becomes, rule.op) ?? rule.says,
             rule,
             off: !!rule.off,
           })),
@@ -122,8 +123,10 @@
       options: restaDa(device, rules),
       onPick: (scelto: string) => {
         if (scelto === SILENZIO) return void devices.watch(device, true);
-        const [code, becomes] = scelto.split(/:(.*)/s);
-        void devices.addRule(device.id, code as string, becomes as string);
+        // l'ultimo passo è quello delle scene: subito, o dopo la soglia
+        completa(device, scelto, 'quando', (prova) =>
+          void devices.addRule(device.id, prova.code, String(prova.value), prova.op),
+        );
       },
     });
   }

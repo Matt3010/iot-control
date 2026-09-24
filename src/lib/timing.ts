@@ -1,4 +1,5 @@
 import type { Timing } from './devices.svelte';
+import { dopoGiorni, istante, oraIn } from './fuso';
 
 /**
  * Le parole di un orario che si ripete.
@@ -41,30 +42,27 @@ export function saysDay(iso: string): string {
  * Un giorno detto in poco spazio: «oggi», «domani», «gio 25». Per le righe
  * strette, dove «giovedì 25 settembre» andrebbe a capo.
  */
-export function saysShortDay(at: number, now = new Date()): string {
-  const quando = new Date(at);
-  const mezzanotte = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const giorni = Math.round((mezzanotte(quando) - mezzanotte(now)) / 86_400_000);
-  if (giorni === 0) return 'oggi';
-  if (giorni === 1) return 'domani';
-  return `${GIORNI[quando.getDay()]} ${quando.getDate()}`;
+export function saysShortDay(at: number, tz: string, now = new Date()): string {
+  const quando = oraIn(tz, new Date(at));
+  const oggi = oraIn(tz, now).date;
+  if (quando.date === oggi) return 'oggi';
+  if (quando.date === dopoGiorni(oggi, 1)) return 'domani';
+  return `${GIORNI[quando.day]} ${Number(quando.date.slice(8, 10))}`;
 }
 
 /** «ogni giorno alle 19:00», «dal lunedì al venerdì alle 07:30», «domani alle 22:00». */
 export function saysWhen(when: Timing): string {
   if (when.on) return `${saysDay(when.on)} alle ${when.at}, una volta sola`;
+  return `${saysDays(when.days)} alle ${when.at}`;
+}
 
-  const days = [...when.days].sort();
-
-  const quali = !days.length
-    ? 'ogni giorno'
-    : uguali(days, FERIALI)
-      ? 'dal lunedì al venerdì'
-      : uguali(days, FESTIVI)
-        ? 'sabato e domenica'
-        : days.map((day) => GIORNI[day]).join(' ');
-
-  return `${quali} alle ${when.at}`;
+/** Dei giorni della settimana a parole: «ogni giorno», «dal lunedì al venerdì», «lun mer ven». */
+export function saysDays(giorni: number[]): string {
+  const days = [...giorni].sort();
+  if (!days.length || days.length === 7) return 'ogni giorno';
+  if (uguali(days, FERIALI)) return 'dal lunedì al venerdì';
+  if (uguali(days, FESTIVI)) return 'sabato e domenica';
+  return days.map((day) => GIORNI[day]).join(' ');
 }
 
 /** Il fuso di questo browser: «le sette» vuol dire le sette dove sei. */
@@ -97,26 +95,26 @@ export function nextDays(quanti = 30): string[] {
  * Quando partirà la prossima volta, in millisecondi. Mai, se non ha un
  * orario, se è sospesa, o se era una volta sola e quel giorno è passato.
  *
- * Serve a mettere in fila le scene, non a farle partire: quello lo fa il
- * server nel fuso della scena. Qui si conta nell'ora di chi guarda, che per
- * mettere in fila scene della stessa casa dà lo stesso ordine.
+ * Nel fuso dell'account (`tz`), che è quello in cui il server la farà
+ * partire: le 19 sono le 19 di casa anche se chi guarda è altrove.
  */
-export function nextRun(when: Timing | undefined, now = new Date()): number | undefined {
+export function nextRun(when: Timing | undefined, tz: string, now = new Date()): number | undefined {
   if (!when || when.off) return undefined;
-  const [ore, minuti] = when.at.split(':').map(Number) as [number, number];
+  const adesso = now.getTime();
 
   if (when.on) {
-    const [anno, mese, giorno] = when.on.split('-').map(Number) as [number, number, number];
-    const quando = new Date(anno, mese - 1, giorno, ore, minuti).getTime();
-    return quando > now.getTime() ? quando : undefined;
+    const quando = istante(when.on, when.at, tz);
+    return quando > adesso ? quando : undefined;
   }
 
   // la prima fra oggi e i prossimi sette giorni che cade in un giorno giusto
+  const oggi = oraIn(tz, now).date;
   for (let fra = 0; fra <= 7; fra += 1) {
-    const quando = new Date(now.getFullYear(), now.getMonth(), now.getDate() + fra, ore, minuti);
-    const giorno = quando.getDay();
-    if (quando.getTime() <= now.getTime()) continue;
-    if (!when.days.length || when.days.includes(giorno)) return quando.getTime();
+    const data = dopoGiorni(oggi, fra);
+    const quando = istante(data, when.at, tz);
+    if (quando <= adesso) continue;
+    const giorno = new Date(`${data}T12:00:00Z`).getUTCDay();
+    if (!when.days.length || when.days.includes(giorno)) return quando;
   }
   return undefined;
 }

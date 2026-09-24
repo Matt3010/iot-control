@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, isNull, ne, or } from 'drizzle-orm';
+import { and, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import { iso, type Transaction } from '../persistence/db.js';
 import { scenes } from '../persistence/schema.js';
 import type { Scene, SceneStep } from '../types.js';
@@ -14,6 +14,8 @@ const toScene = (row: Row): Scene => ({
   ...(row.timing ? { when: row.timing } : {}),
   ...(row.lastRunAt ? { lastRunAt: row.lastRunAt } : {}),
   ...(row.ranAt ? { ranAt: iso(row.ranAt) as string } : {}),
+  triggers: row.triggers ?? [],
+  only: row.only ?? [],
 });
 
 export class SceneRepository {
@@ -28,6 +30,21 @@ export class SceneRepository {
   /** Le scene sono di chi le ha fatte, come gli agenti. */
   async findAllOf(ownerId: string): Promise<Scene[]> {
     const rows = await this.tx.db.select().from(scenes).where(eq(scenes.ownerId, ownerId));
+    return rows.map(toScene);
+  }
+
+  /**
+   * Quelle che partono quando quella cosa di quel dispositivo cambia.
+   *
+   * Lo chiede il database, dentro all'elenco dei trigger: a ogni grado di
+   * una sonda leggere tutte le scene di tutti per guardarle una a una
+   * sarebbe il modo più lento di non trovarne nessuna.
+   */
+  async findTriggeredBy(deviceId: string, code: string): Promise<Scene[]> {
+    const rows = await this.tx.db
+      .select()
+      .from(scenes)
+      .where(sql`${scenes.triggers} @> ${JSON.stringify([{ deviceId, code }])}::jsonb`);
     return rows.map(toScene);
   }
 
@@ -54,10 +71,15 @@ export class SceneRepository {
     return toScene(row as Row);
   }
 
-  async update(id: string, patch: Partial<Pick<Scene, 'name' | 'steps' | 'when'>>): Promise<Scene | undefined> {
+  async update(
+    id: string,
+    patch: Partial<Pick<Scene, 'name' | 'steps' | 'when' | 'triggers' | 'only'>>,
+  ): Promise<Scene | undefined> {
     const set = {
       ...(patch.name === undefined ? {} : { name: patch.name }),
       ...(patch.steps === undefined ? {} : { steps: patch.steps }),
+      ...(patch.triggers === undefined ? {} : { triggers: patch.triggers }),
+      ...(patch.only === undefined ? {} : { only: patch.only }),
       ...('when' in patch ? { timing: patch.when ?? null } : {}),
     };
     if (!Object.keys(set).length) return this.findById(id);

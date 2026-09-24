@@ -1,4 +1,5 @@
-import type { Device, Rule } from './devices.svelte';
+import type { Device, Op, Rule } from './devices.svelte';
+import { fraseProva, scelteDi } from './prove';
 import type { Capability } from './types';
 import type { Choice } from './table';
 
@@ -17,45 +18,12 @@ export const SILENZIO = 'silenzio';
 export const TACE = 'Se smette di rispondere';
 
 /**
- * Le parole sono quelle che dice il dispositivo, e il valore sta fra
- * virgolette perché «diventa apri» non è italiano e non lo diventa smontando
- * la parola: quei valori li sceglie lui, e sono stati dove una porta dice
- * aperta e comandi dove una tenda dice apri.
+ * La frase di un avviso già scritto: le stesse parole di quando lo si
+ * sceglie, e di quando fa partire una scena (lib/prove.ts).
  */
-export function frase(capability: Capability, value: string): string {
-  if (capability.kind === 'switch')
-    return value === 'true' ? `${capability.label} si accende` : `${capability.label} si spegne`;
-  return `${capability.label} diventa «${value}»`;
-}
-
-/** La stessa frase partendo da un avviso già scritto. */
-export function fraseDi(device: Device, code: string, becomes: string): string | undefined {
+export function fraseDi(device: Device, code: string, becomes: string, op: Op = 'is'): string | undefined {
   const capability = (device.capabilities as Capability[]).find((one) => one.code === code);
-  return capability ? frase(capability, becomes) : undefined;
-}
-
-/**
- * I valori su cui si può scrivere un avviso.
- *
- * Solo quelli che un dispositivo assume davvero: un interruttore ha acceso e
- * spento, una tenda ha le sue tre posizioni. Su un numero — la luminosità, i
- * gradi — non si offre niente per ora: «sopra» e «sotto» sono un'altra cosa
- * da quella che c'è qui, e mezza cosa non si mette.
- */
-function valoriDi(device: Device): Choice[] {
-  return (device.capabilities as Capability[]).flatMap((capability) => {
-    if (capability.kind === 'switch')
-      return ['true', 'false'].map((value) => ({
-        id: `${capability.code}:${value}`,
-        label: frase(capability, value),
-      }));
-    if (capability.kind === 'enum')
-      return capability.values.map((value) => ({
-        id: `${capability.code}:${value}`,
-        label: frase(capability, String(value)),
-      }));
-    return [];
-  });
+  return capability ? fraseProva(capability, op, becomes, 'quando') : undefined;
 }
 
 /**
@@ -66,11 +34,12 @@ function valoriDi(device: Device): Choice[] {
  * ripropongono: offrire due volte la stessa cosa è rumore.
  */
 export function restaDa(device: Device, rules: Rule[]): Choice[] {
-  const scritte = rules.filter((rule) => rule.deviceId === device.id);
+  const scritte = rules.filter((rule) => rule.deviceId === device.id && (rule.op ?? 'is') === 'is');
   return [
     ...(device.watch ? [] : [{ id: SILENZIO, label: TACE }]),
-    ...valoriDi(device).filter(
-      (one) => !scritte.some((rule) => `${rule.code}:${rule.becomes}` === one.id),
+    // le soglie si ripropongono sempre: «sopra 25» e «sopra 30» sono due avvisi
+    ...scelteDi(device, 'quando').filter(
+      (one) => !scritte.some((rule) => `${rule.code}:=${rule.becomes}` === one.id),
     ),
   ];
 }

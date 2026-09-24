@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsDefined,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -107,6 +108,86 @@ export class TimingDto {
  * sua. «Sera» può chiudere le tende e accendere l'abat-jour, che sono due
  * azioni diverse su due cose diverse, premute insieme.
  */
+/**
+ * Un dispositivo e come guardarlo, per quello che fa partire una scena e per
+ * quello che deve essere vero. La forma sola: se quel dispositivo esiste, è
+ * tuo e sa fare quella cosa lo decide il manager.
+ */
+class DeviceTestDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  id?: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'serve il dispositivo' })
+  @MaxLength(80)
+  deviceId!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'serve la cosa da guardare' })
+  @MaxLength(80)
+  code!: string;
+
+  @IsIn(['is', 'above', 'below'], { message: 'si guarda un valore preciso, o sopra, o sotto' })
+  op!: 'is' | 'above' | 'below';
+
+  @IsDefined({ message: 'serve il valore' })
+  value!: string | number;
+}
+
+export class SceneTriggerDto extends DeviceTestDto {}
+
+/**
+ * Una condizione. I campi che valgono dipendono dal genere: un dispositivo,
+ * dei giorni, una fascia oraria, un periodo. Quali servono a quale lo
+ * controlla il manager, che sa anche dire cosa manca.
+ */
+export class SceneConditionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  id?: string;
+
+  @IsIn(['device', 'days', 'hours', 'dates'], { message: 'una condizione è su un dispositivo, dei giorni, delle ore o delle date' })
+  kind!: 'device' | 'days' | 'hours' | 'dates';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  deviceId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  code?: string;
+
+  @IsOptional()
+  @IsIn(['is', 'above', 'below'])
+  op?: 'is' | 'above' | 'below';
+
+  @IsOptional()
+  value?: string | number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(7)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
+  days?: number[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  to?: string;
+}
+
 export class SceneDto {
   @trim()
   @IsString()
@@ -126,4 +207,18 @@ export class SceneDto {
   @ValidateNested()
   @Type(() => TimingDto)
   when?: TimingDto | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => SceneTriggerDto)
+  triggers?: SceneTriggerDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => SceneConditionDto)
+  only?: SceneConditionDto[];
 }

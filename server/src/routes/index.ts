@@ -13,7 +13,7 @@ import { placeController } from '../controllers/PlaceController.js';
 import { sceneController } from '../controllers/SceneController.js';
 import { stateController } from '../controllers/StateController.js';
 import { AgentDto, PairDto } from '../dto/agent.dto.js';
-import { ActDto, CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
+import { AccountDto, ActDto, CredentialsDto, PasswordDto, RegisterDto } from '../dto/auth.dto.js';
 import { CommandDto, WatchDto } from '../dto/device.dto.js';
 import { SceneDto } from '../dto/scene.dto.js';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto.js';
@@ -47,6 +47,9 @@ apiRouter.use(requireUser);
 apiRouter.use(resolveActing);
 
 apiRouter.get('/auth/me', authController.me);
+/** Il proprio account: nome e fuso orario, e la password. */
+apiRouter.patch('/auth/me', validateBody(AccountDto), authController.update);
+apiRouter.put('/auth/password', validateBody(PasswordDto), authController.password);
 
 /** Entrare in casa di qualcuno, e tornarsene a casa propria. */
 apiRouter.post('/auth/act', validateBody(ActDto), authController.enter);

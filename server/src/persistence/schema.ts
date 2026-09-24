@@ -11,7 +11,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import type { Capability } from '../../../shared/protocol.js';
-import type { LogEntry, MapEditor, Notice, SceneStep, Timing } from '../types.js';
+import type { LogEntry, MapEditor, Notice, Op, SceneCondition, SceneStep, SceneTrigger, Timing } from '../types.js';
 
 /**
  * Le tabelle, e perché sono fatte così.
@@ -37,6 +37,15 @@ export const users = pgTable('users', {
   handle: text('handle').notNull().unique(),
   salt: text('salt').notNull(),
   hash: text('hash').notNull(),
+  /**
+   * Il suo fuso orario: «le sette» delle sue scene sono le sette qui.
+   *
+   * Uno solo per persona e non uno per scena. Prima ogni orario si portava
+   * il fuso del browser in cui era stato scritto, e un orario scritto in
+   * viaggio restava in un altro fuso per sempre. Vuoto finché il primo
+   * browser non lo dice.
+   */
+  tz: text('tz'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -210,6 +219,13 @@ export const scenes = pgTable(
      * sapere quali scene si usano e quali no.
      */
     ranAt: timestamp('ran_at', { withTimezone: true }),
+    /** Le cose di casa che la fanno partire: ne basta una. */
+    triggers: jsonb('triggers').$type<SceneTrigger[]>().notNull().default([]),
+    /**
+     * Quello che deve essere vero perché parta da sola: tutto.
+     * La colonna non si chiama «only»: è parola di SQL, come «when».
+     */
+    only: jsonb('conditions').$type<SceneCondition[]>().notNull().default([]),
   },
   (table) => [index('scenes_owner').on(table.ownerId)],
 );
@@ -263,6 +279,8 @@ export const alerts = pgTable(
       .notNull()
       .references(() => devices.id, { onDelete: 'cascade' }),
     code: text('code').notNull(),
+    /** Preciso, sopra o sotto. Le regole di prima erano tutte precise. */
+    op: text('op').$type<Op>().notNull().default('is'),
     becomes: text('becomes').notNull(),
     says: text('says').notNull(),
     also: jsonb('also').$type<string[]>().notNull().default([]),

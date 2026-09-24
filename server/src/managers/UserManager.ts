@@ -1,5 +1,5 @@
 import { hashPassword, verifyPassword } from '../auth/password.js';
-import type { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
+import type { AccountDto, CredentialsDto, PasswordDto, RegisterDto } from '../dto/auth.dto.js';
 import { badRequest } from '../errors/HttpError.js';
 import { store } from '../persistence/db.js';
 import { MapRepository } from '../repositories/MapRepository.js';
@@ -81,6 +81,38 @@ export class UserManager {
       if (await users.findByHandle(dto.handle)) throw badRequest('questo nome utente è già preso');
       return users.insert({ email: dto.email, handle: dto.handle, salt, hash });
     });
+  }
+
+  /**
+   * Cambia nome e fuso. Il nome è di tutti quelli che ti vedono scritto, quindi
+   * se è di un altro te lo diciamo invece di cambiartelo in qualcosa di simile.
+   */
+  update(id: string, dto: AccountDto): Promise<User> {
+    return store.transaction(async (tx) => {
+      const users = new UserRepository(tx);
+      if (dto.handle) {
+        const chi = await users.findByHandle(dto.handle);
+        if (chi && chi.id !== id) throw badRequest('questo nome utente è già preso');
+      }
+      const dopo = await users.update(id, {
+        ...(dto.handle ? { handle: dto.handle } : {}),
+        // nella sua forma di sempre, «Europe/Rome»: `Intl` accetta anche le
+        // minuscole, ma è così che si legge e così che lo scrivono gli altri
+        ...(dto.tz ? { tz: new Intl.DateTimeFormat('en', { timeZone: dto.tz }).resolvedOptions().timeZone } : {}),
+      });
+      if (!dopo) throw badRequest('questo account non esiste più');
+      return dopo;
+    });
+  }
+
+  /** Password nuova, solo con quella giusta di adesso. */
+  async changePassword(id: string, dto: PasswordDto): Promise<void> {
+    const user = await store.transaction((tx) => new UserRepository(tx).findById(id));
+    if (!user || !(await verifyPassword(dto.current, user.salt, user.hash))) {
+      throw badRequest('la password di adesso non è quella giusta');
+    }
+    const { salt, hash } = await hashPassword(dto.next);
+    await store.transaction((tx) => new UserRepository(tx).update(id, { salt, hash }));
   }
 
   /** Stesso messaggio per email sconosciuta e password errata: non si aiuta chi prova. */

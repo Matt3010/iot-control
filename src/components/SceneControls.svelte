@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { devices, type Scene } from '../lib/devices.svelte';
   import { thingHealth } from '../lib/health';
+  import { fraseCondizione, fraseDiProva } from '../lib/prove';
   import { saysWait, saysWhen } from '../lib/timing';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
@@ -151,6 +152,19 @@
       <span class="detto">
         {scene.when.off ? `sospesa — ${saysWhen(scene.when)}` : saysWhen(scene.when)}
       </span>
+    </p>
+  {/if}
+  <!-- le cose di casa che la fanno partire, e le condizioni in fila sotto:
+       chi guarda la scheda chiusa deve sapere perché partirà da sola -->
+  {#each scene.triggers ?? [] as trigger, at (trigger.id ?? at)}
+    <p class="auto">
+      <Icon name="bell" />
+      <span class="detto">quando {fraseDiProva(devices.list, trigger, 'quando')}</span>
+    </p>
+  {/each}
+  {#if (scene.only ?? []).length && (scene.when || (scene.triggers ?? []).length)}
+    <p class="auto is-se">
+      <span class="detto">solo se {(scene.only ?? []).map((one) => fraseCondizione(devices.list, one)).join(', ')}</span>
     </p>
   {/if}
 

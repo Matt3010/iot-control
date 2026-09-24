@@ -3,7 +3,7 @@ import { eq, inArray, sql } from 'drizzle-orm';
 import { uniqueSlug } from '../auth/slug.js';
 import { iso, type Transaction } from '../persistence/db.js';
 import { users } from '../persistence/schema.js';
-import type { User } from '../types.js';
+import { DEFAULT_TZ, type User } from '../types.js';
 
 type Row = typeof users.$inferSelect;
 
@@ -13,6 +13,7 @@ const toUser = (row: Row): User => ({
   handle: row.handle,
   salt: row.salt,
   hash: row.hash,
+  ...(row.tz ? { tz: row.tz } : {}),
   createdAt: iso(row.createdAt) as string,
 });
 
@@ -22,6 +23,23 @@ export class UserRepository {
   async count(): Promise<number> {
     const [row] = await this.tx.db.select({ quanti: sql<number>`count(*)::int` }).from(users);
     return row?.quanti ?? 0;
+  }
+
+  /** Cambia quello che si cambia di un account. Torna com'è dopo. */
+  async update(
+    id: string,
+    patch: Partial<Pick<User, 'handle' | 'tz' | 'salt' | 'hash'>>,
+  ): Promise<User | undefined> {
+    if (!Object.keys(patch).length) return this.findById(id);
+    const [row] = await this.tx.db.update(users).set(patch).where(eq(users.id, id)).returning();
+    return row ? toUser(row) : undefined;
+  }
+
+  /** I fusi di queste persone, tutti in una domanda: l'orologio li vuole insieme. */
+  async tzOf(ids: string[]): Promise<Map<string, string>> {
+    if (!ids.length) return new Map();
+    const rows = await this.tx.db.select({ id: users.id, tz: users.tz }).from(users).where(inArray(users.id, ids));
+    return new Map(rows.map((row) => [row.id, row.tz ?? DEFAULT_TZ]));
   }
 
   async findById(id: string): Promise<User | undefined> {

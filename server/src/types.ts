@@ -9,6 +9,8 @@ export interface User {
   /** scrypt: sale e derivata, mai la password. */
   salt: string;
   hash: string;
+  /** Il suo fuso orario, se il browser l'ha già detto. */
+  tz?: string;
   createdAt: string;
 }
 
@@ -212,13 +214,61 @@ export interface Timing {
   off?: boolean;
 }
 
+/**
+ * Come si guarda il valore di un dispositivo.
+ *
+ * `is` è un valore preciso — acceso, «aperta» — e vale per interruttori e
+ * scelte. `above` e `below` sono una soglia, e valgono per i numeri: i
+ * gradi, la luminosità. Lo stesso modo di guardare serve agli avvisi e alle
+ * scene, perché «quando la porta si apre» è la stessa domanda nei due posti.
+ */
+export type Op = 'is' | 'above' | 'below';
+
+/** Un valore di un dispositivo, e come guardarlo. */
+export interface DeviceTest {
+  deviceId: string;
+  /** Quale capacità: `power`, `temperature`. */
+  code: string;
+  op: Op;
+  /** Il valore preciso per `is`, la soglia per gli altri due. */
+  value: string | number;
+}
+
+/**
+ * Una cosa che fa partire una scena: un dispositivo che passa a quel valore.
+ *
+ * Sul passaggio, non sullo stato. «Sopra 25» la fa partire quando la
+ * temperatura lo supera, non ogni volta che la sonda ripete 26; torna pronta
+ * quando riscende. L'orario non sta qui, sta in `when`, che c'era prima.
+ */
+export interface SceneTrigger extends DeviceTest {
+  id: string;
+}
+
+/**
+ * Una cosa che deve essere vera perché una scena parta da sola.
+ *
+ * Tutte insieme, nel momento in cui qualcosa la farebbe partire. Valgono
+ * solo per le partenze automatiche: chi la preme la vuole adesso, e basta.
+ * I giorni, le ore e le date si leggono nel fuso di chi ha la scena (`User.tz`).
+ */
+export type SceneCondition =
+  | ({ id: string; kind: 'device' } & DeviceTest)
+  | { id: string; kind: 'days'; days: number[] }
+  | { id: string; kind: 'hours'; from: string; to: string }
+  | { id: string; kind: 'dates'; from: string; to: string };
+
 export interface Scene {
   id: string;
   ownerId: string;
   name: string;
   steps: SceneStep[];
-  /** Se parte da sola, e quando. */
+  /** Se parte da sola a un orario, e quando. */
   when?: Timing;
+  /** Le cose di casa che la fanno partire. Ne basta una. */
+  triggers?: SceneTrigger[];
+  /** Quello che deve essere vero perché parta da sola. Tutto. */
+  only?: SceneCondition[];
   /**
    * L'ultimo minuto in cui e' partita da sola.
    *
@@ -305,7 +355,9 @@ export interface Alert {
   deviceId: string;
   /** Quale capacità si guarda: `power`, `state`, `value`. */
   code: string;
-  /** E quale valore fa scattare la cosa. */
+  /** Come si guarda il valore: preciso, sopra o sotto. */
+  op: Op;
+  /** E quale valore fa scattare la cosa: quello preciso, o la soglia. */
   becomes: string;
   /** Come si legge, scritto quando si crea: «La porta diventa aperta». */
   says: string;
@@ -381,3 +433,9 @@ export interface Database {
   alerts: Alert[];
   notices: Notice[];
 }
+
+/**
+ * Il fuso di chi non l'ha ancora detto. Quello dove sta il server di casa:
+ * finché un browser non si fa vivo, è la risposta meno sbagliata.
+ */
+export const DEFAULT_TZ = 'Europe/Rome';

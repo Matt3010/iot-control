@@ -83,6 +83,44 @@ sposterebbe su di lui il compito di capirlo.
 - Premium vuol dire misurato: spazi che tornano, niente ombre dove il resto
   dell'app non ne ha, e niente vuoti grandi come mezza pagina.
 - Ogni pezzo nuovo porta il suo commento sul perché esiste, non su cosa fa.
+- **Una finestra sola.** Tutto quello che si apre davanti — la scheda di un
+  luogo, categorie e gruppi, il registro, una soglia da scrivere — passa da
+  `ui.openModal` e mostra un componente, che non sa di stare in una
+  finestra. I tasti in fondo li detta il componente con `tasti()`
+  (`lib/fondo.svelte.ts`), perché cambiano con lui. Niente `<aside>` nuovi.
+- **Gli elenchi si guardano con una vista.** Ordine e ricerca passano da
+  `lib/vista.svelte.ts`, mai da un `sort` o un filtro scritti nel componente.
+  In una tabella si ordina dall'intestazione, in un elenco di schede con
+  `ViewControls`; un elenco che arriva a pagine lo mette in fila il server.
+  Un filtro nuovo è un'opzione in più della vista, non un metodo accanto.
+- **«C'è una mappa?» si chiede a `viewport.hasMap`**, non a `viewport.narrow`.
+  Il secondo dice quanto è largo lo schermo, e serve solo dove conta quello
+  (la tastiera che si aprirebbe).
+- **Le regole per il dito stanno dopo quelle che correggono.** Un
+  `@media (hover: none)` scritto sopra alla regola normale perde a parità di
+  peso senza dire niente, ed è successo quattro volte.
+
+## Il filo
+
+Ogni cosa che si scrive e che un'altra scheda aperta deve vedere manda un
+evento con `hub.changed`, e `lib/live.svelte.ts` sa cosa farne. Una modifica
+che arriva solo a chi l'ha fatta è una scheda che mente finché non la
+ricarichi. Prima di dire che una cosa nuova è fatta si apre in due schede e
+si guarda l'altra.
+
+## Le prove sui dispositivi
+
+«Quando la porta si apre», «sopra 25 gradi» sono la stessa domanda per gli
+avvisi e per le scene, e hanno un motore solo. `server/src/rules/prove.ts`
+decide se vale e se è appena successo, `src/lib/prove.ts` dice come si legge
+e cosa si può scegliere. Scattano sul passaggio, non sullo stato, e una
+scena partita da sola non riparte da sola per un minuto.
+
+Due scene che possono partire nello stesso momento non danno ordini diversi
+alla stessa cosa: il server rifiuta di salvarle così (`rules/scontri.ts`) e
+dice con quale scena e su quale dispositivo si scontrano. Si blocca solo
+quello che si può prevedere, cioè lo stesso orario negli stessi giorni o lo
+stesso cambiamento dello stesso dispositivo.
 
 ## L'archivio
 
@@ -98,6 +136,14 @@ dentro o succede tutto o non succede niente.
 - **Lo schema dice cosa si porta via cosa.** Un agente eliminato porta con sé
   i suoi dispositivi, e quelli le regole scritte su di loro. Quando serve
   sapere *quante* ne sono cadute bisogna contarle prima di toglierle.
+- **Niente parole di SQL come nome di colonna.** `when`, `only`, `order` e
+  le altre funzionano finché l'ORM mette le virgolette e si rompono al primo
+  SQL scritto a mano. Il nome in TypeScript può restare quello, la colonna
+  no (`only` → `conditions`, `when` → `timing`).
+- **Le ore sono nel fuso dell'account** (`users.tz`), mai in quello del
+  browser o del server, perché le scene partono all'ora di chi le ha
+  scritte anche se chi guarda è altrove. Sul client è `auth.tz`, sul server
+  `UserRepository.tzOf`.
 - **Una migrazione per ogni modifica allo schema**, generata con
   `npm run db:genera` e letta prima di lanciarla. Il server le applica da sé
   quando parte.

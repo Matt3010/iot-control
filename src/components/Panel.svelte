@@ -2,6 +2,7 @@
   import { fadeEdges } from '../lib/overflow';
   import { mapBridge } from '../lib/mapBridge.svelte';
   import { auth } from '../lib/auth.svelte';
+  import { ACCOUNT_PATH } from '../lib/routing';
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
@@ -74,25 +75,15 @@
     <MapSwitcher />
     <span class="panel-head-end">
       {#if auth.account}
-        <!-- Chi sei e la porta, in testa.
-             In fondo a un telefono quel posto è del pollice e serve a quello
-             che si fa tutti i giorni, quindi il piede se n'era già andato di
-             lì. Sul grande stava ancora sotto, e con lui il nome scritto per
-             intero, cioè due modi di uscire dalla stessa app, e uno dei due da
-             tenere in piedi per niente. Il nome si legge dove serve davvero,
-             cioè nella domanda che chiede se uscire. -->
+        <!-- Il tuo account, in testa. Porta alla sua pagina — nome, fuso
+             orario, password — e da lì si esce: aprire subito la domanda
+             «vuoi uscire?» faceva della «@» una porta e basta, quando dietro
+             c'è anche quello che di te si può cambiare. -->
         <Button
           look="icon"
           extra="whoami-btn"
-          title={'@' + auth.account.handle + ' — esci'}
-          onclick={(event: MouseEvent) =>
-            ui.askSure(event.currentTarget as HTMLElement, {
-              title: `Uscire da @${auth.account?.handle ?? ''}?`,
-              detail: 'Le tue mappe restano dove sono. Si rientra quando vuoi.',
-              verb: 'Esci',
-              no: 'Resto',
-              onYes: () => auth.leave(),
-            })}
+          href={ACCOUNT_PATH}
+          title={'@' + auth.account.handle + ', il tuo account'}
         >
           <Icon name="handle" />
         </Button>

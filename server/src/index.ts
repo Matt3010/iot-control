@@ -6,6 +6,7 @@ import { attachAgentLink } from './iot/link.js';
 import { watchLog } from './managers/LogManager.js';
 import { closeDb, migrateUp } from './persistence/db.js';
 import { watchClock } from './services/SceneClock.js';
+import { watchTriggers } from './services/SceneTriggers.js';
 import { watchSilence } from './services/SilenceWatch.js';
 
 /*
@@ -29,6 +30,7 @@ attachAgentLink(server);
 watchSilence();
 // e qualcuno guarda l'orologio, per le scene che partono da sole
 watchClock();
+watchTriggers();
 // e qualcuno porta fuori le righe di registro scadute
 watchLog();
 

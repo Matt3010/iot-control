@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { auth } from '../lib/auth.svelte';
   import type { Scene } from '../lib/devices.svelte';
   import { fadeEdges } from '../lib/overflow';
   import { nextRun, saysShortDay } from '../lib/timing';
@@ -27,13 +28,14 @@
 
   const tappe = $derived(
     scenes
-      .map((scene) => ({ scene, at: nextRun(scene.when, new Date(adesso)) }))
+      .map((scene) => ({ scene, at: nextRun(scene.when, auth.tz, new Date(adesso)) }))
       .filter((tappa): tappa is { scene: Scene; at: number } => tappa.at !== undefined)
       .sort((a, b) => a.at - b.at),
   );
 
+  // le ore di casa, non quelle del browser: è a quest'ora che partirà
   const ora = (at: number): string =>
-    new Date(at).toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit' });
+    new Date(at).toLocaleTimeString('it', { hour: '2-digit', minute: '2-digit', timeZone: auth.tz });
 </script>
 
 {#if tappe.length}
@@ -45,7 +47,7 @@
           <span class="punto" aria-hidden="true"></span>
           <span class="quando">
             <b>{ora(tappa.at)}</b>
-            {saysShortDay(tappa.at)}
+            {saysShortDay(tappa.at, auth.tz)}
           </span>
           <span class="nome">{tappa.scene.name}</span>
         </li>
@@ -81,6 +83,13 @@
     list-style: none;
     overflow-x: auto;
     scrollbar-width: none;
+    /*
+     * Il filo corre per tutta la riga, non solo da un punto all'altro: una
+     * partenza sola restava un punto sospeso nel vuoto, e non si capiva che
+     * fosse una linea del tempo. `local` lo fa scorrere insieme alle tappe
+     * quando sono tante e la riga scorre di lato.
+     */
+    background: linear-gradient(var(--hairline), var(--hairline)) 0 8px / 100% 1px no-repeat local;
   }
 
   .tappe::-webkit-scrollbar { display: none; }
@@ -93,17 +102,6 @@
     min-width: 96px;
     max-width: 180px;
     padding-top: 16px;
-  }
-
-  /* il filo: da ogni punto fino al punto dopo, così finisce sull'ultima */
-  .tappa:not(:last-child)::before {
-    content: '';
-    position: absolute;
-    top: 4px;
-    left: 8px;
-    right: -28px;
-    height: 1px;
-    background: var(--hairline);
   }
 
   .punto {

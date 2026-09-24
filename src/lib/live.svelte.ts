@@ -29,7 +29,11 @@ export type LiveEvent =
   | { kind: 'running'; sceneId: string; at: number; of: number; done?: boolean }
   | { kind: 'notice' }
   /** Il registro di un agente ha una riga in più: chi lo legge lo rilegga. */
-  | { kind: 'log'; agentId: string };
+  | { kind: 'log'; agentId: string }
+  /** Le regole degli avvisi sono cambiate da un'altra parte. */
+  | { kind: 'rules' }
+  /** L'account è cambiato da un'altra scheda: nome o fuso. */
+  | { kind: 'account' };
 
 class Live {
   #stream: EventSource | null = null;
@@ -112,6 +116,10 @@ class Live {
     } else if (event.kind === 'notice') {
       // se la pagina degli avvisi e' aperta si rilegge; se non lo e', niente
       void alerts.seen();
+    } else if (event.kind === 'rules') {
+      void devices.loadRules().catch(() => undefined);
+    } else if (event.kind === 'account') {
+      void auth.refresh();
     } else {
       store.apply(event);
       // una mappa che cambia può aver cambiato anche fin dove arrivo

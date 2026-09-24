@@ -1,5 +1,5 @@
 import type { Capability, DeviceValue } from '../../../shared/protocol.js';
-import type { SceneDto, SceneStepDto } from '../dto/scene.dto.js';
+import type { SceneConditionDto, SceneDto, SceneStepDto, SceneTriggerDto } from '../dto/scene.dto.js';
 import { badGateway, badRequest, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
 import { noticeManager } from './NoticeManager.js';
@@ -9,8 +9,10 @@ import { check } from './check.js';
 import { DeviceRepository } from '../repositories/DeviceRepository.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { logManager } from './LogManager.js';
-import type { Device, Scene, SceneStep } from '../types.js';
+import { randomUUID } from 'node:crypto';
+import type { Device, DeviceTest, Op, Scene, SceneCondition, SceneStep, SceneTrigger } from '../types.js';
 import { toSceneView } from '../dto/views.js';
+import { ordiniDiversi, partonoInsieme } from '../rules/scontri.js';
 
 /**
  * Se partendo da una scena si arriva a un'altra, anche passando per altre.
@@ -56,6 +58,8 @@ export class SceneManager {
 
       const patch: Partial<Scene> = { name: dto.name };
       if (dto.steps) patch.steps = await this.#clean(tx, ownerId, dto.steps, id);
+      if (dto.triggers) patch.triggers = await this.#cleanTriggers(tx, ownerId, dto.triggers);
+      if (dto.only) patch.only = await this.#cleanConditions(tx, ownerId, dto.only);
 
       /*
        * `null` vuol dire «non parte piu' da sola», che e' diverso da «non ne
@@ -74,6 +78,7 @@ export class SceneManager {
             }
           : undefined;
       }
+      await this.#scontri(tx, ownerId, id, patch);
       return (await scenes.update(id, patch)) as Scene;
     });
   }
@@ -328,6 +333,103 @@ export class SceneManager {
    * momenti diversi: «apri, aspetta un minuto, richiudi» è una scena sensata,
    * «apri e chiudi nello stesso istante» no.
    */
+  /**
+   * Com'è la scena dopo questa modifica, confrontata con le altre.
+   *
+   * Se può partire insieme a un'altra che dà a un dispositivo un ordine
+   * diverso, non si salva: quale dei due vincerebbe lo deciderebbe l'ordine
+   * in cui arrivano, cioè nessuno. Si dice con quale scena e su quale
+   * dispositivo, così si sa cosa cambiare.
+   */
+  async #scontri(tx: Transaction, ownerId: string, id: string, patch: Partial<Scene>): Promise<void> {
+    const scenes = new SceneRepository(tx);
+    const prima = await scenes.findById(id);
+    if (!prima) return;
+    const dopo: Scene = { ...prima, ...patch, ...('when' in patch ? { when: patch.when } : {}) };
+
+    const altre = (await scenes.findAllOf(ownerId)).filter((one) => one.id !== id);
+    for (const altra of altre) {
+      if (!partonoInsieme(dopo, altra)) continue;
+      const [scontro] = ordiniDiversi(dopo, altra);
+      if (!scontro) continue;
+
+      const device = await new DeviceRepository(tx).findById(scontro.deviceId);
+      throw badRequest(
+        `Può partire insieme alla scena «${altra.name}», che dà a «${device?.name ?? 'un dispositivo'}» un ordine diverso. ` +
+          'Cambia l’orario o quello che la fa partire, oppure togli una delle due righe.',
+      );
+    }
+  }
+
+  /**
+   * Un dispositivo e come guardarlo, controllati contro quello che sa fare.
+   *
+   * Una soglia vale per i numeri — i gradi, la luminosità — e un valore
+   * preciso per il resto, e quel valore dev'essere uno che il dispositivo
+   * può avere: «quando la tenda diventa viola» non scatterebbe mai, e
+   * nessuno capirebbe perché.
+   */
+  #test(devices: Device[], test: { deviceId?: string; code?: string; op?: Op; value?: unknown }): DeviceTest {
+    const device = devices.find((one) => one.id === test.deviceId);
+    if (!device) throw badRequest('uno dei dispositivi non c’è più');
+    const capability = (device.capabilities as Capability[]).find((one) => one.code === test.code);
+    if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
+
+    const numerica = capability.kind === 'range' || capability.kind === 'sensor';
+    const op = test.op ?? 'is';
+    if (numerica) {
+      if (op === 'is') throw badRequest(`per «${device.name}» si sceglie sopra o sotto un numero`);
+      const soglia = Number(test.value);
+      if (!Number.isFinite(soglia)) throw badRequest('la soglia va scritta come numero');
+      return { deviceId: device.id, code: capability.code, op, value: soglia };
+    }
+
+    if (op !== 'is') throw badRequest('sopra e sotto valgono solo per i numeri');
+    const scritto = String(test.value);
+    if (capability.kind === 'switch' && scritto !== 'true' && scritto !== 'false') {
+      throw badRequest('un interruttore è acceso o spento');
+    }
+    if (capability.kind === 'enum' && !capability.values.includes(scritto)) {
+      throw badRequest(`«${device.name}» non ha il valore «${scritto}»`);
+    }
+    if (capability.kind === 'image') throw badRequest(`«${device.name}» si guarda e basta`);
+    return { deviceId: device.id, code: capability.code, op, value: scritto };
+  }
+
+  async #cleanTriggers(tx: Transaction, ownerId: string, triggers: SceneTriggerDto[]): Promise<SceneTrigger[]> {
+    const devices = await new DeviceRepository(tx).findAllOf(ownerId);
+    return triggers.map((trigger) => ({ id: trigger.id || `trg-${randomUUID()}`, ...this.#test(devices, trigger) }));
+  }
+
+  /** Le condizioni, ognuna con quello che le serve e niente di più. */
+  async #cleanConditions(tx: Transaction, ownerId: string, only: SceneConditionDto[]): Promise<SceneCondition[]> {
+    const devices = await new DeviceRepository(tx).findAllOf(ownerId);
+    const ORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const DATA = /^\d{4}-\d{2}-\d{2}$/;
+
+    return only.map((condizione): SceneCondition => {
+      const id = condizione.id || `cnd-${randomUUID()}`;
+      switch (condizione.kind) {
+        case 'device':
+          return { id, kind: 'device', ...this.#test(devices, condizione) };
+        case 'days':
+          return { id, kind: 'days', days: [...new Set(condizione.days ?? [])].sort() };
+        case 'hours':
+          if (!ORA.test(condizione.from ?? '') || !ORA.test(condizione.to ?? '')) {
+            throw badRequest("le ore vanno scritte come 07:30");
+          }
+          return { id, kind: 'hours', from: condizione.from as string, to: condizione.to as string };
+        case 'dates': {
+          const from = condizione.from ?? '';
+          const to = condizione.to ?? '';
+          if (!DATA.test(from) || !DATA.test(to)) throw badRequest('le date vanno scritte come 2026-09-25');
+          if (from > to) throw badRequest('il periodo finisce prima di cominciare');
+          return { id, kind: 'dates', from, to };
+        }
+      }
+    });
+  }
+
   async #clean(
     tx: Transaction,
     ownerId: string,

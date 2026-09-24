@@ -9,7 +9,9 @@ export type Route =
   /** Le scene: più cose che partono insieme, ognuna con la sua azione. */
   | { kind: 'scenes' }
   /** E gli avvisi: cosa farsi dire, e su quali macchine. */
-  | { kind: 'alerts' };
+  | { kind: 'alerts' }
+  /** Il proprio account: nome, fuso orario, password. */
+  | { kind: 'account' };
 
 /** Nessun router: un percorso, e la pagina che gli corrisponde. */
 export function readRoute(path = window.location.pathname): Route {
@@ -24,6 +26,8 @@ export function readRoute(path = window.location.pathname): Route {
 
   if (/^\/alerts\/?$/i.test(path)) return { kind: 'alerts' };
 
+  if (/^\/account\/?$/i.test(path)) return { kind: 'account' };
+
   return { kind: 'app' };
 }
 
@@ -34,6 +38,8 @@ export const MAPS_PATH = '/maps';
 export const SCENES_PATH = '/scenes';
 
 export const ALERTS_PATH = '/alerts';
+
+export const ACCOUNT_PATH = '/account';
 
 /**
  * L'indirizzo buono di una pagina, dato uno qualsiasi che porti lì.
@@ -49,6 +55,7 @@ export function canonical(path: string): string {
   if (route.kind === 'maps') return MAPS_PATH;
   if (route.kind === 'scenes') return SCENES_PATH;
   if (route.kind === 'alerts') return ALERTS_PATH;
+  if (route.kind === 'account') return ACCOUNT_PATH;
   return path;
 }
 

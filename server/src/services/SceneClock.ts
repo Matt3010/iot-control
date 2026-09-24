@@ -3,7 +3,9 @@ import { hub } from '../iot/hub.js';
 import { sceneManager } from '../managers/SceneManager.js';
 import { store } from '../persistence/db.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
-import type { Scene } from '../types.js';
+import { DEFAULT_TZ, type Scene } from '../types.js';
+import { conditionsHold, localNow } from '../rules/prove.js';
+import { UserRepository } from '../repositories/UserRepository.js';
 
 /**
  * Le scene che partono da sole.
@@ -20,41 +22,21 @@ import type { Scene } from '../types.js';
  */
 const EVERY_MS = 20_000;
 
-/** Che ore sono, e che giorno è, dove stanno quelle lancette. */
-function localNow(tz: string): { minute: string; day: number; clock: string } {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    weekday: 'short',
-  }).formatToParts(new Date());
-
-  const bit = (what: Intl.DateTimeFormatPartTypes): string =>
-    parts.find((part) => part.type === what)?.value ?? '';
-
-  const GIORNI = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const clock = `${bit('hour')}:${bit('minute')}`;
-
-  return {
-    minute: `${bit('year')}-${bit('month')}-${bit('day')} ${clock}`,
-    day: GIORNI.indexOf(bit('weekday')),
-    clock,
-  };
-}
-
-/** Se è il suo momento, adesso. E se quel momento è già passato per sempre. */
-function due(scene: Scene): { yes: boolean; minute: string; over: boolean } {
+/**
+ * Se è il suo momento, adesso. E se quel momento è già passato per sempre.
+ *
+ * Le ore sono quelle di chi ha la scena (`tz`), non quelle scritte dentro
+ * l'orario: prima ogni orario si portava il fuso del browser in cui era nato,
+ * e uno scritto in viaggio restava in un altro fuso per sempre.
+ */
+function due(scene: Scene, tz: string): { yes: boolean; minute: string; over: boolean } {
   const when = scene.when;
   const niente = { yes: false, minute: '', over: false };
   if (!when || when.off || !scene.steps.length) return niente;
 
   let now: ReturnType<typeof localNow>;
   try {
-    now = localNow(when.tz);
+    now = localNow(tz);
   } catch {
     // Un fuso che non esiste — scritto a mano, o sparito da una versione di
     // node all'altra — non deve fermare l'orologio di tutti gli altri.
@@ -78,16 +60,24 @@ function due(scene: Scene): { yes: boolean; minute: string; over: boolean } {
 
 /** Un giro solo. Esportato perché si possa provare senza aspettare un minuto. */
 export async function tick(): Promise<void> {
-  const scenes = await store.transaction((tx) => new SceneRepository(tx).findAll());
+  const { scenes, fusi } = await store.transaction(async (tx) => {
+    const tutte = await new SceneRepository(tx).findAll();
+    const chi = [...new Set(tutte.filter((scene) => scene.when).map((scene) => scene.ownerId))];
+    return { scenes: tutte, fusi: await new UserRepository(tx).tzOf(chi) };
+  });
 
   for (const scene of scenes) {
-    const { yes, minute, over } = due(scene);
+    const tz = fusi.get(scene.ownerId) ?? DEFAULT_TZ;
+    const { yes, minute, over } = due(scene, tz);
 
     if (over) {
       await scorda(scene);
       continue;
     }
     if (!yes) continue;
+
+    // l'ora è quella, ma deve valere anche il resto di quello che hai scritto
+    if (!conditionsHold(scene.only, (id) => hub.stateOf(id), tz)) continue;
 
     /*
      * Prima il turno, poi il lavoro. Se la scrittura non vince vuol dire che

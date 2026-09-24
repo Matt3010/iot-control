@@ -1,16 +1,5 @@
 import type { Capability, DeviceValue } from '../../../shared/protocol.js';
-import type {
-  Agent,
-  Category,
-  Device,
-  Group,
-  MapEditor,
-  Place,
-  PlaceMap,
-  Scene,
-  SceneStep,
-  Timing,
-} from '../types.js';
+import type { Agent, Category, Device, Group, MapEditor, Place, PlaceMap, Scene, SceneCondition, SceneStep, SceneTrigger, Timing } from '../types.js';
 import type { OwnerState } from '../managers/StateManager.js';
 
 /** The shapes that leave the API: entities never go out untouched. */
@@ -81,6 +70,8 @@ export interface SceneView {
   when?: Timing;
   /** L'ultima volta che è partita, per metterle in fila per uso. */
   ranAt?: string;
+  triggers: SceneTrigger[];
+  only: SceneCondition[];
 }
 
 export interface StateView {
@@ -101,10 +92,12 @@ export const toMapView = (map: PlaceMap): MapView => ({
 
 export const toGroupView = ({ id, name }: Group): GroupView => ({ id, name });
 
-export const toSceneView = ({ id, name, steps, when, ranAt }: Scene): SceneView => ({
+export const toSceneView = ({ id, name, steps, when, ranAt, triggers, only }: Scene): SceneView => ({
   id,
   name,
   steps: steps ?? [],
+  triggers: triggers ?? [],
+  only: only ?? [],
   ...(ranAt ? { ranAt } : {}),
   // l'ultima partenza resta di qua: a chi guarda serve sapere quando parte,
   // non quando e' partita l'ultima volta — quello e' nel registro

@@ -1,5 +1,6 @@
 import type { Agent, Device, Scene } from './devices.svelte';
 import { store } from './store.svelte';
+import { auth } from './auth.svelte';
 import { nextRun } from './timing';
 import type { Category, Group, PlaceMap } from './types';
 import { perNome, poiPerNome, Vista } from './vista.svelte';
@@ -66,8 +67,8 @@ export const vistaScene = new Vista<Scene>({
     {
       id: 'prossima',
       label: 'Prossima esecuzione',
-      per: poiPerNome((a, b) => (nextRun(a.when) ?? 0) - (nextRun(b.when) ?? 0)),
-      inFondo: (scena) => nextRun(scena.when) === undefined,
+      per: poiPerNome((a, b) => (nextRun(a.when, auth.tz) ?? 0) - (nextRun(b.when, auth.tz) ?? 0)),
+      inFondo: (scena) => nextRun(scena.when, auth.tz) === undefined,
     },
   ],
 });

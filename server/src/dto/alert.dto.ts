@@ -1,4 +1,4 @@
-import { IsBoolean, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /**
  * Una regola: quale cosa, di quale dispositivo, e con quale valore.
@@ -21,6 +21,11 @@ export class AlertDto {
   @IsNotEmpty({ message: 'serve il valore che fa scattare la regola' })
   @MaxLength(80)
   becomes!: string;
+
+  /** Preciso, sopra o sotto. Senza, è preciso: com'erano tutte prima. */
+  @IsOptional()
+  @IsIn(['is', 'above', 'below'], { message: 'si guarda un valore preciso, o sopra, o sotto' })
+  op?: 'is' | 'above' | 'below';
 }
 
 /** Spegnere o riaccendere una regola. */

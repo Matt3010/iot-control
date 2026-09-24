@@ -14,6 +14,7 @@
   import Hint from './components/Hint.svelte';
   import LoginScreen from './components/LoginScreen.svelte';
   import AgentPage from './components/AgentPage.svelte';
+  import AccountPage from './components/AccountPage.svelte';
   import AgentsPage from './components/AgentsPage.svelte';
   import MapsPage from './components/MapsPage.svelte';
   import ScenesPage from './components/ScenesPage.svelte';
@@ -130,6 +131,8 @@
 {:else if route.kind === 'alerts'}
   <GuestBar />
   <AlertsPage />
+{:else if route.kind === 'account'}
+  <AccountPage />
 {:else}
   <GuestBar />
   <!--

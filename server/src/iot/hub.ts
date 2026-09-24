@@ -45,7 +45,18 @@ export type LiveEvent =
    * aperta la rilegge, e chi non ce l'ha non deve ricevere niente. L'avviso
    * vero arriva sul telefono per un'altra strada.
    */
-  | { kind: 'notice' };
+  | { kind: 'notice' }
+  /**
+   * Le regole degli avvisi sono cambiate: una aggiunta, spenta o tolta da
+   * un'altra scheda. Chi ha la pagina degli avvisi aperta le rilegge.
+   */
+  | { kind: 'rules' }
+  /**
+   * L'account è cambiato: il nome, o il fuso orario. Le altre schede della
+   * stessa persona lo rileggono, se no la linea delle partenze resterebbe
+   * sulle ore del fuso di prima.
+   */
+  | { kind: 'account' };
 
 /** Quel poco che il hub sa dire al registro: chi, cosa, e di chi è. */
 export interface LiveNote {
@@ -186,7 +197,7 @@ export class Hub {
     if (deviceId && before) {
       for (const [code, value] of Object.entries(live.state)) {
         if (before.state[code] === value) continue;
-        this.#changed?.(deviceId, code, value);
+        for (const ascolta of this.#changed) ascolta(deviceId, code, value, before.state[code]);
       }
     }
 
@@ -223,10 +234,29 @@ export class Hub {
    * cosa succede, non cosa farne. Legarlo alle regole vorrebbe dire che per
    * provare un passaggio bisogna avere un archivio.
    */
-  #changed: ((deviceId: string, code: string, value: DeviceValue) => void) | undefined;
+  /*
+   * Più d'uno: le regole degli avvisi e le scene che partono da sole
+   * ascoltano gli stessi passaggi, e nessuno dei due deve sapere dell'altro.
+   * Con il valore di prima, perché «sale sopra 25» è un confronto fra due
+   * numeri, non un numero solo.
+   */
+  #changed: ((deviceId: string, code: string, value: DeviceValue, before: DeviceValue | undefined) => void)[] = [];
 
-  watchesChanges(write: (deviceId: string, code: string, value: DeviceValue) => void): void {
-    this.#changed = write;
+  watchesChanges(
+    write: (deviceId: string, code: string, value: DeviceValue, before: DeviceValue | undefined) => void,
+  ): void {
+    this.#changed.push(write);
+  }
+
+  /**
+   * Lo stato di adesso di un dispositivo, per chi deve controllare una
+   * condizione nel momento in cui qualcosa succede.
+   */
+  stateOf(deviceId: string): Record<string, DeviceValue> | undefined {
+    for (const [key, id] of this.#ids) {
+      if (id === deviceId) return this.#live.get(key)?.state;
+    }
+    return undefined;
   }
 
   liveOf(agentId: string, externalId: string): Live | undefined {

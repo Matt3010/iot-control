@@ -3,10 +3,11 @@ import { scopeOf, whoIs } from '../auth/owner.js';
 import { config } from '../config.js';
 import { badRequest } from '../errors/HttpError.js';
 import { userManager } from '../managers/UserManager.js';
-import type { ActDto, CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
+import type { AccountDto, ActDto, CredentialsDto, PasswordDto, RegisterDto } from '../dto/auth.dto.js';
 import { dtoOf } from '../middleware/validateBody.js';
 import type { Session } from '../services/AuthService.js';
 import { authService } from '../services/AuthService.js';
+import { hub } from '../iot/hub.js';
 
 /**
  * Il token vive in un cookie httpOnly: nessuno script della pagina può
@@ -50,6 +51,27 @@ export class AuthController {
     // chi esce esce da tutto: anche dall'indice di un altro
     res.clearCookie(config.auth.actCookie, { ...cookieOptions(req), maxAge: undefined });
     res.status(204).end();
+  };
+
+  /** Nome e fuso: torna com'è l'account dopo, come lo chiede `me`. */
+  update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const dopo = await userManager.update(whoIs(req).id, dtoOf<AccountDto>(req));
+      // il filo è per indice: le sue schede aperte sul suo stanno lì
+      hub.changed(dopo.id, { kind: 'account' });
+      res.json(await authService.me(dopo, req.acting));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  password = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await userManager.changePassword(whoIs(req).id, dtoOf<PasswordDto>(req));
+      res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
   };
 
   me = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

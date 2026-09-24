@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import type { CredentialsDto, RegisterDto } from '../dto/auth.dto.js';
 import { mapManager } from '../managers/MapManager.js';
 import { userManager } from '../managers/UserManager.js';
-import type { Scope, User } from '../types.js';
+import { DEFAULT_TZ, type Scope, type User } from '../types.js';
 
 /** Una mappa di qualcun altro che posso modificare: la porta e chi la tiene. */
 export interface KeyRef {
@@ -26,6 +26,10 @@ export interface UserView {
    * toccare; un elenco vuol dire soltanto quelli, e gli altri si guardano.
    */
   actingAs: { ownerId: string; handle: string; places: string[] | null } | null;
+  /** Il fuso delle sue ore: sempre uno, anche se non l'ha ancora detto. */
+  tz: string;
+  /** Se l'ha detto lui, o è quello di partenza: il browser lo dice solo allora. */
+  tzSet: boolean;
   createdAt: string;
 }
 
@@ -40,6 +44,8 @@ const toUserView = (user: User): UserView => ({
   handle: user.handle,
   keys: [],
   actingAs: null,
+  tz: user.tz ?? DEFAULT_TZ,
+  tzSet: !!user.tz,
   createdAt: user.createdAt,
 });
 

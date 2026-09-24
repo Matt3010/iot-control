@@ -77,11 +77,33 @@ export interface Timing {
   off?: boolean;
 }
 
+/** Come si guarda il valore di un dispositivo: preciso, sopra o sotto. */
+export type Op = 'is' | 'above' | 'below';
+
+export interface DeviceTest {
+  deviceId: string;
+  code: string;
+  op: Op;
+  value: string | number;
+}
+
+/** Quello che fa partire una scena da sola: ne basta uno. */
+export type SceneTrigger = DeviceTest & { id?: string };
+
+/** Quello che deve essere vero perché parta da sola: tutto. */
+export type SceneCondition =
+  | ({ id?: string; kind: 'device' } & DeviceTest)
+  | { id?: string; kind: 'days'; days: number[] }
+  | { id?: string; kind: 'hours'; from: string; to: string }
+  | { id?: string; kind: 'dates'; from: string; to: string };
+
 export interface Scene {
   id: string;
   name: string;
   steps: SceneStep[];
   when?: Timing;
+  triggers?: SceneTrigger[];
+  only?: SceneCondition[];
   /** L'ultima volta che è partita, a mano o da sola. Mai, se manca. */
   ranAt?: string;
 }
@@ -97,6 +119,8 @@ export interface Rule {
   id: string;
   deviceId: string;
   code: string;
+  /** Preciso, sopra o sotto: le regole di prima sono tutte precise. */
+  op?: Op;
   becomes: string;
   says: string;
   off?: boolean;
@@ -324,9 +348,9 @@ class Devices {
     return this.rules.filter((one) => one.deviceId === deviceId);
   }
 
-  async addRule(deviceId: string, code: string, becomes: string): Promise<void> {
+  async addRule(deviceId: string, code: string, becomes: string, op: Op = 'is'): Promise<void> {
     try {
-      this.rules = [...this.rules, await api.post<Rule>('/alerts/rules', { deviceId, code, becomes })];
+      this.rules = [...this.rules, await api.post<Rule>('/alerts/rules', { deviceId, code, becomes, op })];
     } catch (error) {
       toast.show((error as Error).message);
     }
@@ -394,7 +418,13 @@ class Devices {
    */
   async patchScene(
     scene: Scene,
-    patch: { name?: string; steps?: SceneStep[]; when?: Timing | null },
+    patch: {
+      name?: string;
+      steps?: SceneStep[];
+      when?: Timing | null;
+      triggers?: SceneTrigger[];
+      only?: SceneCondition[];
+    },
   ): Promise<void> {
     const before = { ...scene, steps: [...scene.steps] };
     Object.assign(scene, { ...patch, ...(patch.when === null ? { when: undefined } : {}) });
