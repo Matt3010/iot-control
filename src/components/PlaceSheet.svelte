@@ -4,6 +4,7 @@
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui, type ModalAction } from '../lib/ui.svelte';
+  import { viewport } from '../lib/viewport.svelte';
   import Chip from './Chip.svelte';
   import AgentField from './AgentField.svelte';
   import Tabs from './Tabs.svelte';
@@ -183,6 +184,9 @@
       {#if tab === 'edit' || !mine}
       <label class="field">
         <span class="eyebrow">Nome del luogo</span>
+        <!-- Il cursore nel nome solo per un luogo nuovo, e solo dove c'è una
+             tastiera vera. Su un telefono apriva la tastiera a ogni luogo
+             aperto, anche solo per guardarlo, e copriva mezza scheda. -->
         <!-- svelte-ignore a11y_autofocus -->
         <!-- binding a funzione: chiudendo la scheda la bozza sparisce un attimo
              prima del componente, e una lettura secca solleverebbe -->
@@ -191,7 +195,7 @@
           required
           maxlength={80}
           placeholder="Es. Trattoria da Nonna"
-          autofocus={mine}
+          autofocus={mine && !draft.id && !viewport.narrow}
           readonly={!mine}
           bind:value={() => draft?.name ?? '', (value: string) => draft && (draft.name = value)}
         />
