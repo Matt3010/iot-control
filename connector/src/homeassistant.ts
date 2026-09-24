@@ -39,6 +39,12 @@ export interface Voce {
   platform: string;
   translationKey: string | null;
   originalName: string | null;
+  /**
+   * Se il dispositivo è di quelli che la centrale chiama «servizio»: il sole,
+   * i backup, ma anche le scene di una marca. Da un servizio entra solo
+   * quello che si comanda (connector/src/gruppi.ts).
+   */
+  servizio: boolean;
 }
 
 /** Un'entità che è davvero un dispositivo, e di quale. */
@@ -259,10 +265,11 @@ export class HomeAssistant {
    * appartiene, la sua categoria e il nome con cui la chiama l'integrazione.
    *
    * Restano fuori quelle spente (di un'entità spenta Home Assistant non dà
-   * lo stato), quelle nascoste, le spie di diagnostica — il segnale, la
-   * connessione — e i dispositivi finti, come il sole e i backup. Le
-   * impostazioni (`config`) invece restano: sono le funzioni in più di un
-   * dispositivo, e da qui diventano capacità come le altre.
+   * lo stato), quelle nascoste e le spie di diagnostica — il segnale, la
+   * connessione. I dispositivi di tipo «servizio» restano, segnati: da loro
+   * entra solo quello che si comanda. Le impostazioni (`config`) restano
+   * anche loro: sono le funzioni in più di un dispositivo, e da qui
+   * diventano capacità come le altre.
    */
   async anagrafe(): Promise<Voce[]> {
     const [entities, devices] = (await Promise.all([
@@ -277,14 +284,13 @@ export class HomeAssistant {
       RegistryDevice[],
     ];
 
-    const finti = new Set(devices.filter((device) => device.entry_type === 'service').map((device) => device.id));
+    const servizi = new Set(devices.filter((device) => device.entry_type === 'service').map((device) => device.id));
     const nomi = new Map(devices.map((device) => [device.id, device.name_by_user || device.name || '']));
 
     return entities
       .filter(
         (entity) =>
           !!entity.device_id &&
-          !finti.has(entity.device_id) &&
           !entity.disabled_by &&
           !entity.hidden_by &&
           entity.entity_category !== 'diagnostic',
@@ -297,6 +303,7 @@ export class HomeAssistant {
         platform: entity.platform,
         translationKey: entity.translation_key ?? null,
         originalName: entity.original_name ?? null,
+        servizio: servizi.has(entity.device_id as string),
       }));
   }
 

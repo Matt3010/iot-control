@@ -88,10 +88,16 @@ export function raggruppa(voci: Voce[], stati: Map<string, HaEntity>): Gruppo[] 
     const nome = ordinati[0]?.deviceName ?? '';
     const vale = (voce: Voce): boolean => !!translate(stati.get(voce.entityId) as HaEntity);
 
+    /*
+     * Da un servizio — il sole, i backup, le scene di una marca — entra solo
+     * quello che si comanda. Le sue letture sono l'ora dell'alba e lo stato
+     * dei backup, e su una mappa di case sono rumore.
+     */
+    const servizio = ordinati.some((voce) => voce.servizio);
     const principali = ordinati.filter((voce) => principale(voce) && vale(voce));
-    const letture = ordinati.filter((voce) => lettura(voce) && vale(voce));
+    const letture = servizio ? [] : ordinati.filter((voce) => lettura(voce) && vale(voce));
     const comandi = ordinati.filter((voce) => comando(voce) && vale(voce));
-    const impostazioni = ordinati.filter(impostazione);
+    const impostazioni = servizio ? [] : ordinati.filter(impostazione);
 
     if (principali.length === 1) {
       const [sola] = principali as [Voce];
