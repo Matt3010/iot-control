@@ -88,8 +88,16 @@
       <!-- l'ordine si sceglie quando c'è qualcosa da mettere in fila: con due
            o tre dispositivi il comando sarebbe più lungo dell'elenco -->
       {#if theirs.length > 3}
-        <div class="list-tools">
-          <ViewControls vista={vistaDispositivi} label="In che ordine i dispositivi" />
+        <!-- una riga sua, come la testata: dice di cosa si parla e in che
+             ordine sta, con il filo sopra e sotto come ogni parte della
+             scheda. Appoggiato da solo sotto il nome dell'agente, il comando
+             sembrava un pezzo della testata rimasto indietro. -->
+        <div class="list-head">
+          <span class="eyebrow">Dispositivi</span>
+          <span class="list-count">{theirs.length}</span>
+          <span class="list-order">
+            <ViewControls vista={vistaDispositivi} label="In che ordine i dispositivi" />
+          </span>
         </div>
       {/if}
       <div class="list">
@@ -223,9 +231,21 @@
     border-top: 1px solid var(--hairline-soft);
   }
 
-  .list-tools {
+  /* stessa rientranza della testata e delle righe, così il titolo cade
+     sulla colonna dei nomi */
+  .list-head {
     display: flex;
-    justify-content: flex-end;
-    padding: 4px 10px 0;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px 4px 12px;
+    border-top: 1px solid var(--hairline-soft);
   }
+
+  .list-count {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-3);
+  }
+
+  .list-order { margin-left: auto; }
 </style>
