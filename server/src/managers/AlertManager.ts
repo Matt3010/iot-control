@@ -41,7 +41,7 @@ export class AlertManager {
 
       const capability = device.capabilities.find((one) => one.code === code);
       if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
-      provabile(capability, device.name);
+      provabile(capability, device.name, 'quando', becomes);
 
       // una soglia vale per i numeri, un valore preciso per il resto
       const numerica = capability.kind === 'range' || capability.kind === 'sensor';
@@ -153,6 +153,7 @@ export class AlertManager {
     if (!capability) return `è ${value}`;
     if (op !== 'is') return saysThreshold(capability, op, value);
 
+    if (capability.kind === 'switch' && capability.pulse) return 'scatta';
     if (capability.kind === 'switch') return value === 'true' ? 'si accende' : 'si spegne';
     // una serratura si comanda con «Apri» e con lo stesso valore dice com'è
     // rimasta, e letto come un ordine l'avviso sembrava chiederle di aprirsi

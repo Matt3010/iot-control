@@ -65,6 +65,8 @@ export function fraseProva(capability: Capability, op: Op, value: string | numbe
     if (modo === 'quando') return `${capability.label} ${op === 'above' ? 'sale sopra' : 'scende sotto'} ${soglia}`;
     return `${capability.label} ${op === 'above' ? 'sopra' : 'sotto'} ${soglia}`;
   }
+  // a impulso si chiede solo che scatti, e «scatta» non si accorda col nome
+  if (capability.kind === 'switch' && capability.pulse) return 'scatta';
   if (capability.kind === 'switch') {
     const acceso = String(value) === 'true';
     if (modo === 'quando') return acceso ? 'si accende' : 'si spegne';
@@ -96,14 +98,17 @@ export function fraseDiProva(devices: Device[], prova: DeviceTest, modo: Modo): 
  */
 const SOLO_ORDINI = new Set(['move']);
 
-/** Le cose di un dispositivo su cui si può scrivere una prova. */
-export const provabili = (device: Device): Capability[] =>
+/**
+ * Le cose di un dispositivo su cui si può scrivere una prova. Un interruttore
+ * a impulso torna spento subito e com'è rimasto quello che comanda non si
+ * sa, quindi non sta in un «solo se». Che scatti invece si vede.
+ */
+export const provabili = (device: Device, modo: Modo): Capability[] =>
   (device.capabilities as Capability[]).filter(
     (capability) =>
       capability.kind !== 'image' &&
       !SOLO_ORDINI.has(capability.code) &&
-      // a impulso torna spento subito, e com'è rimasto quello che comanda non si sa
-      !(capability.kind === 'switch' && capability.pulse),
+      !(modo === 'se' && capability.kind === 'switch' && capability.pulse),
   );
 
 /**
@@ -114,7 +119,7 @@ export const provabili = (device: Device): Capability[] =>
  * chiederla.
  */
 export function scelteDi(device: Device, modo: Modo): { id: string; label: string }[] {
-  return provabili(device).flatMap((capability) => {
+  return provabili(device, modo).flatMap((capability) => {
     if (numerica(capability)) {
       return modo === 'quando'
         ? [
@@ -129,7 +134,9 @@ export function scelteDi(device: Device, modo: Modo): { id: string; label: strin
     const stati = STATI[capability.code];
     const valori =
       capability.kind === 'switch'
-        ? ['true', 'false']
+        ? capability.pulse
+          ? ['true']
+          : ['true', 'false']
         : capability.kind === 'enum'
           ? capability.values.filter((value) => !stati || value in stati)
           : [];

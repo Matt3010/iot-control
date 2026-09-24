@@ -22,9 +22,16 @@ import { DEFAULT_TZ } from '../types.js';
  * Due scene possono rincorrersi: «quando la luce si accende, spegni la
  * presa» e «quando la presa si spegne, accendi la luce» farebbero lampeggiare
  * la casa per sempre. Una scena appena partita non riparte per un minuto,
- * che basta a spezzare il giro e non disturba nessuno che la preme a mano.
+ * che basta a spezzare il giro.
+ *
+ * Ma un giro passa solo dai nostri comandi. Se il cambiamento l'ha fatto una
+ * persona — il pulsante a muro, l'app del provider — la pausa non serve, e
+ * toglieva la seconda pressione a chi preme due volte per accendere e poi
+ * spegnere. Nostro vuol dire un comando mandato a quel dispositivo da poco:
+ * un agente risponde in pochi secondi, e dieci bastano anche a uno lento.
  */
 const PAUSA_MS = 60_000;
+const ECO_MS = 10_000;
 
 async function happened(deviceId: string, code: string, value: DeviceValue, before: DeviceValue | undefined): Promise<void> {
   const { scenes, fusi } = await store.transaction(async (tx) => {
@@ -43,7 +50,8 @@ async function happened(deviceId: string, code: string, value: DeviceValue, befo
     const tz = fusi.get(scene.ownerId) ?? DEFAULT_TZ;
     if (!conditionsHold(scene.only, (id) => hub.stateOf(id), tz)) continue;
 
-    if (scene.ranAt && Date.now() - Date.parse(scene.ranAt) < PAUSA_MS) {
+    const nostro = hub.comandatoDaPoco(deviceId, ECO_MS);
+    if (nostro && scene.ranAt && Date.now() - Date.parse(scene.ranAt) < PAUSA_MS) {
       console.warn(`la scena «${scene.name}» è appena partita, non riparte da sola per un minuto`);
       continue;
     }

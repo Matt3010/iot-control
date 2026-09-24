@@ -51,10 +51,25 @@ export function check(capability: Capability, value: DeviceValue): void {
  */
 export const SOLO_ORDINI = new Set(['move']);
 
-export function provabile(capability: Capability, deviceName: string): void {
-  // a impulso torna spento dopo mezzo secondo, qualunque cosa abbia fatto
+export function provabile(
+  capability: Capability,
+  deviceName: string,
+  /** `quando` è una cosa che succede, `se` una cosa che è vera adesso. */
+  modo: 'quando' | 'se',
+  value?: unknown,
+): void {
+  /*
+   * A impulso torna spento dopo mezzo secondo, e com'è rimasto quello che
+   * comanda non si sa: non si chiede in un «solo se». Che scatti invece si
+   * vede, perché l'impulso comincia con un'accensione, ed è l'unica cosa
+   * che se ne può chiedere.
+   */
   if (capability.kind === 'switch' && capability.pulse) {
-    throw badRequest(`«${deviceName}» è a impulso e non si sa com’è rimasto, quindi non si può chiedere in una condizione`);
+    if (modo === 'se') {
+      throw badRequest(`«${deviceName}» è a impulso e non si sa com’è rimasto, quindi non si può chiedere in una condizione`);
+    }
+    if (String(value) !== 'true') throw badRequest(`di «${deviceName}» si può chiedere solo quando scatta`);
+    return;
   }
   if (!SOLO_ORDINI.has(capability.code)) return;
   throw badRequest(

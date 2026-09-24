@@ -264,6 +264,26 @@ export class Hub {
     return undefined;
   }
 
+  /**
+   * Quando abbiamo mandato l'ultimo comando a ogni dispositivo.
+   *
+   * Serve a distinguere un cambiamento che abbiamo provocato noi — una scena
+   * che accende una presa — da uno fatto da una persona, col pulsante a muro
+   * o dall'app del provider. Il primo può far rincorrere due scene, il
+   * secondo no.
+   */
+  #comandati = new Map<string, number>();
+
+  /** Se a quel dispositivo abbiamo mandato un comando negli ultimi `ms`. */
+  comandatoDaPoco(deviceId: string, ms: number): boolean {
+    for (const [key, id] of this.#ids) {
+      if (id !== deviceId) continue;
+      const quando = this.#comandati.get(key);
+      return quando !== undefined && Date.now() - quando < ms;
+    }
+    return false;
+  }
+
   liveOf(agentId: string, externalId: string): Live | undefined {
     return this.#live.get(this.#key(agentId, externalId));
   }
@@ -293,6 +313,7 @@ export class Hub {
 
   /** Premere un interruttore: non torna niente, o torna un errore. */
   async command(agentId: string, externalId: string, code: string, value: DeviceValue): Promise<void> {
+    this.#comandati.set(this.#key(agentId, externalId), Date.now());
     await this.#ask(agentId, (reqId) => ({ type: 'command', reqId, externalId, code, value }));
   }
 

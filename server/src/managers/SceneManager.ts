@@ -375,12 +375,16 @@ export class SceneManager {
    * può avere: «quando la tenda diventa viola» non scatterebbe mai, e
    * nessuno capirebbe perché.
    */
-  #test(devices: Device[], test: { deviceId?: string; code?: string; op?: Op; value?: unknown }): DeviceTest {
+  #test(
+    devices: Device[],
+    test: { deviceId?: string; code?: string; op?: Op; value?: unknown },
+    modo: 'quando' | 'se',
+  ): DeviceTest {
     const device = devices.find((one) => one.id === test.deviceId);
     if (!device) throw badRequest('uno dei dispositivi non c’è più');
     const capability = (device.capabilities as Capability[]).find((one) => one.code === test.code);
     if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
-    provabile(capability, device.name);
+    provabile(capability, device.name, modo, test.value);
 
     const numerica = capability.kind === 'range' || capability.kind === 'sensor';
     const op = test.op ?? 'is';
@@ -405,7 +409,7 @@ export class SceneManager {
 
   async #cleanTriggers(tx: Transaction, ownerId: string, triggers: SceneTriggerDto[]): Promise<SceneTrigger[]> {
     const devices = await new DeviceRepository(tx).findAllOf(ownerId);
-    return triggers.map((trigger) => ({ id: trigger.id || `trg-${randomUUID()}`, ...this.#test(devices, trigger) }));
+    return triggers.map((trigger) => ({ id: trigger.id || `trg-${randomUUID()}`, ...this.#test(devices, trigger, 'quando') }));
   }
 
   /**
@@ -440,7 +444,7 @@ export class SceneManager {
         case 'group':
           return gruppo(condizione, livello + 1);
         case 'device':
-          return { id, kind: 'device', ...this.#test(devices, condizione) };
+          return { id, kind: 'device', ...this.#test(devices, condizione, 'se') };
         case 'days':
           return { id, kind: 'days', days: [...new Set(condizione.days ?? [])].sort() };
         case 'hours':
