@@ -3,6 +3,7 @@ import { healthOf, salute, type Salute } from './health';
 import { api } from './api';
 import { toast } from './toast.svelte';
 import type { Capability, DeviceValue, Health, LinkedAccount, PairingStep } from './types';
+import type { Handler } from '../../shared/protocol';
 
 /** Un agente, per come lo vede il sito: il servizio installato in quel posto. */
 export interface Agent {
@@ -661,7 +662,7 @@ class Devices {
   pair(
     agent: Agent,
     action: 'start' | 'submit' | 'cancel',
-    options: { handler?: string; flowId?: string; input?: Record<string, string | boolean> } = {},
+    options: { handler?: Handler; flowId?: string; input?: Record<string, string | boolean> } = {},
   ): Promise<PairingStep | null> {
     return api.post<PairingStep | null>(`/agents/${agent.id}/pair`, { action, ...options });
   }

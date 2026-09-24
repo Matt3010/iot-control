@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import type { AgentView } from '../dto/views.js';
 import { toAgentView } from '../dto/views.js';
 import { badGateway, notFound } from '../errors/HttpError.js';
-import type { LinkedAccount, PairingStep } from '../../../shared/protocol.js';
+import type { LinkedAccount, PairingStep, Handler } from '../../../shared/protocol.js';
 import { hub } from '../iot/hub.js';
 import { toPlaceView } from '../dto/views.js';
 import { agentManager } from '../managers/AgentManager.js';
@@ -105,7 +105,7 @@ export class AgentService {
     ownerId: string,
     id: string,
     action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink',
-    options: { handler?: string; flowId?: string; input?: Record<string, string | boolean>; entryId?: string },
+    options: { handler?: Handler; flowId?: string; input?: Record<string, string | boolean>; entryId?: string },
     who?: string,
   ): Promise<PairingStep | LinkedAccount[] | null> {
     // che sia tuo lo si controlla prima di bussare a casa sua

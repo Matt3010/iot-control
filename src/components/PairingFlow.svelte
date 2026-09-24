@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
+  import type { Provider } from '../lib/providers';
   import type { PairingStep } from '../lib/types';
   import Button from './Button.svelte';
   import TextField from './TextField.svelte';
@@ -26,15 +27,13 @@
    */
   let {
     agent,
-    handler,
-    label,
+    provider,
     onquit,
     ondone,
   }: {
     agent: Agent;
-    handler: string;
-    /** Come si chiama la marca, per scriverlo a schermo. */
-    label: string;
+    /** Cosa si collega, e come si spiega (lib/providers.ts). */
+    provider: Provider;
     /** Se ne va senza aver collegato niente. */
     onquit: () => void;
     /** Ha collegato: chi tiene l'elenco lo rilegga. */
@@ -60,21 +59,8 @@
     host: 'Indirizzo',
   };
 
-  /**
-   * Gli stessi nomi, detti diversamente a seconda di chi li chiede.
-   *
-   * `username` per eWeLink è l'email con cui entri nell'app; per una
-   * telecamera è l'utente che *quella telecamera* chiede, se lo chiede — e
-   * quasi sempre non lo chiede. Chiamarlo «email» davanti a una telecamera fa
-   * credere che serva la tua, e la tua lì dentro non c'entra niente.
-   */
-  const PER_MARCA: Record<string, Record<string, string>> = {
-    sonoff: { username: 'Email o numero di telefono' },
-    generic: { username: 'Utente della telecamera', password: 'Password della telecamera' },
-  };
-
   const named = (name: string) =>
-    PER_MARCA[handler]?.[name] ?? LABELS[name] ?? name.replace(/_/g, ' ');
+    provider.campi?.[name] ?? LABELS[name] ?? name.replace(/_/g, ' ');
 
   let step = $state<PairingStep | null>(null);
   let busy = $state(false);
@@ -155,7 +141,7 @@
 
     try {
       const next = await devices.pair(agent, action, {
-        handler,
+        handler: provider.handler,
         ...(step?.flowId ? { flowId: step.flowId } : {}),
         ...(action === 'submit' ? { input } : {}),
       });
@@ -171,7 +157,7 @@
       touched = {};
 
       if (next?.kind === 'done') {
-        toast.show(`${label} si collega, i dispositivi stanno arrivando`);
+        toast.show(`${provider.label} si collega, i dispositivi stanno arrivando`);
         ondone();
       }
     } catch (error) {
@@ -236,7 +222,7 @@
 </script>
 
 <div class="pair" class:is-busy={busy}>
-  <span class="eyebrow">{label}</span>
+  <span class="eyebrow">{provider.label}</span>
 
   {#if step?.error}
     <p class="wrong">{step.error}</p>
@@ -256,9 +242,9 @@
       <Button look="link" disabled={busy} onclick={onquit}>Più tardi</Button>
     </div>
   {:else if step.qr}
+    <!-- il testo è della marca, perché l'app con cui si inquadra è la sua -->
     <p class="say">
-      Inquadra questo codice con l'app <b>Smart Life</b> (o Tuya Smart). Quando l'app ha finito,
-      conferma qui sotto.
+      {@html provider.qr ?? 'Inquadra questo codice con l’app del servizio. Quando ha finito, conferma qui sotto.'}
     </p>
     <Qr data={step.qr} label="Codice da inquadrare" />
     <div class="acts">
@@ -272,26 +258,10 @@
          fatto la cosa giusta. -->
     {#if step.preview}
       <!-- niente: qui si guarda -->
-    {:else if handler === 'tuya'}
-      <p class="say">
-        Serve il tuo codice utente. Nell'app <b>Smart Life</b> (o Tuya Smart):
-        <i>Impostazioni</i> → <i>Account e sicurezza</i>, alla voce <i>User Code</i>.
-      </p>
-      <p class="say careful">Copialo <b>esattamente</b> com'è, perché maiuscole e minuscole contano.</p>
-    {:else if handler === 'sonoff'}
-      <p class="say">
-        Entra con le stesse credenziali che usi nell'app <b>eWeLink</b>: l'email <b>intera</b>,
-        oppure il numero di telefono.
-      </p>
-    {:else if handler === 'generic'}
-      <p class="say">
-        Serve l'indirizzo del flusso, una riga che comincia per <b>rtsp://</b>, quella che ti dà
-        il registratore o la telecamera. Un canale per volta.
-      </p>
-      <p class="say careful">
-        Se l'immagine non arriva, scegli <b>TCP</b>: certi registratori dichiarano un indirizzo
-        di ritorno che non esiste più, e solo il TCP lo ignora.
-      </p>
+    {:else}
+      {#each provider.istruzioni ?? [] as istruzione, at (at)}
+        <p class="say" class:careful={istruzione.attento}>{@html istruzione.html}</p>
+      {/each}
     {/if}
 
     {#if step.preview}
@@ -368,7 +338,7 @@
       <Button look="link" disabled={busy} onclick={() => go('cancel')}>Annulla</Button>
     </div>
   {:else}
-    <p class="say">Sto aspettando {label}…</p>
+    <p class="say">Sto aspettando {provider.label}…</p>
     <div class="acts">
       <Button look="link" disabled={busy} onclick={() => go('cancel')}>Annulla</Button>
     </div>
@@ -411,9 +381,9 @@
 
   .say { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ink-2); }
 
-  .say b { font-weight: 600; color: var(--ink); }
+  .say :global(b) { font-weight: 600; color: var(--ink); }
 
-  .say i { font-style: normal; font-weight: 560; color: var(--ink); }
+  .say :global(i) { font-style: normal; font-weight: 560; color: var(--ink); }
 
   /* La tastiera del telefono mette la maiuscola alla prima lettera da sola, e
      quel codice diventa sbagliato senza che tu abbia toccato niente. Il campo

@@ -109,10 +109,17 @@ export interface PairingStep {
  */
 export type Health = 'live' | 'degraded' | 'lost' | 'new';
 
+/**
+ * I provider che si sanno collegare, con il nome che gli dà Home Assistant.
+ * `sonoff` è eWeLink, `generic` una telecamera. Lo stesso nome lo usano
+ * l'agente (connector/src/providers.ts) e il sito (src/lib/providers.ts),
+ * e uno che l'altro non conosce non compila.
+ */
+export type Handler = 'tuya' | 'sonoff' | 'generic';
+
 /** Un account già collegato a quell'agente, e come si fa a staccarlo. */
 export interface LinkedAccount {
-  /** Chi è: `tuya`, `sonoff`. */
-  handler: string;
+  handler: Handler;
   /** Come lo chiama lui: di solito l'utente con cui sei entrato. */
   title: string;
   /** Serve a scollegarlo. */
@@ -229,8 +236,8 @@ export interface PairMessage {
   reqId: string;
   /** `list` chiede cosa è già collegato, `unlink` stacca. */
   action: 'start' | 'submit' | 'cancel' | 'list' | 'unlink';
-  /** Quale account si sta collegando: `tuya`, e domani altri. */
-  handler?: string;
+  /** Quale account si sta collegando. */
+  handler?: Handler;
   flowId?: string;
   input?: Record<string, string | boolean>;
   /** Quale collegamento staccare. */

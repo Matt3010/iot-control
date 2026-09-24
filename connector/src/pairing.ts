@@ -1,7 +1,8 @@
-import type { Health, LinkedAccount, PairingStep } from '../../shared/protocol.js';
+import type { Handler, Health, LinkedAccount, PairingStep } from '../../shared/protocol.js';
+import { PROVIDERS, providerDi } from './providers.js';
 import fs from 'node:fs';
 import { stateFile, type ConnectorConfig } from './config.js';
-import { EXTRAS, install, installed } from './extras.js';
+import { install, installed } from './extras.js';
 import { lastSeen } from './eyes.js';
 import { channelOf, forget } from './go2rtc.js';
 import { frameFrom } from './homeassistant.js';
@@ -463,11 +464,16 @@ async function handlers(config: ConnectorConfig): Promise<string[]> {
   return response.ok ? ((await response.json()) as string[]) : [];
 }
 
-export async function startPairing(config: ConnectorConfig, handler: string): Promise<PairingStep> {
+export async function startPairing(config: ConnectorConfig, handler: Handler | undefined): Promise<PairingStep> {
+  const provider = providerDi(handler);
+  if (!provider) throw new Error('questo agente non sa collegare quel tipo di account');
+  // da qui in avanti il nome è quello del registro, che di sicuro c'è
+  const chi = provider.handler;
+
   // Certe integrazioni HA non ce l'ha di serie: si installano al volo, la
   // prima volta che qualcuno le chiede, e non prima.
-  const extra = EXTRAS[handler];
-  if (extra && !(await handlers(config)).includes(handler)) {
+  const extra = provider.extra;
+  if (extra && !(await handlers(config)).includes(chi)) {
     if (!(await installed(config, extra))) await install(config, extra);
     return {
       flowId: '',
@@ -483,13 +489,13 @@ export async function startPairing(config: ConnectorConfig, handler: string): Pr
    * che ce n'e' gia' una in corso. Chi guarda non puo' saperlo e non puo'
    * farci niente: la si chiude e si ricomincia.
    */
-  await forgetOpen(config, handler);
+  await forgetOpen(config, chi);
 
   const flow = await ask(config, FLOWS, {
     method: 'POST',
-    body: JSON.stringify({ handler, show_advanced_options: false }),
+    body: JSON.stringify({ handler: chi, show_advanced_options: false }),
   });
-  if (flow.flow_id && flow.type === 'form') ricorda(config, flow.flow_id, handler);
+  if (flow.flow_id && flow.type === 'form') ricorda(config, flow.flow_id, chi);
   return pictured(config, flow, translate(flow));
 }
 
@@ -612,15 +618,12 @@ export async function listLinked(config: ConnectorConfig): Promise<LinkedAccount
     title: string;
     state?: string;
   }[];
-  // «generic» sono le telecamere: una per canale, e ognuna si stacca per conto
-  // suo. Senza di loro nell'elenco, una telecamera si poteva collegare e non
-  // scollegare piu' — e sbagliare canale capita al primo tentativo.
-  const ours = new Set(['tuya', 'generic', ...Object.keys(EXTRAS)]);
-
+  // Solo i provider che conosciamo. Le telecamere ci sono, una per canale:
+  // senza, una si poteva collegare e non scollegare più.
   return entries
-    .filter((entry) => ours.has(entry.domain))
+    .filter((entry) => entry.domain in PROVIDERS)
     .map((entry) => ({
-      handler: entry.domain,
+      handler: entry.domain as Handler,
       title: entry.title,
       entryId: entry.entry_id,
       health: howIs(entry.state),

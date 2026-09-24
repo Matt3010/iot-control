@@ -1,3 +1,4 @@
+import type { Handler } from '../../../shared/protocol.js';
 import { Transform } from 'class-transformer';
 import { Allow, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
@@ -8,11 +9,14 @@ export class PairDto {
   @IsIn(['start', 'submit', 'cancel', 'list', 'unlink'], { message: 'azione sconosciuta' })
   action!: 'start' | 'submit' | 'cancel' | 'list' | 'unlink';
 
-  /** Quale account: `tuya`, e domani altri. */
+  /**
+   * Quale account. Qui passa e basta: quali si sanno collegare lo sa
+   * l'agente, che rifiuta quelli che non conosce e lo dice.
+   */
   @IsOptional()
   @IsString()
   @MaxLength(40)
-  handler?: string;
+  handler?: Handler;
 
   /** La conversazione in corso, dal passo prima. */
   @IsOptional()

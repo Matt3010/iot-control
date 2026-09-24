@@ -27,16 +27,6 @@ export interface Extra {
   source: string;
 }
 
-/** Le integrazioni che sappiamo aggiungere, e da dove. */
-export const EXTRAS: Record<string, Extra> = {
-  sonoff: {
-    domain: 'sonoff',
-    label: 'eWeLink',
-    repo: 'AlexxIT/SonoffLAN',
-    ref: 'v3.13.0',
-    source: 'custom_components/sonoff',
-  },
-};
 
 interface Entry {
   name: string;

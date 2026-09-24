@@ -14,7 +14,7 @@ import type { HomeAssistant } from './homeassistant.js';
  * integrazione, e come si leggono i suoi dati — e tutto il resto è in
  * comune: la domanda alla centrale, e cosa diventa la risposta (il campo
  * `pulse` dell'interruttore, che il sito sa già disegnare). Un provider in
- * più è un lettore in più in `LETTORI`, e basta.
+ * più è un lettore in più nella sua voce di `providers.ts`, e basta.
  */
 
 /** Un'entità dell'integrazione, con il nome interno che le dà lei. */
@@ -43,7 +43,7 @@ export interface LettoreImpulsi {
  * `pulses: [{ outlet, pulse, width }]`, e l'entità del canale `n` si chiama
  * `<dispositivo>_<n + 1>`.
  */
-const EWELINK: LettoreImpulsi = {
+export const EWELINK: LettoreImpulsi = {
   piattaforma: 'sonoff',
   leggi(diagnostica, entita) {
     const trovati = new Map<string, number>();
@@ -76,8 +76,6 @@ const EWELINK: LettoreImpulsi = {
 /** I domini delle entità che hanno un interruttore, l'unica cosa che può essere a impulso. */
 const ACCENDIBILI = new Set(['switch', 'light', 'fan', 'input_boolean']);
 
-/** I provider che sappiamo leggere. Tuya avrà il suo, quando ci sarà un relè vero da provare. */
-export const LETTORI: LettoreImpulsi[] = [EWELINK];
 
 /**
  * Tutti gli interruttori a impulso della casa, da tutti i provider.
@@ -86,9 +84,9 @@ export const LETTORI: LettoreImpulsi[] = [EWELINK];
  * risponde male — non ferma le altre e non ferma l'agente: quei dispositivi
  * restano interruttori normali, com'erano prima.
  */
-export async function leggiImpulsi(ha: HomeAssistant): Promise<Map<string, number>> {
+export async function leggiImpulsi(ha: HomeAssistant, lettori: LettoreImpulsi[]): Promise<Map<string, number>> {
   const tutti = new Map<string, number>();
-  for (const lettore of LETTORI) {
+  for (const lettore of lettori) {
     try {
       /*
        * Solo quelle che si accendono e si spengono. Un'integrazione dà lo

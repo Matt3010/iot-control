@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Agent } from '../lib/devices.svelte';
-  import type { Account, Health, LinkedAccount } from '../lib/types';
+  import type { Provider } from '../lib/providers';
+  import type { Health, LinkedAccount } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
 
@@ -26,10 +27,10 @@
     onoff,
   }: {
     agent: Agent;
-    accounts: readonly Account[];
+    accounts: readonly Provider[];
     linked: LinkedAccount[];
     busy: boolean;
-    onbegin: (account: Account) => void;
+    onbegin: (account: Provider) => void;
     onoff: (joint: LinkedAccount, label: string) => void;
   } = $props();
 
@@ -48,7 +49,7 @@
             : 'Non collegato';
 
   /** Niente parte prima di un sì: collegare un account non è un clic qualunque. */
-  function ask(event: MouseEvent, account: Account) {
+  function ask(event: MouseEvent, account: Provider) {
     ui.askSure(event.currentTarget as HTMLElement, {
       title: `Collegare ${account.label}?`,
       detail: account.warns,

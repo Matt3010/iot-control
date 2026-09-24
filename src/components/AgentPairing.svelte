@@ -1,7 +1,8 @@
 <script lang="ts">
   import { devices, type Agent } from '../lib/devices.svelte';
   import { toast } from '../lib/toast.svelte';
-  import type { Account, LinkedAccount } from '../lib/types';
+  import { PROVIDERS, type Provider } from '../lib/providers';
+  import type { LinkedAccount } from '../lib/types';
   import AccountList from './AccountList.svelte';
   import PairingFlow from './PairingFlow.svelte';
 
@@ -20,47 +21,11 @@
    */
   let { agent }: { agent: Agent } = $props();
 
-  /**
-   * Cosa si può collegare, e cosa comporta collegarlo. Il secondo non è un
-   * dettaglio: aggiungere eWeLink scarica un'integrazione di terze parti su
-   * quella macchina e la fa riavviare, e chi preme deve saperlo prima.
-   */
-  const ACCOUNTS: readonly Account[] = [
-    {
-      handler: 'tuya',
-      label: 'Tuya',
-      /** Di account ce n'è uno: quello con cui sei entrato. */
-      many: false,
-      more: '',
-      warns: "Ti verrà chiesto il codice che sta nell'app Smart Life, e poi un QR da inquadrare.",
-    },
-    {
-      handler: 'sonoff',
-      label: 'eWeLink',
-      many: false,
-      more: '',
-      warns:
-        "La prima volta l'agente aggiunge il supporto eWeLink e si riavvia, e ci vuole un minuto. Poi ti chiederà le credenziali dell'app.",
-    },
-    {
-      handler: 'generic',
-      label: 'Telecamera',
-      /**
-       * Di telecamere invece ce ne sono quante ne ha il registratore, una per
-       * canale, e ognuna è un collegamento a sé: si stacca da sola, senza
-       * portarsi via le altre.
-       */
-      many: true,
-      more: 'Un’altra telecamera',
-      warns:
-        "Ti chiederà l'indirizzo del flusso — di solito una riga che comincia per rtsp:// — e come raggiungerlo. Si fa una telecamera per volta, quindi con un registratore da quattro si ripete quattro volte.",
-    },
-  ];
 
   /** Cosa è già collegato: si chiede una volta, e si rilegge quando cambia. */
   let linked = $state<LinkedAccount[]>([]);
   /** La conversazione aperta adesso, se ce n'è una. */
-  let open = $state<Account | null>(null);
+  let open = $state<Provider | null>(null);
   let busy = $state(false);
 
   $effect(() => {
@@ -91,8 +56,7 @@
 {#if open}
   <PairingFlow
     {agent}
-    handler={open.handler}
-    label={open.label}
+    provider={open}
     onquit={() => (open = null)}
     ondone={() => {
       open = null;
@@ -102,7 +66,7 @@
 {:else}
   <AccountList
     {agent}
-    accounts={ACCOUNTS}
+    accounts={PROVIDERS}
     {linked}
     {busy}
     onbegin={(account) => (open = account)}

@@ -16,6 +16,7 @@ import { HomeAssistant } from './homeassistant.js';
 import { Link, PROTOCOL } from './link.js';
 import { blind, look } from './live.js';
 import { leggiImpulsi } from './impulsi.js';
+import { lettoriImpulsi } from './providers.js';
 import { ensureToken } from './onboarding.js';
 import { cancelPairing, listLinked, startPairing, submitPairing, titled, unlink } from './pairing.js';
 
@@ -107,7 +108,7 @@ async function main(): Promise<void> {
    */
   async function refill(): Promise<void> {
     real = await ha.devices();
-    impulsi = await leggiImpulsi(ha);
+    impulsi = await leggiImpulsi(ha, lettoriImpulsi());
     const entities = await ha.states();
 
     devices.clear();
@@ -288,7 +289,7 @@ async function main(): Promise<void> {
 
       const step =
         message.action === 'start'
-          ? await startPairing(config, message.handler ?? 'tuya')
+          ? await startPairing(config, message.handler)
           : await submitPairing(config, message.flowId ?? '', message.input ?? {});
 
       link.send({ type: 'ack', reqId: message.reqId, ok: true, data: step });
@@ -389,7 +390,7 @@ async function main(): Promise<void> {
    */
   const rileggi = setInterval(() => {
     if (!ha.connected) return;
-    void leggiImpulsi(ha).then((adesso) => {
+    void leggiImpulsi(ha, lettoriImpulsi()).then((adesso) => {
       const prima = JSON.stringify([...impulsi].sort());
       if (JSON.stringify([...adesso].sort()) === prima) return;
       impulsi = adesso;
