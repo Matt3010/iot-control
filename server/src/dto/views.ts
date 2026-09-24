@@ -73,6 +73,8 @@ export interface SceneView {
   ranAt?: string;
   triggers: SceneTrigger[];
   only: SceneConditionGroup;
+  /** Se sta andando adesso: a che momento, e quanto manca all'attesa di adesso. */
+  corre?: { at: number; of: number; resta?: number };
 }
 
 export interface StateView {

@@ -116,6 +116,8 @@ export interface Scene {
   only?: SceneConditionGroup;
   /** L'ultima volta che è partita, a mano o da sola. Mai, se manca. */
   ranAt?: string;
+  /** Se stava andando quando la pagina l'ha chiesta. Dopo lo dice `devices.running`. */
+  corre?: { at: number; of: number; resta?: number };
 }
 
 /**
@@ -262,6 +264,15 @@ class Devices {
       this.agents = agents;
       this.list = list;
       this.scenes = scenes;
+      // quelle che stanno andando, per chi ha aperto la pagina a metà
+      this.running = Object.fromEntries(
+        scenes
+          .filter((scene) => scene.corre)
+          .map((scene) => {
+            const { at, of, resta } = scene.corre!;
+            return [scene.id, { at, of, ...(resta ? { fino: Date.now() + resta } : {}) }];
+          }),
+      );
     } catch {
       // Un indice senza agenti è un indice normale: non si disturba nessuno.
       this.agents = [];

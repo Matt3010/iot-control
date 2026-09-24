@@ -359,7 +359,30 @@ export class Hub {
    * la stessa cosa la lascia com'è.
    */
   changed(ownerId: string, event: LiveEvent): void {
+    if (event.kind === 'running') this.#corsa(event);
     this.#tell(ownerId, event);
+  }
+
+  /**
+   * Le scene che stanno andando adesso, e quando finisce l'attesa di ognuna.
+   *
+   * Un evento lo sente solo chi c'era quando è partito. Chi ricarica la
+   * pagina a metà di un'attesa vedeva la scena ferma, come se non stesse
+   * andando, e il conto alla rovescia sparito. Chi arriva dopo lo chiede
+   * qui, insieme alle scene.
+   */
+  #corse = new Map<string, { at: number; of: number; fino?: number }>();
+
+  #corsa(event: Extract<LiveEvent, { kind: 'running' }>): void {
+    if (event.done) this.#corse.delete(event.sceneId);
+    else this.#corse.set(event.sceneId, { at: event.at, of: event.of, ...(event.resta ? { fino: Date.now() + event.resta } : {}) });
+  }
+
+  /** A che punto è quella scena, se sta andando. `resta` sono millisecondi da adesso. */
+  corsaDi(sceneId: string): { at: number; of: number; resta?: number } | undefined {
+    const corsa = this.#corse.get(sceneId);
+    if (!corsa) return undefined;
+    return { at: corsa.at, of: corsa.of, ...(corsa.fino ? { resta: Math.max(0, corsa.fino - Date.now()) } : {}) };
   }
 
   watch(ownerId: string, listener: (event: LiveEvent) => void): () => void {

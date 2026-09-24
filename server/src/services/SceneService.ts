@@ -7,7 +7,11 @@ import { sceneManager } from '../managers/SceneManager.js';
 
 export class SceneService {
   async list(ownerId: string): Promise<SceneView[]> {
-    return (await sceneManager.list(ownerId)).map(toSceneView);
+    // con quelle che stanno andando, per chi apre la pagina a metà di un'attesa
+    return (await sceneManager.list(ownerId)).map((scene) => {
+      const corre = hub.corsaDi(scene.id);
+      return { ...toSceneView(scene), ...(corre ? { corre } : {}) };
+    });
   }
 
   async create(ownerId: string, dto: SceneDto): Promise<SceneView> {
