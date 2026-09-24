@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { portal } from '../lib/portal';
   import { MAPS_PATH } from '../lib/routing';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
@@ -19,14 +20,6 @@
   let anchor = $state<HTMLElement>();
   let menu = $state<HTMLElement>();
   let at = $state({ left: 0, top: 0, width: 240 });
-
-  /** Appende il nodo al corpo: fuori da ogni ritaglio. */
-  function portal(node: HTMLElement) {
-    document.body.appendChild(node);
-    return {
-      destroy: () => node.remove(),
-    };
-  }
 
   function apri() {
     if (open) return (open = false);

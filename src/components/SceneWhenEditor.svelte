@@ -82,7 +82,10 @@
     setWhen(acceso ? (scene.when ? { ...scene.when, off: false } : defaultWhen()) : scene.when ? { ...scene.when, off: true } : null)}
 />
 
-{#if scene.when}
+<!-- spento, l'orario resta scritto e torna com'era alla riaccensione, ma
+     finché è spento non si mostra: dei campi sotto un interruttore spento
+     sembrano ancora in funzione -->
+{#if scene.when && !scene.when.off}
   <!-- Ogni settimana o una volta sola sono due cose diverse, non due
        sfumature della stessa: o si ripete o no, e quello che si sceglie
        sotto cambia di conseguenza. -->

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { alCentro } from '../lib/centra';
   import type { Choice } from '../lib/table';
 
   /**
@@ -21,9 +22,7 @@
     title?: string;
   } = $props();
 
-  function reveal(node: HTMLElement): void {
-    node.querySelector('.is-on')?.scrollIntoView({ block: 'center' });
-  }
+  const reveal = alCentro;
 </script>
 
 {#if title}<p class="what">{title}</p>{/if}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { placeAnchored, placeBeside } from '../lib/popover';
+  import { portal } from '../lib/portal';
 
   /**
    * Il foglietto che si apre accanto a qualcosa.
@@ -98,6 +99,7 @@
      dritti qui: uno stile scritto sull'elemento vince su qualunque regola, e
      su un telefono questo foglietto non deve stare dove dice il conto -->
 <div
+  use:portal
   {id}
   {role}
   data-pop

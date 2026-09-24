@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { alCentro } from '../lib/centra';
   import Icon from './Icon.svelte';
   import Popover from './Popover.svelte';
 
@@ -41,9 +42,7 @@
    * Quando si apre, il valore di adesso si porta sotto gli occhi: un elenco
    * che parte da mezzanotte fa cercare le sette di sera a mano.
    */
-  function reveal(node: HTMLElement): void {
-    node.querySelectorAll('.is-on').forEach((one) => one.scrollIntoView({ block: 'center' }));
-  }
+  const reveal = alCentro;
 </script>
 
 <button
