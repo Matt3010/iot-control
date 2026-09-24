@@ -60,8 +60,10 @@
   .big {
     width: 100vw;
     max-width: 100vw;
-    height: 100dvh;
-    max-height: 100dvh;
+    /* sta nello strato più alto, fuori dal corpo: il pezzo che iOS lascia
+       fuori sotto va aggiunto qui a mano */
+    height: calc(100dvh + var(--sotto, 0px));
+    max-height: calc(100dvh + var(--sotto, 0px));
     padding: 0;
     border: 0;
     background: #000;

@@ -9,7 +9,23 @@
 
 html, body { height: 100%; margin: 0; }
 
+/*
+ * Il corpo è lo schermo, fino in fondo.
+ *
+ * Fermo e alto quanto lo spazio della pagina più quello che, installata su
+ * iPhone, restava fuori sotto (`--sotto`, misurato in lib/schermo.ts; zero
+ * altrove). La trasformazione lo rende il riferimento anche per chi è
+ * `fixed` — le pagine, i foglietti, la fascia dell'ospite — così tutto
+ * quello che si appoggia in fondo si appoggia al fondo vero, con una regola
+ * sola invece che una per pezzo.
+ */
 body {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(100% + var(--sotto, 0px));
+  transform: translateZ(0);
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.45;
@@ -134,35 +150,19 @@ h2 {
   }
 
   /*
-   * Su un telefono la scheda è alta sempre uguale, non quanto quello che ha
-   * dentro.
+   * Su un telefono una finestra non è un foglietto appoggiato in fondo, è la
+   * schermata, dai quattro lati del corpo. Appoggiata in fondo era alta
+   * quanto quello che aveva dentro, e sopra lasciava mezzo schermo di nero.
    *
-   * Dietro non c'è nessuna mappa da lasciar vedere: una scheda con due righe
-   * dentro lasciava sopra di sé mezzo schermo di nero, con il pannello
-   * ridotto a galleggiare in cima. Quel vuoto non mostrava niente e non si
-   * poteva toccare — era solo spazio perso fra le due cose che servivano.
-   *
-   * `dvh` e non `vh`: su iPhone la barra dell'indirizzo si ritira mentre
-   * scorri, e con `vh` la scheda cambiava altezza sotto il dito.
+   * `.surface.modal` e non `.modal`: il vestito — bordo, angoli, ombra — lo
+   * mette `.surface`, e per vincere su di lei ci vogliono due classi. Con una
+   * sola gli angoli restavano tondi in basso, a disegnare una cornice intorno
+   * a un bordo che non c'è.
    */
-  /*
-   * Su un telefono una scheda non è un foglietto appoggiato in fondo: è la
-   * schermata.
-   *
-   * Appoggiata in fondo era alta quanto quello che aveva dentro, e sopra
-   * lasciava mezzo schermo di nero fra sé e il pannello ridotto — un vuoto
-   * che non mostrava niente e non si poteva toccare. E gli angoli tondi in
-   * basso disegnavano una cornice intorno a un bordo che non c'è: sotto
-   * finisce lo schermo, non la pagina.
-   */
-  /* `.surface.modal` e non `.modal`: il vestito — bordo, angoli, ombra — lo
-     mette `.surface`, e per vincere su di lei ci vogliono due classi. Con una
-     sola gli angoli restavano tondi in basso, a disegnare una cornice intorno
-     a un bordo che non c'è. */
   .surface.modal {
     inset: 0;
     width: auto;
-    height: 100dvh;
+    height: auto;
     max-height: none;
     border: 0;
     border-radius: 0;

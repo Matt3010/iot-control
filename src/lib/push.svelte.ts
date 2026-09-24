@@ -1,3 +1,4 @@
+import { install } from './install.svelte';
 import { api } from './api';
 
 /**
@@ -87,7 +88,7 @@ class Push {
     if (!this.can) {
       // Un iPhone col browser normale non ce l'ha: diventa capace appena
       // l'app sta nella schermata home, e allora vale la pena dirglielo.
-      this.needsInstall = /iPhone|iPad/.test(navigator.userAgent) && !this.#standalone();
+      this.needsInstall = install.iPhone && !install.installata;
       return;
     }
 
@@ -198,13 +199,6 @@ class Push {
       auth: raw.keys?.auth,
       agent: whichMachine(),
     });
-  }
-
-  #standalone(): boolean {
-    return (
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as unknown as { standalone?: boolean }).standalone === true
-    );
   }
 }
 

@@ -3,6 +3,7 @@
   import { toast } from '../lib/toast.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
+  import InstallHint from './InstallHint.svelte';
   import Switch from './Switch.svelte';
 
   /**
@@ -111,13 +112,7 @@
     {/if}
   {:else if push.needsInstall}
     <!-- Non è un difetto nostro e non si aggira: tanto vale dire come si fa. -->
-    <p class="nota">
-      <Icon name="alert" />
-      <span
-        >Su iPhone gli avvisi arrivano solo se aggiungi questa pagina alla schermata home, con il tasto
-        <b>Condividi</b>, poi <b>Aggiungi alla schermata Home</b>. Da lì si accendono.</span
-      >
-    </p>
+    <InstallHint />
   {:else}
     <p class="nota">Questo browser non sa ricevere avvisi.</p>
   {/if}

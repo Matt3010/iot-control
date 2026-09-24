@@ -8,6 +8,7 @@
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import Icon from './Icon.svelte';
+  import InstallHint from './InstallHint.svelte';
   import MapSwitcher from './MapSwitcher.svelte';
   import PanelSkeleton from './PanelSkeleton.svelte';
   import PlaceList from './PlaceList.svelte';
@@ -100,6 +101,10 @@
   </div>
 
   <SearchTrigger />
+
+  <!-- dal browser e non dall'app installata: chi la usa da una scheda non sa
+       che su iPhone gli avvisi arrivano solo così -->
+  <InstallHint chiudibile />
 
   {#if store.categories.length && !store.loading}
     <div class="filtro">
