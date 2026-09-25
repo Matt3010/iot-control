@@ -1,10 +1,11 @@
 <script lang="ts">
   import { auth } from '../lib/auth.svelte';
-  import { tasti } from '../lib/fondo.svelte';
+  import { modifiche, tasti } from '../lib/fondo.svelte';
   import { store } from '../lib/store.svelte';
   import { toast } from '../lib/toast.svelte';
   import { ui, type ModalAction } from '../lib/ui.svelte';
   import { viewport } from '../lib/viewport.svelte';
+  import type { Draft } from '../lib/types';
   import Chip from './Chip.svelte';
   import AgentField from './AgentField.svelte';
   import Tabs from './Tabs.svelte';
@@ -68,6 +69,31 @@
     if (alive.length !== held.length) draft.groupIds = alive;
   });
 
+  /**
+   * Quello che di un luogo si può cambiare da qui, messo in fila per
+   * confrontarlo. La categoria e i gruppi si leggono come li mette a posto
+   * la scheda appena aperta — un luogo nuovo nasce nella prima categoria —
+   * se no la scheda risulterebbe cambiata prima di toccarla.
+   */
+  function firma(one: Draft | null): string {
+    if (!one) return '';
+    const categoria = store.categories.some((category) => category.id === one.categoryId)
+      ? one.categoryId
+      : (store.categories[0]?.id ?? '');
+    return JSON.stringify([
+      (one.name ?? '').trim(),
+      (one.note ?? '').trim(),
+      categoria,
+      (one.groupIds ?? []).filter((id) => store.groups.some((group) => group.id === id)).sort(),
+      [...(one.agentIds ?? [])].sort(),
+      one.lat,
+      one.lng,
+    ]);
+  }
+
+  // cambiata da quando si è aperta: Esc e la crocetta chiedono prima di buttarla
+  modifiche(() => mine && !!draft && firma(draft) !== firma(ui.draftOrigine));
+
   function save() {
     if (!draft || !mine) return;
     if (!draft.categoryId) {
@@ -83,12 +109,38 @@
       toast.show('Dai un nome al luogo prima di salvare');
       return;
     }
-    store.savePlace({ ...draft, name });
+    /*
+     * La scheda si chiude subito, e il luogo compare sulla mappa prima che il
+     * server risponda. Se poi il server dice di no — o la rete non c'è —
+     * quello che avevi scritto non deve andarsene con lei: la scheda si
+     * riapre con dentro il nome e la nota, e si dice cosa è successo.
+     */
+    const scritto = $state.snapshot({ ...draft, name }) as Draft;
+    const origine = ($state.snapshot(ui.draftOrigine) as Draft | null) ?? scritto;
+    const nuovo = !editing;
+    void store.savePlace(scritto).then(
+      () => toast.show(nuovo ? `Luogo «${name}» salvato` : `Luogo «${name}» aggiornato`),
+      (error: Error) => riapri(scritto, origine, error.message),
+    );
     // Saving something the filters would hide makes it vanish; show it instead.
-    if (store.hiddenCategories.includes(draft.categoryId)) store.toggleCategory(draft.categoryId);
+    if (store.hiddenCategories.includes(draft.categoryId ?? '')) store.toggleCategory(draft.categoryId ?? '');
     if (store.activeGroup && !(draft.groupIds ?? []).includes(store.activeGroup)) store.setGroup(null);
     ui.closePlace();
-    toast.show(editing ? `Luogo «${name}» aggiornato` : `Luogo «${name}» salvato`);
+  }
+
+  /**
+   * Il salvataggio non è riuscito: la scheda torna con quello che c'era
+   * scritto. Subito, se davanti non c'è niente; se nel frattempo se n'è
+   * aperta un'altra, a richiesta, per non portarla via da sotto le mani.
+   */
+  function riapri(scritto: Draft, origine: Draft, perche: string): void {
+    const frase = `Il luogo «${scritto.name}» non si è salvato. ${perche}`;
+    if (!ui.modal) {
+      ui.openPlace(scritto, origine);
+      toast.show(`${frase} La scheda è di nuovo aperta con quello che avevi scritto.`);
+      return;
+    }
+    toast.show(frase, { label: 'Riapri', run: () => ui.openPlace(scritto, origine) });
   }
 
   /** Groups are labels: a place wears as many as you like. */
@@ -262,7 +314,9 @@
         <AgentField
           agentIds={draft.agentIds ?? []}
           placeKey={draft.key}
-          onchange={(ids) => draft && (draft.agentIds = ids)}
+          onchange={(ids) => {
+            if (draft) draft.agentIds = ids;
+          }}
         />
       {/if}
 

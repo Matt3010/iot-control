@@ -61,14 +61,32 @@
         ? 'ascending'
         : 'descending'
       : undefined;
+
+  /*
+   * Il nome della colonna scritto su ogni cella, per il telefono.
+   *
+   * Lì la tabella non scorre di lato: cinque colonne non stanno in 390
+   * pixel, e quella che finiva fuori era proprio la frase che si voleva
+   * leggere. Ogni riga diventa un blocco, una cella sotto l'altra, e davanti
+   * a ogni cella si legge di quale colonna è. Le celle le disegna chi usa la
+   * tabella, quindi il nome lo mette qui chi conosce le colonne.
+   */
+  function etichette(corpo: HTMLTableSectionElement): void {
+    $effect(() => {
+      void rows;
+      const nomi = columns.map((column) => column.label);
+      for (const riga of corpo.rows) {
+        [...riga.cells].forEach((cella, at) => (cella.dataset.colonna = nomi[at] ?? ''));
+      }
+    });
+  }
 </script>
 
 {#if rows.length}
   <!-- Le colonne non si tolgono quando lo schermo è stretto: quella che
-       sparisce è sempre quella che a qualcuno serviva, e una tabella che
-       cambia forma va riletta ogni volta. Qui invece scorre di lato, e
-       quello che non ci sta resta raggiungibile invece che tagliato dal
-       bordo della scheda. -->
+       sparisce è sempre quella che a qualcuno serviva. Su uno schermo medio
+       scorre di lato; su un telefono ogni riga si mette in colonna, con il
+       nome davanti a ogni cella (vedi `etichette`). -->
   <div class="scorre">
     <table aria-label={label}>
       <colgroup>
@@ -86,6 +104,7 @@
               scope="col"
               class:end={column.align === 'end'}
               class:fit={column.width === 'fit'}
+              class:is-vuota={!column.label}
               aria-sort={versoDi(column)}
             >
               {#if vista && column.ordina}
@@ -110,7 +129,7 @@
         </tr>
       </thead>
 
-      <tbody>
+      <tbody use:etichette>
         {#each rows as one (one.id)}
           <tr>{@render row(one)}</tr>
         {/each}
@@ -234,6 +253,70 @@
   .ordina :global(.ico) { width: 12px; height: 12px; }
 
   th.end .ordina { flex-direction: row-reverse; }
+
+  /*
+   * Sul telefono niente scorre di lato: ogni riga è un blocco e le celle
+   * vanno una sotto l'altra, col nome della colonna davanti. L'intestazione
+   * resta, in fila e senza le celle vuote, perché è lei che mette in ordine.
+   * Scritto dopo le regole di sopra, che a parità di peso vincerebbero.
+   */
+  @media (max-width: 600px) {
+    .scorre { overflow-x: visible; scroll-snap-type: none; }
+
+    table, thead, tbody, tr { display: block; }
+
+    colgroup { display: none; }
+
+    thead tr {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 14px;
+      padding-bottom: 9px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    th { display: block; padding: 0; border: 0; }
+
+    th.is-vuota { display: none; }
+
+    tbody tr { padding: 8px 0; border-bottom: 1px solid var(--hairline-soft); }
+
+    tbody tr:last-child { border-bottom: 0; }
+
+    tbody :global(td),
+    tbody :global(td:first-child),
+    tbody :global(td:last-child) {
+      /* il nome sta nel rientro a sinistra, e la cella è alta almeno quanto
+         lui anche quando va a capo («Ti avviso quando») */
+      display: flow-root;
+      padding: 2px 0 2px 86px;
+      border: 0;
+      text-align: left;
+      /* a capo, anche in mezzo a una parola che non ci sta */
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    tbody :global(td)::before {
+      content: attr(data-colonna);
+      float: left;
+      width: 78px;
+      margin: 2px 0 0 -86px;
+      line-height: 1.3;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+
+    /* la cella senza nome è quella dei tasti: sta a filo, senza rientro */
+    tbody :global(td[data-colonna=''])::before { content: none; }
+
+    tbody :global(td[data-colonna='']) { padding-left: 0; }
+
+    tbody tr:hover :global(td) { background: none; }
+  }
 
   /* dove si tocca, l'intestazione è alta quanto un dito senza spostare la
      riga: lo spazio si aggiunge dentro e si toglie fuori */

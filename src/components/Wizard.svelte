@@ -140,7 +140,8 @@
 
   .passo.is-fatto { color: var(--ink-2); }
 
-  .contenuto { display: grid; gap: 10px; padding-top: 4px; }
+  /* la colonna non si allarga per quello che contiene (vedi Modal.svelte) */
+  .contenuto { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding-top: 4px; }
 
   .fondo { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; }
 

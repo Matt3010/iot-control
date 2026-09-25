@@ -106,7 +106,7 @@
         <td class="chi fit">
           <!-- il pallino, come sui luoghi e sugli agenti: giallo quando c'e'
                qualcosa che non va, verde quando e' rientrato -->
-          <span class="segno" class:is-back={one.kind === 'back'} class:is-scene={one.kind === 'scene'}></span>
+          <span class="segno" class:is-back={one.kind === 'back'} class:is-scene={one.kind === 'scene' || one.kind === 'rule'}></span>
           {#each chi(one) as pezzo, at (at)}
             {#if at}<span class="sep">/</span>{/if}
             <span class="tipo">{pezzo.tipo}</span><span class="sep">/</span>{pezzo.nome}

@@ -47,7 +47,8 @@
   {/each}
 
   <PageCard dashed>
-    <span class="eyebrow">Un'altra scena</span>
+    <!-- «un'altra» solo se ce n'è già una davanti -->
+    <span class="eyebrow">{devices.scenes.length ? "Un'altra scena" : 'Una scena'}</span>
     <AddRow placeholder="Nome scena — es. Sera" title="Crea scena" bind:value={newName} onadd={create} />
     <p class="once">
       Nasce vuota. Con la matita le dici quali dispositivi muovere, e una sola scena può toccarne

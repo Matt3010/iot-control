@@ -28,7 +28,7 @@
 </script>
 
 {#if acting}
-  <div class="bar">
+  <div class="bar" data-guest>
     <Icon name="key" />
     <span class="what">
       Stai lavorando nelle mappe di <b>{acting.handle}</b>

@@ -52,7 +52,12 @@
   $effect(() => {
     if (guscio) ui.registra(request, guscio);
   });
-  offriIlFondo({ detta: (azioni) => (dettati = azioni), chiudi: () => ui.closeModal(request) });
+  offriIlFondo({
+    detta: (azioni) => (dettati = azioni),
+    chiudi: () => ui.closeModal(request),
+    // chi ci sta dentro dice se ha del lavoro in sospeso, e la crocetta chiede
+    modifiche: (quando) => ui.segnaModifiche(request, quando),
+  });
 
   const azioni = $derived(dettati ? dettati() : (request.actions ?? []));
 
@@ -130,11 +135,13 @@
   hidden={!davanti}
   tabindex="-1"
   bind:this={guscio}
-  use:swipeToClose={() => ui.closeModal(request)}
+  use:swipeToClose={() => ui.lascia(request)}
 >
   <header>
     <h2>{request.title}</h2>
-    <Button look="icon" title="Chiudi" onclick={() => ui.closeModal(request)}>
+    <!-- chiudere di qui chiede, se dentro c'è qualcosa di non salvato; la
+         domanda si attacca a questo tasto (`data-chiudi`) -->
+    <Button look="icon" title="Chiudi" data-chiudi onclick={() => ui.lascia(request)}>
       <Icon name="close" />
     </Button>
   </header>
@@ -208,6 +215,10 @@
     min-height: 0;
     overflow: auto;
     display: grid;
+    /* una colonna larga quanto la finestra e non quanto la cosa più larga
+       che ci sta dentro: una pastiglia col nome lungo allargava la colonna,
+       e la finestra scorreva di lato */
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
     gap: 10px;
     /*

@@ -587,7 +587,11 @@ class Store {
     }
   }
 
-  /** Shown immediately; the server's answer replaces it in place. */
+  /**
+   * Si vede subito, e la risposta del server ci si scrive sopra. Se il
+   * server dice di no, l'elenco torna com'era e l'errore sale a chi ha
+   * chiamato: è la scheda che sa cosa fare di quello che era scritto.
+   */
   async savePlace(draft: Draft): Promise<void> {
     // se il posto c'era già resta dov'era: solo i nuovi nascono in quella selezionata
     const mapId = draft.mapId ?? this.activeMap?.id ?? '';
@@ -601,7 +605,8 @@ class Store {
         Object.assign(existing, await api.put<Place>(`/places/${existing.id}`, payload));
       } catch (error) {
         Object.assign(existing, before);
-        toast.show((error as Error).message);
+        // cosa dire, e cosa fare di quello che era scritto, lo sa la scheda
+        throw error;
       }
       return;
     }
@@ -637,7 +642,7 @@ class Store {
     } catch (error) {
       const at = mine();
       if (at >= 0) this.places.splice(at, 1);
-      toast.show((error as Error).message);
+      throw error;
     }
   }
 

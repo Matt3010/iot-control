@@ -89,13 +89,19 @@
     void devices.versioniAccount[agentId];
     const mio = ++giro;
     const questo = untrack(() => agent);
+    // un blocco e non `mio === giro && (…)`: il valore di un'assegnazione a
+    // uno stato vivo non è quello che ci resta dentro, e Svelte lo segnala
     void devices
       .linked(questo)
-      .then((list) => mio === giro && (stato.linked = list))
+      .then((list) => {
+        if (mio === giro) stato.linked = list;
+      })
       .catch(() => undefined);
     void devices
       .catalog(questo)
-      .then((list) => mio === giro && (stato.catalogo = list))
+      .then((list) => {
+        if (mio === giro) stato.catalogo = list;
+      })
       .catch(() => undefined);
   });
 

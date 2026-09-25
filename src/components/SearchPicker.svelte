@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { perNome, Vista } from '../lib/vista.svelte';
+  import { unici } from '../lib/unici';
   import Icon from './Icon.svelte';
   import TextField from './TextField.svelte';
 
@@ -81,7 +82,7 @@
 {#if prima && !vista.cerca.trim()}{@render prima()}{/if}
 
 <ul class="elenco">
-  {#each elenco as voce (voce.id)}
+  {#each unici(elenco, (one) => one.id) as voce (voce.id)}
     {@const detto = nota(voce)}
     <li>
       <button type="button" class="voce" class:is-on={voce.id === scelta} onclick={() => onpick(voce.id)}>

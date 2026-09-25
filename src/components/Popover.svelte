@@ -21,6 +21,7 @@
     width,
     height,
     onclose,
+    onesc,
     place = 'anchored',
     id,
     role,
@@ -33,6 +34,8 @@
     width: number;
     height: number;
     onclose: () => void;
+    /** Chiuderlo con Esc, quando deve fare qualcosa in più che chiudersi. */
+    onesc?: () => void;
     /**
      * `anchored` sotto al tasto, `beside` di fianco alla scheda quando c'è
      * spazio — che è quello che serve a un foglietto aperto dentro un pannello,
@@ -83,7 +86,7 @@
    * Chi lo apre ha uno stato suo — l'elenco dell'attesa, un orario — e
    * all'applicazione, che è quella che sente Esc, non lo diceva nessuno.
    */
-  $effect(() => ui.sopra(() => onclose()));
+  $effect(() => ui.sopra(() => (onesc ?? onclose)()));
 
   /**
    * Un clic fuori chiude, ma non quello sul tasto che l'ha aperto: quello sta

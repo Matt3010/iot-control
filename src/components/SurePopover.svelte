@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { ui } from '../lib/ui.svelte';
   import Button from './Button.svelte';
   import Popover from './Popover.svelte';
@@ -26,6 +27,14 @@
     run();
   }
 
+  // il fuoco sul «no», quando chi chiede lo vuole (`fuoco`)
+  let tasti = $state<HTMLElement>();
+  $effect(() => {
+    if (!request.fuoco || !tasti) return;
+    const qui = tasti;
+    void tick().then(() => qui.querySelector<HTMLElement>('button')?.focus());
+  });
+
   /** Anche il no può fare qualcosa: in un bivio l'altra strada è una strada. */
   function no() {
     const run = request.onNo;
@@ -42,10 +51,11 @@
   role="alertdialog"
   label={request.title}
   onclose={() => (ui.sure = null)}
+  onesc={() => ui.lasciaDomanda()}
 >
   <p class="sure-what">{request.title}</p>
   {#if request.detail}<p class="sure-detail">{request.detail}</p>{/if}
-  <div class="sure-acts">
+  <div class="sure-acts" bind:this={tasti}>
     <Button look="ghost" size="sm" onclick={no}>{request.no ?? 'Annulla'}</Button>
     <Button look={request.tone === 'plain' ? 'primary' : 'danger-solid'} size="sm" onclick={yes}>
       {request.verb}

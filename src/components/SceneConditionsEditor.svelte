@@ -29,8 +29,10 @@
 
 {#if automatica}
   <span class="nota">
-    Valgono quando parte da sola. Premuta a mano parte sempre.{#if daDispositivo && scene.when && !scene.when.off}
-      Giorni e ore valgono per i dispositivi, perché l’orario ha già i suoi.{/if}
+    <!-- lo spazio fra le due frasi è scritto: quello a capo dentro al blocco
+         Svelte lo toglie, e le frasi si attaccavano («sempre.Giorni») -->
+    Valgono quando parte da sola. Premuta a mano parte sempre.{#if daDispositivo && scene.when && !scene.when.off}{' '}Giorni
+      e ore valgono per i dispositivi, perché l’orario ha già i suoi.{/if}
   </span>
 
   <SceneConditionGroupView gruppo={gruppoDi(scene.only)} {daDispositivo} onchange={salva} />

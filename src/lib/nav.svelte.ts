@@ -27,8 +27,22 @@ class Nav {
       this.path = buono;
     }
 
-    // il tasto indietro del browser resta il tasto indietro del browser
-    window.addEventListener('popstate', () => (this.path = window.location.pathname));
+    /*
+     * Il tasto indietro del browser resta il tasto indietro del browser. Ma
+     * se davanti c'è una finestra con del lavoro non salvato, prima si
+     * chiede: l'indirizzo torna quello di adesso mentre si risponde, e con
+     * un «Butta» si fa davvero il passo indietro.
+     */
+    window.addEventListener('popstate', () => {
+      const dove = window.location.pathname;
+      if (dove === this.path) return;
+      const eravamo = this.path;
+      if (this.#prima?.(() => history.back())) {
+        history.pushState({}, '', eravamo);
+        return;
+      }
+      this.path = dove;
+    });
 
     /*
      * Un ascolto solo, in fondo al documento, invece di un `onclick` su ogni
@@ -40,10 +54,22 @@ class Nav {
     document.addEventListener('click', (event) => this.#maybe(event));
   }
 
+  /**
+   * Chi va consultato prima di lasciare la pagina: torna `true` se sta
+   * chiedendo, e allora il viaggio lo riprende lui chiamando `vai`. Lo
+   * mette chi avvia l'app, perché qui dentro non si sa niente di finestre.
+   */
+  #prima: ((vai: () => void) => boolean) | null = null;
+
+  custodisci(prima: (vai: () => void) => boolean): void {
+    this.#prima = prima;
+  }
+
   /** Va a un indirizzo di casa senza ricaricare niente. */
   go(path: string): void {
     const dove = canonical(path);
     if (dove === this.path) return;
+    if (this.#prima?.(() => this.go(path))) return;
     history.pushState({}, '', dove);
     this.path = dove;
     // una pagina nuova si legge dall'alto, non da dove stava l'altra

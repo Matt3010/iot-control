@@ -3,6 +3,7 @@
   import type { Provider } from '../lib/providers';
   import type { Health, LinkedAccount } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
+  import { unici } from '../lib/unici';
   import Button from './Button.svelte';
 
   /**
@@ -86,10 +87,10 @@
 {/snippet}
 
 <div class="accounts">
-  {#each accounts as account (account.handler)}
+  {#each unici(accounts, (one) => one.handler) as account (account.handler)}
     {@const mine = joined(account.handler)}
 
-    {#each mine as joint (joint.entryId)}
+    {#each unici(mine, (one) => one.entryId) as joint (joint.entryId)}
       <div class="account is-joined">
         {@render segno(account.label, joint.title, joint.health ?? 'live')}
 

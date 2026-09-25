@@ -1,6 +1,7 @@
 import { alerts } from './alerts.svelte';
 import { auth } from './auth.svelte';
 import { devices, type Scene } from './devices.svelte';
+import { rete } from './rete.svelte';
 import { store } from './store.svelte';
 import { toast } from './toast.svelte';
 import type { LiveEvent as Evento } from '../../shared/live';
@@ -67,6 +68,7 @@ class Live {
     // Alla prima apertura non si rilegge niente, perché chi si collega ha
     // appena caricato. Da lì in poi ogni ritorno è un buco da colmare.
     stream.onopen = () => {
+      rete.filo(true);
       this.#attesa = 0;
       if (this.#aperto) this.#rileggi();
       this.#aperto = true;
@@ -75,6 +77,7 @@ class Live {
     // mentre si riconnette da sé lo si lascia fare, e si interviene solo
     // quando ha smesso di provarci
     stream.onerror = () => {
+      if (this.#stream === stream) rete.filo(false);
       if (this.#stream !== stream || stream.readyState !== EventSource.CLOSED) return;
       stream.close();
       this.#stream = null;

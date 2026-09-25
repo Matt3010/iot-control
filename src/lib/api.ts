@@ -26,7 +26,7 @@ function motivo(status: number): string {
 /** Quando la richiesta non è nemmeno arrivata: la rete di qui, o il server là. */
 const senzaRisposta = (): string =>
   typeof navigator !== 'undefined' && navigator.onLine === false
-    ? 'Questo dispositivo è senza rete, e la richiesta non è partita.'
+    ? 'Questa macchina è senza rete, e la richiesta non è partita.'
     : 'Il server non risponde, e la richiesta non è arrivata. Controlla la rete e riprova.';
 
 /** Every call the client makes, in one place, with the server's error text kept. */

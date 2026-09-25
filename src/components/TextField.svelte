@@ -13,6 +13,9 @@
    * ricerca. Non una in più — un componente con dieci vestiti è un foglio di
    * stile con un nome diverso.
    */
+  import { modifiche } from '../lib/fondo.svelte';
+  import { ui } from '../lib/ui.svelte';
+
   type Kind = 'text' | 'email' | 'password' | 'search';
 
   let {
@@ -83,6 +86,36 @@
    * scritti qui sotto: una cosa che regge per caso.
    */
   const chiuso = $derived(readonly ?? (shy && !touched));
+
+  /*
+   * Quello che c'era prima che ci scrivessi, per sapere se hai scritto
+   * qualcosa che non è ancora da nessuna parte.
+   *
+   * Un valore che cambia mentre il campo non ha il fuoco non l'hai scritto
+   * tu — è arrivato da un'altra scheda, o chi lo usa l'ha svuotato dopo
+   * averlo aggiunto — e diventa il nuovo punto di partenza. Un campo che
+   * consegna da sé (`onchange`) ha consegnato quando lasci il campo, e
+   * anche lì si riparte da capo. Una ricerca non è lavoro da salvare.
+   */
+  // svelte-ignore state_referenced_locally
+  let base = value;
+  $effect.pre(() => {
+    const ora = value;
+    if (!element || element !== document.activeElement) base = ora;
+  });
+  modifiche(() => kind !== 'search' && !chiuso && (value ?? '') !== (base ?? ''));
+
+  /*
+   * Consegna quello che hai scritto, una volta sola: all'invio o lasciando
+   * il campo. Non mentre si chiede se buttarlo — rispondere alla domanda
+   * vuol dire lasciare il campo, e si salverebbe proprio quello che stai
+   * buttando — e allora lo si consegna la prossima volta che lo lasci.
+   */
+  function consegna(ora: string): void {
+    if (!onchange || ui.inDubbio || ora === base) return;
+    base = ora;
+    onchange(ora);
+  }
 </script>
 
 <!-- svelte-ignore a11y_autofocus -->
@@ -101,7 +134,8 @@
   aria-label={label}
   onfocus={() => (touched = true)}
   oninput={(event) => oninput?.(event.currentTarget.value)}
-  onchange={(event) => onchange?.(event.currentTarget.value)}
+  onchange={(event) => consegna(event.currentTarget.value)}
+  onblur={(event) => consegna(event.currentTarget.value)}
   onkeydown={(event) => {
     // l'invio vale come «ho finito», dove non c'è un modulo che lo prende
     if (event.key === 'Enter' && onchange && !event.currentTarget.form) event.currentTarget.blur();

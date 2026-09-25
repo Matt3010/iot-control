@@ -1,4 +1,4 @@
-import { getContext, setContext } from 'svelte';
+import { getContext, onDestroy, setContext } from 'svelte';
 import type { ModalAction } from './ui.svelte';
 
 /**
@@ -27,6 +27,8 @@ interface Fondo {
   detta: (azioni: () => ModalAction[]) => void;
   /** Chiude questa finestra, e non quella che le si è aperta sopra. */
   chiudi: () => void;
+  /** Si fa dire se c'è qualcosa di scritto e non salvato; torna come smettere. */
+  modifiche: (quando: () => boolean) => () => void;
 }
 
 /** Lo apre il guscio, che di cosa ci finirà dentro non sa niente. */
@@ -54,4 +56,23 @@ export function tasti(azioni: () => ModalAction[]): boolean {
 export function chiusura(): () => void {
   const fondo = getContext<Fondo | undefined>(CHIAVE);
   return fondo ? fondo.chiudi : () => undefined;
+}
+
+/**
+ * Dire alla finestra che qui dentro c'è qualcosa di scritto e non salvato.
+ *
+ * Esc, la crocetta, un cambio di pagina chiudevano la scheda di un luogo con
+ * dentro un nome a metà, e quello che avevi scritto se ne andava senza una
+ * parola. Chi sa se c'è del lavoro in sospeso è il componente, non il
+ * guscio: lo dice con una domanda che la finestra si rifà ogni volta che sta
+ * per chiudersi, e se la risposta è sì prima di chiudersi chiede.
+ *
+ * Ce ne possono essere quante servono — ogni campo di testo dice la sua, e
+ * la scheda di un luogo aggiunge le pastiglie — e basta un sì. Fuori da una
+ * finestra non c'è niente da chiudere, e non fa niente.
+ */
+export function modifiche(quando: () => boolean): void {
+  const fondo = getContext<Fondo | undefined>(CHIAVE);
+  if (!fondo) return;
+  onDestroy(fondo.modifiche(quando));
 }

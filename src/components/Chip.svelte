@@ -14,6 +14,7 @@
     size,
     disabled = false,
     onclick,
+    title,
     ...rest
   }: {
     color?: string;
@@ -27,9 +28,21 @@
     size?: 'sm';
     disabled?: boolean;
     onclick?: (event: MouseEvent) => void;
-    /* quello che non sappiamo ancora di dover passare: title, aria, dati */
+    /** Cosa fa, detto a chi ci passa sopra. */
+    title?: string;
+    /* quello che non sappiamo ancora di dover passare: aria, dati */
     [key: string]: unknown;
   } = $props();
+
+  /*
+   * Un nome troppo lungo si taglia coi puntini dentro la pastiglia, e allora
+   * il nome intero si legge passandoci sopra. Si misura quando ci si arriva,
+   * col puntatore o col fuoco, perché solo lì serve saperlo.
+   */
+  let nome = $state<HTMLElement>();
+  let tagliato = $state(false);
+  const misura = () => (tagliato = !!nome && nome.scrollWidth > nome.clientWidth);
+  const detto = $derived(tagliato ? (title ? `${label}. ${title}` : label) : title);
 </script>
 
 <button
@@ -38,11 +51,14 @@
   style:--c={color}
   {disabled}
   {onclick}
+  title={detto}
+  onpointerenter={misura}
+  onfocus={misura}
   {...rest}
 >
   {#if emoji}<span class="emo"><Mark value={emoji} size={14} /></span>{/if}
   {#if salute}<HealthDot {salute} />{/if}
-  <span class="name">{label}</span>
+  <span class="name" bind:this={nome}>{label}</span>
   {#if count !== undefined}<span class="count">{count}</span>{/if}
 </button>
 
@@ -66,6 +82,9 @@
   font-size: 12.5px;
   font-weight: 500;
   white-space: nowrap;
+  /* mai più larga di chi la ospita: il nome si taglia dentro (vedi .name) */
+  max-width: 100%;
+  min-width: 0;
   user-select: none;
   transition: background 0.16s, border-color 0.16s, color 0.16s, opacity 0.16s, transform 0.14s var(--ease);
 }
@@ -90,6 +109,15 @@
 /* il segno dentro alla pillola: un disegno prende il colore del testo, e
    un'emoji di quelle vecchie si porta ancora i suoi */
 .chip .emo { display: inline-grid; place-items: center; line-height: 1; }
+
+/* a stringersi è solo il nome: il segno, il pallino e il numero restano interi */
+.chip > :global(:not(.name)) { flex-shrink: 0; }
+
+.chip .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .chip .count {
   font-size: 11px;

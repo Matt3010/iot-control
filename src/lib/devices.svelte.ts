@@ -718,8 +718,25 @@ class Devices {
       void this.load();
       return;
     }
-    device.online = event.online as boolean;
-    device.state = event.state as Record<string, DeviceValue>;
+    /*
+     * Un evento storto non rompe la pagina: `online` vale solo se è un sì o
+     * un no, e lo stato solo se è un oggetto. Uno stato mancante diventava
+     * `undefined`, e i controlli che lo leggevano cadevano tutti insieme.
+     */
+    if (typeof event.online === 'boolean') device.online = event.online;
+    const state = event.state;
+    if (!state || typeof state !== 'object' || Array.isArray(state)) return;
+    /*
+     * Quello che è in coda resta sullo schermo: una lettura arrivata mentre
+     * si aspetta il comando di prima racconta com'era prima dell'ultimo
+     * valore chiesto, e il cursore tornerebbe indietro per poi saltare avanti.
+     */
+    const inCoda: Record<string, DeviceValue> = {};
+    for (const [key, value] of this.#attesi) {
+      const [deviceId, ...code] = key.split(':');
+      if (deviceId === device.id) inCoda[code.join(':')] = value;
+    }
+    device.state = { ...(state as Record<string, DeviceValue>), ...inCoda };
   }
 
   /* --------------------------------------------------------------- comandi */
@@ -731,7 +748,19 @@ class Devices {
    */
   async command(device: Device, code: string, value: DeviceValue, prima?: { value: DeviceValue | undefined }): Promise<void> {
     const key = `${device.id}:${code}`;
-    if (this.busy.includes(key)) return;
+
+    /*
+     * Mentre il comando di prima è in viaggio, quello nuovo aspetta in coda
+     * e parte appena l'altro finisce. Buttarlo lasciava il cursore tenuto
+     * premuto sulla freccia al 53% e la lampada al 44%: sullo schermo un
+     * valore che nessuno aveva mandato. In coda ce n'è uno solo, l'ultimo
+     * chiesto, perché quelli in mezzo sono già superati.
+     */
+    if (this.busy.includes(key)) {
+      this.#attesi.set(key, value);
+      device.state = { ...device.state, [code]: value };
+      return;
+    }
 
     /*
      * Com'era prima, per tornarci se va male. Un cursore lo dice da sé
@@ -752,10 +781,15 @@ class Devices {
      */
     let rest = SETTLE_MS;
 
+    /** Il valore che il dispositivo ha davvero, a comando finito. */
+    let vero: { value: DeviceValue | undefined } = { value };
+
     try {
       await api.post(`/devices/${device.id}/command`, { code, value });
     } catch (error) {
-      device.state = before;
+      vero = { value: before[code] };
+      // torna il valore vero, ma non sopra a uno più nuovo già in coda
+      device.state = this.#attesi.has(key) ? { ...before, [code]: this.#attesi.get(key)! } : before;
       const why = (error as Error).message;
 
       /*
@@ -779,7 +813,37 @@ class Devices {
 
     if (rest) await new Promise((done) => setTimeout(done, rest));
     this.busy = this.busy.filter((held) => held !== key);
+
+    // l'ultimo valore chiesto nel frattempo parte adesso, da quello vero
+    if (!this.#attesi.has(key)) return;
+    const dopo = this.#attesi.get(key) as DeviceValue;
+    this.#attesi.delete(key);
+    const ora = this.byId(device.id) ?? device;
+    if (dopo === vero.value) {
+      // è quello che ha già: niente da mandare, e lo schermo lo dice
+      ora.state = { ...ora.state, [code]: dopo };
+      return;
+    }
+    await this.command(ora, code, dopo, vero);
   }
+
+  /**
+   * Un valore mostrato prima di mandarlo, mentre si trascina un cursore.
+   *
+   * Lo scrive l'elenco, che è di chi possiede lo stato: scritto dal
+   * componente che riceve il dispositivo, Svelte lo segnalava come la
+   * modifica di una cosa ricevuta e non sua.
+   */
+  anteprima(device: Device, code: string, value: DeviceValue): void {
+    const vero = this.byId(device.id) ?? device;
+    vero.state = { ...vero.state, [code]: value };
+  }
+
+  /**
+   * L'ultimo valore chiesto per ogni comando ancora in viaggio, come
+   * `dev-1:bright` → 53. Parte quando quello di prima finisce.
+   */
+  #attesi = new Map<string, DeviceValue>();
 
   /* ---------------------------------------------------------------- agenti */
 

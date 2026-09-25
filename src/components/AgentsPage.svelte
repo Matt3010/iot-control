@@ -147,10 +147,23 @@
     </PageCard>
   {/each}
 
+  <!-- Da ospite il riquadro per crearne uno non c'è, e senza nessun agente
+       aperto la pagina restava vuota sotto il titolo, come se si fosse
+       inceppata. Si dice perché è vuota, e da chi dipende. -->
+  {#if !auth.canAdmin && devices.letto && devices.agents.length === 0}
+    <PageCard>
+      <p class="once">
+        Chi ti ha aperto la mappa non ti ha dato nessuna casa da comandare. Se ti serve, chiedi a
+        {auth.account?.actingAs?.handle} di aprirti un luogo che ha un agente.
+      </p>
+    </PageCard>
+  {/if}
+
   <!-- un agente nuovo lo installa chi possiede l'indice: da ospite il riquadro non c'è -->
   {#if auth.canAdmin}
   <PageCard dashed>
-    <span class="eyebrow">Un altro agente</span>
+    <!-- «un altro» solo se ce n'è già uno davanti -->
+    <span class="eyebrow">{devices.agents.length ? 'Un altro agente' : 'Un agente'}</span>
     <AddRow
       placeholder="Nome agente — es. Padova"
       title="Crea agente"

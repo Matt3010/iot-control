@@ -3,6 +3,7 @@
   import { nomeColore } from '../lib/colori';
   import { leggiValore } from '../lib/valori';
   import { numero } from '../lib/prove';
+  import { unici } from '../lib/unici';
   import HealthDot from './HealthDot.svelte';
   import { auth } from '../lib/auth.svelte';
   import { devices, type Device } from '../lib/devices.svelte';
@@ -40,8 +41,10 @@
   const stato = $derived(devices.saluteDi(device));
 
   /* le capacità di tutti i giorni, e a parte le impostazioni (protocol.d.ts, `setting`) */
-  const principali = $derived((device.capabilities as Capability[]).filter((one) => !one.setting));
-  const impostazioni = $derived((device.capabilities as Capability[]).filter((one) => one.setting));
+  // una capacità per codice: quello che l'agente ripete si disegna una volta (lib/unici.ts)
+  const capacita = $derived(unici(device.capabilities as Capability[], (one) => one.code));
+  const principali = $derived(capacita.filter((one) => !one.setting));
+  const impostazioni = $derived(capacita.filter((one) => one.setting));
   let aperte = $state(false);
   const how = $derived(stato.state);
 
@@ -73,7 +76,7 @@
    */
   function preview(code: string, value: number): void {
     if (!(code in partenza)) partenza[code] = { value: device.state[code] };
-    device.state = { ...device.state, [code]: value };
+    devices.anteprima(device, code, value);
   }
 
   /** Lasciato il cursore parte il comando, e il trascinamento è finito. */
@@ -224,7 +227,7 @@
         <div class="line" class:is-busy={devices.isBusy(device.id, capability.code)}>
           <span class="line-name">{capability.label}</span>
           <span class="choices">
-            {#each capability.values as value (value)}
+            {#each unici(capability.values, (one) => one) as value (value)}
               <Chip
                 label={capability.labels?.[value] ?? value}
                 look={device.state[capability.code] === value ? 'sel' : 'off'}

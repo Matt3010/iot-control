@@ -53,6 +53,11 @@ export interface SureRequest {
   onNo?: () => void;
   /** Rosso solo quando porta via qualcosa. */
   tone?: 'danger' | 'plain';
+  /**
+   * Il fuoco sul «no» appena si apre. Serve a chi usa la tastiera, che
+   * altrimenti la domanda la vede e non la raggiunge.
+   */
+  fuoco?: boolean;
 }
 
 /**
@@ -158,6 +163,13 @@ const ricordo = readJSON<Ricordo>(RICORDO, { tab: 'categories' });
 class Ui {
   #tab = $state<ManageTab>(ricordo.tab);
   draft = $state<Draft | null>(null);
+  /**
+   * Com'era il luogo quando la scheda si è aperta, per sapere se da allora
+   * qualcosa è cambiato. Di solito è la bozza stessa; riaperta dopo un
+   * salvataggio andato male è quella di prima, perché quello che c'è
+   * scritto non è ancora salvato da nessuna parte.
+   */
+  draftOrigine = $state<Draft | null>(null);
 
   /** La linguetta si legge come un campo, ma passando di qui si ricorda. */
   get manageTab(): ManageTab {
@@ -234,6 +246,119 @@ class Ui {
     this.#gusci.set(request, guscio);
   }
 
+  /**
+   * Chi dentro a ogni finestra sa dire se c'è qualcosa di scritto e non
+   * salvato (`modifiche()` in `fondo.svelte.ts`). Basta un sì.
+   */
+  #modifiche = new WeakMap<ModalRequest, Set<() => boolean>>();
+
+  /**
+   * Le finestre di cui si è già detto «butta»: chi ha risposto non deve
+   * sentirsi rifare la stessa domanda dal passo dopo — la pagina che cambia,
+   * la finestra che se ne va — per le stesse modifiche.
+   */
+  #lasciate = new WeakSet<ModalRequest>();
+
+  /** Lo dice `Modal.svelte` per conto di chi ci sta dentro. Torna come smettere. */
+  segnaModifiche(request: ModalRequest, quando: () => boolean): () => void {
+    const tutte = this.#modifiche.get(request) ?? new Set();
+    tutte.add(quando);
+    this.#modifiche.set(request, tutte);
+    return () => tutte.delete(quando);
+  }
+
+  /** Se dentro a questa finestra c'è qualcosa di scritto e non salvato. */
+  #sporca(request: ModalRequest): boolean {
+    if (this.#lasciate.has(request)) return false;
+    for (const quando of this.#modifiche.get(request) ?? []) {
+      try {
+        if (quando()) return true;
+      } catch {
+        /* un componente a metà dello smontarsi non ha più niente da dire */
+      }
+    }
+    return false;
+  }
+
+  /** Se fra tutte quelle aperte ce n'è una con del lavoro in sospeso. */
+  get conModifiche(): boolean {
+    return this.modals.some((one) => this.#sporca(one));
+  }
+
+  /**
+   * Prima di buttare quello che si stava scrivendo, si chiede.
+   *
+   * Torna `false` quando non c'è niente da chiedere, e chi chiama va avanti
+   * da sé. Se no apre la domanda accanto alla crocetta della finestra
+   * davanti e torna `true`: `poi` parte solo con un «Butta», e le finestre
+   * di cui si è risposto non la rifanno.
+   */
+  chiediPrima(quali: ModalRequest[], poi: () => void): boolean {
+    const sporche = quali.filter((one) => this.#sporca(one));
+    if (!sporche.length) return false;
+
+    const davanti = this.modal ? this.#gusci.get(this.modal) : undefined;
+    const anchor = davanti?.querySelector<HTMLElement>('[data-chiudi]') ?? davanti;
+    if (!anchor) return false;
+
+    // si torna a scrivere dove si era
+    const era = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    this.#fuocoPrima = era;
+    this.askSure(anchor, {
+      title: 'Buttare le modifiche?',
+      detail: 'Quello che hai scritto qui non è ancora salvato.',
+      verb: 'Butta',
+      no: 'Continua a scrivere',
+      fuoco: true,
+      onYes: () => {
+        for (const one of sporche) this.#lasciate.add(one);
+        poi();
+      },
+      onNo: () => era?.focus(),
+    });
+    this.#domanda = this.sure;
+    return true;
+  }
+
+  /**
+   * Chiude la domanda senza rispondere, che è quello che fa Esc. Quella
+   * sulle modifiche rende il fuoco al campo da cui era partita: si era lì a
+   * scrivere, e lì si torna.
+   */
+  lasciaDomanda(): void {
+    const torna = this.inDubbio ? this.#fuocoPrima : null;
+    this.sure = null;
+    torna?.focus();
+  }
+
+  /** La domanda su cosa buttare, finché è aperta, e dove era il fuoco prima. */
+  #domanda: SureRequest | null = null;
+  #fuocoPrima: HTMLElement | null = null;
+
+  /**
+   * Se in questo momento si sta chiedendo se buttare le modifiche.
+   *
+   * Un campo che consegna quello che hai scritto quando lo lasci
+   * (`TextField` con `onchange`) lo lascia anche per rispondere alla
+   * domanda: consegnarlo allora salverebbe proprio quello che stai per
+   * buttare. Finché la domanda è aperta aspetta.
+   */
+  get inDubbio(): boolean {
+    return !!this.sure && this.sure === this.#domanda;
+  }
+
+  /**
+   * Chiude chiedendo, se c'è da chiedere: è la strada di Esc, della crocetta
+   * e del dito che spinge via. I tasti in fondo chiudono con `closeModal`,
+   * perché lì chi preme ha già detto cosa vuole — salvare, o annullare.
+   */
+  lascia(which: ModalRequest | undefined = this.modal ?? undefined): void {
+    const at = which ? this.modals.indexOf(which) : -1;
+    if (at < 0) return;
+    if (this.chiediPrima(this.modals.slice(at), () => this.closeModal(which))) return;
+    this.closeModal(which);
+  }
+
   /** Il guscio della finestra davanti, per chi deve cercarci dentro. */
   get guscioDavanti(): HTMLElement | undefined {
     return this.modal ? this.#gusci.get(this.modal) : undefined;
@@ -255,7 +380,10 @@ class Ui {
    * cosa stai aprendo, mentre i tasti in fondo li detta la scheda stessa,
    * perché dipendono da com'è messa lei.
    */
-  openPlace(draft: Draft): void {
+  openPlace(draft: Draft, origine: Draft = draft): void {
+    // la scheda di prima se ne va: se aveva del lavoro in sospeso, si chiede
+    if (this.chiediPrima(this.modals, () => this.openPlace(draft, origine))) return;
+
     /*
      * Una copia, sempre. Dall'elenco del telefono e dalla ricerca arrivava il
      * luogo vero dell'archivio, e la scheda ci scriveva sopra mentre digitavi:
@@ -263,6 +391,7 @@ class Ui {
      * rimettere se il server diceva di no era già quello modificato.
      */
     this.draft = $state.snapshot(draft) as Draft;
+    this.draftOrigine = $state.snapshot(origine) as Draft;
     this.picking = false;
     if (!this.placeView) return;
 
@@ -352,6 +481,8 @@ class Ui {
   }
 
   setPicking(on: boolean): void {
+    // scegliere il punto di un luogo nuovo chiude la scheda aperta: prima si chiede
+    if (on && this.#place && this.chiediPrima([this.#place], () => this.setPicking(true))) return;
     this.picking = on;
     if (on) this.closePlace();
   }
@@ -414,7 +545,12 @@ class Ui {
       this.modals = [...this.modals.filter((one) => one !== request), request];
       return;
     }
-    const prima = this.modals.filter((one) => one !== request).reverse();
+    // prende il posto di quelle aperte: se una aveva del lavoro in sospeso, si chiede
+    const via = this.modals.filter((one) => one !== request);
+    // ripresa dopo il «Butta», parte dal tasto della domanda: senza dirlo si
+    // appoggerebbe sopra a quella che doveva sostituire
+    if (this.chiediPrima(via, () => this.openModal(Object.assign(request, { sopra: false })))) return;
+    const prima = via.reverse();
     this.modals = [request];
     for (const chiusa of prima) chiusa.onclose?.();
   }
@@ -504,12 +640,12 @@ class Ui {
     // prima l'ultimo aperto sopra a tutto, chiunque sia stato ad aprirlo
     const ultimo = this.#sopra.pop();
     if (ultimo) return ultimo(), true;
-    if (this.sure) return (this.sure = null), true;
+    if (this.sure) return this.lasciaDomanda(), true;
     if (this.mark) return (this.mark = null), true;
     if (this.color) return (this.color = null), true;
     if (this.pick) return (this.pick = null), true;
     if (this.paletteOpen) return (this.paletteOpen = false), true;
-    if (this.modal) return this.closeModal(), true;
+    if (this.modal) return this.lascia(), true;
     if (this.picking) return (this.picking = false), true;
     return false;
   }
@@ -556,6 +692,17 @@ function segna(event: Event): void {
 if (typeof window !== 'undefined') {
   window.addEventListener('pointerdown', segna, true);
   window.addEventListener('keydown', segna, true);
+
+  /*
+   * Chiudere la scheda del browser, ricaricare, andare su un altro sito: lì
+   * la domanda non si può fare noi, la fa il browser con le sue parole. Si
+   * chiede solo se c'è davvero qualcosa di scritto e non salvato.
+   */
+  window.addEventListener('beforeunload', (event) => {
+    if (!ui.conModifiche) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
 }
 
 /** Un elemento e quelli che lo contengono, dal più vicino al più lontano. */

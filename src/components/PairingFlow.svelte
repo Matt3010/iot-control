@@ -4,6 +4,7 @@
   import { toast } from '../lib/toast.svelte';
   import { nelRegistro, type Provider } from '../lib/providers';
   import { tasti } from '../lib/fondo.svelte';
+  import { unici } from '../lib/unici';
   import type { ModalAction } from '../lib/ui.svelte';
   import type { PairingStep } from '../lib/types';
   import Button from './Button.svelte';
@@ -369,7 +370,7 @@
       <img class="shot" src={`data:image/jpeg;base64,${step.preview}`} alt="Anteprima della telecamera" />
     {/if}
 
-    {#each step.fields as field (field.name)}
+    {#each unici(step.fields, (one) => one.name) as field (field.name)}
       {#if field.yesno}
         <!-- Un sì/no non è un campo da riempire: è una levetta, e la levetta
              si porta già il suo nome. Fuori dalla <label> degli altri: una
@@ -392,7 +393,7 @@
               }
             >
               <option value="">—</option>
-              {#each field.options as option (option.value)}
+              {#each unici(field.options, (one) => one.value) as option (option.value)}
                 <option value={option.value}>{option.label}</option>
               {/each}
             </select>

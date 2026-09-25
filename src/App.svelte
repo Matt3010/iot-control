@@ -33,6 +33,7 @@
   import SurePopover from './components/SurePopover.svelte';
   import GuestBar from './components/GuestBar.svelte';
   import Toast from './components/Toast.svelte';
+  import SenzaRete from './components/SenzaRete.svelte';
 
   /**
    * Dove siamo adesso. Cambia mentre si guarda: fra le pagine di casa si
@@ -91,6 +92,9 @@
    * agenti con la scheda del luogo ancora appesa in un angolo, con dentro
    * un «Salva» che parlava di una schermata che non era piu' li'.
    */
+  // e se in una finestra c'è del lavoro non salvato, prima di cambiare si chiede
+  nav.custodisci((vai) => ui.chiediPrima(ui.modals, vai));
+
   let eravamo = nav.path;
   $effect(() => {
     const siamo = nav.path;
@@ -212,3 +216,5 @@
 {#if ui.pick}<PickPopover />{/if}
 
 <Toast />
+<!-- la rete che manca si dice su ogni pagina, anche da fuori -->
+<SenzaRete />

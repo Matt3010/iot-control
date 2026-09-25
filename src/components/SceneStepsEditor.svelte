@@ -25,6 +25,23 @@
   // per le righe nuove solo quelli che ci sono: uno sparito resta nelle righe che aveva
   const all = $derived(devices.presenti);
 
+  /**
+   * Un valore tondo di un cursore, a una certa quota fra il minimo e il
+   * massimo: sul passo che parte dal minimo e mai fuori dai due estremi.
+   *
+   * Arrotondato al passo contato da zero, una lampada da 2202 a 6535 K
+   * riceveva «Bianco 2200K», sotto il suo minimo, e il server rifiutava la
+   * scena. Contato dal minimo, i gradini sono quelli che il cursore stesso
+   * sa fare.
+   */
+  function sulPasso(capability: Capability & { kind: 'range' }, quota: number): number {
+    const passo = capability.step > 0 ? capability.step : 1;
+    const gradini = Math.max(0, Math.floor((capability.max - capability.min) / passo + 1e-9));
+    const quanti = Math.min(gradini, Math.max(0, Math.round(((capability.max - capability.min) * quota) / 100 / passo)));
+    // senza la coda di decimali che lascia un passo come 0,1
+    return Number((capability.min + quanti * passo).toFixed(6));
+  }
+
   /** Le azioni che un dispositivo sa fare, come righe gia' pronte da aggiungere. */
   function choices(device: Device): { key: string; what: string; step: SceneStep }[] {
     /*
@@ -60,10 +77,7 @@
       } else if (capability.kind === 'range') {
         // i valori tondi, perche' una scena non si scrive al pixel
         for (const quota of [0, 25, 50, 75, 100]) {
-          // arrotondato al passo del cursore: 3300 K e non 3275 K
-          const passo = capability.step > 0 ? capability.step : 1;
-          const value = Math.round((capability.min + ((capability.max - capability.min) * quota) / 100) / passo) * passo;
-          push(riga(capability, value));
+          push(riga(capability, sulPasso(capability, quota)));
         }
       }
     }
@@ -223,7 +237,8 @@
               onchange={(testo: string) => setNotify(at, testo)}
             />
           {:else}
-            <span class="line">{says.who}{#if says.what} · <b>{says.what}</b>{/if}</span>
+            <!-- tagliata coi puntini se è lunga, e intera passandoci sopra -->
+            <span class="line" title={says.what ? `${says.who} · ${says.what}` : says.who}>{says.who}{#if says.what} · <b>{says.what}</b>{/if}</span>
           {/if}
           <!-- su e giù: l'ordine di una sequenza e' la sequenza, e senza
                questi per spostare una riga bisognava rifare le altre -->

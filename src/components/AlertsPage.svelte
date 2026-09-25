@@ -81,8 +81,8 @@
   );
 
   /*
-   * Il luogo viene dopo la frase, non prima. Su un telefono la tabella scorre
-   * di lato, e quello che si vede senza scorrere sono le prime due colonne:
+   * Il luogo viene dopo la frase, non prima. Su un telefono le celle vanno
+   * una sotto l'altra, e quello che si legge per primo sono le prime due:
    * il nome e cosa ti arriverà. Dove sta è la domanda dopo.
    */
   const COLONNE: Column[] = [

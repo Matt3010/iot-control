@@ -19,6 +19,24 @@
   const markers = new Map<string, Marker>();
   let draftMarker: Marker | null = null;
 
+  /*
+   * Se l'ultima cosa fatta è stata un tasto e non un tocco: un fumetto
+   * aperto da tastiera si prende il fuoco, uno aperto col puntatore no.
+   */
+  let daTastiera = false;
+  $effect(() => {
+    const tasto = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') daTastiera = true;
+    };
+    const tocco = () => (daTastiera = false);
+    window.addEventListener('keydown', tasto, true);
+    window.addEventListener('pointerdown', tocco, true);
+    return () => {
+      window.removeEventListener('keydown', tasto, true);
+      window.removeEventListener('pointerdown', tocco, true);
+    };
+  });
+
   /** Il pin di un posto: colore ed emoji della sua categoria. */
   const lookOf = (
     category: Category | undefined,
@@ -146,16 +164,56 @@
         groupIds: store.activeGroup ? [store.activeGroup] : [],
       });
     });
+    /*
+     * Il fumetto con la tastiera sola.
+     *
+     * Invio sul pin lo apriva, ma il fuoco restava sul pin, e il primo Tab
+     * andava al pin dopo invece che dentro al fumetto: «Modifica» non si
+     * raggiungeva. Aperto da tastiera — sul pin o su una riga dell'elenco —
+     * il fuoco entra sul primo tasto; Esc lo chiude e torna da dove si era
+     * partiti. Esc passa da `ui.sopra`, così chiude il fumetto e non la
+     * finestra che sta sotto.
+     */
+    let lascia: (() => void) | null = null;
     map.on('popupopen', (event: L.PopupEvent) => {
       mapBridge.activeKey = (event.popup.options as { key?: string }).key ?? null;
+      const partenza = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      lascia?.();
+      lascia = ui.sopra(() => {
+        map.closePopup();
+        partenza?.focus();
+      });
+      if (daTastiera) event.popup.getElement()?.querySelector<HTMLElement>('.pop-actions button, .pop-actions a')?.focus();
     });
     // e che non finisca sotto al pannello, che la mappa non sa di avere addosso
     const clear = clearOf(map, () => document.getElementById('panel'));
     map.on('popupclose', () => {
       mapBridge.activeKey = null;
+      lascia?.();
+      lascia = null;
+    });
+
+    /*
+     * Un pin è un tasto (`keyboard` di Leaflet), e un tasto senza nome si
+     * legge «pulsante» e basta. Il nome gli si dà quando entra sulla mappa,
+     * perché un pin dentro a un grappolo non ha ancora un elemento: un
+     * luogo si chiama col suo nome, un grappolo dice quanti ne tiene.
+     */
+    map.on('layeradd', (event: L.LayerEvent) => {
+      const layer = event.layer as L.Marker & { getChildCount?: () => number };
+      const el = layer instanceof L.Marker ? layer.getElement() : undefined;
+      if (!el) return;
+      if (typeof layer.getChildCount === 'function') {
+        el.setAttribute('aria-label', `${layer.getChildCount()} luoghi vicini, Invio per avvicinarsi`);
+        return;
+      }
+      const key = [...markers].find(([, one]) => one === layer)?.[0];
+      const place = key ? store.places.find((one) => one.key === key) : undefined;
+      if (place) el.setAttribute('aria-label', place.name);
     });
 
     return () => {
+      lascia?.();
       clear();
       mapBridge.detach(map);
       map.remove();
@@ -230,6 +288,8 @@
         }
         // il grappolo legge il colore da qui: se cambia categoria deve saperlo
         (marker.options as { colour?: string }).colour = aspetto.colour;
+        // e chi legge lo schermo il nome, anche quando cambia
+        marker.getElement()?.setAttribute('aria-label', place.name);
       }
       // Il popup si lega una volta sola: il contenuto lo fa la funzione, ogni
       // volta che si apre. Rilegarlo a ogni giro butterebbe via quello aperto.

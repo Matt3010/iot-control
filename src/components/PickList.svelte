@@ -1,6 +1,7 @@
 <script lang="ts">
   import { alCentro } from '../lib/centra';
   import type { Choice } from '../lib/table';
+  import { unici } from '../lib/unici';
   import HealthDot from './HealthDot.svelte';
 
   /**
@@ -29,7 +30,7 @@
 {#if title}<p class="what">{title}</p>{/if}
 
 <div class="list" use:reveal>
-  {#each options as option (option.id)}
+  {#each unici(options, (one) => one.id) as option (option.id)}
     <button
       type="button"
       class="one"

@@ -23,7 +23,11 @@ class Toast {
     this.nonce += 1;
     this.open = true;
     clearTimeout(this.#timer);
-    this.#timer = setTimeout(() => this.hide(), action ? ACTION_MS : PLAIN_MS);
+    // un messaggio lungo resta quanto serve a leggerlo: tre frasi in due
+    // secondi e mezzo se ne andavano a metà della seconda. Con un tasto no,
+    // perché lì la durata è quella dell'annullare (ACTION_MS)
+    const leggere = Math.max(PLAIN_MS, message.length * 55);
+    this.#timer = setTimeout(() => this.hide(), action ? ACTION_MS : leggere);
   }
 
   hide(): void {

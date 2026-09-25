@@ -97,5 +97,7 @@
   /* con una finestra aperta in fondo ci sono i suoi tasti, e un messaggio lì
      sopra copre proprio quello che si stava per premere: va in cima */
   :global(body.sheet-open) #toast, :global(body.sheet-open:has([data-banner])) #toast { top: calc(12px + env(safe-area-inset-top)); bottom: auto; }
+  /* e se in cima c'è la riga della rete che manca, le sta sotto */
+  :global(body.sheet-open:has([data-rete])) #toast { top: calc(52px + env(safe-area-inset-top)); }
 }
 </style>
