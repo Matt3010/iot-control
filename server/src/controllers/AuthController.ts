@@ -1,4 +1,7 @@
 import type { CookieOptions, NextFunction, Request, Response } from 'express';
+import { chiudiToken } from '../auth/sessioni.js';
+import { tokenDi } from '../auth/token.js';
+import { sessionManager } from '../managers/SessionManager.js';
 import { scopeOf, whoIs } from '../auth/owner.js';
 import { config } from '../config.js';
 import { badRequest } from '../errors/HttpError.js';
@@ -22,6 +25,12 @@ const cookieOptions = (req: Request): CookieOptions => ({
   maxAge: config.auth.ttlDays * 24 * 60 * 60 * 1000,
 });
 
+/**
+ * Da dove arriva la richiesta, per contare i tentativi. È quello che dice il
+ * proxy davanti, se c'è (`trust proxy` in `app.ts`).
+ */
+const indirizzoDi = (req: Request): string => req.ip ?? req.socket.remoteAddress ?? 'sconosciuto';
+
 export class AuthController {
   state = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -33,7 +42,7 @@ export class AuthController {
 
   register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      this.#open(req, res, await authService.register(dtoOf<RegisterDto>(req)), 201);
+      this.#open(req, res, await authService.register(dtoOf<RegisterDto>(req), indirizzoDi(req)), 201);
     } catch (error) {
       next(error);
     }
@@ -41,18 +50,48 @@ export class AuthController {
 
   login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      this.#open(req, res, await authService.login(dtoOf<CredentialsDto>(req)), 200);
+      this.#open(req, res, await authService.login(dtoOf<CredentialsDto>(req), indirizzoDi(req)), 200);
     } catch (error) {
       next(error);
     }
   };
 
-  logout = (req: Request, res: Response): void => {
+  /**
+   * Esce da questo browser. Il cookie se ne va, e il token si segna come
+   * uscito, così anche una copia presa prima smette di valere e il filo aperto
+   * con lui si chiude. Le altre sessioni restano; per chiuderle tutte c'è
+   * «esci da tutte le sessioni».
+   */
+  logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const token = tokenDi(req);
+      if (token) {
+        await sessionManager.revoke(token.jti, new Date(token.exp * 1000));
+        chiudiToken(token.sub, token.jti);
+      }
+      this.#close(req, res);
+      res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /** Esce da tutte le sessioni, in ogni browser: i token di prima non valgono più, compreso questo. */
+  logoutAll = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await authService.closeSessions(whoIs(req));
+      this.#close(req, res);
+      res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  #close(req: Request, res: Response): void {
     res.clearCookie(config.auth.cookie, { ...cookieOptions(req), maxAge: undefined });
     // chi esce esce da tutto: anche dall'indice di un altro
     res.clearCookie(config.auth.actCookie, { ...cookieOptions(req), maxAge: undefined });
-    res.status(204).end();
-  };
+  }
 
   /** Nome e fuso: torna com'è l'account dopo, come lo chiede `me`. */
   update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -68,7 +107,9 @@ export class AuthController {
 
   password = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await userManager.changePassword(whoIs(req).id, dtoOf<PasswordDto>(req));
+      // le altre sessioni si chiudono; questa continua con il suo token nuovo
+      const session = await authService.changePassword(whoIs(req), dtoOf<PasswordDto>(req));
+      res.cookie(config.auth.cookie, session.token, cookieOptions(req));
       res.status(204).end();
     } catch (error) {
       next(error);

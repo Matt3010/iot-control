@@ -100,13 +100,13 @@ export class PlaceRepository {
     return rows.length > 0;
   }
 
-  /** Una categoria si porta via i suoi posti, ovunque siano. */
-  async deleteByCategory(categoryId: string): Promise<number> {
-    const rows = await this.tx.db
-      .delete(places)
-      .where(eq(places.categoryId, categoryId))
-      .returning({ id: places.id });
-    return rows.length;
+  /**
+   * I luoghi di una categoria, ovunque siano: se ne andranno con lei per il
+   * vincolo dello schema, e chi deve dire quanti erano li conta prima.
+   */
+  async idsOfCategory(categoryId: string): Promise<string[]> {
+    const rows = await this.tx.db.select({ id: places.id }).from(places).where(eq(places.categoryId, categoryId));
+    return rows.map((row) => row.id);
   }
 
   async deleteByMap(mapId: string): Promise<number> {

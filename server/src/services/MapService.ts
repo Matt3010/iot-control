@@ -67,6 +67,18 @@ export class MapService {
     return view;
   }
 
+  /**
+   * Luoghi che se ne sono andati erano nell'elenco di qualche ospite: le
+   * schede del padrone rileggono quelle mappe, e quelle degli ospiti il loro
+   * raggio, che adesso ha un luogo in meno.
+   */
+  async ristretti(ownerId: string, chi: { mapId: string; userId: string }[]): Promise<void> {
+    if (!chi.length) return;
+    const quali = new Set(chi.map((one) => one.mapId));
+    for (const map of await mapManager.list(casaDi(ownerId))) if (quali.has(map.id)) this.#detto(ownerId, map);
+    for (const userId of new Set(chi.map((one) => one.userId))) hub.changed(userId, { kind: 'account' });
+  }
+
   look(code: string): Promise<InviteLook> {
     return mapManager.look(code);
   }

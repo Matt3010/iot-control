@@ -13,6 +13,15 @@ export const config = {
   /** I modelli che l'installer di un agente scarica da qui. */
   deployDir: path.join(projectRoot, 'connector', 'deploy'),
   bodyLimit: '128kb',
+  /**
+   * Di quali proxy davanti credere quando dicono da dove arriva una
+   * richiesta e se era in https. Di solito quelli sulla stessa macchina o
+   * nella stessa rete privata (un tunnel, un nginx nello stesso compose). Di
+   * tutti no: chiunque può scrivere `X-Forwarded-For`, e cambiando quella
+   * riga a ogni tentativo passerebbe sotto al limite dei tentativi per
+   * indirizzo. Si cambia con TRUST_PROXY, nella forma che capisce Express.
+   */
+  trustProxy: process.env.TRUST_PROXY ?? 'loopback, linklocal, uniquelocal',
   db: {
     /**
      * Dove sta l'archivio. Senza, si prova quello che il compose tira su

@@ -1,4 +1,5 @@
 import { hub, type Cambio } from '../iot/hub.js';
+import { contaPartenza, SOGLIA } from '../managers/fusibile.js';
 import { guardati } from '../managers/guardati.js';
 import { sceneManager } from '../managers/SceneManager.js';
 import { casaDi } from '../managers/raggio.js';
@@ -31,36 +32,13 @@ import { DEFAULT_TZ, type Scene } from '../types.js';
  * Fermata vuol dire fermata: resta scritto sulla scena (`blownAt`) e non si
  * riarma da solo, se no un giro vero ripartirebbe dopo un minuto e
  * rimanderebbe l'avviso ogni minuto per sempre. La riaccende chi la cambia
- * o la fa partire a mano.
+ * o la fa partire a mano. Il conto sta in `managers/fusibile.ts`.
  */
-export const SOGLIA = 10;
-const FINESTRA_MS = 60_000;
-
-/** Quando è partita da sola, nell'ultimo minuto, ogni scena. */
-const partenze = new Map<string, number[]>();
-
-/**
- * Via quello che è più vecchio della finestra, e le scene che non partono
- * da un minuto: una scena cancellata non lascia niente qui dentro.
- */
-function ripulisci(adesso: number): void {
-  for (const [id, quando] of partenze) {
-    const recenti = quando.filter((one) => adesso - one < FINESTRA_MS);
-    if (recenti.length) partenze.set(id, recenti);
-    else partenze.delete(id);
-  }
-}
+export { SOGLIA } from '../managers/fusibile.js';
 
 /** Se può ripartire. Se no fa saltare il fusibile, e avvisa chi lo fa saltare davvero. */
 async function fusibile(scene: Scene, adesso = Date.now()): Promise<boolean> {
-  ripulisci(adesso);
-  const recenti = partenze.get(scene.id) ?? [];
-  if (recenti.length < SOGLIA) {
-    partenze.set(scene.id, [...recenti, adesso]);
-    return true;
-  }
-
-  partenze.delete(scene.id);
+  if (contaPartenza(scene.id, adesso)) return true;
   const fermata = await sceneManager.blow(scene.id);
   if (fermata) console.warn(`la scena «${scene.name}» è partita da sola ${SOGLIA} volte in un minuto, fermata`);
   return false;

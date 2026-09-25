@@ -111,12 +111,24 @@ export class AlertRepository {
     return rows.length;
   }
 
-  /** Quelle già scattate su quel dispositivo: sono le sole che possono dover rientrare. */
-  async findFiredOf(deviceId: string): Promise<Alert[]> {
+  /**
+   * Segnate come già scattate, senza mandare niente: quello che chiedono è
+   * vero, ma non si è visto succedere. Solo quelle ancora da scattare, con
+   * la condizione nella scrittura come per `fire`.
+   */
+  async markFired(ids: string[]): Promise<number> {
+    if (!ids.length) return 0;
     const rows = await this.tx.db
-      .select()
-      .from(alerts)
-      .where(and(eq(alerts.deviceId, deviceId), isNotNull(alerts.firedAt)));
+      .update(alerts)
+      .set({ firedAt: new Date() })
+      .where(and(inArray(alerts.id, ids), isNull(alerts.firedAt)))
+      .returning({ id: alerts.id });
+    return rows.length;
+  }
+
+  /** Tutte quelle scritte su quel dispositivo. */
+  async findAllOfDevice(deviceId: string): Promise<Alert[]> {
+    const rows = await this.tx.db.select().from(alerts).where(eq(alerts.deviceId, deviceId));
     return rows.map(toAlert);
   }
 
@@ -164,6 +176,18 @@ export class AlertRepository {
       .where(inArray(alerts.deviceId, ids))
       .returning({ id: alerts.id });
     return rows.length;
+  }
+
+  /**
+   * Quelle su questi dispositivi che `via` sceglie, tolte. Torna quelle
+   * tolte, con le loro parole, per dire al padrone quali erano.
+   */
+  async pruneWhere(deviceIds: string[], via: (alert: Alert) => boolean): Promise<Alert[]> {
+    if (!deviceIds.length) return [];
+    const rows = await this.tx.db.select().from(alerts).where(inArray(alerts.deviceId, deviceIds));
+    const tolte = rows.map(toAlert).filter(via);
+    if (tolte.length) await this.tx.db.delete(alerts).where(inArray(alerts.id, tolte.map((one) => one.id)));
+    return tolte;
   }
 
   /**

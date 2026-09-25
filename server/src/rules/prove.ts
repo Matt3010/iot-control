@@ -65,6 +65,63 @@ export function localNow(tz: string, at = new Date()): { minute: string; day: nu
   return { minute: `${date} ${clock}`, day: GIORNI.indexOf(bit('weekday')), clock, date };
 }
 
+/**
+ * Il minuto in cui parte, quel giorno e in quel fuso, un orario scritto come
+ * «02:30».
+ *
+ * Di solito è lui. Ma la notte in cui torna l'ora legale le lancette
+ * saltano dalle 02:00 alle 03:00, e le 02:30 quel giorno non esistono: una
+ * scena scritta per quell'ora non partiva, e se era «una volta sola» il
+ * giorno dopo perdeva l'orario. Un orario che quel giorno non c'è parte al
+ * primo minuto che c'è dopo. Quello che c'è due volte, la notte in cui
+ * l'ora legale finisce, parte una volta sola: lo dice il turno del minuto
+ * (`SceneRepository.claim`), che è lo stesso le due volte.
+ */
+export function oraVera(tz: string, date: string, at: string): string {
+  const chiave = `${tz}|${date}|${at}`;
+  const nota = vere.get(chiave);
+  if (nota) return nota;
+
+  let vera = at;
+  if (!esiste(tz, date, at)) {
+    const [h, m] = at.split(':').map(Number) as [number, number];
+    for (let dopo = h * 60 + m + 1; dopo < 24 * 60; dopo += 1) {
+      const clock = `${String(Math.floor(dopo / 60)).padStart(2, '0')}:${String(dopo % 60).padStart(2, '0')}`;
+      if (esiste(tz, date, clock)) {
+        vera = clock;
+        break;
+      }
+    }
+  }
+  if (vere.size > 5_000) vere.clear();
+  vere.set(chiave, vera);
+  return vera;
+}
+
+/** Gli orari già calcolati: l'orologio chiede lo stesso ogni venti secondi. */
+const vere = new Map<string, string>();
+
+/**
+ * Se quell'ora esiste quel giorno in quel fuso. Si prova con lo scarto dal
+ * tempo universale di mezza giornata prima e mezza giornata dopo: se nessuno
+ * dei due porta le lancette lì, quell'ora è nel salto.
+ */
+function esiste(tz: string, date: string, clock: string): boolean {
+  const [y, mo, d] = date.split('-').map(Number) as [number, number, number];
+  const [h, mi] = clock.split(':').map(Number) as [number, number];
+  const ingenuo = Date.UTC(y, mo - 1, d, h, mi);
+  const scarto = (t: number): number => {
+    const { date: giorno, clock: ora } = localNow(tz, new Date(t));
+    const [yy, mm, dd] = giorno.split('-').map(Number) as [number, number, number];
+    const [hh, mn] = ora.split(':').map(Number) as [number, number];
+    return Date.UTC(yy, mm - 1, dd, hh, mn) - Math.floor(t / 60_000) * 60_000;
+  };
+  return [scarto(ingenuo - 12 * 3_600_000), scarto(ingenuo + 12 * 3_600_000)].some((s) => {
+    const qui = localNow(tz, new Date(ingenuo - s));
+    return qui.date === date && qui.clock === clock;
+  });
+}
+
 /* ------------------------------------------------------------ le condizioni */
 
 /** Lo stato di un dispositivo, come lo sa chi chiede. */

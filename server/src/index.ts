@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { attachAgentLink } from './iot/link.js';
 import { guardati } from './managers/guardati.js';
 import { watchLog } from './managers/LogManager.js';
+import { watchRevoked } from './managers/SessionManager.js';
 import { closeDb, migrateUp } from './persistence/db.js';
 import { watchRuns } from './services/RunWatch.js';
 import { watchClock } from './services/SceneClock.js';
@@ -39,6 +40,8 @@ await guardati.prepara();
 watchRuns();
 // e qualcuno porta fuori le righe di registro scadute
 watchLog();
+// e i token con cui si è usciti, quando sarebbero scaduti comunque
+watchRevoked();
 
 server.listen(config.port, () => {
   console.log(`place-index in ascolto su http://localhost:${config.port} (archivio ${where(config.db.url)})`);

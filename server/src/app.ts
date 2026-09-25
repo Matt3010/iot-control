@@ -5,6 +5,7 @@ import path from 'node:path';
 import { configurePassport } from './auth/strategy.js';
 import { config } from './config.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { intestazioni } from './middleware/intestazioni.js';
 import { apiRouter } from './routes/index.js';
 
 export function createApp(): express.Express {
@@ -12,7 +13,10 @@ export function createApp(): express.Express {
 
   configurePassport();
 
-  app.set('trust proxy', true);
+  app.set('trust proxy', config.trustProxy);
+  // chi risponde non si presenta: dire che è Express aiuta solo chi cerca i suoi difetti
+  app.disable('x-powered-by');
+  app.use(intestazioni);
   app.use(express.json({ limit: config.bodyLimit }));
   app.use(cookieParser());
   app.use(passport.initialize());

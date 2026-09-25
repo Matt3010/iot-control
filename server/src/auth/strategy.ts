@@ -2,6 +2,7 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import passport from 'passport';
 import { ExtractJwt, Strategy as JwtStrategy, type StrategyOptionsWithoutRequest } from 'passport-jwt';
 import { config } from '../config.js';
+import { sessionManager } from '../managers/SessionManager.js';
 import { userManager } from '../managers/UserManager.js';
 import { resolveSecret } from './secret.js';
 
@@ -15,11 +16,19 @@ export function configurePassport(): void {
   };
 
   passport.use(
-    new JwtStrategy(options, (payload: { sub?: string }, done) => {
-      if (!payload.sub) return done(null, false);
-      userManager
-        .findById(payload.sub)
-        .then((user) => done(null, user ?? false))
+    /*
+     * Un token vale se l'account c'è e se porta il numero di sessione di
+     * adesso: cambiata la password o chiuse tutte le sessioni, quelli di
+     * prima non entrano più, anche se non sono ancora scaduti. Non entra
+     * nemmeno un token con cui si è usciti da un browser (`SessionManager`).
+     * Un token senza numero o senza id è di prima che esistessero, e non
+     * vale.
+     */
+    new JwtStrategy(options, (payload: { sub?: string; v?: number; jti?: string }, done) => {
+      if (!payload.sub || typeof payload.v !== 'number' || typeof payload.jti !== 'string') return done(null, false);
+      const v = payload.v;
+      Promise.all([userManager.findById(payload.sub), sessionManager.revoked(payload.jti)])
+        .then(([user, uscito]) => done(null, user && !uscito && user.tokenVersion === v ? user : false))
         .catch((error: unknown) => done(error, false));
     }),
   );

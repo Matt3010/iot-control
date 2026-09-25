@@ -16,7 +16,7 @@ export class CategoryController {
 
   create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.status(201).json(await categoryService.create(ownerOf(req), dtoOf<CreateCategoryDto>(req)));
+      res.status(201).json(await categoryService.create(scopeOf(req), dtoOf<CreateCategoryDto>(req)));
     } catch (error) {
       next(error);
     }
@@ -24,7 +24,7 @@ export class CategoryController {
 
   update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.json(await categoryService.update(ownerOf(req), req.params.id as string, dtoOf<UpdateCategoryDto>(req)));
+      res.json(await categoryService.update(scopeOf(req), req.params.id as string, dtoOf<UpdateCategoryDto>(req)));
     } catch (error) {
       next(error);
     }

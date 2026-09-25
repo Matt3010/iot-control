@@ -1,4 +1,4 @@
-import { hashPassword, verifyPassword } from '../auth/password.js';
+import { hashPassword, verifyNobody, verifyPassword } from '../auth/password.js';
 import type { AccountDto, CredentialsDto, PasswordDto, RegisterDto } from '../dto/auth.dto.js';
 import { badRequest } from '../errors/HttpError.js';
 import { store } from '../persistence/db.js';
@@ -64,7 +64,9 @@ export class UserManager {
 
   /**
    * Il primo che arriva prende l'indice. Dopo, altri account si aprono solo
-   * se chi ospita l'app lo consente.
+   * se chi ospita l'app lo consente: chi chiama lo sa già e non arriva fin
+   * qui a iscrizioni chiuse, e qui si ricontrolla nella stessa transazione
+   * che scrive, per chi si iscrive nello stesso istante del primo.
    */
   async register(dto: RegisterDto, opened: boolean): Promise<User> {
     const { salt, hash } = await hashPassword(dto.password);
@@ -101,22 +103,43 @@ export class UserManager {
     });
   }
 
-  /** Password nuova, solo con quella giusta di adesso. */
-  async changePassword(id: string, dto: PasswordDto): Promise<void> {
-    const user = await store.transaction((tx) => new UserRepository(tx).findById(id));
-    if (!user || !(await verifyPassword(dto.current, user.salt, user.hash))) {
-      throw badRequest('la password di adesso non è quella giusta');
-    }
-    const { salt, hash } = await hashPassword(dto.next);
-    await store.transaction((tx) => new UserRepository(tx).update(id, { salt, hash }));
+  /**
+   * Password nuova, solo con quella giusta di adesso, e le sessioni di prima
+   * chiuse: chi cambia la password di solito lo fa perché qualcun altro la
+   * sa. Torna l'account com'è dopo, con il numero di sessione nuovo.
+   *
+   * Una transazione sola, con la riga bloccata dal controllo alla
+   * scrittura: due cambi insieme non si scavalcano, e il secondo deve
+   * conoscere la password scritta dal primo.
+   */
+  changePassword(id: string, dto: PasswordDto): Promise<User> {
+    return store.transaction(async (tx) => {
+      const users = new UserRepository(tx);
+      const user = await users.lockById(id);
+      if (!user || !(await verifyPassword(dto.current, user.salt, user.hash))) {
+        throw badRequest('la password di adesso non è quella giusta');
+      }
+      const { salt, hash } = await hashPassword(dto.next);
+      const dopo = await users.setPassword(id, salt, hash);
+      if (!dopo) throw badRequest('questo account non esiste più');
+      return dopo;
+    });
   }
 
-  /** Stesso messaggio per email sconosciuta e password errata: non si aiuta chi prova. */
-  async authenticate(dto: CredentialsDto): Promise<User> {
+  /** Esce da tutte le sessioni, in ogni browser: i token di prima smettono di valere. */
+  closeSessions(id: string): Promise<User | undefined> {
+    return store.transaction((tx) => new UserRepository(tx).closeSessions(id));
+  }
+
+  /**
+   * Stesso messaggio per email sconosciuta e password errata: non si aiuta chi
+   * prova. E lo stesso tempo, perché anche un'email che non c'è passa per una
+   * derivata (`verifyNobody`).
+   */
+  async authenticate(dto: CredentialsDto): Promise<User | undefined> {
     const user = await store.transaction((tx) => new UserRepository(tx).findByEmail(dto.email));
-    const ok = user ? await verifyPassword(dto.password, user.salt, user.hash) : false;
-    if (!user || !ok) throw badRequest('email o password non corrette');
-    return user;
+    const ok = user ? await verifyPassword(dto.password, user.salt, user.hash) : await verifyNobody(dto.password);
+    return user && ok ? user : undefined;
   }
 }
 

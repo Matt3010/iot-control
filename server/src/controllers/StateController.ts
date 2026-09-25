@@ -1,5 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
+import { tokenDi } from '../auth/token.js';
 import { isGuest, ownerOf, scopeOf, whoIs } from '../auth/owner.js';
+import { ascolta } from '../auth/sessioni.js';
 import { hub } from '../iot/hub.js';
 import { leggiRaggio, type Raggio } from '../managers/raggio.js';
 import { userManager } from '../managers/UserManager.js';
@@ -42,10 +44,14 @@ export class StateController {
     const stop = isGuest(req) ? this.#ospite(req, res, manda) : hub.watch(ownerId, manda);
     const beat = setInterval(() => res.write(': .\n\n'), KEEPALIVE_MS);
     beat.unref?.();
+    // se la sessione di questo token si chiude, si chiude anche il filo (`auth/sessioni.ts`)
+    const me = whoIs(req);
+    const scorda = ascolta(me.id, me.tokenVersion, tokenDi(req)?.jti ?? '', () => res.end());
 
     req.on('close', () => {
       clearInterval(beat);
       stop();
+      scorda();
     });
   };
 

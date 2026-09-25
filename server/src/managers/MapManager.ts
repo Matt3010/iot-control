@@ -74,13 +74,19 @@ export class MapManager {
     }));
   }
 
-  /** Il nome, e basta: chi ci lavora si cambia con gli inviti e con gli editor. */
+  /**
+   * Il nome, e basta: chi ci lavora si cambia con gli inviti e con gli editor.
+   *
+   * Lo cambia solo il padrone. Il nome è di tutta la mappa, e lo leggono
+   * tutti quelli a cui è aperta: da ospite si lavora sui luoghi, e chi ne
+   * può toccare uno solo non rinomina il foglio su cui stanno anche gli
+   * altri.
+   */
   update(scope: Scope, id: string, dto: MapDto): Promise<PlaceMap> {
     return store.transaction(async (tx) => {
-      const maps = new MapRepository(tx);
-      if (!(await maps.within(scope, id))) throw notFound('mappa inesistente');
-      const map = (await maps.update(id, { name: dto.name })) as PlaceMap;
-      return aCasa(scope) ? this.#una(tx, id) : map;
+      await this.#delPadrone(tx, scope, id);
+      await new MapRepository(tx).update(id, { name: dto.name });
+      return this.#una(tx, id);
     });
   }
 
@@ -190,13 +196,20 @@ export class MapManager {
       if (!map) throw notFound('La mappa di questo invito non c’è più.');
       if (map.ownerId === user.id) throw badRequest('Questo link l’hai creato tu, e la mappa è già tua. Mandalo a chi vuoi far entrare.');
 
+      /*
+       * Prima si entra, poi si consuma il link. L'ingresso è la riga
+       * dell'editor, e la scrive uno solo: chi apre insieme due link diversi
+       * della stessa mappa ne vede tornare una sola, e l'altro trova la
+       * persona già dentro e lascia il suo link buono per chi doveva usarlo.
+       * Se il link non vale più, la riga scritta se ne va con la
+       * transazione.
+       */
       const editors = new EditorRepository(tx);
-      if (await editors.has(map.id, user.id)) return { map, ownerId: map.ownerId, nuovo: false };
+      if (!(await editors.add(map.id, user.id))) return { map, ownerId: map.ownerId, nuovo: false };
 
       // il turno sta nella scrittura: se torna vuota, qualcuno è arrivato prima o il link non vale più
       const preso = await invites.claim(hash, user.id);
       if (!preso) throw badRequest(perche(statoDi((await invites.findByHash(hash)) ?? invite)));
-      await editors.add(map.id, user.id);
       return { map, ownerId: map.ownerId, nuovo: true };
     });
   }

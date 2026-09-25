@@ -1,5 +1,5 @@
 import type { Capability, DeviceValue } from '../../../shared/protocol.js';
-import type { Agent, Category, Device, Group, MapEditor, MapInvite, Place, PlaceMap, Scene, SceneConditionGroup, SceneStep, SceneTrigger, Timing } from '../types.js';
+import type { Agent, Category, LogEntry, Device, Group, MapEditor, MapInvite, Place, PlaceMap, Scene, SceneConditionGroup, SceneStep, SceneTrigger, Timing } from '../types.js';
 import type { OwnerState } from '../managers/StateManager.js';
 import { NESSUNA_CONDIZIONE } from '../types.js';
 
@@ -112,6 +112,18 @@ export const toMapView = (map: PlaceMap): MapView => ({
  * arriva a caldo non è mai più di quello che si leggerebbe ricaricando.
  */
 export const mapForGuest = ({ editors: _editors, invites: _invites, ...map }: MapView): MapView => map;
+
+/**
+ * Una riga del registro vista da un ospite: chi ha premuto si legge con il
+ * suo nome utente, che è quello con cui lo vedono tutti, e mai con l'email.
+ * L'email di un altro non è cosa che un ospite debba sapere, come chi altri
+ * lavora su una mappa (`mapForGuest`). Un account che non c'è più non ha un
+ * nome da dire, e la riga resta senza.
+ */
+export const logForGuest = ({ who, ...riga }: LogEntry, nomi: ReadonlyMap<string, string>): LogEntry => {
+  const nome = who ? nomi.get(who) : undefined;
+  return nome ? { ...riga, who: nome } : riga;
+};
 
 export const toGroupView = ({ id, name }: Group): GroupView => ({ id, name });
 

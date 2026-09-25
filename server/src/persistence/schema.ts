@@ -47,6 +47,13 @@ export const users = pgTable('users', {
    * browser non lo dice.
    */
   tz: text('tz'),
+  /**
+   * Il numero delle sue sessioni. Ogni token porta quello di quando è nato,
+   * e vale solo finché è ancora questo: cambiare password o uscire da tutte
+   * le sessioni lo fa salire, e i token di prima smettono di valere alla
+   * richiesta dopo, anche quelli che nessuno ha cancellato da un browser.
+   */
+  tokenVersion: integer('token_version').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -179,13 +186,21 @@ export const places = pgTable(
       .notNull()
       .references(() => maps.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    categoryId: text('category_id').notNull(),
+    /**
+     * Un luogo sta in una categoria che esiste: lo dice lo schema, e una
+     * categoria che se ne va si porta via i suoi luoghi. Senza il vincolo,
+     * un luogo scritto nello stesso istante in cui la sua categoria veniva
+     * tolta restava sulla mappa con una categoria che non c'era più.
+     */
+    categoryId: text('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'cascade' }),
     lat: doublePrecision('lat').notNull(),
     lng: doublePrecision('lng').notNull(),
     note: text('note').notNull().default(''),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('places_map').on(table.mapId)],
+  (table) => [index('places_map').on(table.mapId), index('places_category').on(table.categoryId)],
 );
 
 /**
@@ -453,4 +468,21 @@ export const notices = pgTable(
     index('notices_agent_at').on(table.agentId, table.at),
     index('notices_device_at').on(table.deviceId, table.at),
   ],
+);
+
+/**
+ * I token usciti prima di scadere.
+ *
+ * Un token si firma e poi vale da solo fino alla scadenza. Chi esce toglie il
+ * cookie dal suo browser, ma una copia presa prima varrebbe ancora. Qui resta
+ * l'id di ogni token con cui qualcuno è uscito, finché quel token non sarebbe
+ * scaduto comunque; dopo la riga non serve più e si porta via.
+ */
+export const revokedTokens = pgTable(
+  'revoked_tokens',
+  {
+    jti: text('jti').primaryKey(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('revoked_tokens_expires').on(table.expiresAt)],
 );

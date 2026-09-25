@@ -53,6 +53,8 @@ apiRouter.get('/auth/me', authController.me);
 /** Il proprio account: nome e fuso orario, e la password. */
 apiRouter.patch('/auth/me', validateBody(AccountDto), authController.update);
 apiRouter.put('/auth/password', validateBody(PasswordDto), authController.password);
+/** Fuori da tutte le sessioni, in ogni browser: per un computer lasciato acceso da qualche parte. */
+apiRouter.post('/auth/logout-all', authController.logoutAll);
 
 /** Entrare in casa di qualcuno, e tornarsene a casa propria. */
 apiRouter.post('/auth/act', validateBody(ActDto), authController.enter);

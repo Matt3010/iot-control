@@ -69,6 +69,8 @@ export class AlertManager {
         becomes: valore,
         says: `${device.name} ${this.#reads(device, code, valore, prova.op)}`,
         also: [],
+        // se è già vera nasce già scattata: scatterà al prossimo passaggio, non al prossimo numero
+        ...(giaVera(deviceId, code, prova) ? { firedAt: new Date().toISOString() } : {}),
       });
       if (!scritta) throw badRequest('questa regola c’è già');
       return scritta;
@@ -80,15 +82,17 @@ export class AlertManager {
   /**
    * Spegne o riaccende una regola senza cancellarla.
    *
-   * Riaccesa riparte da capo, come appena scritta. Spenta non guarda più
-   * niente, quindi non vede nemmeno la porta che si chiude: se restava
+   * Riaccesa riparte da capo, come appena scritta: se quello che chiede è
+   * già vero nasce già scattata, se no pronta a scattare. Spenta non guarda
+   * più niente, quindi non vede nemmeno la porta che si chiude: se restava
    * segnata come scattata, alla prossima apertura taceva.
    */
   async flip(scope: Scope, id: string, off: boolean): Promise<Alert> {
     const fatta = await store.transaction(async (tx) => {
       const alerts = new AlertRepository(tx);
-      await this.#vista(tx, scope, id);
-      return (await alerts.update(id, off ? { off } : { off, firedAt: undefined })) as Alert;
+      const alert = await this.#vista(tx, scope, id);
+      const gia = !off && giaVera(alert.deviceId, alert.code, { op: alert.op, value: alert.becomes });
+      return (await alerts.update(id, off ? { off } : { off, firedAt: gia ? new Date().toISOString() : undefined })) as Alert;
     });
     guardati.cambiate();
     return fatta;
@@ -149,7 +153,7 @@ export class AlertManager {
       for (const alert of vinte) {
         righe.push(
           await scrivi(tx, alert.ownerId, {
-            kind: 'scene',
+            kind: 'rule',
             deviceId: device.id,
             agentId: device.agentId,
             who: device.name,
@@ -174,16 +178,18 @@ export class AlertManager {
    * Non fa scattare niente, perché non si sa quando è successo. Ma una regola
    * già scattata che adesso non vale più rientra: se la porta si è chiusa
    * mentre non la vedevamo, la prossima volta che si apre lo si deve dire.
+   * E una che adesso vale senza essere scattata si segna come scattata,
+   * come una regola appena scritta: se no il primo numero dopo — da 30 a
+   * 30,5 gradi con «sopra 25» — la faceva scattare senza nessun passaggio.
    */
   async settled(deviceId: string, state: Record<string, unknown>): Promise<void> {
     if (!(await guardati.conAvvisi(deviceId))) return;
     await store.transaction(async (tx) => {
       const alerts = new AlertRepository(tx);
-      const scattate = await alerts.findFiredOf(deviceId);
-      const rientrate = scattate.filter(
-        (alert) => alert.code in state && !holds({ op: alert.op, value: alert.becomes }, state[alert.code]),
-      );
-      await alerts.rearm(rientrate.map((alert) => alert.id));
+      const guardano = (await alerts.findAllOfDevice(deviceId)).filter((alert) => !alert.off && alert.code in state);
+      const vale = (alert: Alert): boolean => holds({ op: alert.op, value: alert.becomes }, state[alert.code]);
+      await alerts.rearm(guardano.filter((alert) => alert.firedAt && !vale(alert)).map((alert) => alert.id));
+      await alerts.markFired(guardano.filter((alert) => !alert.firedAt && vale(alert)).map((alert) => alert.id));
     });
   }
 
@@ -221,6 +227,15 @@ export class AlertManager {
      */
     return `diventa «${says(capability, value)}»`;
   }
+}
+
+/**
+ * Se quello che la regola chiede è già vero adesso, per quello che il
+ * dispositivo racconta. Uno che non risponde non racconta niente, e allora
+ * no (`hub.stateOf`).
+ */
+function giaVera(deviceId: string, code: string, prova: { op: Op; value: string | number }): boolean {
+  return holds(prova, hub.stateOf(deviceId)?.[code]);
 }
 
 export const alertManager = new AlertManager();

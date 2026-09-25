@@ -46,18 +46,27 @@ export function check(capability: Capability, value: DeviceValue): void {
   }
 }
 
+/**
+ * Dove non si può usare, detto con il suo nome: «non si può chiedere in una
+ * condizione» detto a chi sta scrivendo una partenza gli faceva cercare una
+ * condizione che non c'era. Una cosa che succede (`quando`) si scrive in una
+ * partenza o in un avviso, e il no è lo stesso per tutti e due.
+ */
+const IN: Record<'quando' | 'se', string> = {
+  quando: 'non si può usare in una partenza né in un avviso',
+  se: 'non si può chiedere in una condizione',
+};
+
 /** Come si dice a chi scrive la prova perché su quella cosa non si può. */
-const PERCHE: Record<NonProvabile, (label: string, deviceName: string) => string> = {
+const PERCHE: Record<NonProvabile, (label: string, deviceName: string, modo: 'quando' | 'se') => string> = {
   immagine: (_label, deviceName) => `«${deviceName}» si guarda e basta`,
-  colore: (label, deviceName) => `«${label}» di «${deviceName}» è un colore, quindi non si può chiedere in una condizione`,
-  impostazione: (label, deviceName) =>
-    `«${label}» di «${deviceName}» è un’impostazione, quindi non si può chiedere in una condizione`,
+  colore: (label, deviceName, modo) => `«${label}» di «${deviceName}» è un colore, quindi ${IN[modo]}`,
+  impostazione: (label, deviceName, modo) => `«${label}» di «${deviceName}» è un’impostazione, quindi ${IN[modo]}`,
   evento: (label, deviceName) =>
     `«${label}» di «${deviceName}» è un evento, quindi si chiede quando succede e non com’è`,
-  impulso: (_label, deviceName) =>
-    `«${deviceName}» è a impulso e non si sa com’è rimasto, quindi non si può chiedere in una condizione`,
-  ordine: (_label, deviceName) =>
-    `di «${deviceName}» si sa solo l’ultimo ordine dato e non com’è adesso, quindi non si può chiedere in una condizione`,
+  impulso: (_label, deviceName, modo) => `«${deviceName}» è a impulso e non si sa com’è rimasto, quindi ${IN[modo]}`,
+  ordine: (_label, deviceName, modo) =>
+    `di «${deviceName}» si sa solo l’ultimo ordine dato e non com’è adesso, quindi ${IN[modo]}`,
 };
 
 /**
@@ -82,7 +91,7 @@ export function provaDi(
   value: unknown,
 ): { op: Op; value: string | number } {
   const perche = nonProvabile(capability, modo);
-  if (perche) throw badRequest(PERCHE[perche](capability.label, deviceName));
+  if (perche) throw badRequest(PERCHE[perche](capability.label, deviceName, modo));
 
   if (siMisura(capability)) {
     if (op === 'is') throw badRequest(`per «${deviceName}» si sceglie sopra o sotto un numero`);

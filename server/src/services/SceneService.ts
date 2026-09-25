@@ -27,9 +27,11 @@ export class SceneService {
     return scene;
   }
 
+  /** Tolta lei, e cambiate quelle che la chiamavano: le altre schede lo sanno tutte e due. */
   async remove(scope: Scope, id: string): Promise<void> {
-    await sceneManager.remove(scope, id);
+    const toccate = await sceneManager.remove(scope, id);
     hub.changed(scope.ownerId, { kind: 'scene', id, value: null });
+    for (const one of toccate) hub.changed(scope.ownerId, { kind: 'scene', id: one.id, value: toSceneView(one) });
   }
 
   /**

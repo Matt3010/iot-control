@@ -14,6 +14,7 @@ const toUser = (row: Row): User => ({
   salt: row.salt,
   hash: row.hash,
   ...(row.tz ? { tz: row.tz } : {}),
+  tokenVersion: row.tokenVersion,
   createdAt: iso(row.createdAt) as string,
 });
 
@@ -28,10 +29,40 @@ export class UserRepository {
   /** Cambia quello che si cambia di un account. Torna com'è dopo. */
   async update(
     id: string,
-    patch: Partial<Pick<User, 'handle' | 'tz' | 'salt' | 'hash'>>,
+    patch: Partial<Pick<User, 'handle' | 'tz'>>,
   ): Promise<User | undefined> {
     if (!Object.keys(patch).length) return this.findById(id);
     const [row] = await this.tx.db.update(users).set(patch).where(eq(users.id, id)).returning();
+    return row ? toUser(row) : undefined;
+  }
+
+  /**
+   * Una password nuova, e insieme un numero di sessione nuovo: i token di
+   * prima non valgono più. La somma la fa il database, così due cambi nello
+   * stesso istante contano due.
+   */
+  async setPassword(id: string, salt: string, hash: string): Promise<User | undefined> {
+    const [row] = await this.tx.db
+      .update(users)
+      .set({ salt, hash, tokenVersion: sql`${users.tokenVersion} + 1` })
+      .where(eq(users.id, id))
+      .returning();
+    return row ? toUser(row) : undefined;
+  }
+
+  /** Esce da tutte le sessioni: il numero sale, e ogni token di prima non vale più. */
+  async closeSessions(id: string): Promise<User | undefined> {
+    const [row] = await this.tx.db
+      .update(users)
+      .set({ tokenVersion: sql`${users.tokenVersion} + 1` })
+      .where(eq(users.id, id))
+      .returning();
+    return row ? toUser(row) : undefined;
+  }
+
+  /** Lo stesso account letto bloccandolo, per chi deve controllare e poi scrivere senza che un altro passi in mezzo. */
+  async lockById(id: string): Promise<User | undefined> {
+    const [row] = await this.tx.db.select().from(users).where(eq(users.id, id)).limit(1).for('update');
     return row ? toUser(row) : undefined;
   }
 
@@ -55,6 +86,16 @@ export class UserRepository {
   async findByHandle(handle: string): Promise<User | undefined> {
     const [row] = await this.tx.db.select().from(users).where(eq(users.handle, handle)).limit(1);
     return row ? toUser(row) : undefined;
+  }
+
+  /** Il nome utente di queste email, in una domanda: chi legge un registro da ospite vede quelli. */
+  async handlesOf(emails: string[]): Promise<Map<string, string>> {
+    if (!emails.length) return new Map();
+    const rows = await this.tx.db
+      .select({ email: users.email, handle: users.handle })
+      .from(users)
+      .where(inArray(users.email, [...new Set(emails)]));
+    return new Map(rows.map((row) => [row.email, row.handle]));
   }
 
   /** Più persone in un colpo, per chi ne ha un elenco in mano. */
@@ -86,7 +127,7 @@ export class UserRepository {
   }
 
   async insert(
-    data: Omit<User, 'id' | 'createdAt'>,
+    data: Omit<User, 'id' | 'createdAt' | 'tokenVersion'>,
   ): Promise<User> {
     const [row] = await this.tx.db
       .insert(users)

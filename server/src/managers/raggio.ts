@@ -71,6 +71,20 @@ export function soloPadrone(scope: Scope): void {
   if (!aCasa(scope)) throw forbidden('Questa cosa la fa solo chi possiede l’indice.');
 }
 
+/**
+ * Categorie e gruppi sono del padrone e valgono su tutte le sue mappe, anche
+ * su quelle che a un ospite non sono aperte. Rinominarli o toglierli cambia
+ * luoghi che l'ospite non tocca, quindi lo fa solo il padrone. Crearne uno
+ * nuovo invece non cambia niente di nessuno, e serve a chi aggiunge luoghi:
+ * lo può fare l'ospite che i luoghi li può aggiungere, cioè quello a cui una
+ * mappa è aperta tutta, e non quello che ne può toccare solo alcuni.
+ */
+export function puoEtichettare(scope: Scope, cosa: string): void {
+  if (scope.places !== null) {
+    throw forbidden(`${cosa} nuove le crea chi può aggiungere luoghi, e a te ne sono aperti solo alcuni.`);
+  }
+}
+
 /** I dispositivi che una scena nomina da sé: righe, partenze e condizioni. */
 function nominati(scene: Pick<Scene, 'steps' | 'triggers' | 'only'>): string[] {
   const out: string[] = [];

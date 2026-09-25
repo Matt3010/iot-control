@@ -7,6 +7,7 @@ import { AgentRepository } from '../repositories/AgentRepository.js';
 import { GroupRepository } from '../repositories/GroupRepository.js';
 import { MapRepository } from '../repositories/MapRepository.js';
 import { PlaceRepository } from '../repositories/PlaceRepository.js';
+import { EditorRepository } from '../repositories/ShareRepository.js';
 import type { Place, Scope } from '../types.js';
 import { raggioDi } from './raggio.js';
 
@@ -59,12 +60,15 @@ export class PlaceManager {
     });
   }
 
-  remove(scope: Scope, id: string): Promise<void> {
+  /** Toglie un luogo. Torna chi era limitato anche a lui, e su quale mappa: il suo elenco è cambiato. */
+  remove(scope: Scope, id: string): Promise<{ mapId: string; userId: string }[]> {
     return store.transaction(async (tx) => {
       const places = new PlaceRepository(tx);
       const current = await places.findById(id);
       if (!current || !(await this.#reaches(scope, tx, current))) throw notFound('posto inesistente');
       await places.delete(id);
+      // chi era limitato a questo luogo non lo ha più nel suo elenco
+      return new EditorRepository(tx).forgetPlaces([id]);
     });
   }
 
@@ -98,8 +102,14 @@ export class PlaceManager {
   ): Promise<void> {
     const ownerId = scope.ownerId;
     if (!(await new MapRepository(tx).within(scope, mapId))) throw notFound('mappa inesistente');
-    if (!(await new CategoryRepository(tx).owns(ownerId, categoryId)))
+    /*
+     * La categoria si tiene ferma finché il luogo non è scritto: se qualcuno
+     * la sta togliendo nello stesso istante, o se ne va prima e qui non si
+     * trova più, o aspetta che il luogo ci sia e se lo porta via con sé.
+     */
+    if (!(await new CategoryRepository(tx).lock(ownerId, categoryId, 'key share'))) {
       throw badRequest('categoria inesistente');
+    }
 
     /*
      * Gli elenchi si controllano contandoli, non uno per uno.

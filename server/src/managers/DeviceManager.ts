@@ -1,4 +1,5 @@
-import type { DeviceSnapshot } from '../../../shared/protocol.js';
+import type { Capability, DeviceSnapshot } from '../../../shared/protocol.js';
+import { nonProvabile } from '../../../shared/regole.js';
 import { badRequest, notFound } from '../errors/HttpError.js';
 import { hub } from '../iot/hub.js';
 import { store } from '../persistence/db.js';
@@ -10,7 +11,8 @@ import { logManager } from './LogManager.js';
 import { guardati } from './guardati.js';
 import { dispositivi, says } from './says.js';
 import type { Transaction } from '../persistence/db.js';
-import type { Device, Scope } from '../types.js';
+import type { Device, Notice, Scope } from '../types.js';
+import { noticeManager, scrivi } from './NoticeManager.js';
 import { raggioDi, soloPadrone } from './raggio.js';
 
 export class DeviceManager {
@@ -56,7 +58,14 @@ export class DeviceManager {
     /** Se l'elenco è completo, e quindi chi non c'è dentro va segnato come sparito. */
     completo = true,
   ): Promise<Device[]> {
-    const { devices, tutti, nuovi, cambiati, gone, spostati } = await store.transaction(async (tx) => {
+    const { devices, tutti, nuovi, cambiati, gone, spostati, perse } = await store.transaction(async (tx) => {
+      /*
+       * Il turno delle scene del padrone per primo, prima di toccare
+       * qualunque riga: un inventario può spostare o togliere quello che le
+       * scene nominano, e chi le sta salvando deve vederlo prima o dopo, non
+       * a metà (`SceneRepository.lockOwner`).
+       */
+      await new SceneRepository(tx).lockOwner(ownerId);
       const repository = new DeviceRepository(tx);
       // letti una volta: tutto quello che serve dopo si sa da qui e da quello che torna dalle scritture
       const prima = await repository.findAllOfAgent(agentId);
@@ -79,6 +88,12 @@ export class DeviceManager {
             JSON.stringify(era.capabilities) !== JSON.stringify(one.capabilities))
         );
       }).length;
+      // quelli che adesso sanno fare le cose in un altro modo: le prove scritte su di loro si ricontrollano
+      const altreCapacita = kept.filter((one) => {
+        const era = perEsterno.get(one.externalId);
+        return !!era && JSON.stringify(era.capabilities) !== JSON.stringify(one.capabilities);
+      });
+      const perse = await this.#provePerse(tx, ownerId, altreCapacita);
       for (const one of kept) perEsterno.set(one.externalId, one);
 
       /*
@@ -124,6 +139,7 @@ export class DeviceManager {
         cambiati,
         gone: appena.length,
         spostati: { scene, regole, dispositivi: moves.length },
+        perse,
       };
     });
 
@@ -157,10 +173,66 @@ export class DeviceManager {
      * il loro evento.
      */
     if (gone || nuovi || cambiati || spostati.dispositivi) hub.changed(ownerId, { kind: 'devices' });
-    if (spostati.regole) hub.changed(ownerId, { kind: 'rules' });
+    if (spostati.regole || perse?.avvisi) hub.changed(ownerId, { kind: 'rules' });
     // scene e avvisi scritti su un dispositivo assorbito adesso guardano l'altro
-    if (spostati.dispositivi) guardati.cambiate();
+    if (spostati.dispositivi || perse) guardati.cambiate();
+    if (perse) await noticeManager.manda(perse.riga);
     return devices;
+  }
+
+  /**
+   * Le prove che non valgono più su dispositivi che adesso sanno fare le
+   * cose in un altro modo, tolte, e dette al padrone.
+   *
+   * Un agente aggiornato può raccontare come un ordine — «apri», «ferma» —
+   * una capacità che prima raccontava come uno stato. Di un ordine si sa
+   * solo l'ultimo dato, quindi una partenza, una condizione o un avviso
+   * scritti su di lui non scatterebbero mai, e lasciati lì impedivano di
+   * salvare la scena che li conteneva con un messaggio che non si capiva.
+   * La regola è la stessa che rifiuta di scriverli (`nonProvabile`, in
+   * `shared/regole.js`), e vale per qualunque capacità cambi, non per un
+   * elenco di nomi. Una capacità che manca del tutto non si tocca: può
+   * essere un'entità che la centrale non ha ancora letto.
+   */
+  async #provePerse(
+    tx: Transaction,
+    ownerId: string,
+    cambiati: Device[],
+  ): Promise<{ riga: Notice; avvisi: number } | undefined> {
+    if (!cambiati.length) return undefined;
+    const perId = new Map(cambiati.map((one) => [one.id, one]));
+    const capacita = (deviceId: string, code: string): Capability | undefined =>
+      perId.get(deviceId)?.capabilities.find((one) => one.code === code);
+    const nonVale = (deviceId: string, code: string, modo: 'quando' | 'se'): boolean => {
+      const capability = capacita(deviceId, code);
+      return !!capability && nonProvabile(capability, modo) !== null;
+    };
+
+    const scene = await new SceneRepository(tx).pruneTests(ownerId, (test, dove) =>
+      nonVale(test.deviceId, test.code, dove === 'partenza' ? 'quando' : 'se'),
+    );
+    const avvisi = await new AlertRepository(tx).pruneWhere([...perId.keys()], (alert) =>
+      nonVale(alert.deviceId, alert.code, 'quando'),
+    );
+    if (!scene.length && !avvisi.length) return undefined;
+
+    const cosa = (deviceId: string, code: string): string =>
+      `«${capacita(deviceId, code)?.label ?? code}» del dispositivo «${perId.get(deviceId)?.name ?? '?'}»`;
+    const elenco = [
+      ...scene.flatMap(({ scene: una, tolte }) =>
+        tolte.map((one) => `la ${one.dove} su ${cosa(one.deviceId, one.code)} nella scena «${una.name}»`),
+      ),
+      ...avvisi.map((alert) => `l’avviso «${alert.says}»`),
+    ];
+    const riga = await scrivi(tx, ownerId, {
+      kind: 'scene',
+      title: 'Alcune scene e alcuni avvisi non guardano più certe cose',
+      body:
+        'L’agente adesso racconta alcune capacità in un altro modo, e su queste non si può più chiedere com’è una cosa o quando cambia. ' +
+        `Le prove scritte su di loro non sarebbero mai scattate, e per questo se ne vanno ${elenco.join('; ')}.`,
+      short: 'tolte le prove che non potevano più scattare',
+    });
+    return { riga, avvisi: avvisi.length };
   }
 
   /**
@@ -172,6 +244,8 @@ export class DeviceManager {
   async remove(scope: Scope, id: string): Promise<void> {
     const ownerId = scope.ownerId;
     const regole = await store.transaction(async (tx) => {
+      // il turno delle scene prima di tutto: chi sta salvando una scena che lo nomina finisce prima, o lo trova già tolto
+      await new SceneRepository(tx).lockOwner(ownerId);
       const devices = new DeviceRepository(tx);
       const device = await this.#visto(tx, scope, id);
       soloPadrone(scope);

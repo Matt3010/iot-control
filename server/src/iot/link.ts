@@ -2,6 +2,7 @@ import type { IncomingMessage, Server } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { AgentMessage } from '../../../shared/protocol.js';
+import { leggiMessaggio } from './forma.js';
 import { agentManager } from '../managers/AgentManager.js';
 import { logManager } from '../managers/LogManager.js';
 import { accountsReported } from '../services/AccountWatch.js';
@@ -61,6 +62,32 @@ const bearer = (header: string | undefined): string | undefined =>
  * processo: l'agente è là fuori.
  */
 const messaggi = new Fila((agentId, error) => console.warn(`messaggio dell'agente ${agentId}, ${error.message}`));
+
+/** Ogni quanto al massimo si scrive nel registro che un agente manda cose senza forma. */
+const SCARTI_OGNI_MS = 10 * 60_000;
+const scartiDetti = new Map<string, number>();
+
+/**
+ * Un agente ha mandato qualcosa che non ha la forma del protocollo, e lo si
+ * è scartato: lo si dice nel registro della sua casa, perché è lì che si va
+ * a guardare quando un dispositivo non compare. Una volta ogni tanto e non
+ * a ogni messaggio: un agente rotto lo ripete ogni dieci secondi, e il
+ * registro servirebbe solo a quello.
+ */
+function scartato(agent: Agent, scarti: string[]): void {
+  const adesso = Date.now();
+  if (adesso - (scartiDetti.get(agent.id) ?? 0) < SCARTI_OGNI_MS) return;
+  scartiDetti.set(agent.id, adesso);
+  const cosa = [...new Set(scarti)];
+  console.warn(`${agent.name}: scartato ${cosa.join(', ')}`);
+  logManager.note({
+    ownerId: agent.ownerId,
+    agentId: agent.id,
+    kind: 'protocol',
+    subject: agent.name,
+    detail: `manda cose fuori dal protocollo, e si scartano. Fra queste c’è ${cosa[0]}${cosa.length > 1 ? ', e ce ne sono altre' : ''}`,
+  });
+}
 
 function serve(socket: WebSocket, agent: Agent): void {
   const connection = {
@@ -124,12 +151,16 @@ function serve(socket: WebSocket, agent: Agent): void {
   };
 
   socket.on('message', (raw) => {
-    let message: AgentMessage;
+    let grezzo: unknown;
     try {
-      message = JSON.parse(raw.toString()) as AgentMessage;
+      grezzo = JSON.parse(raw.toString());
     } catch {
-      return;
+      grezzo = undefined;
     }
+    // da qui in giù passa solo quello che ha la forma del protocollo (`forma.ts`)
+    const { message, scarti } = leggiMessaggio(grezzo);
+    if (scarti.length) scartato(agent, scarti);
+    if (!message) return;
     /*
      * La risposta a un comando non aspetta: chi l'ha chiesto è fermo lì, e
      * non dipende da niente di quello che c'è in fila. Tutto il resto sì,

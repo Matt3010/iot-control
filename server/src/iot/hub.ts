@@ -292,10 +292,17 @@ export class Hub {
   /**
    * Lo stato di adesso di un dispositivo, per chi deve controllare una
    * condizione nel momento in cui qualcosa succede.
+   *
+   * Solo di uno che risponde. Di uno che non risponde resta l'ultimo stato
+   * detto, che può essere di un'ora fa: «se l'allarme è inserito» letto su
+   * un allarme irraggiungibile direbbe sì a una cosa che nessuno sa. Per
+   * una condizione, uno che non risponde non ha stato, e nel dubbio la
+   * scena non parte.
    */
   stateOf(deviceId: string): Record<string, DeviceValue> | undefined {
     const key = this.#keys.get(deviceId);
-    return key ? this.#live.get(key)?.state : undefined;
+    const live = key ? this.#live.get(key) : undefined;
+    return live?.online ? live.state : undefined;
   }
 
   liveOf(agentId: string, externalId: string): Live | undefined {

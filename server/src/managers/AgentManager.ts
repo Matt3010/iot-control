@@ -104,6 +104,8 @@ export class AgentManager {
     const fatto = await store.transaction(async (tx) => {
       const agents = new AgentRepository(tx);
       await this.#delPadrone(tx, scope, id);
+      // il turno delle scene prima di togliere i dispositivi che nominano (`SceneRepository.lockOwner`)
+      await new SceneRepository(tx).lockOwner(ownerId);
 
       const devices = new DeviceRepository(tx);
       // le regole se ne vanno con i dispositivi, per il vincolo: si contano prima

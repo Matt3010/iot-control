@@ -112,6 +112,32 @@ export class EditorRepository {
     return rows.length > 0;
   }
 
+  /**
+   * Luoghi che se ne vanno: escono dall'elenco di chi era limitato a loro.
+   *
+   * Un elenco che nomina un luogo tolto non apre niente, ma resta lì a
+   * contare: chi lo guarda vede tre luoghi aperti e ne trova due. Un elenco
+   * rimasto vuoto resta un elenco vuoto, che vuol dire nessun luogo, e non
+   * diventa «tutta la mappa». Torna chi ha perso qualcosa dal suo elenco, e
+   * su quale mappa, per dirlo a chi guarda.
+   */
+  async forgetPlaces(placeIds: string[]): Promise<{ mapId: string; userId: string }[]> {
+    if (!placeIds.length) return [];
+    const via = sql`array[${sql.join(
+      placeIds.map((id) => sql`${id}`),
+      sql`, `,
+    )}]::text[]`;
+    return this.tx.db
+      .update(mapEditors)
+      .set({
+        only: sql`(select coalesce(jsonb_agg(p order by n), '[]'::jsonb)
+                   from jsonb_array_elements_text(${mapEditors.only}) with ordinality as t(p, n)
+                   where not (p = any(${via})))`,
+      })
+      .where(sql`${mapEditors.only} ?| ${via}`)
+      .returning({ mapId: mapEditors.mapId, userId: mapEditors.userId });
+  }
+
   async remove(mapId: string, userId: string): Promise<boolean> {
     const rows = await this.tx.db
       .delete(mapEditors)

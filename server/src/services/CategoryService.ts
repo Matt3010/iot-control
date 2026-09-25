@@ -3,6 +3,7 @@ import type { CategoryView } from '../dto/views.js';
 import { toCategoryView } from '../dto/views.js';
 import { hub } from '../iot/hub.js';
 import { categoryManager } from '../managers/CategoryManager.js';
+import { mapService } from './MapService.js';
 import type { Scope } from '../types.js';
 
 /**
@@ -14,23 +15,24 @@ export class CategoryService {
     return (await categoryManager.list(ownerId)).map(toCategoryView);
   }
 
-  async create(ownerId: string, dto: CreateCategoryDto): Promise<CategoryView> {
-    const category = toCategoryView(await categoryManager.create(ownerId, dto));
-    hub.changed(ownerId, { kind: 'category', id: category.id, value: category });
+  async create(scope: Scope, dto: CreateCategoryDto): Promise<CategoryView> {
+    const category = toCategoryView(await categoryManager.create(scope, dto));
+    hub.changed(scope.ownerId, { kind: 'category', id: category.id, value: category });
     return category;
   }
 
-  async update(ownerId: string, id: string, dto: UpdateCategoryDto): Promise<CategoryView> {
-    const category = toCategoryView(await categoryManager.update(ownerId, id, dto));
-    hub.changed(ownerId, { kind: 'category', id: category.id, value: category });
+  async update(scope: Scope, id: string, dto: UpdateCategoryDto): Promise<CategoryView> {
+    const category = toCategoryView(await categoryManager.update(scope, id, dto));
+    hub.changed(scope.ownerId, { kind: 'category', id: category.id, value: category });
     return category;
   }
 
   /** Come per le mappe: chi guarda sa che una categoria si porta via i suoi luoghi. */
   async remove(scope: Scope, id: string): Promise<{ removedPlaces: number }> {
-    const done = await categoryManager.remove(scope, id);
+    const { removedPlaces, ristretti } = await categoryManager.remove(scope, id);
     hub.changed(scope.ownerId, { kind: 'category', id, value: null });
-    return done;
+    await mapService.ristretti(scope.ownerId, ristretti);
+    return { removedPlaces };
   }
 }
 

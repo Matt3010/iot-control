@@ -3,6 +3,7 @@ import type { PlaceView } from '../dto/views.js';
 import { toPlaceView } from '../dto/views.js';
 import { hub } from '../iot/hub.js';
 import { placeManager } from '../managers/PlaceManager.js';
+import { mapService } from './MapService.js';
 import type { Scope } from '../types.js';
 
 export class PlaceService {
@@ -23,8 +24,9 @@ export class PlaceService {
   }
 
   async remove(scope: Scope, id: string): Promise<void> {
-    await placeManager.remove(scope, id);
+    const ristretti = await placeManager.remove(scope, id);
     hub.changed(scope.ownerId, { kind: 'place', id, value: null });
+    await mapService.ristretti(scope.ownerId, ristretti);
   }
 }
 

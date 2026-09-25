@@ -92,6 +92,41 @@
       "when": 1790288171395,
       "tag": "0012_inviti-con-un-link",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790291077196,
+      "tag": "0013_sessioni-e-categorie-dei-luoghi",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790291771329,
+      "tag": "0014_dati-rimasti-storti",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790291772474,
+      "tag": "0015_giorni-uniti-dalla-0004",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790292734753,
+      "tag": "0016_avvisi-delle-regole",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790321163619,
+      "tag": "0017_token-usciti",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,3 @@
+# Gli script di shell girano su Linux: con gli a capo di Windows non partono,
+# anche se il server che li serve sta su una macchina Windows.
+*.sh text eol=lf

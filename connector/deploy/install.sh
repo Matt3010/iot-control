@@ -10,7 +10,11 @@ set -eu
 BASE=@@BASE@@
 AGENT=@@AGENT_ID@@
 TOKEN=@@TOKEN@@
-NAME=@@NAME@@
+# Già scritti per il file .env. Nel heredoc qui sotto entrano come variabili,
+# che la shell non rilegge: scritti lì dentro direttamente, un «$(…)» nel nome
+# dell'agente sarebbe stato eseguito.
+BACKEND_ENV=@@BACKEND_ENV@@
+NAME_ENV=@@NAME_ENV@@
 DIR=${DIR:-/opt/place-index}
 
 say() { printf '%s\n' "$*"; }
@@ -48,9 +52,9 @@ if [ -z "$HA_PASSWORD" ]; then
 fi
 
 cat > .env <<ENV
-BACKEND_URL=@@BACKEND_URL@@
+BACKEND_URL=$BACKEND_ENV
 AGENT_TOKEN=$TOKEN
-AGENT_NAME=$NAME
+AGENT_NAME=$NAME_ENV
 HA_URL=http://localhost:8123
 HA_USER=place-index
 HA_PASSWORD=$HA_PASSWORD

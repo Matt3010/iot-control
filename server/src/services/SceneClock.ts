@@ -1,11 +1,10 @@
-import { toSceneView } from '../dto/views.js';
 import { hub } from '../iot/hub.js';
 import { sceneManager } from '../managers/SceneManager.js';
 import { casaDi } from '../managers/raggio.js';
 import { store } from '../persistence/db.js';
 import { SceneRepository } from '../repositories/SceneRepository.js';
 import { DEFAULT_TZ, type Scene } from '../types.js';
-import { conditionsHold, localNow } from '../rules/prove.js';
+import { conditionsHold, localNow, oraVera } from '../rules/prove.js';
 import { UserRepository } from '../repositories/UserRepository.js';
 
 /**
@@ -33,10 +32,12 @@ type Ora = ReturnType<typeof localNow>;
  * l'orario: prima ogni orario si portava il fuso del browser in cui era nato,
  * e uno scritto in viaggio restava in un altro fuso per sempre.
  */
-function due(scene: Scene, now: Ora | undefined): { yes: boolean; over: boolean } {
+function due(scene: Scene, now: Ora | undefined, tz: string): { yes: boolean; over: boolean } {
   const when = scene.when;
   const niente = { yes: false, over: false };
   if (!now || !when || when.off || !scene.steps.length) return niente;
+  // l'ora di quel giorno: quella scritta, o la prima che c'è se quel giorno le lancette la saltano
+  const ora = oraVera(tz, now.date, when.at);
 
   /*
    * Una volta sola: conta la data, non il giorno della settimana. E se quel
@@ -45,11 +46,11 @@ function due(scene: Scene, now: Ora | undefined): { yes: boolean; over: boolean 
    */
   if (when.on) {
     if (when.on < now.date) return { ...niente, over: true };
-    return { yes: when.on === now.date && now.clock === when.at, over: false };
+    return { yes: when.on === now.date && now.clock === ora, over: false };
   }
 
   const oggi = !when.days.length || when.days.includes(now.day);
-  return { yes: oggi && now.clock === when.at, over: false };
+  return { yes: oggi && now.clock === ora, over: false };
 }
 
 /**
@@ -83,9 +84,10 @@ export async function tick(at = new Date()): Promise<void> {
   const parti = async (scene: Scene): Promise<void> => {
     const tz = fusi.get(scene.ownerId) ?? DEFAULT_TZ;
     const now = oraIn(tz);
-    const { yes, over } = due(scene, now);
+    const { yes, over } = due(scene, now, tz);
 
-    if (over) return scorda(scene);
+    // passato senza partire: l'orario se ne va, e lo si dice
+    if (over) return void (await sceneManager.scordaOrario(scene, true));
     // una scena fermata dal fusibile non parte da sola, finché qualcuno non la tocca
     if (!yes || !now || scene.blownAt) return;
 
@@ -102,7 +104,7 @@ export async function tick(at = new Date()): Promise<void> {
 
     // Una volta sola vuol dire una volta sola: l'orario se ne va appena
     // servito, anche se la scena e' partita a meta'.
-    if (scene.when?.on) await scorda(scene);
+    if (scene.when?.on) await sceneManager.scordaOrario(scene, false);
 
     await sceneManager.run(casaDi(scene.ownerId), scene.id);
   };
@@ -116,20 +118,6 @@ export async function tick(at = new Date()): Promise<void> {
       console.warn(`la scena «${scenes[at]?.name}» non è andata fino in fondo, ${(esito.reason as Error).message}`);
     }
   });
-}
-
-/**
- * Toglie l'orario a una scena, e lo dice a chi sta guardando.
- *
- * Un appuntamento che si e' consumato deve sparire anche dallo schermo di chi
- * ha la pagina aperta: se resta scritto «sabato alle 19» quando sabato e'
- * passato, la prossima volta non ci si fida piu' di quello che c'e' scritto.
- */
-async function scorda(scene: Scene): Promise<void> {
-  if (!scene.when) return;
-  const letto = scene.when;
-  const dopo = await store.transaction((tx) => new SceneRepository(tx).forgetWhen(scene.id, letto));
-  if (dopo) hub.changed(scene.ownerId, { kind: 'scene', id: dopo.id, value: toSceneView(dopo) });
 }
 
 export function watchClock(): void {

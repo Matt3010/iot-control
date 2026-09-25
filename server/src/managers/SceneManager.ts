@@ -14,6 +14,7 @@ import { diversi, ordiniDi, partonoInsieme } from '../rules/scontri.js';
 import type { Device, DeviceTest, Op, Scene, SceneCondition, SceneConditionGroup, SceneStep, SceneTrigger, Scope } from '../types.js';
 import { raggioDi, sceneVisibili, type Raggio } from './raggio.js';
 import { check, provaDi } from './check.js';
+import { riarma } from './fusibile.js';
 import { guardati } from './guardati.js';
 import { logManager } from './LogManager.js';
 import { noticeManager, scrivi } from './NoticeManager.js';
@@ -57,6 +58,26 @@ function aspetta(secondi: number, segnale: AbortSignal): Promise<void> {
   });
 }
 
+/**
+ * La prova già salvata uguale a questa (lo stesso id, lo stesso dispositivo,
+ * la stessa domanda), se c'è. È quella che una modifica lascia com'era, e
+ * resta scritta com'è senza ricontrollarla.
+ */
+function uguale<T extends { id: string; deviceId: string; code: string; op: Op; value: string | number }>(
+  salvate: readonly T[],
+  test: { id?: string; deviceId?: string; code?: string; op?: Op; value?: unknown },
+): T | undefined {
+  return salvate.find(
+    (one) =>
+      !!test.id &&
+      one.id === test.id &&
+      one.deviceId === test.deviceId &&
+      one.code === test.code &&
+      one.op === (test.op ?? 'is') &&
+      String(one.value) === String(test.value),
+  );
+}
+
 /** Perché una partenza si è fermata prima della fine: detto nel registro. */
 class Fermata extends Error {}
 
@@ -73,6 +94,8 @@ export class SceneManager {
   create(scope: Scope, dto: SceneDto): Promise<Scene> {
     const ownerId = scope.ownerId;
     return store.transaction(async (tx) => {
+      // il turno delle scene di questo padrone, prima di leggerle (`SceneRepository.lockOwner`)
+      await new SceneRepository(tx).lockOwner(ownerId);
       const [scene, devices] = await this.#leggi(tx, ownerId);
       const raggio = await raggioDi(tx, scope, scene);
       const steps = this.#clean(this.#viste(scene, raggio), this.#visti(devices, raggio), ownerId, dto.steps ?? []);
@@ -85,6 +108,13 @@ export class SceneManager {
     const ownerId = scope.ownerId;
     const fatta = await store.transaction(async (tx) => {
       const scenes = new SceneRepository(tx);
+      /*
+       * Prima il turno, poi la lettura. Chi salva un'altra scena dello stesso
+       * padrone, o toglie un dispositivo che questa nomina, aspetta qui: i
+       * controlli qui sotto guardano le scene e i dispositivi come sono
+       * davvero nel momento in cui si scrive, non come erano un attimo prima.
+       */
+      await scenes.lockOwner(ownerId);
       const [tutte, devices] = await this.#leggi(tx, ownerId);
       const raggio = await raggioDi(tx, scope, tutte);
       const prima = tutte.find((one) => one.id === id);
@@ -93,10 +123,16 @@ export class SceneManager {
       // da ospite si nomina solo quello che si vede: il resto, per lui, non c'è
       const viste = this.#viste(tutte, raggio);
       const visti = this.#visti(devices, raggio);
+      /*
+       * Quello che la modifica lascia com'era non si ricontrolla: una partenza
+       * scritta ieri su una capacità che oggi l'agente racconta in un altro
+       * modo non deve impedire di rinominare la scena o di aggiungerle una
+       * riga. Si controlla quello che chi scrive ha cambiato.
+       */
       const patch: Partial<Scene> = { name: dto.name };
-      if (dto.steps) patch.steps = this.#clean(viste, visti, ownerId, dto.steps, id);
-      if (dto.triggers) patch.triggers = this.#cleanTriggers(visti, dto.triggers);
-      if (dto.only) patch.only = this.#cleanConditions(visti, dto.only);
+      if (dto.steps) patch.steps = this.#clean(viste, visti, ownerId, dto.steps, id, prima.steps);
+      if (dto.triggers) patch.triggers = this.#cleanTriggers(visti, dto.triggers, prima.triggers ?? []);
+      if (dto.only) patch.only = this.#cleanConditions(visti, dto.only, prima.only);
 
       /*
        * `null` vuol dire «non parte piu' da sola», che e' diverso da «non ne
@@ -121,6 +157,8 @@ export class SceneManager {
     });
     // le sue partenze possono essere cambiate: chi ascolta i passaggi rilegge cosa guardare
     guardati.cambiate();
+    // cambiata vuol dire riaccesa: il conto del fusibile riparte da zero
+    riarma(id);
     this.#ferma(id, 'si ferma prima della fine, perché nel frattempo la scena cambia');
     return fatta;
   }
@@ -149,16 +187,27 @@ export class SceneManager {
     );
   }
 
-  async remove(scope: Scope, id: string): Promise<void> {
-    await store.transaction(async (tx) => {
+  /**
+   * Toglie una scena, e la toglie anche dalle scene che la chiamavano (con
+   * la regola delle attese di `senzaRighe`). Torna quelle cambiate, per
+   * dirlo a chi le sta guardando: nella stessa transazione, e con il turno
+   * delle scene del padrone, così una scena salvata nello stesso istante con
+   * una chiamata a questa non ce la lascia dentro.
+   */
+  async remove(scope: Scope, id: string): Promise<Scene[]> {
+    const toccate = await store.transaction(async (tx) => {
       const scenes = new SceneRepository(tx);
+      await scenes.lockOwner(scope.ownerId);
       if (!(await scenes.owns(scope.ownerId, id)) || !(await raggioDi(tx, scope)).vedeScena(id)) {
         throw notFound('scena inesistente');
       }
       await scenes.delete(id);
+      return scenes.pruneCalls(scope.ownerId, id);
     });
     guardati.cambiate();
+    riarma(id);
     this.#ferma(id, 'si ferma prima della fine, perché nel frattempo la scena viene tolta');
+    return toccate;
   }
 
   /**
@@ -186,6 +235,43 @@ export class SceneManager {
     hub.changed(fatto.fermata.ownerId, { kind: 'scene', id: fatto.fermata.id, value: toSceneView(fatto.fermata) });
     await noticeManager.manda(fatto.riga);
     return fatto.fermata;
+  }
+
+  /**
+   * Toglie l'orario a una scena «una volta sola», e lo dice a chi sta
+   * guardando.
+   *
+   * Un appuntamento che si è consumato deve sparire anche dallo schermo di
+   * chi ha la pagina aperta: se resta scritto «sabato alle 19» quando sabato
+   * è passato, la prossima volta non ci si fida più di quello che c'è
+   * scritto. E se il giorno è passato senza che partisse, il padrone lo
+   * legge fra i suoi avvisi, perché un orario che sparisce senza dirlo è
+   * una scena che non è partita e che nessuno ha visto non partire. Solo
+   * se l'orario è ancora quello letto: chi l'ha appena riscritto non deve
+   * vederselo cancellare dall'orologio.
+   */
+  async scordaOrario(scene: Scene, persa: boolean): Promise<Scene | undefined> {
+    const letto = scene.when;
+    if (!letto) return undefined;
+    const fatto = await store.transaction(async (tx) => {
+      const dopo = await new SceneRepository(tx).forgetWhen(scene.id, letto);
+      if (!dopo || !persa) return dopo ? { dopo } : undefined;
+      const giorno = letto.on
+        ? new Intl.DateTimeFormat('it', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${letto.on}T12:00:00Z`))
+        : '';
+      const riga = await scrivi(tx, dopo.ownerId, {
+        kind: 'scene',
+        who: dopo.name,
+        short: `non parte il giorno ${giorno} alle ${letto.at}`,
+        title: `La scena «${dopo.name}» non è partita`,
+        body: `Aveva un orario per il giorno ${giorno} alle ${letto.at}, e quel giorno è passato senza che partisse. L’orario si toglie, perché era per una volta sola.`,
+      });
+      return { dopo, riga };
+    });
+    if (!fatto) return undefined;
+    hub.changed(fatto.dopo.ownerId, { kind: 'scene', id: fatto.dopo.id, value: toSceneView(fatto.dopo) });
+    if (fatto.riga) await noticeManager.manda(fatto.riga);
+    return fatto.dopo;
   }
 
   /**
@@ -243,6 +329,12 @@ export class SceneManager {
     return store.transaction(async (tx) => {
       // da ospite prima di tutto se la vede: una che non vede non parte, e non esiste
       if (!(await raggioDi(tx, scope)).vedeScena(id)) throw notFound('scena inesistente');
+      /*
+       * Una partenza automatica prende il suo turno nella scrittura: se nel
+       * frattempo il fusibile l'ha fermata, non parte, anche se chi l'ha
+       * fatta partire l'aveva letta ancora accesa.
+       */
+      if (!who && !(await new SceneRepository(tx).takeAutoRun(id))) return null;
       /*
        * Solo quello che serve: lei, le scene che chiama (e quelle che
        * chiamano loro), e i dispositivi che nominano. Leggere tutte le scene
@@ -367,7 +459,12 @@ export class SceneManager {
   async run(scope: Scope, id: string, who?: string): Promise<void> {
     const ownerId = scope.ownerId;
     const run = `run-${randomUUID()}`;
-    const { scene, momenti, pronte, saltati, segnate, toccate, case_ } = await this.#prepara(scope, id, run, who);
+    const pronta = await this.#prepara(scope, id, run, who);
+    // fermata dal fusibile mentre il passaggio che la faceva partire era in viaggio
+    if (!pronta) return;
+    const { scene, momenti, pronte, saltati, segnate, toccate, case_ } = pronta;
+    // premuta a mano vuol dire riaccesa: il conto del fusibile riparte da zero
+    if (who) riarma(id);
     for (const one of segnate) hub.changed(ownerId, { kind: 'scene', id: one.id, value: toSceneView(one) });
 
     const stop = new AbortController();
@@ -654,12 +751,15 @@ export class SceneManager {
 
         const device = devices.find((one) => one.id === scontro.deviceId);
         // a un ospite i nomi di quello che non vede non si dicono nemmeno qui
-        const nomeDi = (scene: Scene) =>
-          scene.id === id || raggio.vedeScena(scene.id) ? `la scena «${scene.name}»` : 'un’altra scena';
-        const chi = questa.id === id ? 'Può partire' : `Chiamata da ${nomeDi(questa)}, può partire`;
+        // con la preposizione già unita all'articolo: «alla scena», non «a la scena»
+        const nomeDi = (scene: Scene, prep: 'a' | 'da') =>
+          scene.id === id || raggio.vedeScena(scene.id)
+            ? `${prep === 'a' ? 'alla' : 'dalla'} scena «${scene.name}»`
+            : `${prep} un’altra scena`;
+        const chi = questa.id === id ? 'Può partire' : `Chiamata ${nomeDi(questa, 'da')}, può partire`;
         const cosa = device && raggio.vedeDispositivo(device.id) ? `«${device.name}»` : 'un dispositivo';
         throw badRequest(
-          `${chi} insieme a ${nomeDi(altra)}, che dà a ${cosa} un ordine diverso. ` +
+          `${chi} insieme ${nomeDi(altra, 'a')}, che dà a ${cosa} un ordine diverso. ` +
             'Cambia l’orario o quello che la fa partire, oppure togli una delle due righe.',
         );
       }
@@ -677,18 +777,22 @@ export class SceneManager {
   #test(
     devices: Device[],
     test: { deviceId?: string; code?: string; op?: Op; value?: unknown },
-    modo: 'quando' | 'se',
+    dove: 'partenza' | 'condizione',
   ): DeviceTest {
     const device = devices.find((one) => one.id === test.deviceId);
     if (!device) throw badRequest('uno dei dispositivi non c’è più');
     const capability = (device.capabilities as Capability[]).find((one) => one.code === test.code);
     if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
     // lo stesso controllo degli avvisi: una prova è una prova, da qualunque parte la si scriva
+    const modo = dove === 'partenza' ? 'quando' : 'se';
     return { deviceId: device.id, code: capability.code, ...provaDi(capability, device.name, modo, test.op ?? 'is', test.value) };
   }
 
-  #cleanTriggers(devices: Device[], triggers: SceneTriggerDto[]): SceneTrigger[] {
-    return triggers.map((trigger) => ({ id: trigger.id || `trg-${randomUUID()}`, ...this.#test(devices, trigger, 'quando') }));
+  #cleanTriggers(devices: Device[], triggers: SceneTriggerDto[], prima: SceneTrigger[]): SceneTrigger[] {
+    return triggers.map(
+      (trigger) =>
+        uguale(prima, trigger) ?? { id: trigger.id || `trg-${randomUUID()}`, ...this.#test(devices, trigger, 'partenza') },
+    );
   }
 
   /**
@@ -698,7 +802,15 @@ export class SceneManager {
    * non si va: su un telefono un gruppo dentro un gruppo dentro un gruppo non
    * si legge più, e nessuna casa ha bisogno di una domanda così.
    */
-  #cleanConditions(devices: Device[], radice: SceneConditionDto): SceneConditionGroup {
+  #cleanConditions(devices: Device[], radice: SceneConditionDto, prima: SceneConditionGroup | undefined): SceneConditionGroup {
+    // le condizioni su un dispositivo già salvate, per riconoscere quelle che la modifica lascia com'erano
+    const salvate: Extract<SceneCondition, { kind: 'device' }>[] = [];
+    const raccogli = (one: SceneCondition): void => {
+      if (one.kind === 'group') one.items.forEach(raccogli);
+      else if (one.kind === 'device') salvate.push(one);
+    };
+    if (prima) raccogli(prima);
+
     const ORA = /^([01]\d|2[0-3]):[0-5]\d$/;
     const DATA = /^\d{4}-\d{2}-\d{2}$/;
     const PROFONDITA = 3;
@@ -722,7 +834,7 @@ export class SceneManager {
         case 'group':
           return gruppo(condizione, livello + 1);
         case 'device':
-          return { id, kind: 'device', ...this.#test(devices, condizione, 'se') };
+          return uguale(salvate, condizione) ?? { id, kind: 'device', ...this.#test(devices, condizione, 'condizione') };
         case 'days':
           return { id, kind: 'days', days: [...new Set(condizione.days ?? [])].sort() };
         case 'hours':
@@ -753,7 +865,15 @@ export class SceneManager {
    * «apri, aspetta un minuto, richiudi» è una scena sensata, «apri e chiudi
    * nello stesso istante» no.
    */
-  #clean(tutte: Scene[], devices: Device[], ownerId: string, steps: SceneStepDto[], id?: string): SceneStep[] {
+  #clean(
+    tutte: Scene[],
+    devices: Device[],
+    ownerId: string,
+    steps: SceneStepDto[],
+    id?: string,
+    /** Le righe già salvate: una riga uguale a una di queste non si ricontrolla contro il dispositivo. */
+    prima: SceneStep[] = [],
+  ): SceneStep[] {
     /*
      * Un momento finisce dove comincia un'attesa. Dentro a un momento le righe
      * partono insieme, quindi due volte la stessa cosa li' dentro vorrebbe
@@ -791,12 +911,16 @@ export class SceneManager {
       const device = devices.find((one) => one.id === step.deviceId);
       if (!device || device.ownerId !== ownerId) throw badRequest('dispositivo inesistente');
 
-      const capability = device.capabilities.find((entry) => entry.code === step.code);
-      if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
-
       const kind = typeof step.value;
       if (kind !== 'string' && kind !== 'number' && kind !== 'boolean') throw badRequest('valore non valido');
-      check(capability, step.value as DeviceValue);
+      const giaScritta = prima.some(
+        (one) => one.deviceId === step.deviceId && one.code === step.code && one.value === step.value,
+      );
+      if (!giaScritta) {
+        const capability = device.capabilities.find((entry) => entry.code === step.code);
+        if (!capability) throw badRequest(`«${device.name}» non sa fare questa cosa`);
+        check(capability, step.value as DeviceValue);
+      }
 
       if (after > 0) momento += 1;
 
@@ -810,7 +934,7 @@ export class SceneManager {
 
       out.push({
         deviceId: device.id,
-        code: capability.code,
+        code: step.code as string,
         value: step.value as DeviceValue,
         ...(after ? { after } : {}),
       });
@@ -830,7 +954,7 @@ export class SceneManager {
       const anello = stendi(questa, (sceneId) => perId.get(sceneId)).anelli.find((one) => one[0] === id);
       if (anello) {
         const altra = perId.get(anello[1] as string);
-        throw badRequest(`«${altra?.name ?? 'una scena'}» riporta a questa, e sarebbe un giro senza fine`);
+        throw badRequest(`La scena «${altra?.name ?? 'senza nome'}» riporta a questa, e sarebbe un giro senza fine`);
       }
     }
     return out;

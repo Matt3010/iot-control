@@ -2,6 +2,8 @@ import { hub } from '../iot/hub.js';
 import { store } from '../persistence/db.js';
 import { AgentRepository } from '../repositories/AgentRepository.js';
 import { LogRepository } from '../repositories/LogRepository.js';
+import { UserRepository } from '../repositories/UserRepository.js';
+import { logForGuest } from '../dto/views.js';
 import { notFound } from '../errors/HttpError.js';
 import type { LogEntry, Scope } from '../types.js';
 import { raggioDi } from './raggio.js';
@@ -17,8 +19,13 @@ export class LogManager {
   ofAgent(scope: Scope, agentId: string): Promise<LogEntry[]> {
     return store.transaction(async (tx) => {
       const suo = await new AgentRepository(tx).owns(scope.ownerId, agentId);
-      if (!suo || !(await raggioDi(tx, scope)).vedeAgente(agentId)) throw notFound('agente inesistente');
-      return new LogRepository(tx).findAgent(scope.ownerId, agentId);
+      const raggio = await raggioDi(tx, scope);
+      if (!suo || !raggio.vedeAgente(agentId)) throw notFound('agente inesistente');
+      const righe = await new LogRepository(tx).findAgent(scope.ownerId, agentId);
+      if (raggio.padrone) return righe;
+      // chi ha premuto, per un ospite, è un nome utente e non un indirizzo di posta
+      const nomi = await new UserRepository(tx).handlesOf(righe.flatMap((riga) => (riga.who ? [riga.who] : [])));
+      return righe.map((riga) => logForGuest(riga, nomi));
     });
   }
 
@@ -34,7 +41,17 @@ export class LogManager {
     void store
       .transaction((tx) => new LogRepository(tx).add(entry))
       .then(() => hub.changed(entry.ownerId, { kind: 'log', agentId: entry.agentId }))
-      .catch((error: unknown) => console.warn(`registro: ${(error as Error).message}`));
+      .catch((error: unknown) => {
+        /*
+         * Un agente tolto mentre era collegato chiude la sua connessione, e
+         * la connessione che si chiude vuole scrivere «scollegato» su un
+         * agente che non c'è più: il vincolo la rifiuta, e non c'è niente da
+         * dire. Il resto degli errori si racconta.
+         */
+        const causa = (error as { cause?: { code?: string } }).cause;
+        if ((error as { code?: string }).code === '23503' || causa?.code === '23503') return;
+        console.warn(`registro: ${(error as Error).message}`);
+      });
   }
 }
 

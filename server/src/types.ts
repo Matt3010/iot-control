@@ -11,6 +11,8 @@ export interface User {
   hash: string;
   /** Il suo fuso orario, se il browser l'ha già detto. */
   tz?: string;
+  /** Il numero delle sue sessioni: un token vale solo se porta questo. */
+  tokenVersion: number;
   createdAt: string;
 }
 
@@ -350,7 +352,9 @@ export interface LogEntry {
     | 'device-down'
     | 'command'
     | 'scene'
-    | 'account';
+    | 'account'
+    /** L'agente ha mandato qualcosa senza la forma del protocollo, e si è scartato (`iot/forma.ts`). */
+    | 'protocol';
   /** Di chi si parla: il dispositivo, la scena, l'account. Come si chiamava allora. */
   subject?: string;
   /** Cosa gli è successo, in poche parole: «Chiudi», «2 spariti», «Tuya». */
@@ -429,10 +433,13 @@ export interface Notice {
   /**
    * `silent`: un agente ha smesso di rispondere. `back`: ha ripreso.
    * `scene`: l'ha detto una scena, perche' gliel'hai scritto tu.
+   * `rule`: è scattata una regola scritta su un dispositivo («quando la
+   *   porta si apre»). Non è una scena, e il registro la mette sotto
+   *   l'agente e il dispositivo di cui parla.
    * `account`: un account collegato a un agente non funziona più.
    * `map`: qualcosa è cambiato in chi può entrare in una mappa.
    */
-  kind: 'silent' | 'back' | 'scene' | 'account' | 'map';
+  kind: 'silent' | 'back' | 'scene' | 'rule' | 'account' | 'map';
   /** Di chi si parla, se e' un agente. */
   agentId?: string;
   /** O quale dispositivo, quando l'avviso riguarda una cosa sola in casa. */

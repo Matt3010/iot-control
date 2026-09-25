@@ -25,12 +25,43 @@ export class SceneRepository {
   constructor(private readonly tx: Transaction) {}
 
   /**
+   * Il turno di chi cambia le scene di questo padrone, fino alla fine della
+   * transazione.
+   *
+   * Una scena si controlla contro le altre — i giri, gli scontri, le scene
+   * che chiama — e contro i dispositivi che ci sono. Due salvataggi insieme
+   * si controllavano ognuno contro le scene di prima dell'altro, e insieme
+   * passavano un giro che nessuno dei due da solo avrebbe fatto passare; e
+   * un dispositivo tolto mentre si salvava una scena che lo nominava ci
+   * restava dentro. Chi cambia le scene di un padrone, o i dispositivi che
+   * nominano, prende questo turno per primo, prima di leggere e prima di
+   * bloccare qualunque riga: così l'ordine dei blocchi è sempre lo stesso,
+   * e nessuno aspetta chi sta aspettando lui. Padroni diversi non si
+   * aspettano.
+   */
+  async lockOwner(ownerId: string): Promise<void> {
+    await this.tx.db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`scene:${ownerId}`}, 0))`);
+  }
+
+  /** Le scene di un padrone da riscrivere, bloccate in ordine di id: chi le blocca tutte le blocca nello stesso ordine. */
+  async #daRiscrivere(ownerId: string, dove?: ReturnType<typeof sql>): Promise<Row[]> {
+    return this.tx.db
+      .select()
+      .from(scenes)
+      .where(and(eq(scenes.ownerId, ownerId), dove))
+      .orderBy(scenes.id)
+      .for('update');
+  }
+
+  /**
    * Sono partite adesso: quella premuta e quelle che chiama. Torna le scene
    * come sono dopo, per dirlo a chi guarda. Chi ne fa partire una a mano la
    * riaccende anche, se il fusibile l'aveva fermata.
    */
   async markRan(ids: string[], riaccendi?: string): Promise<Scene[]> {
     if (!ids.length) return [];
+    // in ordine di id, come chi le riscrive tutte: due che ne segnano più d'una non si incrociano
+    await this.tx.db.select({ id: scenes.id }).from(scenes).where(inArray(scenes.id, ids)).orderBy(scenes.id).for('update');
     const rows = await this.tx.db
       .update(scenes)
       .set({
@@ -42,6 +73,21 @@ export class SceneRepository {
       .where(inArray(scenes.id, ids))
       .returning();
     return rows.map(toScene);
+  }
+
+  /**
+   * Il turno di una partenza automatica: la scena parte solo se il fusibile
+   * non l'ha fermata. La condizione sta nella scrittura, non in una lettura
+   * fatta prima: un passaggio che era già in viaggio quando il fusibile è
+   * saltato trova la scena fermata, e non parte.
+   */
+  async takeAutoRun(id: string): Promise<boolean> {
+    const rows = await this.tx.db
+      .update(scenes)
+      .set({ ranAt: new Date() })
+      .where(and(eq(scenes.id, id), isNull(scenes.blownAt)))
+      .returning({ id: scenes.id });
+    return rows.length > 0;
   }
 
   /**
@@ -165,8 +211,9 @@ export class SceneRepository {
     const rows = await this.tx.db
       .update(scenes)
       .set({ lastRunAt: minute })
+      // e solo se il fusibile non l'ha fermata nel frattempo
       .where(
-        and(eq(scenes.id, id), or(isNull(scenes.lastRunAt), ne(scenes.lastRunAt, minute))),
+        and(eq(scenes.id, id), isNull(scenes.blownAt), or(isNull(scenes.lastRunAt), ne(scenes.lastRunAt, minute))),
       )
       .returning({ id: scenes.id });
     return rows.length > 0;
@@ -204,7 +251,7 @@ export class SceneRepository {
   async pruneDevices(ownerId: string, gone: Set<string>): Promise<number> {
     if (!gone.size) return 0;
 
-    const rows = await this.tx.db.select().from(scenes).where(eq(scenes.ownerId, ownerId));
+    const rows = await this.#daRiscrivere(ownerId);
 
     let touched = 0;
     for (const row of rows) {
@@ -225,6 +272,55 @@ export class SceneRepository {
   }
 
   /**
+   * Una scena tolta esce dalle scene che la chiamavano, con la regola delle
+   * attese delle righe tolte (`senzaRighe`): l'attesa della chiamata passa
+   * alla riga dopo. Lasciata lì, la chiamata a una scena che non c'è più
+   * faceva rifiutare ogni modifica di chi la chiamava. Torna le scene
+   * cambiate, per dirlo a chi guarda.
+   */
+  async pruneCalls(ownerId: string, sceneId: string): Promise<Scene[]> {
+    const rows = await this.#daRiscrivere(ownerId, sql`${scenes.steps} @> ${JSON.stringify([{ scene: sceneId }])}::jsonb`);
+    const dopo: Scene[] = [];
+    for (const row of rows) {
+      const steps = senzaRighe(row.steps, (step) => step.scene === sceneId);
+      const [scritta] = await this.tx.db.update(scenes).set({ steps }).where(eq(scenes.id, row.id)).returning();
+      if (scritta) dopo.push(toScene(scritta));
+    }
+    return dopo;
+  }
+
+  /**
+   * Le prove — partenze e condizioni — che non valgono più, tolte dalle
+   * scene di quel padrone. `via` dice quali, sapendo se la prova è una
+   * partenza o una condizione. Torna le scene cambiate e quello che hanno
+   * perso, per dirlo al padrone.
+   */
+  async pruneTests(
+    ownerId: string,
+    via: (test: { deviceId: string; code: string }, dove: 'partenza' | 'condizione') => boolean,
+  ): Promise<{ scene: Scene; tolte: { deviceId: string; code: string; dove: 'partenza' | 'condizione' }[] }[]> {
+    const rows = await this.#daRiscrivere(ownerId);
+    const out: { scene: Scene; tolte: { deviceId: string; code: string; dove: 'partenza' | 'condizione' }[] }[] = [];
+    for (const row of rows) {
+      const tolte: { deviceId: string; code: string; dove: 'partenza' | 'condizione' }[] = [];
+      const triggers = (row.triggers ?? []).filter((trigger) => {
+        if (!via(trigger, 'partenza')) return true;
+        tolte.push({ deviceId: trigger.deviceId, code: trigger.code, dove: 'partenza' });
+        return false;
+      });
+      const only = senza(row.only, (one) => {
+        if (one.kind !== 'device' || !via(one, 'condizione')) return false;
+        tolte.push({ deviceId: one.deviceId, code: one.code, dove: 'condizione' });
+        return true;
+      });
+      if (!tolte.length) continue;
+      const [scritta] = await this.tx.db.update(scenes).set({ triggers, only }).where(eq(scenes.id, row.id)).returning();
+      if (scritta) out.push({ scene: toScene(scritta), tolte });
+    }
+    return out;
+  }
+
+  /**
    * Dispositivi che adesso stanno dentro ad altri: le scene che li
    * nominavano — righe, partenze, condizioni — nominano l'altro, con il
    * codice della capacità che dice da quale entità viene. Un codice che ha
@@ -234,7 +330,7 @@ export class SceneRepository {
   async moveDevices(ownerId: string, moves: { from: string; to: string; prefisso: string }[]): Promise<number> {
     if (!moves.length) return 0;
     const perDa = new Map(moves.map((one) => [one.from, one]));
-    const rows = await this.tx.db.select().from(scenes).where(eq(scenes.ownerId, ownerId));
+    const rows = await this.#daRiscrivere(ownerId);
 
     const sposta = <T extends { deviceId?: string; code?: string }>(one: T): T => {
       const move = one.deviceId ? perDa.get(one.deviceId) : undefined;

@@ -39,6 +39,27 @@ const linkUrl = (origin: string): string => `${origin.replace(/^http/, 'ws')}/ap
 const installCommand = (origin: string, id: string, token: string): string =>
   `curl -fsSL "${origin}/api/agents/${id}/install?t=${token}" | sudo sh`;
 
+/**
+ * Un valore dentro uno script di shell, tra apici singoli. Lì dentro niente si
+ * espande, e un apice si scrive chiudendo, mettendolo e riaprendo. Il nome di
+ * un agente lo sceglie una persona e lo script gira come root, quindi «Casa al
+ * mare» rompeva l'installazione e un nome con `$(…)` sarebbe stato eseguito.
+ */
+const perShell = (value: string): string => `'${value.split("'").join(`'"'"'`)}'`;
+
+/**
+ * Un valore in un file `.env` letto da docker compose, tra virgolette doppie.
+ * Barre, virgolette e a capo diventano sequenze, e un `$` si raddoppia perché
+ * compose non lo prenda per una variabile. Così un `#` o uno spazio restano
+ * parte del valore.
+ */
+const perEnv = (value: string): string =>
+  `"${value
+    .split('\\').join('\\\\')
+    .split('"').join('\\"')
+    .split('\n').join('\\n')
+    .split('$').join('$$')}"`;
+
 async function render(file: string, values: Record<string, string>): Promise<string> {
   const template = await fs.readFile(path.join(config.deployDir, file), 'utf8');
   return template.replace(/@@([A-Z_]+)@@/g, (_whole, key: string) => values[key] ?? '');
@@ -166,11 +187,11 @@ export class AgentService {
   async install(id: string, token: string | undefined, origin: string): Promise<string> {
     const agent = await this.#agentOf(id, token);
     return render('install.sh', {
-      BASE: origin,
-      AGENT_ID: agent.id,
-      TOKEN: token ?? '',
-      NAME: agent.name,
-      BACKEND_URL: linkUrl(origin),
+      BASE: perShell(origin),
+      AGENT_ID: perShell(agent.id),
+      TOKEN: perShell(token ?? ''),
+      NAME_ENV: perShell(perEnv(agent.name)),
+      BACKEND_ENV: perShell(perEnv(linkUrl(origin))),
     });
   }
 
