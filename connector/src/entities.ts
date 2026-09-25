@@ -2,7 +2,7 @@ import { Ricordi } from './ricordi.js';
 import type { Capability, DeviceSnapshot, DeviceValue } from '../../shared/protocol.js';
 import { Forme } from './forme.js';
 import type { HaEntity } from './homeassistant.js';
-import { domainOf, ignota, nomeDellaClasse } from './domini/comune.js';
+import { domainOf, ignota, nomeDellaClasse, ripulite } from './domini/comune.js';
 import { DOMINI } from './domini/index.js';
 import { impostaGradi as gradiDellaCasa, impostaTraduzioni as paroleDellaCasa } from './domini/lingua.js';
 import type { Comando, Contesto, Dominio, Origine, Ruolo } from './domini/tipo.js';
@@ -128,7 +128,7 @@ const contesto = (entity: HaEntity, origine?: Origine, prima?: Capability[]): Co
  * conosciamo non ha capacità.
  */
 export function capabilitiesOf(entity: HaEntity, origine?: Origine, prima?: Capability[]): Capability[] {
-  return dominioDi(entity.entity_id)?.capacita(contesto(entity, origine, prima)) ?? [];
+  return ripulite(dominioDi(entity.entity_id)?.capacita(contesto(entity, origine, prima)) ?? []);
 }
 
 /**
@@ -218,7 +218,8 @@ export function formaDi(entity: HaEntity, origine?: Origine): { capabilities: Ca
   const id = entity.entity_id;
   const prima = memoria.get(id);
   let fatta: { capabilities: Capability[]; cambiata: boolean };
-  if (ignota(entity.state) && prima) fatta = { capabilities: prima.capabilities, cambiata: false };
+  // una forma ricordata da un agente di prima può avere ancora i doppioni che adesso si tolgono
+  if (ignota(entity.state) && prima) fatta = { capabilities: ripulite(prima.capabilities), cambiata: false };
   else if (ignota(entity.state)) {
     const provvisoria = capabilitiesOf(entity, origine);
     fatta = { capabilities: provvisoria, cambiata: memoria.tieni(id, provvisoria, false) };

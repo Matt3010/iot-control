@@ -1,6 +1,6 @@
 import type { Capability, DeviceValue } from '../../../shared/protocol.js';
 import type { HaEntity } from '../homeassistant.js';
-import { acceso, accesoSe, has, metti, percent } from './comune.js';
+import { acceso, accesoSe, has, metti, percent, voci } from './comune.js';
 import type { Dominio } from './tipo.js';
 
 /**
@@ -15,8 +15,8 @@ const SIREN = { TONES: 4, VOLUME_SET: 8, DURATION: 16 } as const;
 /** I toni di una sirena: un elenco di nomi, o i nomi con la loro etichetta. */
 function toni(entity: HaEntity): { values: string[]; labels?: Record<string, string> } | undefined {
   const detti = entity.attributes.available_tones;
-  if (Array.isArray(detti) && detti.length) return { values: detti.map(String) };
-  if (detti && typeof detti === 'object' && Object.keys(detti).length) {
+  if (Array.isArray(detti) && voci(detti).length) return { values: voci(detti) };
+  if (detti && !Array.isArray(detti) && typeof detti === 'object' && Object.keys(detti).length) {
     const labels = Object.fromEntries(Object.entries(detti as Record<string, unknown>).map(([k, v]) => [k, String(v)]));
     return { values: Object.keys(labels), labels };
   }

@@ -164,12 +164,21 @@ export const evento: Dominio = {
    * ancora, index.ts fa tornare muto il primo prima di dire il secondo, così
    * anche due squilli uguali sono due passaggi.
    */
-  stato({ entity, arrivo }) {
-    const state: Record<string, DeviceValue> = {};
-    if (ignota(entity.state)) return state;
-    const recente = arrivo !== undefined && Date.now() - arrivo < EVENTO_MS;
-    state.value = recente ? String(entity.attributes.event_type ?? '') : '';
-    return state;
+  /*
+   * Un evento ha sempre il suo codice, vuoto quando tace, anche quando la
+   * centrale non ha ancora sentito niente (`unknown`: il campanello mai
+   * suonato da quando si è accesa). Per il server un passaggio c'è solo fra
+   * due valori; senza il vuoto di prima, la prima pressione in assoluto
+   * sarebbe solo com'è adesso, e non farebbe partire niente. Un evento muto
+   * non è un valore inventato: vuol dire proprio che adesso non succede
+   * niente. Irraggiungibile invece non si sa, e il codice resta fuori: al
+   * ritorno il primo stato è comunque com'è adesso, e il muto di allora fa
+   * da prima per la pressione dopo.
+   */
+  stato({ entity, arrivo }): Record<string, DeviceValue> {
+    if (entity.state === 'unavailable') return {};
+    const recente = !ignota(entity.state) && arrivo !== undefined && Date.now() - arrivo < EVENTO_MS;
+    return { value: recente ? String(entity.attributes.event_type ?? '') : '' };
   },
   comandi: {},
 };

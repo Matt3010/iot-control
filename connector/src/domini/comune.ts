@@ -27,11 +27,92 @@ export const attr = (entity: HaEntity, nome: string, ripiego: number): number =>
   return entity.attributes[nome] !== undefined && entity.attributes[nome] !== null && Number.isFinite(valore) ? valore : ripiego;
 };
 
+/**
+ * Le voci di un elenco come le deve vedere chi sceglie: ognuna una volta
+ * sola, e solo quelle che sono una parola. Una centrale che ripete
+ * «Netflix» due volte, o che mette nell'elenco un vuoto o un oggetto, non
+ * deve far comparire due tasti uguali o uno senza niente scritto sopra. Un
+ * numero è una parola anche lui: i toni di una sirena si chiamano 1, 2, 3.
+ */
+export const voci = (valori: unknown[]): string[] => {
+  const parole = valori
+    .filter((valore) => typeof valore === 'string' || (typeof valore === 'number' && Number.isFinite(valore)))
+    .map(String)
+    .filter((valore) => valore.trim() !== '');
+  return [...new Set(parole)];
+};
+
 /** Un elenco di parole da un attributo, o niente. */
 export const elenco = (entity: HaEntity, nome: string): string[] | undefined => {
   const valore = entity.attributes[nome];
-  return Array.isArray(valore) && valore.length ? valore.map(String) : undefined;
+  const parole = Array.isArray(valore) ? voci(valore) : [];
+  return parole.length ? parole : undefined;
 };
+
+/**
+ * Come si legge ogni voce, senza che due voci diverse si leggano uguali.
+ * Due parole della centrale possono tradursi nella stessa — `on` e
+ * `power_on` sono tutte e due «Acceso» — e allora chi sceglie vede due
+ * tasti identici e non sa quale dei due sia quello giusto. Non si possono
+ * unire, perché lo stato può dire l'una o l'altra e il comando deve
+ * rimandare quella che la cosa conosce: si distinguono mettendo accanto alla
+ * traduzione la parola da cui viene. Una voce senza traduzione si legge già
+ * per quello che è, e resta com'è.
+ */
+function lettureDistinte(values: string[], labels: Record<string, string> | undefined): Record<string, string> | undefined {
+  if (!labels) return undefined;
+  const pulite: Record<string, string> = {};
+  for (const valore of values) {
+    const detta = labels[valore];
+    if (typeof detta === 'string' && detta.trim()) pulite[valore] = detta;
+  }
+  const chiave = (valore: string): string => (pulite[valore] ?? valore).trim().toLowerCase();
+  const quante = new Map<string, number>();
+  for (const valore of values) quante.set(chiave(valore), (quante.get(chiave(valore)) ?? 0) + 1);
+  const distinte: Record<string, string> = {};
+  for (const [valore, detta] of Object.entries(pulite)) {
+    distinte[valore] = (quante.get(chiave(valore)) ?? 0) > 1 ? `${detta} (${valore})` : detta;
+  }
+  return Object.keys(distinte).length ? distinte : undefined;
+}
+
+/**
+ * Ogni capacità che ha un elenco di voci, com'è prima di partire: senza
+ * doppioni, senza voci vuote, con le letture distinte e con i detti solo per
+ * le voci che ci sono. Una scelta o un evento senza nessuna voce non si può
+ * né comandare né aspettare, e non si manda; una lettura senza voci resta
+ * una lettura, che dice quello che dice.
+ *
+ * Sta in un punto solo per tutti i domini e per tutte le forme, anche
+ * quelle ricordate da prima: ogni dominio che costruisce un elenco a modo
+ * suo — da un attributo, da una tabella, da un dizionario — passa di qui.
+ */
+export function ripulite(capabilities: Capability[]): Capability[] {
+  const out: Capability[] = [];
+  for (const capability of capabilities) {
+    if (!('values' in capability) || capability.values === undefined) {
+      out.push(capability);
+      continue;
+    }
+    const values = voci(Array.isArray(capability.values) ? capability.values : []);
+    const scelta = capability.kind === 'enum' || ('event' in capability && capability.event);
+    if (!values.length && scelta) continue;
+    const { labels: _labels, values: _values, ...resto } = capability as Capability & { values: unknown; labels?: Record<string, string> };
+    if (!values.length) {
+      out.push(resto as Capability);
+      continue;
+    }
+    const labels = lettureDistinte(values, 'labels' in capability ? capability.labels : undefined);
+    const pulita = { ...resto, values, ...(labels ? { labels } : {}) } as Capability & { detti?: Record<string, unknown> };
+    if (pulita.detti) {
+      const detti = Object.fromEntries(Object.entries(pulita.detti).filter(([voce]) => values.includes(voce)));
+      if (Object.keys(detti).length) pulita.detti = detti;
+      else delete pulita.detti;
+    }
+    out.push(pulita);
+  }
+  return out;
+}
 
 /** Una parola da un attributo, solo se è fra quelle ammesse: il resto non si sa. */
 export const fra = (valore: unknown, ammessi: string[] | undefined): string | undefined =>

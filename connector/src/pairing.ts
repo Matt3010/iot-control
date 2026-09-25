@@ -66,6 +66,7 @@ async function schemaOf(config: ConnectorConfig, flowId: string): Promise<unknow
   if (!flow || !Array.isArray(flow.data_schema)) return undefined;
 
   SCHEMAS.set(flowId, flow.data_schema);
+  toccata(flowId);
   return flow.data_schema;
 }
 
@@ -354,6 +355,32 @@ function errorOf(flow: HaFlow): string | undefined {
 const PASSI = new Map<string, { handler: string; stepId: string }>();
 
 /**
+ * Quando si è parlato l'ultima volta di ogni conversazione aperta. Lo schema
+ * e il passo di una conversazione servono finché è aperta: una finita, o
+ * chiusa, si scorda subito. Una lasciata a metà — una finestra chiusa, un
+ * telefono spento — non dice mai che è finita, e senza un tempo resterebbe
+ * in memoria per sempre, una per ogni collegamento tentato. Dopo un giorno
+ * di silenzio non la riprende più nessuno; se qualcuno ci torna, lo schema
+ * si richiede alla centrale (`schemaOf`) e i nomi dei campi restano quelli
+ * che manda lei.
+ */
+const ULTIMA_VOLTA = new Map<string, number>();
+const SILENZIO_MS = 24 * 3600_000;
+
+function toccata(flowId: string): void {
+  const adesso = Date.now();
+  ULTIMA_VOLTA.set(flowId, adesso);
+  for (const [id, at] of ULTIMA_VOLTA) if (adesso - at > SILENZIO_MS) finita(id);
+}
+
+/** Una conversazione che non c'è più: di lei non serve più niente. */
+function finita(flowId: string): void {
+  SCHEMAS.delete(flowId);
+  PASSI.delete(flowId);
+  ULTIMA_VOLTA.delete(flowId);
+}
+
+/**
  * I nomi italiani dei campi di un passo, dalle traduzioni della centrale.
  * Chi le sa leggere passa la funzione che le chiede: qui si sa solo dove
  * stanno — `component.<marca>.config.step.<passo>.data.<campo>`.
@@ -383,21 +410,23 @@ function translate(flow: HaFlow, going?: { flowId: string; schema?: unknown[] })
      */
     const wrong = errorOf(flow);
     if (wrong && going?.flowId) {
+      toccata(going.flowId);
       return { flowId: going.flowId, kind: 'form', fields: fieldsOf(going.schema), error: wrong };
     }
 
     // Senza type e senza lamentele sui campi non e' un passo: e' la
     // conversazione che non c'e' piu' — scaduta, o chiusa da un'altra
     // finestra. Dirlo e' meglio che mostrare un modulo vuoto.
+    if (going?.flowId) finita(going.flowId);
     return { flowId: '', kind: 'failed', fields: [], error: flow.message ?? 'la richiesta è scaduta' };
   }
 
   if (flow.type === 'create_entry') {
-    if (flow.flow_id) SCHEMAS.delete(flow.flow_id);
+    if (flow.flow_id) finita(flow.flow_id);
     return { flowId: flow.flow_id ?? '', kind: 'done', fields: [] };
   }
   if (flow.type === 'abort') {
-    if (flow.flow_id) SCHEMAS.delete(flow.flow_id);
+    if (flow.flow_id) finita(flow.flow_id);
     const perche = flow.reason ?? '';
     return {
       flowId: flow.flow_id ?? '',
@@ -410,6 +439,7 @@ function translate(flow: HaFlow, going?: { flowId: string; schema?: unknown[] })
   // Si tiene com'era: al passo dopo serve per rispondere anche di quello che
   // non e' stato chiesto.
   if (flow.flow_id && Array.isArray(flow.data_schema)) SCHEMAS.set(flow.flow_id, flow.data_schema);
+  if (flow.flow_id) toccata(flow.flow_id);
 
   const step: PairingStep = {
     flowId: flow.flow_id ?? '',
@@ -627,7 +657,10 @@ export async function submitPairing(
 
   // Finita o andata storta, quella conversazione non e' piu' aperta: non c'e'
   // niente da chiudere la prossima volta.
-  if (step.kind === 'done' || step.kind === 'failed') scorda(config, flowId);
+  if (step.kind === 'done' || step.kind === 'failed') {
+    scorda(config, flowId);
+    finita(flowId);
+  }
 
   /*
    * «Ce n'e' gia' una in corso» vuol dire che un nostro tentativo di prima e'
@@ -643,7 +676,10 @@ export async function submitPairing(
       await Promise.all(altre.map((id) => cancelPairing(config, id)));
       const ancora = await ask(config, `${FLOWS}/${idSicuro(flowId)}`, { method: 'POST', body });
       const dopo = translate(ancora, { flowId, schema });
-      if (dopo.kind === 'done' || dopo.kind === 'failed') scorda(config, flowId);
+      if (dopo.kind === 'done' || dopo.kind === 'failed') {
+        scorda(config, flowId);
+        finita(flowId);
+      }
       return ourShot(await pictured(config, ancora, dopo), input);
     }
   }
@@ -822,7 +858,7 @@ export async function unlink(config: ConnectorConfig, entryId: string): Promise<
 
 /** Lasciare a metà una conversazione la lascia aperta in HA: meglio chiuderla. */
 export async function cancelPairing(config: ConnectorConfig, flowId: string): Promise<void> {
-  SCHEMAS.delete(flowId);
+  finita(flowId);
   APERTE.delete(flowId);
   await allaCentrale(config, `${FLOWS}/${idSicuro(flowId)}`, { method: 'DELETE' }).catch(() => undefined);
 }
