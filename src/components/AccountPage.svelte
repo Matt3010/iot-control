@@ -133,6 +133,25 @@
           Esci
         </Button>
       </div>
+      <!-- per quando un posto dove sei entrato non è più tuo: un telefono
+           perso, un computer lasciato acceso da qualche parte -->
+      <div class="riga is-avviso">
+        <span class="nota">Anche dagli altri browser e telefoni dove sei entrato. Poi si rientra ovunque con la password.</span>
+        <Button
+          look="ghost"
+          size="sm"
+          onclick={(event: MouseEvent) =>
+            ui.askSure(event.currentTarget as HTMLElement, {
+              title: 'Uscire da tutte le sessioni?',
+              detail: 'Esci da qui e da tutti gli altri posti dove sei entrato con questo account.',
+              verb: 'Esci ovunque',
+              no: 'Resto',
+              onYes: () => void auth.leaveEverywhere().catch((error: Error) => toast.show(error.message)),
+            })}
+        >
+          Esci ovunque
+        </Button>
+      </div>
     </PageCard>
   {/if}
 </PageShell>

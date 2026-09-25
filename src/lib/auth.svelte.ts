@@ -197,6 +197,22 @@ class Auth {
 
   async leave(): Promise<void> {
     await api.post('/auth/logout', {}).catch(() => undefined);
+    await this.#fuori();
+  }
+
+  /**
+   * Esce da tutti i browser e i telefoni dove questo account è entrato, questo
+   * compreso. Serve quando uno di quei posti non è più sotto controllo: un
+   * telefono perso, un computer lasciato acceso da qualche parte. Se il
+   * server dice di no si resta dentro, e l'errore arriva a chi ha premuto.
+   */
+  async leaveEverywhere(): Promise<void> {
+    await api.post('/auth/logout-all', {});
+    await this.#fuori();
+  }
+
+  /** Quello che resta da fare nel browser dopo che il server ha chiuso la sessione. */
+  async #fuori(): Promise<void> {
     this.account = null;
     const gate = await api.get<Gate>('/auth/state').catch(() => null);
     if (gate) {
